@@ -1125,9 +1125,10 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               onClick={handleSolveNeuralOptimum}
               className="btn btn-primary"
               style={{ fontSize: '0.82rem', padding: '0.4rem 0.9rem' }}
+              title="Tìm bộ thông số cài đặt tối ưu (X*) thỏa mãn đồng thời tất cả các chỉ tiêu chất lượng (CQAs) dựa trên hàm dự đoán của Mạng Nơ-ron AI theo thuật toán độ thỏa dụng Desirability (Derringer-Suich)."
             >
               <Sparkles size={16} />
-              <span>Tối Ưu Điểm Neural</span>
+              <span>Tối Ưu Điểm Nơ-ron</span>
             </button>
 
             <button
@@ -1559,7 +1560,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                 <div style={{ fontWeight: '800', fontSize: '0.98rem', color: '#38bdf8', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <span>ĐANG HUẤN LUYỆN MẠNG NƠ-RON (RUNNING...)</span>
                   <span className="badge badge-primary" style={{ backgroundColor: '#0284c7', color: '#ffffff', fontSize: '0.7rem' }}>
-                    Neural Engine
+                    Động Cơ Nơ-ron AI
                   </span>
                 </div>
                 <div style={{ fontSize: '0.76rem', color: '#94a3b8', marginTop: '0.15rem' }}>
