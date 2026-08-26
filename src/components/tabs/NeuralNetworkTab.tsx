@@ -109,6 +109,147 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
   // Neural Optimum State
   const [neuralOptimum, setNeuralOptimum] = useState<DesirabilitySolution | null>(null);
 
+  // Surface Grid Data from Neural Model (Unconditional Hooks for React Rules of Hooks)
+  const factorX = project.factors.find((f) => f.code === xAxisFactor) || project.factors[0];
+  const factorY = project.factors.find((f) => f.code === yAxisFactor) || project.factors[1];
+
+  const surfaceGrid = useMemo(() => {
+    if (!neuralModel || !factorX || !factorY) return null;
+
+    const N = 35;
+    const xActualArr: number[] = [];
+    const yActualArr: number[] = [];
+    const xCodedArr: number[] = [];
+    const yCodedArr: number[] = [];
+
+    for (let i = 0; i < N; i++) {
+      const coded = -1.0 + (2.0 * i) / (N - 1);
+      xCodedArr.push(coded);
+      yCodedArr.push(coded);
+      const xAct = codedToActual(coded, factorX);
+      const yAct = codedToActual(coded, factorY);
+      xActualArr.push(typeof xAct === 'number' ? xAct : Number(xAct) || coded);
+      yActualArr.push(typeof yAct === 'number' ? yAct : Number(yAct) || coded);
+    }
+
+    const zGrid: number[][] = [];
+    for (let j = 0; j < N; j++) {
+      const row: number[] = [];
+      const yCoded = yCodedArr[j];
+
+      for (let i = 0; i < N; i++) {
+        const xCoded = xCodedArr[i];
+        const pointCoded: Record<string, number> = { ...profilerCoded };
+        pointCoded[factorX.code] = xCoded;
+        pointCoded[factorY.code] = yCoded;
+
+        const pred = neuralModel.predict(pointCoded);
+        row.push(Number(pred.toFixed(3)));
+      }
+      zGrid.push(row);
+    }
+
+    return { xActualArr, yActualArr, zGrid };
+  }, [neuralModel, factorX, factorY, profilerCoded]);
+
+  const surfacePlotData = useMemo(() => {
+    if (!surfaceGrid || !factorX || !factorY) return [];
+
+    if (plotType === '3d') {
+      return [
+        {
+          type: 'surface',
+          x: surfaceGrid.xActualArr,
+          y: surfaceGrid.yActualArr,
+          z: surfaceGrid.zGrid,
+          colorscale: colorScale,
+          colorbar: {
+            title: {
+              text: `${currentCQA?.name || ''} (${currentCQA?.code || ''})${currentCQA?.unit ? ` [${currentCQA.unit}]` : ''}`,
+              side: 'right',
+              font: { size: 11, color: '#1e293b' },
+            },
+            len: 0.85,
+            thickness: 18,
+          },
+          contours: {
+            z: { show: true, usecolormap: true, highlightcolor: '#ffffff', project: { z: true } },
+          },
+          hoverinfo: 'x+y+z',
+        },
+      ];
+    } else {
+      return [
+        {
+          type: 'contour',
+          x: surfaceGrid.xActualArr,
+          y: surfaceGrid.yActualArr,
+          z: surfaceGrid.zGrid,
+          colorscale: colorScale,
+          colorbar: {
+            title: {
+              text: `${currentCQA?.name || ''} (${currentCQA?.code || ''})${currentCQA?.unit ? ` [${currentCQA.unit}]` : ''}`,
+              side: 'right',
+              font: { size: 11, color: '#1e293b' },
+            },
+            len: 0.85,
+            thickness: 18,
+          },
+          contours: { coloring: 'heatmap', showlabels: true },
+          hoverinfo: 'x+y+z',
+        },
+      ];
+    }
+  }, [surfaceGrid, plotType, colorScale, factorX, factorY, currentCQA]);
+
+  const surfaceLayout = useMemo(() => {
+    return {
+      title: `${plotType === '3d' ? 'Bề Mặt Đáp Ứng Mạng Nơ-ron 3D' : 'Đường Đồng Mức 2D'}: ${currentCQA?.name || ''} (${currentCQA?.code || ''})${currentCQA?.unit ? ` [${currentCQA.unit}]` : ''}`,
+      autosize: true,
+      margin: plotType === '3d' ? { l: 40, r: 40, b: 40, t: 50 } : { l: 85, r: 60, t: 60, b: 75, pad: 4 },
+      scene: {
+        xaxis: {
+          title: {
+            text: `${factorX?.name || ''} (${factorX?.code || ''})${factorX?.unit ? ` [${factorX.unit}]` : ''}`,
+            font: { size: 12, color: '#1e293b' },
+          },
+          tickfont: { size: 10 },
+        },
+        yaxis: {
+          title: {
+            text: `${factorY?.name || ''} (${factorY?.code || ''})${factorY?.unit ? ` [${factorY.unit}]` : ''}`,
+            font: { size: 12, color: '#1e293b' },
+          },
+          tickfont: { size: 10 },
+        },
+        zaxis: {
+          title: {
+            text: `${currentCQA?.name || ''} (${currentCQA?.code || ''})${currentCQA?.unit ? ` [${currentCQA.unit}]` : ''}`,
+            font: { size: 12, color: '#1e293b' },
+          },
+          tickfont: { size: 10 },
+        },
+        camera: { eye: { x: 1.6, y: 1.6, z: 1.2 } },
+      },
+      xaxis: {
+        title: {
+          text: `${factorX?.name || ''} (${factorX?.code || ''})${factorX?.unit ? ` [${factorX.unit}]` : ''}`,
+          font: { size: 13, color: '#1e293b' },
+          standoff: 12,
+        },
+        tickfont: { size: 11 },
+      },
+      yaxis: {
+        title: {
+          text: `${factorY?.name || ''} (${factorY?.code || ''})${factorY?.unit ? ` [${factorY.unit}]` : ''}`,
+          font: { size: 13, color: '#1e293b' },
+          standoff: 12,
+        },
+        tickfont: { size: 11 },
+      },
+    };
+  }, [plotType, currentCQA, factorX, factorY]);
+
   // Keep local config in sync when switching CQA
   React.useEffect(() => {
     if (neuralConfigs[selectedCQA]) {
@@ -161,7 +302,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
       setLastTrainedNotice(`✓ Huấn luyện thành công ${totalTours} Tours cho ${currentCQA.name}!`);
       try {
         confetti({ particleCount: 65, spread: 55, origin: { y: 0.6 } });
-      } catch (e) {}
+      } catch {}
     }, 350);
   };
 
@@ -171,7 +312,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
       setNeuralOptimum(opt);
       try {
         confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
-      } catch (e) {}
+      } catch {}
     }
   };
 
@@ -238,11 +379,25 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
         });
 
         const layout = {
-          title: `Đồ Thị Thực Tế vs. Dự Đoán (Actual by Predicted Plot) - ${currentCQA.name}`,
-          xaxis: { title: `Giá Trị Dự Đoán (${currentCQA.unit})` },
-          yaxis: { title: `Giá Trị Thực Tế (${currentCQA.unit})` },
-          legend: { orientation: 'h', y: -0.2 },
-          margin: { l: 60, r: 40, t: 40, b: 60 },
+          title: `Đồ Thị Thực Tế vs. Dự Đoán - ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+          xaxis: {
+            title: {
+              text: `Giá Trị Dự Đoán Ý (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+              font: { size: 12, color: '#1e293b' },
+              standoff: 10,
+            },
+            tickfont: { size: 10 },
+          },
+          yaxis: {
+            title: {
+              text: `Giá Trị Thực Tế Y (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+              font: { size: 12, color: '#1e293b' },
+              standoff: 10,
+            },
+            tickfont: { size: 10 },
+          },
+          legend: { orientation: 'h', y: -0.25 },
+          margin: { l: 80, r: 40, t: 50, b: 80, pad: 4 },
         };
 
         return <PlotlyChart data={data} layout={layout} style={{ height: '360px' }} />;
@@ -265,7 +420,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               symbol: isVal.map((v) => (v ? 'triangle-up' : 'circle')),
             },
             text: diag.residuals.map(
-              (r) => `${r.isValidation ? '[Val] ' : ''}Run #${r.runOrder}: Pred=${r.predicted}, Res=${r.residual}`
+              (r) => `${r.isValidation ? '[Kiểm định Val] ' : ''}Run #${r.runOrder}: Thực tế=${r.actual} ${currentCQA.unit || ''}, Dự đoán=${r.predicted} ${currentCQA.unit || ''}, Phần dư=${r.residual} ${currentCQA.unit || ''}`
             ),
           },
         ];
@@ -275,15 +430,29 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
         const maxX = Math.max(...xPred) * 1.05;
 
         const layout = {
-          title: `Phần Dư vs. Giá Trị Dự Đoán (Residual by Predicted Plot)`,
-          xaxis: { title: `Giá Trị Dự Đoán (${currentCQA.unit})` },
-          yaxis: { title: `Phần Dư Y - Ý (${currentCQA.unit})` },
+          title: `Phần Dư vs. Giá Trị Dự Đoán - ${currentCQA.name} (${currentCQA.code})`,
+          xaxis: {
+            title: {
+              text: `Giá Trị Dự Đoán Ý (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+              font: { size: 12, color: '#1e293b' },
+              standoff: 10,
+            },
+            tickfont: { size: 10 },
+          },
+          yaxis: {
+            title: {
+              text: `Phần Dư Y - Ý (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+              font: { size: 12, color: '#1e293b' },
+              standoff: 10,
+            },
+            tickfont: { size: 10 },
+          },
           shapes: [
             { type: 'line', x0: minX, x1: maxX, y0: 0, y1: 0, line: { color: '#64748b', width: 1.5 } },
             { type: 'line', x0: minX, x1: maxX, y0: 2 * rmse, y1: 2 * rmse, line: { color: '#dc2626', width: 1, dash: 'dot' } },
             { type: 'line', x0: minX, x1: maxX, y0: -2 * rmse, y1: -2 * rmse, line: { color: '#dc2626', width: 1, dash: 'dot' } },
           ],
-          margin: { l: 60, r: 40, t: 40, b: 40 },
+          margin: { l: 80, r: 40, t: 50, b: 70, pad: 4 },
         };
 
         return <PlotlyChart data={data} layout={layout} style={{ height: '360px' }} />;
@@ -319,11 +488,26 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
         }
 
         const layout = {
-          title: `Đường Cong Hội Tụ Huấn Luyện (Training & Validation Loss History - Tour #${diag.bestTourIndex})`,
-          xaxis: { title: 'Số Vòng Lặp (Epochs)' },
-          yaxis: { title: 'Mean Squared Error (Normalized Loss)', type: 'log' },
-          legend: { orientation: 'h', y: -0.2 },
-          margin: { l: 60, r: 40, t: 40, b: 60 },
+          title: `Đường Cong Hội Tụ Huấn Luyện (Loss History) - ${currentCQA.name} (${currentCQA.code}) [Tour #${diag.bestTourIndex}]`,
+          xaxis: {
+            title: {
+              text: 'Số Vòng Lặp Huấn Luyện (Epochs)',
+              font: { size: 12, color: '#1e293b' },
+              standoff: 10,
+            },
+            tickfont: { size: 10 },
+          },
+          yaxis: {
+            title: {
+              text: 'Mean Squared Error (MSE Loss Chuẩn Hóa)',
+              font: { size: 12, color: '#1e293b' },
+              standoff: 10,
+            },
+            type: 'log',
+            tickfont: { size: 10 },
+          },
+          legend: { orientation: 'h', y: -0.25 },
+          margin: { l: 80, r: 40, t: 50, b: 80, pad: 4 },
         };
 
         return <PlotlyChart data={data} layout={layout} style={{ height: '360px' }} />;
@@ -331,7 +515,10 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
 
       case 'varImp': {
         const sortedImp = [...diag.variableImportance];
-        const names = sortedImp.map((v) => `${v.factorName} (${v.factorCode})`);
+        const names = sortedImp.map((v) => {
+          const factor = project.factors.find((f) => f.code === v.factorCode);
+          return `${v.factorName} (${v.factorCode})${factor?.unit ? ` [${factor.unit}]` : ''}`;
+        });
         const rels = sortedImp.map((v) => v.relativeImportance);
 
         const data = [
@@ -348,103 +535,21 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
 
         const layout = {
           title: `Mức Độ Quan Trọng Của Biến Đầu Vào (Independent Variable Importance)`,
-          xaxis: { title: 'Tỷ Lệ Đóng Góp Ảnh Hưởng Tương Đối (Relative Importance %)' },
-          yaxis: { autorange: 'reversed' },
-          margin: { l: 120, r: 40, t: 40, b: 40 },
+          xaxis: {
+            title: {
+              text: 'Tỷ Lệ Đóng Góp Ảnh Hưởng Tương Đối (Relative Importance %)',
+              font: { size: 12, color: '#1e293b' },
+              standoff: 10,
+            },
+            tickfont: { size: 10 },
+          },
+          yaxis: { autorange: 'reversed', tickfont: { size: 11 } },
+          margin: { l: 220, r: 40, t: 50, b: 70, pad: 4 },
         };
 
         return <PlotlyChart data={data} layout={layout} style={{ height: '360px' }} />;
       }
     }
-  };
-
-  // Surface Grid Data from Neural Model
-  const factorX = project.factors.find((f) => f.code === xAxisFactor) || project.factors[0];
-  const factorY = project.factors.find((f) => f.code === yAxisFactor) || project.factors[1];
-
-  const surfaceGrid = useMemo(() => {
-    if (!neuralModel || !factorX || !factorY) return null;
-
-    const N = 35;
-    const xActualArr: number[] = [];
-    const yActualArr: number[] = [];
-    const xCodedArr: number[] = [];
-    const yCodedArr: number[] = [];
-
-    for (let i = 0; i < N; i++) {
-      const coded = -1.0 + (2.0 * i) / (N - 1);
-      xCodedArr.push(coded);
-      yCodedArr.push(coded);
-      const xAct = codedToActual(coded, factorX);
-      const yAct = codedToActual(coded, factorY);
-      xActualArr.push(typeof xAct === 'number' ? xAct : Number(xAct) || coded);
-      yActualArr.push(typeof yAct === 'number' ? yAct : Number(yAct) || coded);
-    }
-
-    const zGrid: number[][] = [];
-    for (let j = 0; j < N; j++) {
-      const row: number[] = [];
-      const yCoded = yCodedArr[j];
-
-      for (let i = 0; i < N; i++) {
-        const xCoded = xCodedArr[i];
-        const pointCoded: Record<string, number> = { ...profilerCoded };
-        pointCoded[factorX.code] = xCoded;
-        pointCoded[factorY.code] = yCoded;
-
-        const pred = neuralModel.predict(pointCoded);
-        row.push(Number(pred.toFixed(3)));
-      }
-      zGrid.push(row);
-    }
-
-    return { xActualArr, yActualArr, zGrid };
-  }, [neuralModel, factorX, factorY, profilerCoded]);
-
-  const surfacePlotData = useMemo(() => {
-    if (!surfaceGrid || !factorX || !factorY) return [];
-
-    if (plotType === '3d') {
-      return [
-        {
-          type: 'surface',
-          x: surfaceGrid.xActualArr,
-          y: surfaceGrid.yActualArr,
-          z: surfaceGrid.zGrid,
-          colorscale: colorScale,
-          contours: {
-            z: { show: true, usecolormap: true, highlightcolor: '#ffffff', project: { z: true } },
-          },
-          hoverinfo: 'x+y+z',
-        },
-      ];
-    } else {
-      return [
-        {
-          type: 'contour',
-          x: surfaceGrid.xActualArr,
-          y: surfaceGrid.yActualArr,
-          z: surfaceGrid.zGrid,
-          colorscale: colorScale,
-          contours: { coloring: 'heatmap', showlabels: true },
-          hoverinfo: 'x+y+z',
-        },
-      ];
-    }
-  }, [surfaceGrid, plotType, colorScale, factorX, factorY]);
-
-  const surfaceLayout = {
-    title: `${plotType === '3d' ? 'Bề Mặt Đáp Ứng Mạng Nơ-ron 3D' : 'Đường Đồng Mức 2D'}: ${currentCQA.name} (${currentCQA.code})`,
-    autosize: true,
-    margin: { l: 40, r: 40, b: 40, t: 50 },
-    scene: {
-      xaxis: { title: `${factorX?.name} (${factorX?.unit})` },
-      yaxis: { title: `${factorY?.name} (${factorY?.unit})` },
-      zaxis: { title: `${currentCQA.name} (${currentCQA.unit})` },
-      camera: { eye: { x: 1.6, y: 1.6, z: 1.2 } },
-    },
-    xaxis: { title: `${factorX?.name} (${factorX?.unit})` },
-    yaxis: { title: `${factorY?.name} (${factorY?.unit})` },
   };
 
   return (
@@ -994,7 +1099,12 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                     x: xTraceActual,
                     y: yTracePred,
                     line: { color: '#7c3aed', width: 2.5 },
-                    hoverinfo: 'x+y',
+                    name: `${f.name} (${f.code}) vs ${currentCQA.name} (${currentCQA.code})`,
+                    text: xTraceActual.map(
+                      (x, i) =>
+                        `${f.name} (${f.code}): ${x} ${f.unit || ''}<br>${currentCQA.name} (${currentCQA.code}): ${yTracePred[i].toFixed(2)} ${currentCQA.unit || ''}`
+                    ),
+                    hoverinfo: 'text',
                   },
                   {
                     type: 'scatter',
@@ -1002,17 +1112,35 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                     x: [typeof actual === 'number' ? actual : Number(actual) || coded],
                     y: [neuralModel.predict(profilerCoded)],
                     marker: { size: 9, color: '#dc2626' },
-                    name: 'Điểm hiện tại',
+                    name: `Hiện tại: ${actual} ${f.unit || ''} → ${neuralModel.predict(profilerCoded).toFixed(2)} ${currentCQA.unit || ''}`,
+                    hoverinfo: 'name',
                   },
                 ];
 
                 const traceLayout = {
                   autosize: true,
-                  height: 180,
-                  margin: { l: 40, r: 20, t: 25, b: 35 },
-                  title: `${f.code}: ${f.name}`,
-                  xaxis: { title: `${f.unit}` },
-                  yaxis: { title: `${currentCQA.code}` },
+                  height: 160,
+                  margin: { l: 55, r: 15, t: 10, b: 45, pad: 2 },
+                  xaxis: {
+                    title: {
+                      text: `${f.code} [${f.unit || ''}]`,
+                      font: { size: 10, color: '#475569' },
+                      standoff: 6,
+                    },
+                    tickfont: { size: 9 },
+                    showgrid: true,
+                    gridcolor: '#f1f5f9',
+                  },
+                  yaxis: {
+                    title: {
+                      text: `${currentCQA.code} [${currentCQA.unit || ''}]`,
+                      font: { size: 10, color: '#475569' },
+                      standoff: 6,
+                    },
+                    tickfont: { size: 9 },
+                    showgrid: true,
+                    gridcolor: '#f1f5f9',
+                  },
                   showlegend: false,
                 };
 
@@ -1026,7 +1154,16 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                       border: '1px solid #e2e8f0',
                     }}
                   >
-                    <div style={{ height: '180px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.3rem' }}>
+                      <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#1e3a8a' }}>
+                        {f.name} ({f.code})
+                      </span>
+                      <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600' }}>
+                        [{f.unit || '-'}]
+                      </span>
+                    </div>
+
+                    <div style={{ height: '160px' }}>
                       <PlotlyChart data={tracePlotData} layout={traceLayout} style={{ width: '100%', height: '100%' }} />
                     </div>
 
@@ -1080,10 +1217,10 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                   <label style={{ fontSize: '0.75rem', fontWeight: '600' }}>Trục X:</label>
-                  <select className="input-field" style={{ width: '110px' }} value={xAxisFactor} onChange={(e) => setXAxisFactor(e.target.value)}>
+                  <select className="input-field" style={{ width: '180px', fontSize: '0.78rem' }} value={xAxisFactor} onChange={(e) => setXAxisFactor(e.target.value)}>
                     {project.factors.map((f) => (
                       <option key={f.code} value={f.code} disabled={f.code === yAxisFactor}>
-                        {f.code}
+                        {f.name} ({f.code}) {f.unit ? `[${f.unit}]` : ''}
                       </option>
                     ))}
                   </select>
@@ -1091,10 +1228,10 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                   <label style={{ fontSize: '0.75rem', fontWeight: '600' }}>Trục Y:</label>
-                  <select className="input-field" style={{ width: '110px' }} value={yAxisFactor} onChange={(e) => setYAxisFactor(e.target.value)}>
+                  <select className="input-field" style={{ width: '180px', fontSize: '0.78rem' }} value={yAxisFactor} onChange={(e) => setYAxisFactor(e.target.value)}>
                     {project.factors.map((f) => (
                       <option key={f.code} value={f.code} disabled={f.code === xAxisFactor}>
-                        {f.code}
+                        {f.name} ({f.code}) {f.unit ? `[${f.unit}]` : ''}
                       </option>
                     ))}
                   </select>

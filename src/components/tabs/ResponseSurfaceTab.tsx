@@ -173,8 +173,13 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
           colorscale: colorScale,
           size: 10,
           colorbar: {
-            title: `${currentCQA.code} (${currentCQA.unit})`,
-            len: 0.8,
+            title: {
+              text: `${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+              side: 'right',
+              font: { size: 11, color: '#1e293b' },
+            },
+            len: 0.85,
+            thickness: 18,
           },
           showscale: true,
         },
@@ -182,14 +187,38 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
     ];
 
     plotlyLayout = {
-      title: `Biểu Đồ Tam Giác Hỗn Hợp (Ternary Surface): ${currentCQA.name} (${currentCQA.code})`,
+      title: `Biểu Đồ Tam Giác Hỗn Hợp (Ternary Surface): ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
       autosize: true,
-      margin: { l: 40, r: 40, b: 40, t: 50 },
+      margin: { l: 60, r: 60, b: 60, t: 50 },
       ternary: {
         sum: 100,
-        aaxis: { title: `${ternaryData.fA.name} (%)`, min: 0.01, linewidth: 2, ticks: 'outside' },
-        baxis: { title: `${ternaryData.fB.name} (%)`, min: 0.01, linewidth: 2, ticks: 'outside' },
-        caxis: { title: `${ternaryData.fC.name} (%)`, min: 0.01, linewidth: 2, ticks: 'outside' },
+        aaxis: {
+          title: {
+            text: `${ternaryData.fA.name} (${ternaryData.fA.code}) [${ternaryData.fA.unit || '%'}]`,
+            font: { size: 11, color: '#1e293b' },
+          },
+          min: 0.01,
+          linewidth: 2,
+          ticks: 'outside',
+        },
+        baxis: {
+          title: {
+            text: `${ternaryData.fB.name} (${ternaryData.fB.code}) [${ternaryData.fB.unit || '%'}]`,
+            font: { size: 11, color: '#1e293b' },
+          },
+          min: 0.01,
+          linewidth: 2,
+          ticks: 'outside',
+        },
+        caxis: {
+          title: {
+            text: `${ternaryData.fC.name} (${ternaryData.fC.code}) [${ternaryData.fC.unit || '%'}]`,
+            font: { size: 11, color: '#1e293b' },
+          },
+          min: 0.01,
+          linewidth: 2,
+          ticks: 'outside',
+        },
       },
     };
   } else {
@@ -201,6 +230,15 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
             y: surfaceGrid.yActualArr,
             z: surfaceGrid.zGrid,
             colorscale: colorScale,
+            colorbar: {
+              title: {
+                text: `${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+                side: 'right',
+                font: { size: 11, color: '#1e293b' },
+              },
+              len: 0.85,
+              thickness: 18,
+            },
             contours: {
               z: {
                 show: true,
@@ -217,6 +255,15 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
             y: surfaceGrid.yActualArr,
             z: surfaceGrid.zGrid,
             colorscale: colorScale,
+            colorbar: {
+              title: {
+                text: `${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+                side: 'right',
+                font: { size: 11, color: '#1e293b' },
+              },
+              len: 0.85,
+              thickness: 18,
+            },
             contours: {
               coloring: 'heatmap',
               showlabels: true,
@@ -227,19 +274,51 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
     ];
 
     plotlyLayout = {
-      title: `${plotType === '3d' ? 'Bề Mặt Đáp Ứng 3D' : 'Đường Đồng Mức 2D'}: ${currentCQA.name} (${currentCQA.code})`,
+      title: `${plotType === '3d' ? 'Bề Mặt Đáp Ứng 3D' : 'Đường Đồng Mức 2D'}: ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
       autosize: true,
-      margin: { l: 40, r: 40, b: 40, t: 50 },
+      margin: plotType === '3d' ? { l: 40, r: 40, b: 40, t: 50 } : { l: 85, r: 60, t: 60, b: 75, pad: 4 },
       scene: {
-        xaxis: { title: `${factorX.name} (${factorX.unit})` },
-        yaxis: { title: `${factorY.name} (${factorY.unit})` },
-        zaxis: { title: `${currentCQA.name} (${currentCQA.unit})` },
+        xaxis: {
+          title: {
+            text: `${factorX.name} (${factorX.code})${factorX.unit ? ` [${factorX.unit}]` : ''}`,
+            font: { size: 12, color: '#1e293b' },
+          },
+          tickfont: { size: 10 },
+        },
+        yaxis: {
+          title: {
+            text: `${factorY.name} (${factorY.code})${factorY.unit ? ` [${factorY.unit}]` : ''}`,
+            font: { size: 12, color: '#1e293b' },
+          },
+          tickfont: { size: 10 },
+        },
+        zaxis: {
+          title: {
+            text: `${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+            font: { size: 12, color: '#1e293b' },
+          },
+          tickfont: { size: 10 },
+        },
         camera: {
           eye: { x: 1.6, y: 1.6, z: 1.2 },
         },
       },
-      xaxis: { title: `${factorX.name} (${factorX.unit})` },
-      yaxis: { title: `${factorY.name} (${factorY.unit})` },
+      xaxis: {
+        title: {
+          text: `${factorX.name} (${factorX.code})${factorX.unit ? ` [${factorX.unit}]` : ''}`,
+          font: { size: 13, color: '#1e293b' },
+          standoff: 12,
+        },
+        tickfont: { size: 11 },
+      },
+      yaxis: {
+        title: {
+          text: `${factorY.name} (${factorY.code})${factorY.unit ? ` [${factorY.unit}]` : ''}`,
+          font: { size: 13, color: '#1e293b' },
+          standoff: 12,
+        },
+        tickfont: { size: 11 },
+      },
     };
   }
 

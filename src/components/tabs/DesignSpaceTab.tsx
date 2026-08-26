@@ -274,8 +274,22 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
 
   const overlayLayout = {
     title: `Vùng Thiết Kế (Design Space Overlay) - Giao điểm Tất cả các CQAs`,
-    xaxis: { title: `${factorX.name} (${factorX.unit})` },
-    yaxis: { title: `${factorY.name} (${factorY.unit})` },
+    xaxis: {
+      title: {
+        text: `${factorX.name} (${factorX.code})${factorX.unit ? ` [${factorX.unit}]` : ''}`,
+        font: { size: 13, color: '#1e293b' },
+        standoff: 12,
+      },
+      tickfont: { size: 11 },
+    },
+    yaxis: {
+      title: {
+        text: `${factorY.name} (${factorY.code})${factorY.unit ? ` [${factorY.unit}]` : ''}`,
+        font: { size: 13, color: '#1e293b' },
+        standoff: 12,
+      },
+      tickfont: { size: 11 },
+    },
     annotations: [
       {
         xref: 'paper',
@@ -290,7 +304,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
         font: { size: 11 },
       },
     ],
-    margin: { l: 60, r: 40, t: 50, b: 50 },
+    margin: { l: 85, r: 40, t: 50, b: 75, pad: 4 },
   };
 
   return (

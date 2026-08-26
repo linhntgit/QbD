@@ -107,7 +107,7 @@ export function logGamma(z: number): number {
   const p = [
     1.000000000190015,
     76.18009172947146,
-    -86.50532032941677,
+    -86.50532032941678,
     24.01409824083091,
     -1.231739572450155,
     0.001208650973866179,
@@ -122,7 +122,7 @@ export function logGamma(z: number): number {
     y += 1;
     ser += p[j] / y;
   }
-  return -tmp + Math.log(2.5066282746310005 * ser / x);
+  return -tmp + Math.log((Math.sqrt(2 * Math.PI) * ser) / x);
 }
 
 /**

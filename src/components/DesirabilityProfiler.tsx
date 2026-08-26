@@ -154,7 +154,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
           spread: 70,
           origin: { y: 0.6 },
         });
-      } catch (e) {}
+      } catch {}
     }
   };
 
@@ -878,7 +878,12 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                         type: 'scatter',
                         mode: 'lines',
                         line: { color: '#2563eb', width: 2.2 },
-                        name: `${cqa.code} vs ${f.code}`,
+                        name: `${cqa.name} (${cqa.code}) vs ${f.name} (${f.code})`,
+                        text: traceData.xActual.map(
+                          (x, i) =>
+                            `${f.name} (${f.code}): ${x} ${f.unit || ''}<br>${cqa.name} (${cqa.code}): ${traceData.yPred[i]} ${cqa.unit || ''}`
+                        ),
+                        hoverinfo: 'text',
                         showlegend: false,
                       },
                       // Current Setpoint Marker
@@ -888,8 +893,9 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                         type: 'scatter',
                         mode: 'markers',
                         marker: { size: 7, color: '#dc2626' },
+                        name: `Hiện tại: ${traceData.currentXActual} ${f.unit || ''} → ${traceData.currentYPred} ${cqa.unit || ''}`,
                         showlegend: false,
-                        hoverinfo: 'skip',
+                        hoverinfo: 'name',
                       },
                     ];
 
@@ -980,7 +986,12 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                     type: 'scatter',
                     mode: 'lines',
                     line: { color: '#059669', width: 2.5 },
-                    name: `D vs ${f.code}`,
+                    name: `Overall D vs ${f.name} (${f.code})`,
+                    text: dData.xActual.map(
+                      (x, i) =>
+                        `${f.name} (${f.code}): ${x} ${f.unit || ''}<br>Overall D: ${dData.dOverall[i].toFixed(4)}`
+                    ),
+                    hoverinfo: 'text',
                     showlegend: false,
                   },
                   {
@@ -989,8 +1000,9 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                     type: 'scatter',
                     mode: 'markers',
                     marker: { size: 8, color: '#dc2626' },
+                    name: `Hiện tại: ${dData.currentXActual} ${f.unit || ''} → D = ${dData.currentD.toFixed(4)}`,
                     showlegend: false,
-                    hoverinfo: 'skip',
+                    hoverinfo: 'name',
                   },
                 ];
 

@@ -64,7 +64,33 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
           .filter((t) => t.name !== 'Intercept')
           .sort((a, b) => Math.abs(b.tValue) - Math.abs(a.tValue));
 
-        const names = effectTerms.map((t) => t.name);
+        const formatTermName = (termName: string) => {
+          // If pure single factor like X1
+          const singleFactor = project.factors.find((f) => f.code === termName);
+          if (singleFactor) {
+            return `${singleFactor.name} (${singleFactor.code})${singleFactor.unit ? ` [${singleFactor.unit}]` : ''}`;
+          }
+          // If squared term like X1²
+          if (termName.endsWith('²')) {
+            const baseCode = termName.replace('²', '');
+            const f = project.factors.find((fac) => fac.code === baseCode);
+            if (f) {
+              return `${f.name}² (${termName})`;
+            }
+          }
+          // If interaction like X1*X2
+          if (termName.includes('*')) {
+            const parts = termName.split('*');
+            const f1 = project.factors.find((fac) => fac.code === parts[0]);
+            const f2 = project.factors.find((fac) => fac.code === parts[1]);
+            if (f1 && f2) {
+              return `${f1.code}*${f2.code} (${f1.name} * ${f2.name})`;
+            }
+          }
+          return termName;
+        };
+
+        const names = effectTerms.map((t) => formatTermName(t.name));
         const tVals = effectTerms.map((t) => Math.abs(t.tValue));
         const colors = effectTerms.map((t) => (t.significant ? '#1e3a8a' : '#94a3b8'));
 
@@ -81,9 +107,16 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
         ];
 
         const layout = {
-          title: `Biểu đồ Pareto các Hiệu ứng Chuẩn hóa (|t-value|) - ${currentCQA.name}`,
-          xaxis: { title: 'T-Value of Effect (Standardized)' },
-          yaxis: { autorange: 'reversed' },
+          title: `Biểu đồ Pareto các Hiệu ứng Chuẩn hóa (|t-value|) - ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+          xaxis: {
+            title: {
+              text: 'T-Value of Effect (Chuẩn hóa |t-value|)',
+              font: { size: 12, color: '#1e293b' },
+              standoff: 10,
+            },
+            tickfont: { size: 10 },
+          },
+          yaxis: { autorange: 'reversed', tickfont: { size: 11 } },
           shapes: [
             {
               type: 'line',
@@ -106,7 +139,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
               font: { color: '#dc2626', size: 11 },
             },
           ],
-          margin: { l: 80, r: 40, t: 40, b: 40 },
+          margin: { l: 220, r: 40, t: 50, b: 70, pad: 4 },
         };
 
         return <PlotlyChart data={data} layout={layout} style={{ height: '350px' }} />;
@@ -123,20 +156,35 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
             x: xPred,
             y: yRes,
             marker: { size: 9, color: '#0f766e' },
-            text: model.diagnostics.residuals.map((r) => `Run #${r.runOrder}: Act=${r.actual}, Pred=${r.predicted.toFixed(2)}`),
+            text: model.diagnostics.residuals.map((r) => `Run #${r.runOrder}: Thực tế=${r.actual} ${currentCQA.unit || ''}, Dự đoán=${r.predicted.toFixed(2)} ${currentCQA.unit || ''}`),
           },
         ];
 
         const layout = {
-          title: `Phần dư Chuẩn hóa vs. Giá trị Dự đoán (Residuals vs. Predicted)`,
-          xaxis: { title: `Giá trị Dự đoán (${currentCQA.unit})` },
-          yaxis: { title: 'Internally Studentized Residuals', range: [-3.5, 3.5] },
+          title: `Phần dư Chuẩn hóa vs. Giá trị Dự đoán - ${currentCQA.name} (${currentCQA.code})`,
+          xaxis: {
+            title: {
+              text: `Giá trị Dự đoán Ý (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+              font: { size: 12, color: '#1e293b' },
+              standoff: 10,
+            },
+            tickfont: { size: 10 },
+          },
+          yaxis: {
+            title: {
+              text: 'Internally Studentized Residuals (Phần dư Student hóa)',
+              font: { size: 12, color: '#1e293b' },
+              standoff: 10,
+            },
+            range: [-3.5, 3.5],
+            tickfont: { size: 10 },
+          },
           shapes: [
             { type: 'line', x0: Math.min(...xPred) * 0.95, x1: Math.max(...xPred) * 1.05, y0: 0, y1: 0, line: { color: '#64748b', width: 1 } },
             { type: 'line', x0: Math.min(...xPred) * 0.95, x1: Math.max(...xPred) * 1.05, y0: 3, y1: 3, line: { color: '#dc2626', width: 1, dash: 'dot' } },
             { type: 'line', x0: Math.min(...xPred) * 0.95, x1: Math.max(...xPred) * 1.05, y0: -3, y1: -3, line: { color: '#dc2626', width: 1, dash: 'dot' } },
           ],
-          margin: { l: 60, r: 40, t: 40, b: 40 },
+          margin: { l: 80, r: 40, t: 50, b: 70, pad: 4 },
         };
 
         return <PlotlyChart data={data} layout={layout} style={{ height: '350px' }} />;
@@ -155,9 +203,9 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
             type: 'scatter',
             mode: 'markers',
             x: sortedRes,
-            y: theoreticalZ.map((z) => normalInverseCDF(normalInverseCDF(z)) * 0 + z), // z-scores
+            y: theoreticalZ, // z-scores
             marker: { size: 9, color: '#1e3a8a' },
-            name: 'Residuals',
+            name: 'Residuals (Phần dư)',
           },
           {
             type: 'line',
@@ -169,10 +217,26 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
         ];
 
         const layout = {
-          title: `Biểu đồ Xác suất Chuẩn của Phần dư (Normal Probability Plot)`,
-          xaxis: { title: 'Internally Studentized Residuals', range: [-3.5, 3.5] },
-          yaxis: { title: 'Theoretical Quantiles (Z-score)', range: [-3.5, 3.5] },
-          margin: { l: 60, r: 40, t: 40, b: 40 },
+          title: `Biểu đồ Xác suất Chuẩn của Phần dư (Normal Plot) - ${currentCQA.name} (${currentCQA.code})`,
+          xaxis: {
+            title: {
+              text: 'Internally Studentized Residuals (Phần dư Student hóa)',
+              font: { size: 12, color: '#1e293b' },
+              standoff: 10,
+            },
+            range: [-3.5, 3.5],
+            tickfont: { size: 10 },
+          },
+          yaxis: {
+            title: {
+              text: 'Theoretical Quantiles (Phân vị lý thuyết Z-score)',
+              font: { size: 12, color: '#1e293b' },
+              standoff: 10,
+            },
+            range: [-3.5, 3.5],
+            tickfont: { size: 10 },
+          },
+          margin: { l: 80, r: 40, t: 50, b: 70, pad: 4 },
         };
 
         return <PlotlyChart data={data} layout={layout} style={{ height: '350px' }} />;
@@ -193,9 +257,23 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
         ];
 
         const layout = {
-          title: `Khoảng cách Cook (Cook's Distance - Đánh giá Điểm Ngoại lai / Ảnh hưởng)`,
-          xaxis: { title: 'Số thứ tự lần chạy (Run Order)' },
-          yaxis: { title: "Cook's Distance" },
+          title: `Khoảng cách Cook (Cook's Distance - Điểm ảnh hưởng) - ${currentCQA.name} (${currentCQA.code})`,
+          xaxis: {
+            title: {
+              text: 'Số thứ tự lần chạy thực nghiệm (Run Order)',
+              font: { size: 12, color: '#1e293b' },
+              standoff: 10,
+            },
+            tickfont: { size: 10 },
+          },
+          yaxis: {
+            title: {
+              text: "Khoảng cách Cook (Cook's Distance)",
+              font: { size: 12, color: '#1e293b' },
+              standoff: 10,
+            },
+            tickfont: { size: 10 },
+          },
           shapes: [
             {
               type: 'line',
@@ -206,7 +284,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
               line: { color: '#dc2626', width: 2, dash: 'dash' },
             },
           ],
-          margin: { l: 60, r: 40, t: 40, b: 40 },
+          margin: { l: 80, r: 40, t: 50, b: 70, pad: 4 },
         };
 
         return <PlotlyChart data={data} layout={layout} style={{ height: '350px' }} />;

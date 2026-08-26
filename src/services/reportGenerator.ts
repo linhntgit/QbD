@@ -415,8 +415,8 @@ export async function exportQBDWordReport(
   const runHeaders = [
     createHeaderCell('Std', 6),
     createHeaderCell('Run', 6),
-    ...project.factors.map((f) => createHeaderCell(`${f.code} (${f.unit})`)),
-    ...project.cqas.map((c) => createHeaderCell(`${c.code} (${c.unit})`)),
+    ...project.factors.map((f) => createHeaderCell(`${f.name} (${f.code})${f.unit ? ` [${f.unit}]` : ''}`)),
+    ...project.cqas.map((c) => createHeaderCell(`${c.name} (${c.code})${c.unit ? ` [${c.unit}]` : ''}`)),
   ];
 
   const runRows = [

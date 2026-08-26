@@ -725,7 +725,7 @@ export function calculateDesignEfficiency(
   let invXTX: number[][] = [];
   try {
     invXTX = matInverse(XTX);
-  } catch (e) {
+  } catch {
     invXTX = [];
   }
 

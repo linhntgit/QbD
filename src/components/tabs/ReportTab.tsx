@@ -354,10 +354,10 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                   <th>Std</th>
                   <th>Run</th>
                   {project.factors.map((f) => (
-                    <th key={f.code}>{f.code} ({f.unit})</th>
+                    <th key={f.code}>{f.name} ({f.code}){f.unit ? ` [${f.unit}]` : ''}</th>
                   ))}
                   {project.cqas.map((c) => (
-                    <th key={c.code}>{c.code} ({c.unit})</th>
+                    <th key={c.code}>{c.name} ({c.code}){c.unit ? ` [${c.unit}]` : ''}</th>
                   ))}
                 </tr>
               </thead>
@@ -461,7 +461,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                   const pred = optimum.predictedResponses[cqa.code];
                   return (
                     <div key={cqa.code} style={{ fontSize: '0.82rem', display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
-                      <span style={{ color: '#475569' }}>{cqa.name}:</span>
+                      <span style={{ color: '#475569' }}>{cqa.name} ({cqa.code}):</span>
                       <span>
                         <strong style={{ color: '#0f766e', marginRight: '0.5rem' }}>
                           {pred ? `${pred.value} ${cqa.unit}` : '-'}
