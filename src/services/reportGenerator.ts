@@ -174,38 +174,55 @@ export async function exportQBDWordReport(
     new Paragraph({ text: '', spacing: { after: 300 } })
   );
 
-  // SECTION 2: CQAs
+  // SECTION 2: CQAs & Desirability Configuration
   sections.push(
     new Paragraph({
-      text: '2. Các thuộc tính chất lượng trọng yếu (CQAs - Critical Quality Attributes)',
+      text: '2. Các thuộc tính chất lượng trọng yếu (CQAs) & Cấu hình Hàm Thỏa Dụng (Desirability Goals)',
       heading: HeadingLevel.HEADING_1,
       spacing: { before: 300, after: 150 },
+    }),
+    new Paragraph({
+      text: 'CQAs là các đặc tính vật lý, hóa học, sinh học hoặc vi sinh cần nằm trong giới hạn thích hợp để đảm bảo chất lượng sản phẩm như mong muốn.',
+      spacing: { after: 150 },
     })
   );
 
   const cqaRows = [
     new TableRow({
       children: [
-        createHeaderCell('Mã', 8),
-        createHeaderCell('Tên CQA', 24),
-        createHeaderCell('Bản chất DL', 16),
-        createHeaderCell('Đơn vị', 8),
-        createHeaderCell('Giới hạn (LSL - USL)', 20),
-        createHeaderCell('Mục tiêu tối ưu', 14),
-        createHeaderCell('Trọng số', 10),
+        createHeaderCell('Mã', 7),
+        createHeaderCell('Tên CQA', 22),
+        createHeaderCell('Bản chất', 13),
+        createHeaderCell('Đơn vị', 7),
+        createHeaderCell('Mục tiêu (Goal)', 15),
+        createHeaderCell('Giới hạn (LSL - Target - USL)', 20),
+        createHeaderCell('Hình dạng (s, t)', 8),
+        createHeaderCell('Trọng số (w)', 8),
       ],
     }),
     ...project.cqas.map(
       (cqa, idx) =>
         new TableRow({
           children: [
-            createDataCell(cqa.code, idx % 2 === 1, 8),
-            createDataCell(cqa.name, idx % 2 === 1, 24),
-            createDataCell(cqa.dataType === 'qualitative_binary' ? 'Định tính (Pass/Fail)' : cqa.dataType === 'qualitative_ordinal' ? 'Định tính (Thứ bậc)' : 'Định lượng (Quantitative)', idx % 2 === 1, 16),
-            createDataCell(cqa.unit, idx % 2 === 1, 8),
-            createDataCell(`${cqa.lowerLimit ?? '-'} đến ${cqa.upperLimit ?? '-'}`, idx % 2 === 1, 20),
-            createDataCell(cqa.objective.toUpperCase(), idx % 2 === 1, 14),
-            createDataCell(`${cqa.weight}`, idx % 2 === 1, 10),
+            createDataCell(cqa.code, idx % 2 === 1, 7),
+            createDataCell(cqa.name, idx % 2 === 1, 22),
+            createDataCell(cqa.dataType === 'qualitative_binary' ? 'Định tính (Pass/Fail)' : cqa.dataType === 'qualitative_ordinal' ? 'Định tính (Thứ bậc)' : 'Định lượng (Quantitative)', idx % 2 === 1, 13),
+            createDataCell(cqa.unit, idx % 2 === 1, 7),
+            createDataCell(
+              cqa.objective === 'maximize' ? '📈 Lớn nhất (Max)' :
+              cqa.objective === 'minimize' ? '📉 Nhỏ nhất (Min)' :
+              cqa.objective === 'target' ? '🎯 Đạt đích (Target)' :
+              cqa.objective === 'range' ? '📏 Trong khoảng' : 'None',
+              idx % 2 === 1,
+              15
+            ),
+            createDataCell(
+              `${cqa.lowerLimit ?? '-'} / ${cqa.target ?? '-'} / ${cqa.upperLimit ?? '-'}`,
+              idx % 2 === 1,
+              20
+            ),
+            createDataCell(`s=${cqa.sShape ?? 1}, t=${cqa.tShape ?? 1}`, idx % 2 === 1, 8),
+            createDataCell(`${cqa.weight}`, idx % 2 === 1, 8),
           ],
         })
     ),
@@ -504,24 +521,30 @@ export async function exportQBDWordReport(
     const nnRows = [
       new TableRow({
         children: [
-          createHeaderCell('Chỉ tiêu CQA', 20),
-          createHeaderCell('Kiến trúc Lớp ẩn', 20),
-          createHeaderCell('Train R²', 15),
-          createHeaderCell('Val R²', 15),
-          createHeaderCell('Overall R²', 15),
-          createHeaderCell('RMSE / Tour', 15),
+          createHeaderCell('Chỉ tiêu CQA', 16),
+          createHeaderCell('Kiến trúc Lớp ẩn', 16),
+          createHeaderCell('Train R²', 12),
+          createHeaderCell('Val R²', 12),
+          createHeaderCell('Overall R²', 12),
+          createHeaderCell('RMSE / Best Tour', 16),
+          createHeaderCell('Độ quan trọng yếu tố (VIP Ranking)', 16),
         ],
       }),
       ...Object.values(neuralModels).map((nm, idx) => {
         const cqa = project.cqas.find((c) => c.code === nm.cqaCode);
+        const vipStr = nm.diagnostics.variableImportance
+          .slice(0, 3)
+          .map((v) => `${v.factorCode}(${v.relativeImportance}%)`)
+          .join(', ');
         return new TableRow({
           children: [
-            createDataCell(cqa ? `${cqa.name} (${nm.cqaCode})` : nm.cqaCode, idx % 2 === 1, 20),
-            createDataCell(`[${nm.config.hiddenNodes1}${nm.config.hiddenNodes2 > 0 ? `, ${nm.config.hiddenNodes2}` : ''}] ${nm.config.activation.toUpperCase()}`, idx % 2 === 1, 20),
-            createDataCell(`${nm.diagnostics.rSquaredTrain}`, idx % 2 === 1, 15),
-            createDataCell(`${nm.diagnostics.rSquaredVal}`, idx % 2 === 1, 15),
-            createDataCell(`${nm.diagnostics.rSquaredOverall}`, idx % 2 === 1, 15),
-            createDataCell(`${nm.diagnostics.rmseOverall} (Tour #${nm.diagnostics.bestTourIndex})`, idx % 2 === 1, 15),
+            createDataCell(cqa ? `${cqa.name} (${nm.cqaCode})` : nm.cqaCode, idx % 2 === 1, 16),
+            createDataCell(`[${nm.config.hiddenNodes1}${nm.config.hiddenNodes2 > 0 ? `, ${nm.config.hiddenNodes2}` : ''}] ${nm.config.activation.toUpperCase()}`, idx % 2 === 1, 16),
+            createDataCell(`${nm.diagnostics.rSquaredTrain}`, idx % 2 === 1, 12),
+            createDataCell(`${nm.diagnostics.rSquaredVal}`, idx % 2 === 1, 12),
+            createDataCell(`${nm.diagnostics.rSquaredOverall}`, idx % 2 === 1, 12),
+            createDataCell(`${nm.diagnostics.rmseOverall} (#${nm.diagnostics.bestTourIndex})`, idx % 2 === 1, 16),
+            createDataCell(vipStr || '-', idx % 2 === 1, 16),
           ],
         });
       }),
@@ -536,16 +559,16 @@ export async function exportQBDWordReport(
     );
   }
 
-  // SECTION 6: Multi-response Desirability & Design Space
+  // SECTION 6: Multi-response Desirability & SAS JMP Prediction Profiler
   if (optimum) {
     sections.push(
       new Paragraph({
-        text: '6. Tối ưu hóa Đa Mục tiêu (Derringer-Suich) & Thiết lập Vùng Thiết kế (Design Space)',
+        text: '6. Tối ưu hóa Đa Mục tiêu theo Hàm Thỏa Dụng (SAS JMP Desirability Profiler)',
         heading: HeadingLevel.HEADING_1,
         spacing: { before: 300, after: 150 },
       }),
       new Paragraph({
-        text: `Điểm vận hành tối ưu toàn cục (Overall Desirability D = ${optimum.overallDesirability}):`,
+        text: `Áp dụng phương pháp Derringer-Suich tổng hợp độ thỏa dụng toàn cục D = exp( ∑(w_i * ln(d_i)) / ∑ w_i ). Điểm vận hành tối ưu toàn cục đạt được Overall Desirability D = ${optimum.overallDesirability}:`,
         spacing: { after: 150 },
       })
     );
@@ -553,18 +576,18 @@ export async function exportQBDWordReport(
     const optFactorRows = [
       new TableRow({
         children: [
-          createHeaderCell('Thông số đầu vào (Factor)', 40),
-          createHeaderCell('Giá trị mã hóa (Coded)', 30),
-          createHeaderCell('Giá trị thực tế đề xuất (Actual Setpoint)', 30),
+          createHeaderCell('Thông số đầu vào (CMA / CPP)', 35),
+          createHeaderCell('Mức mã hóa (Coded Level)', 25),
+          createHeaderCell('Giá trị cài đặt đề xuất (Actual Setpoint)', 40),
         ],
       }),
       ...project.factors.map(
         (f, idx) =>
           new TableRow({
             children: [
-              createDataCell(`${f.name} (${f.code})`, idx % 2 === 1, 40),
-              createDataCell(`${optimum.codedFactors[f.code]}`, idx % 2 === 1, 30),
-              createDataCell(`${optimum.actualFactors[f.code]} ${f.unit}`, idx % 2 === 1, 30),
+              createDataCell(`${f.name} (${f.code})`, idx % 2 === 1, 35),
+              createDataCell(`${optimum.codedFactors[f.code]}`, idx % 2 === 1, 25),
+              createDataCell(`${optimum.actualFactors[f.code]} ${f.unit}`, idx % 2 === 1, 40),
             ],
           })
       ),
@@ -578,26 +601,28 @@ export async function exportQBDWordReport(
       new Paragraph({ text: '', spacing: { after: 200 } })
     );
 
-    // Predicted CQAs table
+    // Predicted CQAs table with SE, 95% CI, and individual d_i
     const predCQARows = [
       new TableRow({
         children: [
-          createHeaderCell('CQA', 30),
+          createHeaderCell('Chỉ tiêu CQA', 25),
+          createHeaderCell('Mục tiêu (Goal)', 15),
           createHeaderCell('Giá trị dự đoán (Mean)', 20),
-          createHeaderCell('Sai số SE', 15),
-          createHeaderCell('Khoảng tin cậy 95% CI', 20),
-          createHeaderCell('Hàm thỏa dụng (d_i)', 15),
+          createHeaderCell('Sai số SE', 12),
+          createHeaderCell('Khoảng tin cậy 95% CI', 16),
+          createHeaderCell('Thỏa dụng (d_i)', 12),
         ],
       }),
       ...project.cqas.map((cqa, idx) => {
         const pred = optimum.predictedResponses[cqa.code];
         return new TableRow({
           children: [
-            createDataCell(`${cqa.name} (${cqa.code})`, idx % 2 === 1, 30),
+            createDataCell(`${cqa.name} (${cqa.code})`, idx % 2 === 1, 25),
+            createDataCell(cqa.objective.toUpperCase(), idx % 2 === 1, 15),
             createDataCell(pred ? `${pred.value} ${cqa.unit}` : '-', idx % 2 === 1, 20),
-            createDataCell(pred ? `±${pred.se}` : '-', idx % 2 === 1, 15),
-            createDataCell(pred ? `[${pred.ciLow} - ${pred.ciHigh}]` : '-', idx % 2 === 1, 20),
-            createDataCell(pred ? `${pred.desirability}` : '-', idx % 2 === 1, 15),
+            createDataCell(pred ? `±${pred.se}` : '-', idx % 2 === 1, 12),
+            createDataCell(pred ? `[${pred.ciLow} - ${pred.ciHigh}]` : '-', idx % 2 === 1, 16),
+            createDataCell(pred ? `${pred.desirability}` : '-', idx % 2 === 1, 12),
           ],
         });
       }),
@@ -615,9 +640,13 @@ export async function exportQBDWordReport(
   // SECTION 7: Control Strategy & Proven Acceptable Range (ICH Q10)
   sections.push(
     new Paragraph({
-      text: '7. Chiến lược kiểm soát & Phạm vi vận hành (Control Strategy - ICH Q10)',
+      text: '7. Chiến lược kiểm soát & Vùng Thiết Kế Liên Tục (Design Space & Control Strategy - ICH Q8/Q10)',
       heading: HeadingLevel.HEADING_1,
       spacing: { before: 300, after: 150 },
+    }),
+    new Paragraph({
+      text: 'Vùng thiết kế được biểu diễn bằng trường biên độ an toàn liên tục Z(x, y) = min(Margin_cqa) ≥ 0, xác lập miền kết hợp đa chiều của các biến đầu vào đảm bảo sản phẩm luôn đạt tiêu chuẩn chất lượng (ICH Q8(R2)).',
+      spacing: { after: 150 },
     })
   );
 
@@ -652,6 +681,7 @@ export async function exportQBDWordReport(
     new Paragraph({ text: '', spacing: { after: 200 } })
   );
 
+  // SECTION 8: Monte Carlo Simulation (ICH Q9)
   if (monteCarlo) {
     sections.push(
       new Paragraph({
@@ -666,15 +696,53 @@ export async function exportQBDWordReport(
             bold: true,
           }),
           new TextRun({
-            text: `Tỷ lệ đạt chuẩn 100% CQAs = ${monteCarlo.reliabilityPercent}% | Tỷ lệ lỗi dự kiến (Defect Rate) = ${monteCarlo.defectRatePPM} PPM`,
+            text: `Tỷ lệ đạt chuẩn 100% CQAs = ${monteCarlo.reliabilityPercent}% | Tỷ lệ lỗi dự kiến (Defect Rate) = ${monteCarlo.defectRatePPM.toLocaleString()} PPM`,
             color: monteCarlo.reliabilityPercent >= 99 ? '15803D' : 'B91C1C',
             bold: true,
           }),
         ],
-        spacing: { after: 200 },
+        spacing: { after: 250 },
       })
     );
   }
+
+  // SECTION 9: Regulatory Sign-off & Quality Assurance Approval
+  sections.push(
+    new Paragraph({
+      text: '9. Kết Luận & Phê Duyệt Hồ Sơ Phát Triển Dược Phẩm (Sign-off & Approval)',
+      heading: HeadingLevel.HEADING_1,
+      spacing: { before: 300, after: 150 },
+    }),
+    new Paragraph({
+      text: 'Báo cáo này xác nhận Vùng Thiết Kế và Chiến Lược Kiểm Soát đã được xây dựng trên nền tảng khoa học vững chắc và quản lý rủi ro chất lượng, đáp ứng đầy đủ yêu cầu đăng ký thuốc theo hướng dẫn ICH CTD Module 3.2.P.2.',
+      spacing: { after: 250 },
+    })
+  );
+
+  const signRows = [
+    new TableRow({
+      children: [
+        createHeaderCell('NGƯỜI LẬP BÁO CÁO (Scientist)', 33),
+        createHeaderCell('TRƯỞNG NHÓM R&D (Formulation Lead)', 34),
+        createHeaderCell('ĐẢM BẢO CHẤT LƯỢNG (QA Director)', 33),
+      ],
+    }),
+    new TableRow({
+      children: [
+        createDataCell('\n\n\n\nKý tên: .......................................\nHọ tên: ' + (project.author || 'Nghiên cứu viên'), false, 33),
+        createDataCell('\n\n\n\nKý tên: .......................................\nHọ tên: ........................................', false, 34),
+        createDataCell('\n\n\n\nKý tên: .......................................\nHọ tên: ........................................', false, 33),
+      ],
+    }),
+  ];
+
+  sections.push(
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: signRows,
+    }),
+    new Paragraph({ text: '', spacing: { after: 200 } })
+  );
 
   // Create Document
   const doc = new Document({

@@ -153,21 +153,22 @@ export const ReportTab: React.FC<ReportTabProps> = ({
           </table>
         </div>
 
-        {/* 2. CQAs */}
+        {/* 2. CQAs & Desirability Configuration */}
         <div style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
-            2. Thuộc Tính Chất Lượng Trọng Yếu (CQAs)
+            2. Thuộc Tính Chất Lượng Trọng Yếu (CQAs) & Cấu Hình Hàm Thỏa Dụng
           </h2>
           <table className="qbd-table">
             <thead>
               <tr style={{ backgroundColor: '#f1f5f9' }}>
                 <th>Mã</th>
                 <th>Tên CQA</th>
-                <th>Bản Chất Dữ Liệu</th>
+                <th>Bản Chất</th>
                 <th>Đơn Vị</th>
-                <th>Giới Hạn Chấp Nhận (LSL - USL)</th>
-                <th>Mục Tiêu Tối Ưu</th>
-                <th>Trọng Số</th>
+                <th>Mục Tiêu (Goal)</th>
+                <th>Giới Hạn (LSL - Target - USL)</th>
+                <th>Hình Dạng (s, t)</th>
+                <th>Trọng Số (w)</th>
               </tr>
             </thead>
             <tbody>
@@ -181,9 +182,17 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                     </span>
                   </td>
                   <td>{cqa.unit}</td>
-                  <td>{cqa.lowerLimit ?? '-'} đến {cqa.upperLimit ?? '-'}</td>
-                  <td><span className="badge badge-teal">{cqa.objective.toUpperCase()}</span></td>
-                  <td style={{ fontWeight: '600' }}>{cqa.weight}</td>
+                  <td>
+                    <span className="badge badge-teal">
+                      {cqa.objective === 'maximize' ? '📈 Maximize' :
+                       cqa.objective === 'minimize' ? '📉 Minimize' :
+                       cqa.objective === 'target' ? '🎯 Target' :
+                       cqa.objective === 'range' ? '📏 Range' : 'None'}
+                    </span>
+                  </td>
+                  <td>{cqa.lowerLimit ?? '-'} / {cqa.target ?? '-'} / {cqa.upperLimit ?? '-'}</td>
+                  <td className="font-mono" style={{ fontSize: '0.78rem' }}>s={cqa.sShape ?? 1}, t={cqa.tShape ?? 1}</td>
+                  <td style={{ fontWeight: '700', color: '#0f766e' }}>{cqa.weight}</td>
                 </tr>
               ))}
             </tbody>
@@ -342,7 +351,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                   {m.equationString}
                 </div>
                 <div style={{ fontSize: '0.8rem', color: '#475569' }}>
-                  R² = <strong>{m.diagnostics.rSquared.toFixed(4)}</strong> | R² Adj = <strong>{m.diagnostics.adjRSquared.toFixed(4)}</strong> | R² Pred = <strong>{m.diagnostics.predRSquared.toFixed(4)}</strong> | Adeq Precision = <strong>{m.diagnostics.adeqPrecision.toFixed(2)}</strong>
+                  R² = <strong>{m.diagnostics.rSquared.toFixed(4)}</strong> | R² Adj = <strong>{m.diagnostics.adjRSquared.toFixed(4)}</strong> | R² Pred = <strong>{m.diagnostics.predRSquared.toFixed(4)}</strong> | Adeq Precision = <strong>{m.diagnostics.adeqPrecision.toFixed(2)}</strong> | Std Dev = <strong>{m.diagnostics.stdDev.toFixed(3)}</strong>
                 </div>
               </div>
             );
@@ -375,35 +384,51 @@ export const ReportTab: React.FC<ReportTabProps> = ({
           </div>
         )}
 
-        {/* 6. Optimum & Design Space */}
+        {/* 6. Optimum & SAS JMP Prediction Profiler */}
         {optimum && (
           <div style={{ marginBottom: '2rem' }}>
             <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
-              6. Điểm Tối Ưu Toàn Cục (Overall Desirability D = {optimum.overallDesirability}) & Vùng Thiết Kế
+              6. Tối Ưu Hóa Đa Mục Tiêu (SAS JMP Desirability Profiler: Overall D = {optimum.overallDesirability})
             </h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <div style={{ border: '1px solid #cbd5e1', borderRadius: '0.375rem', padding: '0.75rem' }}>
-                <div style={{ fontWeight: '700', fontSize: '0.85rem', color: '#1e3a8a', marginBottom: '0.4rem' }}>
-                  Thông Số Cài Đặt Mục Tiêu:
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+              {/* Factors setpoints */}
+              <div style={{ border: '1px solid #cbd5e1', borderRadius: '0.375rem', padding: '0.75rem', backgroundColor: '#f8fafc' }}>
+                <div style={{ fontWeight: '700', fontSize: '0.85rem', color: '#1e3a8a', marginBottom: '0.5rem' }}>
+                  Thông Số Cài Đặt Tối Ưu (Coded & Actual Setpoint):
                 </div>
                 {project.factors.map((f) => (
-                  <div key={f.code} style={{ fontSize: '0.82rem', display: 'flex', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
-                    <span>{f.name}:</span>
-                    <strong>{optimum.actualFactors[f.code]} {f.unit}</strong>
+                  <div key={f.code} style={{ fontSize: '0.82rem', display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
+                    <span style={{ color: '#475569' }}>{f.name} ({f.code}):</span>
+                    <span>
+                      <span className="font-mono" style={{ color: '#64748b', marginRight: '0.5rem' }}>[{optimum.codedFactors[f.code]}]</span>
+                      <strong style={{ color: '#0f172a' }}>{optimum.actualFactors[f.code]} {f.unit}</strong>
+                    </span>
                   </div>
                 ))}
               </div>
 
-              <div style={{ border: '1px solid #cbd5e1', borderRadius: '0.375rem', padding: '0.75rem' }}>
-                <div style={{ fontWeight: '700', fontSize: '0.85rem', color: '#0f766e', marginBottom: '0.4rem' }}>
-                  Đáp Ứng CQAs Dự Đoán:
+              {/* CQAs predictions with SE, 95% CI, and individual desirability */}
+              <div style={{ border: '1px solid #cbd5e1', borderRadius: '0.375rem', padding: '0.75rem', backgroundColor: '#f8fafc' }}>
+                <div style={{ fontWeight: '700', fontSize: '0.85rem', color: '#0f766e', marginBottom: '0.5rem' }}>
+                  Đáp Ứng CQAs Dự Đoán & Thỏa Dụng Từng Phần (d_i):
                 </div>
-                {project.cqas.map((cqa) => (
-                  <div key={cqa.code} style={{ fontSize: '0.82rem', display: 'flex', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
-                    <span>{cqa.name}:</span>
-                    <strong>{optimum.predictedResponses[cqa.code]?.value} {cqa.unit}</strong>
-                  </div>
-                ))}
+                {project.cqas.map((cqa) => {
+                  const pred = optimum.predictedResponses[cqa.code];
+                  return (
+                    <div key={cqa.code} style={{ fontSize: '0.82rem', display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
+                      <span style={{ color: '#475569' }}>{cqa.name}:</span>
+                      <span>
+                        <strong style={{ color: '#0f766e', marginRight: '0.5rem' }}>
+                          {pred ? `${pred.value} ${cqa.unit}` : '-'}
+                        </strong>
+                        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                          {pred ? `[${pred.ciLow} - ${pred.ciHigh}] (d=${pred.desirability})` : ''}
+                        </span>
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -412,7 +437,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
         {/* 7. Control Strategy & Ranges */}
         <div style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
-            7. Chiến Lược Kiểm Soát & Phạm Vi Vận Hành (Control Strategy - ICH Q10)
+            7. Chiến Lược Kiểm Soát & Vùng Thiết Kế Liên Tục (Design Space - ICH Q8/Q10)
           </h2>
           <table className="qbd-table">
             <thead>
@@ -442,17 +467,49 @@ export const ReportTab: React.FC<ReportTabProps> = ({
 
         {/* 8. Monte Carlo Reliability */}
         {monteCarlo && (
-          <div>
+          <div style={{ marginBottom: '2rem' }}>
             <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
-              8. Xác Minh Rủi Ro Vùng Thiết Kế (Monte Carlo - ICH Q9)
+              8. Xác Minh Độ Tin Cậy Vùng Thiết Kế (Mô Phỏng Monte Carlo - ICH Q9)
             </h2>
             <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '0.5rem', padding: '1rem', fontSize: '0.85rem', color: '#14532d' }}>
-              <div>• Tổng số lô mô phỏng ảo: <strong>{monteCarlo.simulations.toLocaleString()} lô</strong></div>
-              <div>• Tỷ lệ độ tin cậy đạt chuẩn 100% CQAs: <strong>{monteCarlo.reliabilityPercent}%</strong></div>
+              <div style={{ marginBottom: '0.3rem' }}>• Tổng số lô mô phỏng ảo: <strong>{monteCarlo.simulations.toLocaleString()} lô</strong></div>
+              <div style={{ marginBottom: '0.3rem' }}>• Tỷ lệ độ tin cậy đạt chuẩn 100% CQAs: <strong style={{ color: '#15803d', fontSize: '0.95rem' }}>{monteCarlo.reliabilityPercent}%</strong></div>
               <div>• Tỷ lệ lỗi dự kiến (Defect Rate): <strong>{monteCarlo.defectRatePPM.toLocaleString()} PPM</strong></div>
             </div>
           </div>
         )}
+
+        {/* 9. Sign-off & Regulatory Approval Block */}
+        <div>
+          <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
+            9. Ký Duyệt & Phê Chuẩn Hồ Sơ Phát Triển Dược Phẩm (Sign-off & Approval)
+          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginTop: '1rem' }}>
+            <div style={{ border: '1px solid #cbd5e1', borderRadius: '0.375rem', padding: '1rem', textAlign: 'center', backgroundColor: '#f8fafc' }}>
+              <div style={{ fontWeight: '700', fontSize: '0.82rem', color: '#1e3a8a', marginBottom: '3rem' }}>
+                NGƯỜI LẬP BÁO CÁO (Scientist)
+              </div>
+              <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Ký & Ghi rõ họ tên</div>
+              <div style={{ fontWeight: '600', color: '#0f172a', marginTop: '0.25rem' }}>{project.author || 'Nghiên cứu viên'}</div>
+            </div>
+
+            <div style={{ border: '1px solid #cbd5e1', borderRadius: '0.375rem', padding: '1rem', textAlign: 'center', backgroundColor: '#f8fafc' }}>
+              <div style={{ fontWeight: '700', fontSize: '0.82rem', color: '#1e3a8a', marginBottom: '3rem' }}>
+                TRƯỞNG PHÒNG R&D (Formulation Lead)
+              </div>
+              <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Ký & Ghi rõ họ tên</div>
+              <div style={{ fontWeight: '600', color: '#0f172a', marginTop: '0.25rem' }}>..........................................</div>
+            </div>
+
+            <div style={{ border: '1px solid #cbd5e1', borderRadius: '0.375rem', padding: '1rem', textAlign: 'center', backgroundColor: '#f8fafc' }}>
+              <div style={{ fontWeight: '700', fontSize: '0.82rem', color: '#1e3a8a', marginBottom: '3rem' }}>
+                GIÁM ĐỐC QA (Quality Assurance)
+              </div>
+              <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Ký & Ghi rõ họ tên</div>
+              <div style={{ fontWeight: '600', color: '#0f172a', marginTop: '0.25rem' }}>..........................................</div>
+            </div>
+          </div>
+        </div>
 
       </div>
 
