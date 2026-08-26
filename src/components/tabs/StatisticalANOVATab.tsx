@@ -10,6 +10,7 @@ import {
 import type {
   QBDProject,
   StatisticalModelResult,
+  NeuralNetModelResult,
   ModelType,
   ModelingEngine,
 } from '../../types/qbd';
@@ -20,6 +21,7 @@ import { generateUpdatedRiskAssessment } from '../../services/statistics';
 interface StatisticalANOVATabProps {
   project: QBDProject;
   models: Record<string, StatisticalModelResult>;
+  neuralModels?: Record<string, NeuralNetModelResult>;
   selectedCQA: string;
   onSelectCQA: (cqaCode: string) => void;
   modelTypes: Record<string, ModelType>;
@@ -33,6 +35,7 @@ interface StatisticalANOVATabProps {
 export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
   project,
   models,
+  neuralModels = {},
   selectedCQA,
   onSelectCQA,
   modelTypes,
@@ -410,26 +413,41 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                 {model.diagnostics.rSquared.toFixed(4)}
               </div>
               <div style={{ fontSize: '0.72rem', color: model.diagnostics.rSquared > 0.8 ? '#15803d' : '#b45309' }}>
-                {model.diagnostics.rSquared > 0.8 ? '✓ Độ khớp mô hình cao' : '⚠ Cân nhắc đổi dạng mô hình'}
+                {model.diagnostics.rSquared > 0.8 ? '✓ Độ khớp cao (> 0.8)' : '⚠ Cân nhắc đổi dạng mô hình'}
               </div>
             </div>
 
             {/* Adjusted R-Squared */}
             <div className="qbd-card" style={{ padding: '1rem', borderLeft: '4px solid #0f766e' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>ADJUSTED R²</div>
+              <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>ADJUSTED R² (R²adj)</div>
               <div style={{ fontSize: '1.6rem', fontWeight: '800', color: '#0f766e', margin: '0.2rem 0' }}>
                 {model.diagnostics.adjRSquared.toFixed(4)}
               </div>
-              <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Hiệu chỉnh theo số bậc tự do</div>
+              <div style={{ fontSize: '0.72rem', color: model.diagnostics.adjRSquared > 0.8 ? '#15803d' : '#64748b' }}>
+                {model.diagnostics.adjRSquared > 0.8 ? '✓ Đạt chuẩn (> 0.8)' : 'Hiệu chỉnh theo bậc tự do'}
+              </div>
             </div>
 
-            {/* Predicted R-Squared */}
-            <div className="qbd-card" style={{ padding: '1rem', borderLeft: '4px solid #3b82f6' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>PREDICTED R² (PRESS)</div>
-              <div style={{ fontSize: '1.6rem', fontWeight: '800', color: '#3b82f6', margin: '0.2rem 0' }}>
-                {model.diagnostics.predRSquared.toFixed(4)}
+            {/* Q-Squared (Cross-Validated R2 via PRESS) */}
+            <div className="qbd-card" style={{ padding: '1rem', borderLeft: '4px solid #2563eb' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>HỆ SỐ DỰ BÁO Q² (PRESS)</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: '800', color: '#2563eb', margin: '0.2rem 0' }}>
+                {(model.diagnostics.qSquared ?? model.diagnostics.predRSquared).toFixed(4)}
               </div>
-              <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Khả năng dự đoán điểm mới</div>
+              <div style={{ fontSize: '0.72rem', color: (model.diagnostics.qSquared ?? model.diagnostics.predRSquared) > 0.7 ? '#15803d' : '#dc2626' }}>
+                {(model.diagnostics.qSquared ?? model.diagnostics.predRSquared) > 0.7 ? '✓ Dự báo xuất sắc (> 0.7)' : '⚠ Dự báo trung bình (< 0.7)'}
+              </div>
+            </div>
+
+            {/* Information Criteria AICc / BIC / -2LL */}
+            <div className="qbd-card" style={{ padding: '1rem', borderLeft: '4px solid #0284c7' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>AICc / BIC / -2LL</div>
+              <div style={{ fontSize: '1.15rem', fontWeight: '800', color: '#0284c7', margin: '0.2rem 0' }}>
+                AICc = {model.diagnostics.aicc?.toFixed(1) ?? '-'}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: '#475569' }}>
+                BIC: {model.diagnostics.bic?.toFixed(1) ?? '-'} | -2LL: {model.diagnostics.twoLL?.toFixed(1) ?? '-'}
+              </div>
             </div>
 
             {/* Adequate Precision */}
@@ -500,28 +518,41 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {model.anova.map((row, idx) => (
-                      <tr key={idx} style={{ fontWeight: row.source === 'Model' || row.source === 'Residual' ? '600' : 'normal' }}>
-                        <td>{row.source}</td>
-                        <td>{row.ss.toFixed(3)}</td>
-                        <td style={{ textAlign: 'center' }}>{row.df}</td>
-                        <td>{row.ms.toFixed(3)}</td>
-                        <td style={{ textAlign: 'center' }}>
-                          {row.fValue !== undefined ? row.fValue.toFixed(2) : '-'}
-                        </td>
-                        <td style={{ textAlign: 'center' }}>
-                          {row.pValue !== undefined ? (
-                            <span
-                              className={`badge ${row.pValue < 0.05 ? 'badge-success' : 'badge-danger'}`}
-                            >
-                              {row.pValue < 0.001 ? '< 0.001' : row.pValue.toFixed(4)}
-                            </span>
-                          ) : (
-                            '-'
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                    {model.anova.map((row, idx) => {
+                      const isLOF = row.source === 'Lack of Fit';
+                      const isPass = isLOF
+                        ? (row.pValue !== undefined && row.pValue > 0.05)
+                        : (row.pValue !== undefined && row.pValue < 0.05);
+
+                      return (
+                        <tr key={idx} style={{ fontWeight: row.source === 'Model' || row.source === 'Residual' ? '600' : 'normal' }}>
+                          <td>
+                            {row.source}
+                            {isLOF && (
+                              <span style={{ fontSize: '0.7rem', color: '#64748b', marginLeft: '0.4rem' }}>
+                                (Độ tương thích mô hình - Slide 11)
+                              </span>
+                            )}
+                          </td>
+                          <td>{row.ss.toFixed(3)}</td>
+                          <td style={{ textAlign: 'center' }}>{row.df}</td>
+                          <td>{row.ms.toFixed(3)}</td>
+                          <td style={{ textAlign: 'center' }}>
+                            {row.fValue !== undefined ? row.fValue.toFixed(2) : '-'}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            {row.pValue !== undefined ? (
+                              <span className={`badge ${isPass ? 'badge-success' : 'badge-danger'}`}>
+                                {row.pValue < 0.001 ? '< 0.001' : row.pValue.toFixed(4)}
+                                {isLOF && (isPass ? ' (✓ Đạt > 0.05)' : ' (⚠ Thiếu phù hợp)')}
+                              </span>
+                            ) : (
+                              '-'
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -645,6 +676,132 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
             </div>
 
             {renderDiagnosticPlot()}
+          </div>
+
+          {/* Model Comparison Dashboard (Đa Thức vs Mạng Nơ-ron - Slide 36) */}
+          <div className="qbd-card" style={{ borderLeft: '4px solid #7c3aed' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <BrainCircuit size={20} color="#7c3aed" />
+                <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a' }}>
+                  Bảng So Sánh Đối Chiếu Hiệu Năng: Mô Hình Đa Thức vs Mạng Nơ-ron (Slide 36)
+                </h3>
+              </div>
+              <span className="badge badge-purple" style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}>
+                Model Comparison (SAS JMP & MODDE Standard)
+              </span>
+            </div>
+
+            <div style={{ fontSize: '0.78rem', color: '#475569', marginBottom: '0.75rem' }}>
+              Đối chiếu song song các chỉ số thống kê then chốt (R², R²adj, Q², RMSE, AICc, BIC) giữa phương pháp Hồi quy Đa thức Cổ điển và Mạng Nơ-ron Nhân tạo (ANN) để lựa chọn mô hình dự đoán tối ưu cho từng chỉ tiêu chất lượng CQA.
+            </div>
+
+            <div className="table-container">
+              <table className="qbd-table">
+                <thead>
+                  <tr style={{ backgroundColor: '#f8fafc' }}>
+                    <th rowSpan={2} style={{ verticalAlign: 'middle' }}>Chỉ Tiêu (CQA)</th>
+                    <th colSpan={5} style={{ textAlign: 'center', backgroundColor: '#eff6ff', color: '#1e40af', borderBottom: '2px solid #bfdbfe' }}>
+                      📐 Mô Hình Đa Thức (MLR / OLS)
+                    </th>
+                    <th colSpan={5} style={{ textAlign: 'center', backgroundColor: '#faf5ff', color: '#6b21a8', borderBottom: '2px solid #e9d5ff' }}>
+                      🧠 Mạng Nơ-ron (ANN)
+                    </th>
+                    <th rowSpan={2} style={{ textAlign: 'center', verticalAlign: 'middle' }}>Khuyến Nghị Tối Ưu</th>
+                  </tr>
+                  <tr style={{ fontSize: '0.75rem', backgroundColor: '#f1f5f9' }}>
+                    {/* MLR subheaders */}
+                    <th style={{ textAlign: 'center' }}>R²</th>
+                    <th style={{ textAlign: 'center' }}>R²adj</th>
+                    <th style={{ textAlign: 'center' }}>Q² (PRESS)</th>
+                    <th style={{ textAlign: 'center' }}>RMSE</th>
+                    <th style={{ textAlign: 'center' }}>AICc</th>
+                    {/* ANN subheaders */}
+                    <th style={{ textAlign: 'center' }}>R² Train</th>
+                    <th style={{ textAlign: 'center' }}>R² Val</th>
+                    <th style={{ textAlign: 'center' }}>Q² (Val)</th>
+                    <th style={{ textAlign: 'center' }}>RMSE</th>
+                    <th style={{ textAlign: 'center' }}>AICc</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {project.cqas.map((cqa) => {
+                    const ols = models[cqa.code];
+                    const ann = neuralModels[cqa.code];
+
+                    const olsQ2 = ols?.diagnostics.qSquared ?? ols?.diagnostics.predRSquared ?? 0;
+                    const annQ2 = ann?.diagnostics.qSquared ?? ann?.diagnostics.rSquaredVal ?? 0;
+                    const olsAIC = ols?.diagnostics.aicc ?? 9999;
+                    const annAIC = ann?.diagnostics.aicc ?? 9999;
+
+                    let recommendation = 'Đang chờ dữ liệu';
+                    let recBadge = 'badge-secondary';
+
+                    if (ols && ann) {
+                      if (annQ2 > olsQ2 + 0.05 || (annAIC < olsAIC - 2 && annQ2 >= olsQ2)) {
+                        recommendation = '🧠 Ưu tiên Mạng Nơ-ron (ANN)';
+                        recBadge = 'badge-purple';
+                      } else {
+                        recommendation = '📐 Ưu tiên Đa thức (MLR)';
+                        recBadge = 'badge-blue';
+                      }
+                    } else if (ols) {
+                      recommendation = '📐 Đa thức (MLR)';
+                      recBadge = 'badge-blue';
+                    } else if (ann) {
+                      recommendation = '🧠 Mạng Nơ-ron (ANN)';
+                      recBadge = 'badge-purple';
+                    }
+
+                    return (
+                      <tr key={cqa.code}>
+                        <td style={{ fontWeight: '600' }}>
+                          {cqa.name} <span style={{ color: '#64748b' }}>({cqa.code})</span>
+                        </td>
+                        {/* MLR Values */}
+                        <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
+                          {ols ? ols.diagnostics.rSquared.toFixed(3) : '-'}
+                        </td>
+                        <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
+                          {ols ? ols.diagnostics.adjRSquared.toFixed(3) : '-'}
+                        </td>
+                        <td style={{ textAlign: 'center', fontFamily: 'monospace', fontWeight: '700', color: olsQ2 > 0.7 ? '#15803d' : '#475569' }}>
+                          {ols ? olsQ2.toFixed(3) : '-'}
+                        </td>
+                        <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
+                          {ols ? ols.diagnostics.stdDev.toFixed(3) : '-'}
+                        </td>
+                        <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
+                          {ols?.diagnostics.aicc !== undefined ? ols.diagnostics.aicc.toFixed(1) : '-'}
+                        </td>
+                        {/* ANN Values */}
+                        <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
+                          {ann ? ann.diagnostics.rSquaredTrain.toFixed(3) : '-'}
+                        </td>
+                        <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
+                          {ann ? ann.diagnostics.rSquaredVal.toFixed(3) : '-'}
+                        </td>
+                        <td style={{ textAlign: 'center', fontFamily: 'monospace', fontWeight: '700', color: annQ2 > 0.7 ? '#15803d' : '#475569' }}>
+                          {ann ? annQ2.toFixed(3) : '-'}
+                        </td>
+                        <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
+                          {ann ? ann.diagnostics.rmseOverall.toFixed(3) : '-'}
+                        </td>
+                        <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
+                          {ann?.diagnostics.aicc !== undefined ? ann.diagnostics.aicc.toFixed(1) : '-'}
+                        </td>
+                        {/* Recommendation */}
+                        <td style={{ textAlign: 'center' }}>
+                          <span className={`badge ${recBadge}`} style={{ fontSize: '0.76rem', padding: '0.25rem 0.5rem' }}>
+                            {recommendation}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Updated Risk Assessment Card (ICH Q9 & US FDA ANDA Standard) */}

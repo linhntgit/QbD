@@ -1450,6 +1450,53 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               <span>{archMetrics.recommendation}</span>
             </div>
           </div>
+
+          {/* Carpenter Architecture Advisor Badge & Quick Apply (Slide 31-32) */}
+          {archMetrics.carpenterRecommended !== undefined && (
+            <div
+              style={{
+                marginTop: '0.65rem',
+                padding: '0.65rem 0.85rem',
+                borderRadius: '0.375rem',
+                backgroundColor: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '0.5rem',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', color: '#1e40af' }}>
+                <Sparkles size={16} color="#2563eb" />
+                <span>
+                  <strong>Khuyến nghị Carpenter (1995):</strong> Số nơ-ron lớp ẩn tối ưu là <strong>h = {archMetrics.carpenterRecommended}</strong> (đảm bảo tổng liên kết & nơ-ron &lt; N = {numSamples}).
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setLocalConfig((prev) => ({
+                    ...prev,
+                    hiddenNodes1: archMetrics.carpenterRecommended || 3,
+                    hiddenNodes2: 0,
+                  }));
+                }}
+                className="btn btn-outline"
+                style={{
+                  fontSize: '0.75rem',
+                  padding: '0.25rem 0.6rem',
+                  backgroundColor: '#ffffff',
+                  borderColor: '#2563eb',
+                  color: '#2563eb',
+                  fontWeight: '700',
+                }}
+                title="Tự động đặt số nơ-ron ẩn Tầng 1 = h theo công thức Carpenter và tắt Tầng 2"
+              >
+                💡 Áp Dụng Kiến Trúc Carpenter (h = {archMetrics.carpenterRecommended})
+              </button>
+            </div>
+          )}
         </div>
 
         {/* 4. Action Buttons Toolbar (Các Nút Fit, Áp Dụng...) */}
@@ -1669,59 +1716,70 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
       ) : (
         <>
           {/* Neural Fit Summary Gauges */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.85rem' }}>
             
             {/* Training R-Squared */}
-            <div className="qbd-card" style={{ padding: '1rem', borderLeft: '4px solid #1e3a8a' }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: '700', color: '#64748b' }}>TRAINING R² (HUẤN LUYỆN)</div>
-              <div style={{ fontSize: '1.6rem', fontWeight: '800', color: '#1e3a8a', margin: '0.2rem 0' }}>
+            <div className="qbd-card" style={{ padding: '0.85rem', borderLeft: '4px solid #1e3a8a' }}>
+              <div style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b' }}>TRAIN R² (HUẤN LUYỆN)</div>
+              <div style={{ fontSize: '1.45rem', fontWeight: '800', color: '#1e3a8a', margin: '0.15rem 0' }}>
                 {neuralModel.diagnostics.rSquaredTrain.toFixed(4)}
               </div>
-              <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+              <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
                 RMSE = {neuralModel.diagnostics.rmseTrain.toFixed(3)}
               </div>
             </div>
 
-            {/* Validation R-Squared */}
-            <div className="qbd-card" style={{ padding: '1rem', borderLeft: '4px solid #dc2626' }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: '700', color: '#64748b' }}>VALIDATION R² (KIỂM ĐỊNH)</div>
-              <div style={{ fontSize: '1.6rem', fontWeight: '800', color: '#dc2626', margin: '0.2rem 0' }}>
-                {neuralModel.diagnostics.rSquaredVal.toFixed(4)}
+            {/* Validation R-Squared / Q^2 */}
+            <div className="qbd-card" style={{ padding: '0.85rem', borderLeft: '4px solid #dc2626' }}>
+              <div style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b' }}>HỆ SỐ DỰ BÁO Q² (VAL R²)</div>
+              <div style={{ fontSize: '1.45rem', fontWeight: '800', color: '#dc2626', margin: '0.15rem 0' }}>
+                {(neuralModel.diagnostics.qSquared ?? neuralModel.diagnostics.rSquaredVal).toFixed(4)}
               </div>
-              <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                RMSE = {neuralModel.diagnostics.rmseVal.toFixed(3)}
+              <div style={{ fontSize: '0.7rem', color: (neuralModel.diagnostics.qSquared ?? neuralModel.diagnostics.rSquaredVal) > 0.7 ? '#15803d' : '#64748b' }}>
+                {(neuralModel.diagnostics.qSquared ?? neuralModel.diagnostics.rSquaredVal) > 0.7 ? '✓ Dự báo tốt (> 0.7)' : `RMSE = ${neuralModel.diagnostics.rmseVal.toFixed(3)}`}
               </div>
             </div>
 
             {/* Overall R-Squared */}
-            <div className="qbd-card" style={{ padding: '1rem', borderLeft: '4px solid #7c3aed' }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: '700', color: '#64748b' }}>OVERALL R² (TOÀN BỘ DỮ LIỆU)</div>
-              <div style={{ fontSize: '1.6rem', fontWeight: '800', color: '#7c3aed', margin: '0.2rem 0' }}>
+            <div className="qbd-card" style={{ padding: '0.85rem', borderLeft: '4px solid #7c3aed' }}>
+              <div style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b' }}>OVERALL R² (TOÀN BỘ)</div>
+              <div style={{ fontSize: '1.45rem', fontWeight: '800', color: '#7c3aed', margin: '0.15rem 0' }}>
                 {neuralModel.diagnostics.rSquaredOverall.toFixed(4)}
               </div>
-              <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                MAE = {neuralModel.diagnostics.maeOverall.toFixed(3)}
+              <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                R²adj = {neuralModel.diagnostics.adjRSquared?.toFixed(4) ?? '-'}
+              </div>
+            </div>
+
+            {/* Information Criteria AICc / BIC / -2LL */}
+            <div className="qbd-card" style={{ padding: '0.85rem', borderLeft: '4px solid #0284c7' }}>
+              <div style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b' }}>AICc / BIC / -2LL</div>
+              <div style={{ fontSize: '1.15rem', fontWeight: '800', color: '#0284c7', margin: '0.2rem 0' }}>
+                AICc = {neuralModel.diagnostics.aicc?.toFixed(1) ?? '-'}
+              </div>
+              <div style={{ fontSize: '0.7rem', color: '#475569' }}>
+                BIC: {neuralModel.diagnostics.bic?.toFixed(1) ?? '-'} | -2LL: {neuralModel.diagnostics.twoLL?.toFixed(1) ?? '-'}
               </div>
             </div>
 
             {/* Tour & Architecture Info */}
-            <div className="qbd-card" style={{ padding: '1rem', borderLeft: '4px solid #0f766e' }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: '700', color: '#64748b' }}>TOUR TỐI ƯU / KIẾN TRÚC</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: '800', color: '#0f766e', margin: '0.35rem 0' }}>
+            <div className="qbd-card" style={{ padding: '0.85rem', borderLeft: '4px solid #0f766e' }}>
+              <div style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b' }}>TOUR TỐI ƯU / KIẾN TRÚC</div>
+              <div style={{ fontSize: '1.15rem', fontWeight: '800', color: '#0f766e', margin: '0.2rem 0' }}>
                 Tour #{neuralModel.diagnostics.bestTourIndex} / {localConfig.numTours}
               </div>
-              <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                Lớp ẩn: [{localConfig.hiddenNodes1}{localConfig.hiddenNodes2 > 0 ? `, ${localConfig.hiddenNodes2}` : ''}] ({localConfig.activation.toUpperCase()})
+              <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                [{localConfig.hiddenNodes1}{localConfig.hiddenNodes2 > 0 ? `, ${localConfig.hiddenNodes2}` : ''}] ({localConfig.activation.toUpperCase()})
               </div>
             </div>
 
           </div>
 
-          {/* Model Comparison Table: Polynomial ANOVA vs Neural Network */}
+          {/* Model Comparison Table: Polynomial ANOVA vs Neural Network (Slide 36) */}
           <div className="qbd-card">
             <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <TrendingUp size={18} color="#1e3a8a" />
-              <span>Bảng So Sánh Hiệu Quả: Hồi Quy Đa Thức ANOVA vs. Mạng Nơ-ron AI (Model Comparison)</span>
+              <span>Bảng So Sánh Hiệu Quả: Hồi Quy Đa Thức ANOVA vs. Mạng Nơ-ron AI (Model Comparison - Slide 36)</span>
             </h3>
 
             <div className="table-container">
@@ -1730,9 +1788,11 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                   <tr>
                     <th>Phương Pháp Mô Hình Hóa</th>
                     <th>Dạng Kiến Trúc</th>
-                    <th style={{ textAlign: 'center' }}>R² (Độ Khớp)</th>
+                    <th style={{ textAlign: 'center' }}>R² Train</th>
+                    <th style={{ textAlign: 'center' }}>R²adj</th>
+                    <th style={{ textAlign: 'center' }}>Hệ Số Q² (PRESS/Val)</th>
                     <th style={{ textAlign: 'center' }}>Sai Số RMSE</th>
-                    <th style={{ textAlign: 'center' }}>Sai Số MAE</th>
+                    <th style={{ textAlign: 'center' }}>AICc</th>
                     <th>Đánh Giá Chuyên Môn Bào Chế</th>
                   </tr>
                 </thead>
@@ -1745,10 +1805,16 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                       {anovaModel ? anovaModel.diagnostics.rSquared.toFixed(4) : '-'}
                     </td>
                     <td style={{ textAlign: 'center' }}>
-                      {anovaModel ? anovaModel.diagnostics.stdDev.toFixed(3) : '-'}
+                      {anovaModel ? anovaModel.diagnostics.adjRSquared.toFixed(4) : '-'}
+                    </td>
+                    <td style={{ textAlign: 'center', fontWeight: '700', color: (anovaModel?.diagnostics.qSquared ?? anovaModel?.diagnostics.predRSquared ?? 0) > 0.7 ? '#15803d' : '#475569' }}>
+                      {anovaModel ? (anovaModel.diagnostics.qSquared ?? anovaModel.diagnostics.predRSquared).toFixed(4) : '-'}
                     </td>
                     <td style={{ textAlign: 'center' }}>
-                      {anovaModel ? (anovaModel.diagnostics.stdDev * 0.7979).toFixed(3) : '-'}
+                      {anovaModel ? anovaModel.diagnostics.stdDev.toFixed(3) : '-'}
+                    </td>
+                    <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
+                      {anovaModel?.diagnostics.aicc !== undefined ? anovaModel.diagnostics.aicc.toFixed(1) : '-'}
                     </td>
                     <td style={{ fontSize: '0.78rem' }}>
                       Mô hình tường minh, dễ giải thích hiệu ứng chính và tương tác theo tiêu chuẩn ICH Q8.
@@ -1762,13 +1828,19 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                       MLP [{localConfig.hiddenNodes1}{localConfig.hiddenNodes2 > 0 ? `, ${localConfig.hiddenNodes2}` : ''}] ({localConfig.activation.toUpperCase()})
                     </td>
                     <td style={{ textAlign: 'center', fontWeight: '700', color: '#7c3aed' }}>
-                      {neuralModel.diagnostics.rSquaredOverall.toFixed(4)}
+                      {neuralModel.diagnostics.rSquaredTrain.toFixed(4)}
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      {neuralModel.diagnostics.adjRSquared?.toFixed(4) ?? neuralModel.diagnostics.rSquaredOverall.toFixed(4)}
+                    </td>
+                    <td style={{ textAlign: 'center', fontWeight: '700', color: (neuralModel.diagnostics.qSquared ?? neuralModel.diagnostics.rSquaredVal) > 0.7 ? '#15803d' : '#7c3aed' }}>
+                      {(neuralModel.diagnostics.qSquared ?? neuralModel.diagnostics.rSquaredVal).toFixed(4)}
                     </td>
                     <td style={{ textAlign: 'center', fontWeight: '700' }}>
                       {neuralModel.diagnostics.rmseOverall.toFixed(3)}
                     </td>
-                    <td style={{ textAlign: 'center' }}>
-                      {neuralModel.diagnostics.maeOverall.toFixed(3)}
+                    <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
+                      {neuralModel.diagnostics.aicc !== undefined ? neuralModel.diagnostics.aicc.toFixed(1) : '-'}
                     </td>
                     <td style={{ fontSize: '0.78rem' }}>
                       Khả năng xấp xỉ phi tuyến tính vượt trội, nắm bắt tốt các tương tác phức tạp và hiện tượng bão hòa/cực trị.

@@ -559,3 +559,132 @@ export function extract2DContourSegments(
   return segments;
 }
 
+/**
+ * Calculate Information Criteria (AICc, BIC, -2LL, Log-Likelihood)
+ * According to Pharmaceutical Formulation DoE Standards (Slide 12)
+ */
+export interface InformationCriteria {
+  aicc: number;
+  bic: number;
+  twoLL: number;
+  logLikelihood: number;
+}
+
+export function calculateInformationCriteria(n: number, p: number, sse: number): InformationCriteria {
+  if (n <= 0 || sse <= 0) {
+    return { aicc: 0, bic: 0, twoLL: 0, logLikelihood: 0 };
+  }
+  const safeSSE = Math.max(1e-12, sse);
+  const logTerm = n * Math.log(safeSSE / n);
+  const constTerm = n * Math.log(2 * Math.PI) + n;
+
+  const twoLL = logTerm + constTerm;
+  const logLikelihood = -twoLL / 2;
+
+  // AICc with Hurvich & Tsai small-sample correction
+  const denom = n - p - 1;
+  const aiccPenalty = 2 * p + (denom > 0 ? (2 * p * (p + 1)) / denom : 2 * p);
+  const aicc = twoLL + aiccPenalty;
+
+  // BIC penalty (Schwarz Criterion)
+  const bicPenalty = p * Math.log(n);
+  const bic = twoLL + bicPenalty;
+
+  return {
+    aicc: Number(aicc.toFixed(3)),
+    bic: Number(bic.toFixed(3)),
+    twoLL: Number(twoLL.toFixed(3)),
+    logLikelihood: Number(logLikelihood.toFixed(3)),
+  };
+}
+
+/**
+ * Calculate Carpenter (1995) Neural Architecture and Empirical Rules
+ * According to Pharmaceutical Formulation ANN Guidelines (Slide 31-32)
+ */
+export interface CarpenterArchitectureResult {
+  carpenterRecommended: number;
+  totalWeights: number;
+  totalNodes: number;
+  totalDegrees: number;
+  isSafe: boolean; // totalWeights + totalNodes < N
+  overfittingRisk: 'safe' | 'warning' | 'danger';
+  rules: { name: string; value: number; description: string }[];
+  recommendation: string;
+}
+
+export function calculateCarpenterArchitecture(
+  nInputs: number,
+  nOutputs: number,
+  nSamples: number,
+  beta: number = 1.2
+): CarpenterArchitectureResult {
+  const n = Math.max(1, nInputs);
+  const m = Math.max(1, nOutputs);
+  const N = Math.max(1, nSamples);
+
+  // Carpenter (1995) formula: h = (N/beta - m) / (n + m + 1)
+  const rawH = (N / Math.max(1.0, beta) - m) / (n + m + 1);
+  const hCarpenter = Math.max(1, Math.min(Math.max(1, 2 * n), Math.round(rawH)));
+
+  // Parameter calculation for 1 hidden layer
+  const weights = n * hCarpenter + hCarpenter * m;
+  const biases = hCarpenter + m;
+  const totalParams = weights + biases;
+  const isSafe = totalParams < N;
+
+  const rules = [
+    {
+      name: 'Carpenter (1995)',
+      value: hCarpenter,
+      description: `Công thức Carpenter với β=${beta}: h = (N/β - m)/(n + m + 1)`,
+    },
+    {
+      name: 'Quy tắc 2/3 (Two-Thirds Rule)',
+      value: Math.max(1, Math.round(n + (2 / 3) * m)),
+      description: `h = n + 2/3 * m = ${n} + 2/3 * ${m}`,
+    },
+    {
+      name: 'Quy tắc Trung bình (Between Inputs & Outputs)',
+      value: Math.max(1, Math.round((n + m) / 2)),
+      description: `h = (n + m) / 2 = (${n} + ${m}) / 2`,
+    },
+    {
+      name: 'Quy tắc Logarithm mẫu',
+      value: Math.max(1, Math.round(Math.log(N))),
+      description: `h ≈ ln(N) = ln(${N})`,
+    },
+    {
+      name: 'Giới hạn trên (Max 2n)',
+      value: 2 * n,
+      description: `h ≤ 2 * n = ${2 * n}`,
+    },
+  ];
+
+  let overfittingRisk: 'safe' | 'warning' | 'danger' = 'safe';
+  let recommendation = '';
+
+  if (totalParams >= N) {
+    overfittingRisk = 'danger';
+    recommendation = `⚠️ Cảnh báo Overfitting: Tổng số tham số (${totalParams}) vượt quá số mẫu thí nghiệm (${N}). Khuyến nghị giảm số nơ-ron ẩn xuống ${Math.max(1, Math.floor(hCarpenter / 2))} hoặc tăng số thí nghiệm.`;
+  } else if (totalParams >= N * 0.75) {
+    overfittingRisk = 'warning';
+    recommendation = `⚡ Cảnh báo: Tỷ lệ tham số / mẫu khá cao (${totalParams}/${N}). Nên áp dụng Dropout hoặc Weight Decay L2 >= 0.01.`;
+  } else {
+    overfittingRisk = 'safe';
+    recommendation = `✓ Cấu trúc tối ưu: Kiến trúc [${n} → ${hCarpenter} → ${m}] cân bằng hoàn hảo giữa độ chính xác và khả năng tổng quát hóa (Tổng tham số = ${totalParams} < N = ${N}).`;
+  }
+
+  return {
+    carpenterRecommended: hCarpenter,
+    totalWeights: weights,
+    totalNodes: biases,
+    totalDegrees: totalParams,
+    isSafe,
+    overfittingRisk,
+    rules,
+    recommendation,
+  };
+}
+
+

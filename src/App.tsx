@@ -282,6 +282,7 @@ export function App() {
           <StatisticalANOVATab
             project={project}
             models={models}
+            neuralModels={neuralModels}
             selectedCQA={selectedCQA}
             onSelectCQA={setSelectedCQA}
             modelTypes={modelTypes}

@@ -145,12 +145,25 @@ export interface ANOVASource {
 export interface ModelDiagnostics {
   rSquared: number;
   adjRSquared: number;
-  predRSquared: number;
+  predRSquared: number; // Q^2 (1 - PRESS/SSTotal)
+  qSquared?: number;    // Alias for Q^2 (Slide 12)
   adeqPrecision: number;
   press: number;
   stdDev: number;
   mean: number;
   cvPercent: number;
+  aicc?: number;        // Akaike's Information Criterion Corrected (Slide 12)
+  bic?: number;         // Bayesian Information Criterion (Slide 12)
+  logLikelihood?: number;
+  twoLL?: number;       // -2 x LogLikelihood (-2LL) (Slide 12)
+  fLOF?: number;        // Lack of Fit F-ratio (Slide 11, 16, 20)
+  pLOF?: number;        // Lack of Fit P-value (> 0.05 indicates good fit)
+  ssLOF?: number;
+  dfLOF?: number;
+  msLOF?: number;
+  ssPureError?: number;
+  dfPureError?: number;
+  msPureError?: number;
   residuals: {
     runOrder: number;
     actual: number;

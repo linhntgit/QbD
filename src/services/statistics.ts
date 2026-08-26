@@ -20,6 +20,7 @@ import {
   fDistributionPValue,
   tDistributionPValue,
   calculateIndividualDesirability,
+  calculateInformationCriteria,
 } from './mathUtils';
 
 interface TermDef {
@@ -261,6 +262,9 @@ export function fitModel(
       ? Math.max(0, Math.min(1, 1 - (ssResidual / dfResidual) / (ssTotal / dfTotal)))
       : 0;
   const predRSquared = ssTotal > 0 ? Math.max(0, Math.min(1, 1 - press / ssTotal)) : 0;
+  const qSquared = predRSquared; // Slide 12 Q^2 (PRESS-based Leave-One-Out R^2)
+
+  const infoCrit = calculateInformationCriteria(n, p, ssResidual);
 
   const yRange = Math.max(...yPred) - Math.min(...yPred);
   const adeqPrecision =
@@ -414,11 +418,24 @@ export function fitModel(
       rSquared,
       adjRSquared,
       predRSquared,
+      qSquared,
       adeqPrecision,
       press,
       stdDev,
       mean: yMean,
       cvPercent,
+      aicc: infoCrit.aicc,
+      bic: infoCrit.bic,
+      logLikelihood: infoCrit.logLikelihood,
+      twoLL: infoCrit.twoLL,
+      fLOF: fLackOfFit,
+      pLOF: pLackOfFit,
+      ssLOF: ssLackOfFit,
+      dfLOF: dfLackOfFit,
+      msLOF: msLackOfFit,
+      ssPureError: ssPureError,
+      dfPureError: dfPureError,
+      msPureError: msPureError,
       residuals: residualDetails,
     },
     equationString,

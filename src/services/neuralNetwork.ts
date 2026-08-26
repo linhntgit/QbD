@@ -10,7 +10,11 @@ import type {
   NeuralActivation,
   DesirabilitySolution,
 } from '../types/qbd';
-import { calculateIndividualDesirability } from './mathUtils';
+import {
+  calculateIndividualDesirability,
+  calculateInformationCriteria,
+  calculateCarpenterArchitecture,
+} from './mathUtils';
 import { projectToBoundedMixture, isWithinSurveyBounds } from './statistics';
 
 /**
@@ -107,6 +111,8 @@ export function calculateNeuralArchitectureMetrics(
   numSamples: number;
   sampleToParamRatio: number;
   overfittingRisk: 'safe' | 'warning' | 'danger';
+  carpenterRecommended?: number;
+  rules?: { name: string; value: number; description: string }[];
   recommendation: string;
 } {
   const h1 = Math.max(1, hidden1);
@@ -121,18 +127,20 @@ export function calculateNeuralArchitectureMetrics(
 
   const sampleToParamRatio = totalParameters > 0 ? Number((numSamples / totalParameters).toFixed(2)) : 0;
 
+  const carp = calculateCarpenterArchitecture(numInputs, m, numSamples, 1.2);
+
   let overfittingRisk: 'safe' | 'warning' | 'danger' = 'safe';
   let recommendation = '';
 
   if (sampleToParamRatio >= 2.0) {
     overfittingRisk = 'safe';
-    recommendation = 'Kích thước mẫu đủ lớn so với số tham số mạng (N/P ≥ 2.0). Nguy cơ quá khớp rất thấp, mô hình có độ tự do tốt.';
+    recommendation = `Kích thước mẫu đủ lớn so với số tham số mạng (N/P = ${sampleToParamRatio} ≥ 2.0). Khuyến nghị số neuron theo Carpenter (1995): h = ${carp.carpenterRecommended}.`;
   } else if (sampleToParamRatio >= 1.0) {
     overfittingRisk = 'warning';
-    recommendation = 'Cảnh báo nguy cơ quá khớp trung bình (1.0 ≤ N/P < 2.0). Khuyến nghị bật L2 Regularization (Weight Decay ≥ 0.01) hoặc giảm bớt số neuron.';
+    recommendation = `Cảnh báo nguy cơ quá khớp trung bình (1.0 ≤ N/P < 2.0). Khuyến nghị cấu trúc theo Carpenter: h = ${carp.carpenterRecommended}, bật L2 Regularization (Weight Decay ≥ 0.01).`;
   } else {
     overfittingRisk = 'danger';
-    recommendation = `BÁO ĐỘNG OVERFITTING: Số tham số mạng (${totalParameters}) lớn hơn số thí nghiệm (${numSamples}) (N/P < 1.0)! Mạng nơ-ron rất dễ ghi nhớ dữ liệu thực nghiệm thay vì khái quát hóa. Hãy giảm số neuron tầng 1, tắt tầng 2 (Nodes = 0) hoặc tăng Weight Decay (≥ 0.05).`;
+    recommendation = `BÁO ĐỘNG OVERFITTING: Số tham số mạng (${totalParameters}) lớn hơn số thí nghiệm (${numSamples})! Khuyến nghị hạ số neuron xuống h = ${carp.carpenterRecommended} theo công thức Carpenter và đặt Weight Decay ≥ 0.05.`;
   }
 
   return {
@@ -144,6 +152,8 @@ export function calculateNeuralArchitectureMetrics(
     numSamples,
     sampleToParamRatio,
     overfittingRisk,
+    carpenterRecommended: carp.carpenterRecommended,
+    rules: carp.rules,
     recommendation,
   };
 }
@@ -737,6 +747,11 @@ export function fitNeuralNetModel(
   }
   excelFormula += `) * ${ySd.toFixed(4)} + ${yMean.toFixed(4)}`;
 
+  const pCount = calculateNeuralArchitectureMetrics(numInputs, h1, h2, 1, N).totalParameters;
+  const adjRSquared = N > pCount && N > 1 ? Math.max(0, Math.min(1, 1 - ((1 - r2Overall) * (N - 1)) / (N - pCount))) : r2Overall;
+  const qSquared = nVal > 0 ? r2Val : r2Overall;
+  const infoCrit = calculateInformationCriteria(N, pCount, overallSSE);
+
   return {
     cqaCode: cqa.code,
     config,
@@ -752,6 +767,8 @@ export function fitNeuralNetModel(
       rSquaredTrain: Number(r2Train.toFixed(4)),
       rSquaredVal: Number(r2Val.toFixed(4)),
       rSquaredOverall: Number(r2Overall.toFixed(4)),
+      adjRSquared: Number(adjRSquared.toFixed(4)),
+      qSquared: Number(qSquared.toFixed(4)),
       rmseTrain: Number(rmseTrain.toFixed(4)),
       rmseVal: Number(rmseVal.toFixed(4)),
       rmseOverall: Number(rmseOverall.toFixed(4)),
@@ -761,6 +778,10 @@ export function fitNeuralNetModel(
       sseTrain: Number(trainSSE.toFixed(4)),
       sseVal: Number(valSSE.toFixed(4)),
       sseOverall: Number(overallSSE.toFixed(4)),
+      aicc: infoCrit.aicc,
+      bic: infoCrit.bic,
+      logLikelihood: infoCrit.logLikelihood,
+      twoLL: infoCrit.twoLL,
       lossHistory: bestGlobalLossHistory,
       residuals,
       variableImportance,
@@ -771,7 +792,7 @@ export function fitNeuralNetModel(
     pythonCode,
     excelFormula,
     architectureMode: 'independent',
-    parameterCount: calculateNeuralArchitectureMetrics(numInputs, h1, h2, 1, N).totalParameters,
+    parameterCount: pCount,
   };
 }
 
@@ -1433,6 +1454,8 @@ export function fitMultiOutputNeuralNet(
         rSquaredTrain: Number(r2Train.toFixed(4)),
         rSquaredVal: Number(r2Val.toFixed(4)),
         rSquaredOverall: Number(r2Overall.toFixed(4)),
+        adjRSquared: Number((nCqaTotal > numInputs && nCqaTotal > 1 ? Math.max(0, Math.min(1, 1 - ((1 - r2Overall) * (nCqaTotal - 1)) / (nCqaTotal - numInputs))) : r2Overall).toFixed(4)),
+        qSquared: Number((nCqaVal > 0 ? r2Val : r2Overall).toFixed(4)),
         rmseTrain: Number(rmseTrain.toFixed(4)),
         rmseVal: Number(rmseVal.toFixed(4)),
         rmseOverall: Number(rmseOverall.toFixed(4)),
@@ -1442,6 +1465,10 @@ export function fitMultiOutputNeuralNet(
         sseTrain: Number(trainSSE.toFixed(4)),
         sseVal: Number(valSSE.toFixed(4)),
         sseOverall: Number(overallSSE.toFixed(4)),
+        aicc: calculateInformationCriteria(nCqaTotal, numInputs + h1, overallSSE).aicc,
+        bic: calculateInformationCriteria(nCqaTotal, numInputs + h1, overallSSE).bic,
+        logLikelihood: calculateInformationCriteria(nCqaTotal, numInputs + h1, overallSSE).logLikelihood,
+        twoLL: calculateInformationCriteria(nCqaTotal, numInputs + h1, overallSSE).twoLL,
         lossHistory: bestGlobalLossHistory,
         residuals,
         variableImportance,

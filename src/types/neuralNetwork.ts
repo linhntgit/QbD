@@ -11,6 +11,8 @@ export interface NeuralArchitectureMetrics {
   numSamples: number;
   sampleToParamRatio: number;
   overfittingRisk: 'safe' | 'warning' | 'danger';
+  carpenterRecommended?: number; // Carpenter (1995) formula: h = (N/beta - m) / (n + m + 1)
+  rules?: { name: string; value: number; description: string }[];
   recommendation: string;
 }
 
@@ -46,6 +48,8 @@ export interface NeuralNetDiagnostics {
   rSquaredTrain: number;
   rSquaredVal: number;
   rSquaredOverall: number;
+  adjRSquared?: number;
+  qSquared?: number; // Q^2 (1 - PRESS/SSTotal or Validation R^2)
   rmseTrain: number;
   rmseVal: number;
   rmseOverall: number;
@@ -55,6 +59,10 @@ export interface NeuralNetDiagnostics {
   sseTrain: number;
   sseVal: number;
   sseOverall: number;
+  aicc?: number;    // Akaike Information Criterion Corrected
+  bic?: number;     // Bayesian Information Criterion
+  logLikelihood?: number;
+  twoLL?: number;   // -2LL (-2 x LogLikelihood)
   lossHistory: { epoch: number; trainLoss: number; valLoss?: number }[];
   residuals: NeuralResidual[];
   variableImportance: FactorSensitivity[];
