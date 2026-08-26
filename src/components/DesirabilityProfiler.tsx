@@ -345,28 +345,66 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <div
               style={{
-                width: '64px',
-                height: '64px',
+                width: '78px',
+                height: '78px',
+                minWidth: '78px',
                 borderRadius: '50%',
-                backgroundColor:
+                background:
                   (currentEvaluation?.overallD || 0) >= 0.8
-                    ? '#10b981'
+                    ? 'linear-gradient(135deg, #10b981, #059669)'
                     : (currentEvaluation?.overallD || 0) >= 0.5
-                    ? '#f59e0b'
-                    : '#ef4444',
+                    ? 'linear-gradient(135deg, #f59e0b, #d97706)'
+                    : 'linear-gradient(135deg, #ef4444, #dc2626)',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-                border: '3px solid rgba(255,255,255,0.4)',
+                boxShadow: '0 4px 14px rgba(0, 0, 0, 0.25)',
+                border: '3px solid rgba(255, 255, 255, 0.7)',
+                flexShrink: 0,
+                textAlign: 'center',
               }}
             >
-              <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.5px' }}>
-                Overall D
+              <span
+                style={{
+                  fontSize: '0.62rem',
+                  textTransform: 'uppercase',
+                  fontWeight: '800',
+                  letterSpacing: '0.04em',
+                  color: 'rgba(255, 255, 255, 0.95)',
+                  lineHeight: 1,
+                  marginBottom: '0.2rem',
+                }}
+              >
+                OVERALL D
               </span>
-              <span style={{ fontSize: '1.15rem', fontWeight: '800', fontFamily: 'monospace' }}>
+              <span
+                style={{
+                  fontSize: '1.25rem',
+                  fontWeight: '900',
+                  fontFamily: 'monospace',
+                  lineHeight: 1,
+                  color: '#ffffff',
+                  textShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                }}
+              >
                 {currentEvaluation?.overallD.toFixed(3) || '0.000'}
+              </span>
+              <span
+                style={{
+                  fontSize: '0.55rem',
+                  fontWeight: '700',
+                  color: 'rgba(255, 255, 255, 0.9)',
+                  lineHeight: 1,
+                  marginTop: '0.2rem',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {(currentEvaluation?.overallD || 0) >= 0.8
+                  ? 'TỐI ƯU'
+                  : (currentEvaluation?.overallD || 0) >= 0.5
+                  ? 'ĐẠT'
+                  : 'CHƯA ĐẠT'}
               </span>
             </div>
 
