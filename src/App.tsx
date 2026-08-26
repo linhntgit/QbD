@@ -196,6 +196,8 @@ export function App() {
       {/* Top Navbar */}
       <Navbar
         project={project}
+        activeTab={activeTab}
+        onNavigateToTab={setActiveTab}
         onLoadProject={handleLoadProject}
         onExportWord={handleExportWord}
         onSaveJSON={handleSaveJSON}

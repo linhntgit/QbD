@@ -6,12 +6,15 @@ import {
   FolderOpen,
   PlusCircle,
   BookOpen,
+  FileCheck2,
 } from 'lucide-react';
 import type { QBDProject } from '../types/qbd';
 import { CASE_STUDIES } from '../data/caseStudies';
 
 interface NavbarProps {
   project: QBDProject;
+  activeTab?: string;
+  onNavigateToTab?: (tab: any) => void;
   onLoadProject: (project: QBDProject) => void;
   onExportWord: () => void;
   onSaveJSON: () => void;
@@ -20,6 +23,8 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({
   project,
+  activeTab,
+  onNavigateToTab,
   onLoadProject,
   onExportWord,
   onSaveJSON,
@@ -112,7 +117,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <BookOpen size={16} color="#0f766e" />
               <select
                 className="input-field"
-                style={{ width: '220px', padding: '0.35rem 0.5rem', fontSize: '0.8rem' }}
+                style={{ width: '200px', padding: '0.35rem 0.5rem', fontSize: '0.8rem' }}
                 value={project.id}
                 onChange={(e) => {
                   const selected = CASE_STUDIES.find((cs) => cs.id === e.target.value);
@@ -128,15 +133,28 @@ export const Navbar: React.FC<NavbarProps> = ({
               </select>
             </div>
 
+            {/* Direct Jump to Report Tab */}
+            {onNavigateToTab && (
+              <button
+                onClick={() => onNavigateToTab('report')}
+                className={`btn ${activeTab === 'report' ? 'btn-primary' : 'btn-teal'}`}
+                style={{ fontSize: '0.82rem', padding: '0.4rem 0.75rem' }}
+                title="Xem ngay Hồ sơ báo cáo phát triển thuốc CTD Module 3.2.P.2 (Tab 8)"
+              >
+                <FileCheck2 size={16} />
+                <span>8. Báo Cáo Hồ Sơ</span>
+              </button>
+            )}
+
             {/* Export Word */}
             <button
               onClick={onExportWord}
-              className="btn btn-teal"
+              className="btn btn-secondary"
               style={{ fontSize: '0.82rem', padding: '0.4rem 0.75rem' }}
               title="Xuất hồ sơ phát triển thuốc ICH CTD Module 3.2.P.2 sang định dạng MS Word"
             >
-              <FileText size={16} />
-              <span>Xuất Báo cáo Word</span>
+              <FileText size={16} color="#0f766e" />
+              <span>Xuất Word (.docx)</span>
             </button>
 
             {/* Save JSON */}
