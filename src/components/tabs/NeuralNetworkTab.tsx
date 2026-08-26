@@ -21,6 +21,7 @@ import {
   Share2,
   Target,
   Zap,
+  RotateCcw,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import type {
@@ -1228,7 +1229,134 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           </div>
         </div>
 
-        {/* 2. Topology Visualizer, Parameter Counter & Overfitting Risk Evaluator */}
+        {/* 2. Hyperparameter Settings (Phần Cài Đặt Mạng Nơ-ron) */}
+        <div
+          style={{
+            marginTop: '1rem',
+            padding: '1rem 1.1rem',
+            backgroundColor: '#ffffff',
+            borderRadius: '0.5rem',
+            border: '1px solid #cbd5e1',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.82rem', fontWeight: '700', color: '#1e293b' }}>
+              <Sliders size={16} color="#7c3aed" />
+              <span>CÀI ĐẶT THAM SỐ HUẤN LUYỆN (HYPERPARAMETERS):</span>
+            </div>
+            <button
+              onClick={() => setLocalConfig(DEFAULT_NEURAL_CONFIG)}
+              className="btn btn-secondary"
+              style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', gap: '0.25rem' }}
+              title="Khôi phục cấu hình về mặc định"
+            >
+              <RotateCcw size={12} />
+              <span>Mặc Định</span>
+            </button>
+          </div>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+              gap: '0.75rem',
+              alignItems: 'end',
+            }}
+          >
+            <div>
+              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#475569', marginBottom: '0.25rem' }}>
+                NÚT ẨN LỚP 1 (H1)
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={15}
+                className="input-field"
+                value={localConfig.hiddenNodes1}
+                onChange={(e) => setLocalConfig({ ...localConfig, hiddenNodes1: Math.max(1, Number(e.target.value)) })}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#475569', marginBottom: '0.25rem' }}>
+                NÚT ẨN LỚP 2 (H2)
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={10}
+                className="input-field"
+                value={localConfig.hiddenNodes2}
+                onChange={(e) => setLocalConfig({ ...localConfig, hiddenNodes2: Math.max(0, Number(e.target.value)) })}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#475569', marginBottom: '0.25rem' }}>
+                HÀM KÍCH HOẠT
+              </label>
+              <select
+                className="input-field"
+                value={localConfig.activation}
+                onChange={(e) => setLocalConfig({ ...localConfig, activation: e.target.value as NeuralActivation })}
+              >
+                <option value="tanh">TanH (Chuẩn)</option>
+                <option value="gaussian">Gaussian (RBF)</option>
+                <option value="linear">Linear</option>
+                <option value="sigmoid">Sigmoid</option>
+                <option value="relu">ReLU</option>
+              </select>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#475569', marginBottom: '0.25rem' }}>
+                PHẠT WEIGHT DECAY (λ)
+              </label>
+              <select
+                className="input-field"
+                value={localConfig.weightDecay}
+                onChange={(e) => setLocalConfig({ ...localConfig, weightDecay: Number(e.target.value) })}
+              >
+                <option value={0.0}>0.0 (Không phạt)</option>
+                <option value={0.001}>0.001 (Nhẹ)</option>
+                <option value={0.01}>0.01 (Vừa)</option>
+                <option value={0.05}>0.05 (Chống Overfit)</option>
+                <option value={0.1}>0.1 (Cao)</option>
+              </select>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#475569', marginBottom: '0.25rem' }}>
+                SỐ VÒNG TOUR (RESTARS)
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="50"
+                className="input-field"
+                value={localConfig.numTours}
+                onChange={(e) => setLocalConfig({ ...localConfig, numTours: Math.max(1, parseInt(e.target.value) || 10) })}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#475569', marginBottom: '0.25rem' }}>
+                SỐ VÒNG LẶP EPOCHS
+              </label>
+              <input
+                type="number"
+                min="50"
+                max="2000"
+                step="50"
+                className="input-field"
+                value={localConfig.maxEpochs}
+                onChange={(e) => setLocalConfig({ ...localConfig, maxEpochs: Math.max(50, parseInt(e.target.value) || 500) })}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* 3. Topology Visualizer, Parameter Counter & Overfitting Risk Evaluator (Hiển Thị Kiến Trúc & Cảnh Báo) */}
         <div
           style={{
             marginTop: '1rem',
@@ -1323,112 +1451,22 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           </div>
         </div>
 
-        {/* 3. Hyperparameter Settings Toolbar */}
+        {/* 4. Action Buttons Toolbar (Các Nút Fit, Áp Dụng...) */}
         <div
           style={{
             marginTop: '1rem',
-            padding: '1rem',
+            padding: '0.85rem 1rem',
             backgroundColor: '#ffffff',
             borderRadius: '0.5rem',
             border: '1px solid #cbd5e1',
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
             gap: '0.75rem',
-            alignItems: 'end',
           }}
         >
-          <div>
-            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#475569', marginBottom: '0.25rem' }}>
-              NÚT ẨN LỚP 1 (H1)
-            </label>
-            <input
-              type="number"
-              min={1}
-              max={15}
-              className="input-field"
-              value={localConfig.hiddenNodes1}
-              onChange={(e) => setLocalConfig({ ...localConfig, hiddenNodes1: Math.max(1, Number(e.target.value)) })}
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#475569', marginBottom: '0.25rem' }}>
-              NÚT ẨN LỚP 2 (H2)
-            </label>
-            <input
-              type="number"
-              min={0}
-              max={10}
-              className="input-field"
-              value={localConfig.hiddenNodes2}
-              onChange={(e) => setLocalConfig({ ...localConfig, hiddenNodes2: Math.max(0, Number(e.target.value)) })}
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#475569', marginBottom: '0.25rem' }}>
-              HÀM KÍCH HOẠT
-            </label>
-            <select
-              className="input-field"
-              value={localConfig.activation}
-              onChange={(e) => setLocalConfig({ ...localConfig, activation: e.target.value as NeuralActivation })}
-            >
-              <option value="tanh">TanH (Chuẩn)</option>
-              <option value="gaussian">Gaussian (RBF)</option>
-              <option value="linear">Linear</option>
-              <option value="sigmoid">Sigmoid</option>
-              <option value="relu">ReLU</option>
-            </select>
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#475569', marginBottom: '0.25rem' }}>
-              PHẠT WEIGHT DECAY (λ)
-            </label>
-            <select
-              className="input-field"
-              value={localConfig.weightDecay}
-              onChange={(e) => setLocalConfig({ ...localConfig, weightDecay: Number(e.target.value) })}
-            >
-              <option value={0.0}>0.0 (Không phạt)</option>
-              <option value={0.001}>0.001 (Nhẹ)</option>
-              <option value={0.01}>0.01 (Vừa)</option>
-              <option value={0.05}>0.05 (Chống Overfit)</option>
-              <option value={0.1}>0.1 (Cao)</option>
-            </select>
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#475569', marginBottom: '0.25rem' }}>
-              SỐ VÒNG TOUR (RESTARS)
-            </label>
-            <input
-              type="number"
-              min="1"
-              max="50"
-              className="input-field"
-              value={localConfig.numTours}
-              onChange={(e) => setLocalConfig({ ...localConfig, numTours: Math.max(1, parseInt(e.target.value) || 10) })}
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#475569', marginBottom: '0.25rem' }}>
-              SỐ VÒNG LẶP EPOCHS
-            </label>
-            <input
-              type="number"
-              min="50"
-              max="2000"
-              step="50"
-              className="input-field"
-              value={localConfig.maxEpochs}
-              onChange={(e) => setLocalConfig({ ...localConfig, maxEpochs: Math.max(50, parseInt(e.target.value) || 500) })}
-            />
-          </div>
-
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', flex: 1 }}>
             <button
               onClick={handleTrain}
               disabled={isTraining}
@@ -1436,22 +1474,22 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               style={{
                 backgroundColor: isTraining ? '#9333ea' : '#7c3aed',
                 borderColor: '#7c3aed',
-                fontSize: '0.82rem',
-                padding: '0.45rem 1rem',
-                flex: 1,
+                fontSize: '0.85rem',
+                padding: '0.5rem 1.3rem',
                 cursor: isTraining ? 'wait' : 'pointer',
                 fontWeight: '700',
+                boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
               }}
             >
               {isTraining ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  <span>Đang Fit ({trainingProgress ? `Tour ${trainingProgress.tour}/${trainingProgress.totalTours}` : '...'})</span>
+                  <span>Đang Huấn Luyện ({trainingProgress ? `Tour ${trainingProgress.tour}/${trainingProgress.totalTours}` : '...'})</span>
                 </>
               ) : (
                 <>
                   <RefreshCw size={16} />
-                  <span>{neuralTrainingMode === 'shared' ? 'Huấn Luyện Mạng Chung (All Y)' : `Huấn Luyện ${currentCQA.code}`}</span>
+                  <span>{neuralTrainingMode === 'shared' ? '⚡ Huấn Luyện Mạng Chung (All Y)' : `⚡ Huấn Luyện ${currentCQA.code}`}</span>
                 </>
               )}
             </button>
@@ -1463,15 +1501,16 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                   disabled={isTraining}
                   className="btn btn-outline"
                   style={{
-                    fontSize: '0.78rem',
-                    padding: '0.45rem 0.75rem',
+                    fontSize: '0.82rem',
+                    padding: '0.5rem 1rem',
                     borderColor: '#7c3aed',
                     color: '#7c3aed',
+                    fontWeight: '600',
                   }}
                   title="Huấn luyện đồng loạt tất cả các CQA với cấu hình độc lập của từng CQA"
                 >
-                  <Zap size={14} />
-                  <span>Fit All CQAs</span>
+                  <Zap size={15} />
+                  <span>⚡ Fit All CQAs</span>
                 </button>
 
                 <button
@@ -1479,16 +1518,24 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                   disabled={isTraining}
                   className="btn btn-outline"
                   style={{
-                    fontSize: '0.78rem',
-                    padding: '0.45rem 0.75rem',
+                    fontSize: '0.82rem',
+                    padding: '0.5rem 1rem',
+                    borderColor: '#64748b',
+                    color: '#334155',
                   }}
                   title="Sao chép số node và hàm kích hoạt hiện tại cho toàn bộ các CQA khác"
                 >
-                  <Share2 size={14} />
-                  <span>Áp Dụng All</span>
+                  <Share2 size={15} />
+                  <span>Áp Dụng Cho Tất Cả CQA</span>
                 </button>
               </>
             )}
+          </div>
+
+          <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+            {neuralTrainingMode === 'shared'
+              ? `* Kiến trúc chung áp dụng cho tất cả ${project.cqas.length} biến Y.`
+              : `* Cấu hình đang chọn riêng cho chỉ tiêu ${currentCQA.code} (${currentCQA.name}).`}
           </div>
         </div>
       </div>
