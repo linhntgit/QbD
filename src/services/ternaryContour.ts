@@ -551,7 +551,7 @@ export function buildTernaryPlotlyData(
   } = options;
 
   const traces: any[] = [];
-  const { xGrid, yGrid, zGrid, meshPoints, contourLines, constraints, activeFraction } = contourResult;
+  const { xGrid, yGrid, zGrid, meshPoints, contourLines, constraints } = contourResult;
   const H = TERNARY_HEIGHT;
 
   // 1. Native Plotly 2D Contour (Continuous Bicubic Vector Gradient - 100% Smooth identical to 2D Contour!)
@@ -799,15 +799,14 @@ export function buildTernaryPlotlyData(
         const rawB = typeof valB === 'number' ? valB : parseFloat(String(valB)) || 0;
         const rawC = typeof valC === 'number' ? valC : parseFloat(String(valC)) || 0;
 
-        const aPct = factorA.role === 'mixture_component' ? rawA * 100 : rawA;
-        const bPct = factorB.role === 'mixture_component' ? rawB * 100 : rawB;
-        const cPct = factorC.role === 'mixture_component' ? rawC * 100 : rawC;
+        const aPct = rawA <= 1.0 && factorA.unit !== '%' ? rawA * 100 : rawA;
+        const bPct = rawB <= 1.0 && factorB.unit !== '%' ? rawB * 100 : rawB;
+        const cPct = rawC <= 1.0 && factorC.unit !== '%' ? rawC * 100 : rawC;
 
         const sum = aPct + bPct + cPct;
-        const total = activeFraction * 100;
-        const aNorm = sum > 0 ? (aPct / total) * 100 : 0;
-        const bNorm = sum > 0 ? (bPct / total) * 100 : 0;
-        const cNorm = sum > 0 ? (cPct / total) * 100 : 0;
+        const aNorm = sum > 0 ? (aPct / sum) * 100 : 0;
+        const bNorm = sum > 0 ? (bPct / sum) * 100 : 0;
+        const cNorm = sum > 0 ? (cPct / sum) * 100 : 0;
 
         const cart = ternaryToCartesian(aNorm, bNorm, cNorm);
         runX.push(cart.x);
@@ -858,14 +857,14 @@ export function buildTernaryPlotlyData(
     const optB = typeof rawB === 'number' ? rawB : parseFloat(String(rawB)) || 0;
     const optC = typeof rawC === 'number' ? rawC : parseFloat(String(rawC)) || 0;
 
-    const aPct = factorA.role === 'mixture_component' ? optA * 100 : optA;
-    const bPct = factorB.role === 'mixture_component' ? optB * 100 : optB;
-    const cPct = factorC.role === 'mixture_component' ? optC * 100 : optC;
+    const aPct = optA <= 1.0 && factorA.unit !== '%' ? optA * 100 : optA;
+    const bPct = optB <= 1.0 && factorB.unit !== '%' ? optB * 100 : optB;
+    const cPct = optC <= 1.0 && factorC.unit !== '%' ? optC * 100 : optC;
 
-    const total = activeFraction * 100;
-    const aNorm = (aPct / total) * 100;
-    const bNorm = (bPct / total) * 100;
-    const cNorm = (cPct / total) * 100;
+    const sum = aPct + bPct + cPct;
+    const aNorm = sum > 0 ? (aPct / sum) * 100 : 0;
+    const bNorm = sum > 0 ? (bPct / sum) * 100 : 0;
+    const cNorm = sum > 0 ? (cPct / sum) * 100 : 0;
 
     const cart = ternaryToCartesian(aNorm, bNorm, cNorm);
     const optPred = optimum.predictedResponses[cqa.code];
@@ -1358,15 +1357,14 @@ export function generateTernaryDesignSpace(
         const rawB = typeof valB === 'number' ? valB : parseFloat(String(valB)) || 0;
         const rawC = typeof valC === 'number' ? valC : parseFloat(String(valC)) || 0;
 
-        const aPct = factorA.role === 'mixture_component' ? rawA * 100 : rawA;
-        const bPct = factorB.role === 'mixture_component' ? rawB * 100 : rawB;
-        const cPct = factorC.role === 'mixture_component' ? rawC * 100 : rawC;
+        const aPct = rawA <= 1.0 && factorA.unit !== '%' ? rawA * 100 : rawA;
+        const bPct = rawB <= 1.0 && factorB.unit !== '%' ? rawB * 100 : rawB;
+        const cPct = rawC <= 1.0 && factorC.unit !== '%' ? rawC * 100 : rawC;
 
         const sum = aPct + bPct + cPct;
-        const total = activeFraction * 100;
-        const aNorm = sum > 0 ? (aPct / total) * 100 : 0;
-        const bNorm = sum > 0 ? (bPct / total) * 100 : 0;
-        const cNorm = sum > 0 ? (cPct / total) * 100 : 0;
+        const aNorm = sum > 0 ? (aPct / sum) * 100 : 0;
+        const bNorm = sum > 0 ? (bPct / sum) * 100 : 0;
+        const cNorm = sum > 0 ? (cPct / sum) * 100 : 0;
 
         const cart = ternaryToCartesian(aNorm, bNorm, cNorm);
         runX.push(cart.x);
@@ -1415,14 +1413,14 @@ export function generateTernaryDesignSpace(
     const optB = typeof rawB === 'number' ? rawB : parseFloat(String(rawB)) || 0;
     const optC = typeof rawC === 'number' ? rawC : parseFloat(String(rawC)) || 0;
 
-    const aPct = factorA.role === 'mixture_component' ? optA * 100 : optA;
-    const bPct = factorB.role === 'mixture_component' ? optB * 100 : optB;
-    const cPct = factorC.role === 'mixture_component' ? optC * 100 : optC;
+    const aPct = optA <= 1.0 && factorA.unit !== '%' ? optA * 100 : optA;
+    const bPct = optB <= 1.0 && factorB.unit !== '%' ? optB * 100 : optB;
+    const cPct = optC <= 1.0 && factorC.unit !== '%' ? optC * 100 : optC;
 
-    const total = activeFraction * 100;
-    const aNorm = (aPct / total) * 100;
-    const bNorm = (bPct / total) * 100;
-    const cNorm = (cPct / total) * 100;
+    const sum = aPct + bPct + cPct;
+    const aNorm = sum > 0 ? (aPct / sum) * 100 : 0;
+    const bNorm = sum > 0 ? (bPct / sum) * 100 : 0;
+    const cNorm = sum > 0 ? (cPct / sum) * 100 : 0;
 
     const cart = ternaryToCartesian(aNorm, bNorm, cNorm);
 

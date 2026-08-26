@@ -31,6 +31,14 @@ export function codedToActual(coded: number, factor: Factor): number | string {
     return factor.categories[midIdx];
   }
 
+  // Mixture Component Factor (coded is proportion 0..1, actual is percentage 0..100%)
+  if (factor.role === 'mixture_component' || factor.type === 'Mixture') {
+    if (factor.high <= 1.0 && factor.unit !== '%') {
+      return Number(coded.toFixed(4));
+    }
+    return Number((coded * 100).toFixed(2));
+  }
+
   // Standard Quantitative Continuous Factor
   const low = factor.low;
   const high = factor.high;
@@ -53,12 +61,22 @@ export function actualToCoded(actual: number | string, factor: Factor): number {
     }
     return 0;
   }
+  const val = typeof actual === 'number' ? actual : Number(actual);
+
+  // Mixture Component Factor (actual is 0..100%, coded is proportion 0..1)
+  if (factor.role === 'mixture_component' || factor.type === 'Mixture') {
+    if (factor.high <= 1.0 && factor.unit !== '%') {
+      return Number(val.toFixed(4));
+    }
+    return Number((val / 100).toFixed(4));
+  }
+
   const low = factor.low;
   const high = factor.high;
   const center = factor.center !== undefined ? factor.center : (low + high) / 2;
   const halfRange = (high - low) / 2;
   if (halfRange === 0) return 0;
-  return Number(((actual - center) / halfRange).toFixed(4));
+  return Number(((val - center) / halfRange).toFixed(4));
 }
 
 /**
