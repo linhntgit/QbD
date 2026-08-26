@@ -321,6 +321,65 @@ export function calculateIndividualDesirability(
 }
 
 /**
+ * Calculate QbD Acceptance Criterion Margin for a given predicted response.
+ * Margin >= 0 indicates PASS (within specification / Design Space).
+ * Margin < 0 indicates FAIL (Out of Specification - OOS).
+ */
+export function calculateCQAMargin(
+  yPred: number,
+  objective: string,
+  lowerLimit?: number,
+  upperLimit?: number,
+  target?: number
+): number {
+  if (isNaN(yPred)) return -1;
+
+  if (objective === 'minimize') {
+    // For minimize, specification is y <= upperLimit (USL)
+    if (upperLimit !== undefined) {
+      const range = lowerLimit !== undefined && upperLimit > lowerLimit ? upperLimit - lowerLimit : Math.abs(upperLimit) || 1.0;
+      return (upperLimit - yPred) / range;
+    }
+    if (lowerLimit !== undefined) {
+      return (lowerLimit - yPred) / (Math.abs(lowerLimit) || 1.0);
+    }
+  } else if (objective === 'maximize') {
+    // For maximize, specification is y >= lowerLimit (LSL)
+    if (lowerLimit !== undefined) {
+      const range = upperLimit !== undefined && upperLimit > lowerLimit ? upperLimit - lowerLimit : Math.abs(lowerLimit) || 1.0;
+      return (yPred - lowerLimit) / range;
+    }
+    if (upperLimit !== undefined) {
+      return (yPred - upperLimit) / (Math.abs(upperLimit) || 1.0);
+    }
+  } else if (objective === 'target') {
+    // For target, specification is within [lowerLimit, upperLimit]
+    if (lowerLimit !== undefined && upperLimit !== undefined) {
+      const range = upperLimit - lowerLimit || 1.0;
+      const distLower = (yPred - lowerLimit) / range;
+      const distUpper = (upperLimit - yPred) / range;
+      return Math.min(distLower, distUpper);
+    }
+    if (target !== undefined) {
+      const tol = Math.abs(target) > 0 ? Math.abs(target) * 0.1 : 1.0;
+      return 1.0 - Math.abs(yPred - target) / tol;
+    }
+  } else {
+    // Default dual limit
+    if (lowerLimit !== undefined && upperLimit !== undefined) {
+      const range = upperLimit - lowerLimit || 1.0;
+      const distLower = (yPred - lowerLimit) / range;
+      const distUpper = (upperLimit - yPred) / range;
+      return Math.min(distLower, distUpper);
+    }
+    if (lowerLimit !== undefined) return (yPred - lowerLimit) / (Math.abs(lowerLimit) || 1.0);
+    if (upperLimit !== undefined) return (upperLimit - yPred) / (Math.abs(upperLimit) || 1.0);
+  }
+
+  return 1.0;
+}
+
+/**
  * Compute the Determinant of a square matrix |M| using LU / Gaussian elimination with partial pivoting
  */
 export function matrixDeterminant(matrix: number[][]): number {

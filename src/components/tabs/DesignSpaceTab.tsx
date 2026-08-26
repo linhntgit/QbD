@@ -34,7 +34,7 @@ import {
   generateControlStrategy,
 } from '../../services/statistics';
 import { codedToActual, actualToCoded } from '../../services/doeGenerator';
-import { formatAxisTitle } from '../../services/mathUtils';
+import { formatAxisTitle, calculateCQAMargin } from '../../services/mathUtils';
 import { generateTernaryDesignSpace } from '../../services/ternaryContour';
 
 interface DesignSpaceTabProps {
@@ -267,28 +267,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
         for (const cqa of validCQAs) {
           const model = models[cqa.code];
           const yPred = model.predict(pointCoded);
-          let cqaMargin = 1.0;
-
-          const L = cqa.lowerLimit;
-          const U = cqa.upperLimit;
-          const T = cqa.target;
-
-          if (L !== undefined && U !== undefined) {
-            const range = U - L;
-            const denom = range > 0 ? range : 1.0;
-            const mL = (yPred - L) / denom;
-            const mU = (U - yPred) / denom;
-            cqaMargin = Math.min(mL, mU);
-          } else if (L !== undefined) {
-            const denom = T !== undefined && T > L ? T - L : Math.abs(L) > 0 ? Math.abs(L) * 0.2 : 1.0;
-            cqaMargin = (yPred - L) / denom;
-          } else if (U !== undefined) {
-            const denom = T !== undefined && U > T ? U - T : Math.abs(U) > 0 ? Math.abs(U) * 0.2 : 1.0;
-            cqaMargin = (U - yPred) / denom;
-          } else if (cqa.objective === 'target' && T !== undefined) {
-            const tol = Math.abs(T) > 0 ? Math.abs(T) * 0.1 : 1.0;
-            cqaMargin = 1.0 - Math.abs(yPred - T) / tol;
-          }
+          const cqaMargin = calculateCQAMargin(yPred, cqa.objective, cqa.lowerLimit, cqa.upperLimit, cqa.target);
 
           if (cqaMargin < minMargin) {
             minMargin = cqaMargin;

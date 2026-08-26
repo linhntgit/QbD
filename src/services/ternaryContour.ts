@@ -6,7 +6,7 @@ import type {
   StatisticalModelResult,
   NeuralNetModelResult,
 } from '../types/qbd';
-import { extract2DContourSegments } from './mathUtils';
+import { extract2DContourSegments, calculateCQAMargin } from './mathUtils';
 import { codedToActual, actualToCoded } from './doeGenerator';
 
 export interface TernaryPoint {
@@ -1075,18 +1075,7 @@ export function generateTernaryDesignSpace(
           const m = models[cqa.code];
           if (!m) continue;
           const yPred = m.predict(pointCoded);
-          let cqaMargin = 1.0;
-
-          if (cqa.lowerLimit !== undefined && cqa.upperLimit !== undefined) {
-            const range = cqa.upperLimit - cqa.lowerLimit || 1.0;
-            const distLower = (yPred - cqa.lowerLimit) / range;
-            const distUpper = (cqa.upperLimit - yPred) / range;
-            cqaMargin = Math.min(distLower, distUpper);
-          } else if (cqa.lowerLimit !== undefined) {
-            cqaMargin = (yPred - cqa.lowerLimit) / (Math.abs(cqa.lowerLimit) || 1.0);
-          } else if (cqa.upperLimit !== undefined) {
-            cqaMargin = (cqa.upperLimit - yPred) / (Math.abs(cqa.upperLimit) || 1.0);
-          }
+          const cqaMargin = calculateCQAMargin(yPred, cqa.objective, cqa.lowerLimit, cqa.upperLimit, cqa.target);
 
           if (cqaMargin < minMargin) {
             minMargin = cqaMargin;
