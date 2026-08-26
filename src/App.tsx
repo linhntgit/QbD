@@ -105,7 +105,7 @@ export function App() {
       name: 'Dự án Phát triển Bào chế Mới (QbD Project)',
       moleculeName: 'Hoạt chất mới (New Chemical Entity)',
       dosageForm: 'Viên nén bao phim',
-      author: 'Phòng R&D',
+      author: 'Tran Linh Nguyen',
       version: '1.0.0',
       createdDate: new Date().toISOString().slice(0, 10),
       updatedDate: new Date().toISOString().slice(0, 10),
@@ -288,10 +288,10 @@ export function App() {
       <footer style={{ borderTop: '1px solid #e2e8f0', backgroundColor: '#ffffff', padding: '1rem', marginTop: 'auto', textAlign: 'center', fontSize: '0.78rem', color: '#64748b' }}>
         <div style={{ maxWidth: '1440px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div>
-            <strong>QbD Studio™ Pharma DoE Suite</strong> — Tuân thủ hướng dẫn ICH Q8(R2), ICH Q9, ICH Q10, ICH Q11.
+            <strong>QbD Studio™ Pharma DoE Suite</strong> — © 2026 <strong>Tran Linh Nguyen</strong>. All rights reserved.
           </div>
           <div>
-            Hệ thống toán học: Hồi quy OLS đa thức bậc 2 • ANOVA Lack-of-Fit • Tối ưu hóa Derringer-Suich • Mô phỏng Monte Carlo.
+            Tuân thủ chuẩn mực ICH Q8(R2), ICH Q9, ICH Q10, ICH Q11 • Nền tảng DoE & SAS JMP Profiler.
           </div>
         </div>
       </footer>

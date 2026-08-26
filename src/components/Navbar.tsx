@@ -81,8 +81,24 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           </div>
 
-          {/* ICH Compliance Badges */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          {/* Author Copyright & ICH Compliance Badges */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+            <span
+              className="badge"
+              style={{
+                backgroundColor: '#1e3a8a',
+                color: '#ffffff',
+                fontWeight: '700',
+                fontSize: '0.75rem',
+                padding: '0.2rem 0.55rem',
+                borderRadius: '0.375rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+              }}
+            >
+              © Tran Linh Nguyen
+            </span>
             <span className="badge badge-teal" title="Pharmaceutical Development & Design Space">ICH Q8(R2)</span>
             <span className="badge badge-warning" title="Quality Risk Management & FMEA">ICH Q9</span>
             <span className="badge badge-success" title="Pharmaceutical Quality System & Control Strategy">ICH Q10</span>
