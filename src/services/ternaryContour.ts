@@ -1068,8 +1068,7 @@ export function generateTernaryDesignSpace(
         pointCoded[factorC.code] = factorC.role === 'mixture_component' ? cProp : actualToCoded(cPct, factorC);
 
         let minMargin = 999999;
-        let worstCQA = '';
-        let worstPred = 0;
+        const cqaHoverLines: string[] = [];
 
         for (const cqa of validCQAs) {
           const m = models[cqa.code];
@@ -1079,9 +1078,12 @@ export function generateTernaryDesignSpace(
 
           if (cqaMargin < minMargin) {
             minMargin = cqaMargin;
-            worstCQA = `${cqa.name} (${cqa.code})`;
-            worstPred = yPred;
           }
+
+          const isPass = cqaMargin >= 0;
+          cqaHoverLines.push(
+            `<span style="color:${isPass ? '#16a34a' : '#dc2626'};font-weight:600">${isPass ? '✓' : '✗'} ${cqa.code}: ${yPred.toFixed(3)} ${cqa.unit || ''}</span>`
+          );
         }
 
         const clampedMargin = Number(Math.max(-0.35, Math.min(0.35, minMargin)).toFixed(4));
@@ -1103,14 +1105,15 @@ export function generateTernaryDesignSpace(
           const statusText =
             minMargin >= 0
               ? `<span style="color:#16a34a;font-weight:700">✓ ĐẠT DESIGN SPACE (+${(minMargin * 100).toFixed(1)}% Margin)</span>`
-              : `<span style="color:#dc2626;font-weight:700">⚠ KHÔNG ĐẠT: ${worstCQA} = ${worstPred.toFixed(2)}</span>`;
+              : `<span style="color:#dc2626;font-weight:700">⚠ NGOÀI TIÊU CHUẨN (${(minMargin * 100).toFixed(1)}% Margin)</span>`;
 
           hoverText.push(
             `<b>${factorA.name}</b>: ${aPct}%<br>` +
             `<b>${factorB.name}</b>: ${bPct}%<br>` +
             `<b>${factorC.name}</b>: ${cPct}%<br>` +
             `-------------------------<br>` +
-            `${statusText}`
+            `${statusText}<br>` +
+            cqaHoverLines.join('<br>')
           );
         }
       }
@@ -1413,6 +1416,16 @@ export function generateTernaryDesignSpace(
 
     const cart = ternaryToCartesian(aNorm, bNorm, cNorm);
 
+    const optPredLines: string[] = [];
+    validCQAs.forEach((cqa) => {
+      const pred = optimum.predictedResponses[cqa.code];
+      if (pred) {
+        optPredLines.push(
+          `• <b>${cqa.name} (${cqa.code})</b>: ${pred.value.toFixed(2)} ${cqa.unit || ''} (d = ${pred.desirability.toFixed(3)})`
+        );
+      }
+    });
+
     sweetSpotTraces.push({
       type: 'scatter',
       mode: 'markers+text',
@@ -1427,7 +1440,10 @@ export function generateTernaryDesignSpace(
         `<b>★ ĐIỂM TỐI ƯU DESIRABILITY (D = ${(optimum.overallDesirability * 100).toFixed(1)}%)</b><br>` +
         `${factorA.name}: ${aPct.toFixed(1)}%<br>` +
         `${factorB.name}: ${bPct.toFixed(1)}%<br>` +
-        `${factorC.name}: ${cPct.toFixed(1)}%`
+        `${factorC.name}: ${cPct.toFixed(1)}%<br>` +
+        `-------------------------<br>` +
+        `<b>Dự đoán đáp ứng tại điểm tối ưu:</b><br>` +
+        optPredLines.join('<br>')
       ],
       marker: {
         symbol: 'star',

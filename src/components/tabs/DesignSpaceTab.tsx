@@ -366,23 +366,36 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
       const isNearTop = optY > yMin + 0.8 * (yMax - yMin);
       const textpos = isNearTop ? 'bottom center' : 'top center';
 
-      data.push({
-        type: 'scatter',
-        mode: 'markers+text',
-        x: [optX],
-        y: [optY],
-        marker: { size: 14, color: '#1e3a8a', symbol: 'star' },
-        text: ['★ ĐIỂM VẬN HÀNH ĐỀ XUẤT'],
-        textposition: textpos,
-        textfont: { family: 'Inter, sans-serif', size: 11, color: '#1e3a8a', weight: 700 },
-        hoverinfo: 'text',
-        hovertext: [
-          `<b>★ ĐIỂM VẬN HÀNH ĐỀ XUẤT (TARGET SETPOINT)</b><br>` +
-          `${factorX.name} (${factorX.code}): ${optX} ${factorX.unit || ''}<br>` +
-          `${factorY.name} (${factorY.code}): ${optY} ${factorY.unit || ''}`
-        ],
-        name: 'Target Setpoint',
-      });
+        const optPredLines: string[] = [];
+        cqas.forEach((cqa) => {
+          const pred = optimum.predictedResponses[cqa.code];
+          if (pred) {
+            optPredLines.push(
+              `• <b>${cqa.name} (${cqa.code})</b>: ${pred.value.toFixed(2)} ${cqa.unit || ''} (d = ${pred.desirability.toFixed(3)})`
+            );
+          }
+        });
+
+        data.push({
+          type: 'scatter',
+          mode: 'markers+text',
+          x: [optX],
+          y: [optY],
+          marker: { size: 14, color: '#1e3a8a', symbol: 'star' },
+          text: ['★ ĐIỂM VẬN HÀNH ĐỀ XUẤT'],
+          textposition: textpos,
+          textfont: { family: 'Inter, sans-serif', size: 11, color: '#1e3a8a', weight: 700 },
+          hoverinfo: 'text',
+          hovertext: [
+            `<b>★ ĐIỂM VẬN HÀNH ĐỀ XUẤT (D = ${(optimum.overallDesirability * 100).toFixed(1)}%)</b><br>` +
+            `${factorX.name} (${factorX.code}): ${optX} ${factorX.unit || ''}<br>` +
+            `${factorY.name} (${factorY.code}): ${optY} ${factorY.unit || ''}<br>` +
+            `-------------------------<br>` +
+            `<b>Dự đoán đáp ứng tại điểm tối ưu:</b><br>` +
+            optPredLines.join('<br>')
+          ],
+          name: 'Target Setpoint',
+        });
     }
 
     return data;

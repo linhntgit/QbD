@@ -262,61 +262,70 @@ export function normalInverseCDF(p: number): number {
  */
 export function calculateIndividualDesirability(
   y: number,
-  objective: 'maximize' | 'minimize' | 'target' | 'range' | 'pass_category',
+  objective: string,
   lowLimit?: number,
   highLimit?: number,
   target?: number,
   s: number = 1.0,
   t: number = 1.0
 ): number {
-  if (isNaN(y)) return 0;
+  if (isNaN(y) || y === null || y === undefined) return 0;
 
   switch (objective) {
     case 'pass_category': {
       // 100% or >= 90% is pass
       if (y >= 90) return 1.0;
       if (y <= 0) return 0.0;
-      return y / 100.0;
+      return Math.max(0, Math.min(1.0, y / 100.0));
     }
     case 'maximize': {
-      const L = lowLimit ?? (target ? target * 0.8 : 0);
-      const T = target ?? highLimit ?? (L * 1.5);
-      if (y <= L) return 0;
-      if (y >= T) return 1;
-      return Math.pow((y - L) / (T - L), s);
+      // Ramp Up (Larger is better): d=0 below L, d=1 at/above T
+      const L = lowLimit !== undefined ? lowLimit : target !== undefined ? target * 0.8 : 0;
+      const T = target !== undefined ? target : highLimit !== undefined ? highLimit : L !== 0 ? L * 1.5 : 100;
+      if (T <= L) return y >= L ? 1.0 : 0.0;
+      if (y <= L) return 0.0;
+      if (y >= T) return 1.0;
+      const frac = (y - L) / (T - L);
+      return Math.pow(Math.max(0, Math.min(1.0, frac)), Math.max(0.01, s));
     }
 
     case 'minimize': {
-      const T = target ?? lowLimit ?? 0;
-      const U = highLimit ?? (T ? T * 1.5 : 100);
-      if (y <= T) return 1;
-      if (y >= U) return 0;
-      return Math.pow((U - y) / (U - T), s);
+      // Ramp Down (Smaller is better): d=1 at/below T, d=0 at/above U
+      const T = target !== undefined ? target : lowLimit !== undefined ? lowLimit : 0;
+      const U = highLimit !== undefined ? highLimit : T !== 0 ? T * 1.5 : 100;
+      if (U <= T) return y <= U ? 1.0 : 0.0;
+      if (y <= T) return 1.0;
+      if (y >= U) return 0.0;
+      const frac = (U - y) / (U - T);
+      return Math.pow(Math.max(0, Math.min(1.0, frac)), Math.max(0.01, s));
     }
 
     case 'target': {
-      const L = lowLimit ?? (target ? target * 0.9 : 0);
-      const U = highLimit ?? (target ? target * 1.1 : 100);
-      const T = target ?? (L + U) / 2;
-      if (y < L || y > U) return 0;
+      // Tent Shape (Nominal is best): d=0 outside [L, U], d=1 at Target T
+      const L = lowLimit !== undefined ? lowLimit : target !== undefined ? target * 0.9 : 0;
+      const U = highLimit !== undefined ? highLimit : target !== undefined ? target * 1.1 : 100;
+      const T = target !== undefined ? target : (L + U) / 2;
+      if (y < L || y > U) return 0.0;
       if (y <= T) {
-        if (T === L) return 1;
-        return Math.pow((y - L) / (T - L), s);
+        if (T <= L) return 1.0;
+        const frac = (y - L) / (T - L);
+        return Math.pow(Math.max(0, Math.min(1.0, frac)), Math.max(0.01, s));
       } else {
-        if (U === T) return 1;
-        return Math.pow((U - y) / (U - T), t);
+        if (U <= T) return 1.0;
+        const frac = (U - y) / (U - T);
+        return Math.pow(Math.max(0, Math.min(1.0, frac)), Math.max(0.01, t));
       }
     }
 
     case 'range': {
-      const L = lowLimit ?? 0;
-      const U = highLimit ?? 100;
-      if (y >= L && y <= U) return 1;
-      return 0;
+      const L = lowLimit !== undefined ? lowLimit : 0;
+      const U = highLimit !== undefined ? highLimit : 100;
+      if (y >= L && y <= U) return 1.0;
+      return 0.0;
     }
 
     default:
-      return 1;
+      return 1.0;
   }
 }
 
