@@ -1496,20 +1496,6 @@ export function generateTernaryDesignSpace(
       scaleratio: 1,
     },
     annotations: [
-      // Status badge top-left
-      {
-        xref: 'paper',
-        yref: 'paper',
-        x: 0.01,
-        y: 0.99,
-        text: '🟩 Vùng Xanh: Design Space (100% CQAs Đạt Chuẩn)<br>🟥 Vùng Đỏ: Không đạt tiêu chuẩn (OOS)',
-        showarrow: false,
-        bgcolor: '#ffffff',
-        bordercolor: '#cbd5e1',
-        borderwidth: 1,
-        font: { size: 9.5, color: '#1e293b' },
-        align: 'left',
-      },
       // Apex A (Top)
       {
         x: 50,

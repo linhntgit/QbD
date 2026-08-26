@@ -328,14 +328,31 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
 
     // Plot Optimum Target point if available
     if (optimum && optimum.actualFactors[factorX.code] !== undefined && optimum.actualFactors[factorY.code] !== undefined) {
+      const optXVal = optimum.actualFactors[factorX.code];
+      const optYVal = optimum.actualFactors[factorY.code];
+      const optX = typeof optXVal === 'number' ? optXVal : Number(optXVal) || 0;
+      const optY = typeof optYVal === 'number' ? optYVal : Number(optYVal) || 0;
+
+      const yMin = sweetSpotGrid.yActualArr[0] ?? 0;
+      const yMax = sweetSpotGrid.yActualArr[sweetSpotGrid.yActualArr.length - 1] ?? 100;
+      const isNearTop = optY > yMin + 0.8 * (yMax - yMin);
+      const textpos = isNearTop ? 'bottom center' : 'top center';
+
       data.push({
         type: 'scatter',
         mode: 'markers+text',
-        x: [typeof optimum.actualFactors[factorX.code] === 'number' ? optimum.actualFactors[factorX.code] : Number(optimum.actualFactors[factorX.code]) || 0],
-        y: [typeof optimum.actualFactors[factorY.code] === 'number' ? optimum.actualFactors[factorY.code] : Number(optimum.actualFactors[factorY.code]) || 0],
+        x: [optX],
+        y: [optY],
         marker: { size: 14, color: '#1e3a8a', symbol: 'star' },
-        text: ['Điểm Vận Hành Đề Xuất (Target)'],
-        textposition: 'top center',
+        text: ['★ ĐIỂM VẬN HÀNH ĐỀ XUẤT'],
+        textposition: textpos,
+        textfont: { family: 'Inter, sans-serif', size: 11, color: '#1e3a8a', weight: 700 },
+        hoverinfo: 'text',
+        hovertext: [
+          `<b>★ ĐIỂM VẬN HÀNH ĐỀ XUẤT (TARGET SETPOINT)</b><br>` +
+          `${factorX.name} (${factorX.code}): ${optX} ${factorX.unit || ''}<br>` +
+          `${factorY.name} (${factorY.code}): ${optY} ${factorY.unit || ''}`
+        ],
         name: 'Target Setpoint',
       });
     }
@@ -371,20 +388,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
         tickfont: { size: 11 },
         automargin: true,
       },
-      annotations: [
-        {
-          xref: 'paper',
-          yref: 'paper',
-          x: 0.05,
-          y: 0.95,
-          text: '🟩 Vùng Xanh: Design Space (100% CQAs Đạt Chuẩn)<br>🟥 Vùng Đỏ: Không đạt tiêu chuẩn (OOS)',
-          showarrow: false,
-          bgcolor: '#ffffff',
-          bordercolor: '#cbd5e1',
-          borderwidth: 1,
-          font: { size: 11 },
-        },
-      ],
+      annotations: [],
       margin: { l: 85, r: 40, t: 50, b: 75, pad: 4 },
     };
   }, [overlayMode, factorA, factorB, factorC, factorX, factorY]);
@@ -578,6 +582,96 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                 </label>
               )}
             </div>
+          </div>
+
+          {/* External Legend Bar: Clear, Unobstructed, Outside the Chart Canvas */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '1.25rem',
+              padding: '0.4rem 0.85rem',
+              backgroundColor: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '0.5rem',
+              marginBottom: '0.65rem',
+              fontSize: '0.76rem',
+              flexWrap: 'wrap',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: '13px',
+                  height: '13px',
+                  borderRadius: '3px',
+                  backgroundColor: '#4ade80',
+                  border: '1px solid #16a34a',
+                }}
+              />
+              <span style={{ fontWeight: '600', color: '#166534' }}>
+                Vùng Xanh: Design Space (100% CQAs Đạt Chuẩn)
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: '13px',
+                  height: '13px',
+                  borderRadius: '3px',
+                  backgroundColor: '#f87171',
+                  border: '1px solid #dc2626',
+                }}
+              />
+              <span style={{ fontWeight: '600', color: '#991b1b' }}>
+                Vùng Đỏ: Không đạt tiêu chuẩn (OOS)
+              </span>
+            </div>
+
+            {optimum && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <span style={{ color: '#1e3a8a', fontSize: '1rem', lineHeight: 1 }}>★</span>
+                <span style={{ fontWeight: '700', color: '#1e3a8a' }}>
+                  Điểm Vận Hành Đề Xuất (Target)
+                </span>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: '18px',
+                  height: '0px',
+                  borderTop: '2.5px solid #1e3a8a',
+                }}
+              />
+              <span style={{ color: '#475569', fontSize: '0.74rem' }}>
+                Ranh giới tiêu chuẩn (Margin = 0)
+              </span>
+            </div>
+
+            {project.runs && project.runs.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <span
+                  style={{
+                    display: 'inline-block',
+                    width: '9px',
+                    height: '9px',
+                    borderRadius: '50%',
+                    backgroundColor: '#eab308',
+                    border: '1px solid #713f12',
+                  }}
+                />
+                <span style={{ color: '#475569', fontSize: '0.74rem' }}>
+                  Điểm DoE thực nghiệm
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Plotly Canvas */}
