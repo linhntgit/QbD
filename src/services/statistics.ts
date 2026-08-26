@@ -897,8 +897,10 @@ export function generateUpdatedRiskAssessment(
           modelQuality = model.diagnostics.rSquared;
         } else if ('diagnostics' in model) {
           // Neural Net Model
-          modelQuality = (model.diagnostics as any).r2Val ?? 0.85;
-          isSig = true;
+          const diag = (model as any).diagnostics;
+          modelQuality = diag.rSquaredOverall ?? diag.rSquaredVal ?? diag.rSquaredTrain ?? 0.85;
+          const varImp = diag.variableImportance?.find((v: any) => v.factorCode === f.code);
+          isSig = varImp ? varImp.relativeImportance >= 10 : true;
         }
       }
 

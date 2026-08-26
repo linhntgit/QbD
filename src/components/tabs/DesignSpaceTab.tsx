@@ -137,6 +137,24 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
     );
   });
 
+  // Sync optimum, slice factors, and Monte Carlo when models, engine or project changes
+  useEffect(() => {
+    const newOpt = optimizeDesirability(factors, cqas, models);
+    setOptimum(newOpt);
+    if (newOpt) {
+      setSliceFactorsCoded({ ...newOpt.codedFactors });
+      const mc = runMonteCarloSimulation(
+        newOpt.actualFactors,
+        factors,
+        cqas,
+        models,
+        mcVariability,
+        mcSimulations
+      );
+      setMcResult(mc);
+    }
+  }, [project.id, models, modelingEngine]);
+
   // Execute Monte Carlo with non-blocking realistic simulation feedback
   const executeSimulation = (
     targetActual: Record<string, number | string>,
