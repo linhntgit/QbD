@@ -16,7 +16,12 @@ import type {
   DoEDesignType,
   DoECategory,
 } from '../../types/qbd';
-import { generateDoERuns, calculateDesignEfficiency, calculateNumModelTerms } from '../../services/doeGenerator';
+import {
+  generateDoERuns,
+  calculateDesignEfficiency,
+  calculateNumModelTerms,
+  actualToCoded,
+} from '../../services/doeGenerator';
 
 interface DoEDesignerTabProps {
   project: QBDProject;
@@ -29,7 +34,16 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
   onUpdateProject,
   onNavigateToANOVA,
 }) => {
-  const [designConfig, setDesignConfig] = useState<DoEDesignConfig>(project.doeConfig);
+  const [designConfig, setDesignConfig] = useState<DoEDesignConfig>(
+    project.doeConfig || {
+      category: 'RSM',
+      designType: 'BoxBehnken',
+      centerPoints: 3,
+      replicates: 1,
+      randomized: true,
+      dOptimalModel: 'quadratic',
+    }
+  );
 
   const activeFactors = useMemo(
     () => project.factors.filter((f) => f.controllability !== 'constant'),
@@ -40,20 +54,64 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
     [activeFactors.length, designConfig.dOptimalModel]
   );
 
-  // Evaluate D-Efficiency & Design Diagnostics
+  // Calculate D-Efficiency and Matrix Metrics dynamically
   const designMetrics = useMemo(() => {
-    if (project.runs.length === 0) return null;
     return calculateDesignEfficiency(
       project.runs,
       project.factors,
-      designConfig.dOptimalModel || (activeFactors.length <= 3 ? 'Quadratic' : '2FI')
+      (designConfig.dOptimalModel as any) || 'Quadratic'
     );
-  }, [project.runs, project.factors, designConfig.dOptimalModel, activeFactors.length]);
+  }, [project.runs, project.factors, designConfig.dOptimalModel]);
 
   const handleGenerateMatrix = () => {
     const { runs, alpha } = generateDoERuns(project.factors, designConfig);
     const updatedConfig = { ...designConfig, alpha };
     onUpdateProject({ doeConfig: updatedConfig, runs });
+  };
+
+  const handleFactorActualChange = (runId: string, factorCode: string, rawVal: string) => {
+    const factor = project.factors.find((f) => f.code === factorCode);
+    if (!factor) return;
+
+    let parsedVal: number | string = rawVal;
+    let codedVal = 0;
+
+    if (factor.dataType === 'qualitative') {
+      parsedVal = rawVal;
+      codedVal = actualToCoded(rawVal, factor);
+    } else {
+      // Quantitative factor
+      if (rawVal.trim() === '') {
+        parsedVal = '';
+        codedVal = 0;
+      } else {
+        const num = parseFloat(rawVal);
+        if (!isNaN(num)) {
+          parsedVal = num;
+          codedVal = actualToCoded(num, factor);
+        } else {
+          parsedVal = rawVal;
+          codedVal = 0;
+        }
+      }
+    }
+
+    const updatedRuns = project.runs.map((r) => {
+      if (r.id !== runId) return r;
+      return {
+        ...r,
+        factorActual: {
+          ...r.factorActual,
+          [factorCode]: parsedVal,
+        },
+        factorCoded: {
+          ...r.factorCoded,
+          [factorCode]: codedVal,
+        },
+      };
+    });
+
+    onUpdateProject({ runs: updatedRuns });
   };
 
   const handleResponseChange = (runId: string, cqaCode: string, value: string) => {
@@ -445,106 +503,189 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
             </p>
           </div>
         ) : (
-          <div className="table-container" style={{ maxHeight: '550px' }}>
-            <table className="qbd-table">
-              <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                <tr>
-                  <th style={{ width: '50px', textAlign: 'center' }}>Std</th>
-                  <th style={{ width: '50px', textAlign: 'center' }}>Run</th>
-                  {/* Factor Actual Headers */}
-                  {project.factors.map((f) => (
-                    <th
-                      key={`head-fac-${f.id}`}
-                      style={{
-                        backgroundColor: f.controllability === 'constant' ? '#f1f5f9' : f.controllability === 'uncontrollable_noise' ? '#fef3c7' : '#eff6ff',
-                        color: f.controllability === 'constant' ? '#475569' : f.controllability === 'uncontrollable_noise' ? '#92400e' : '#1e40af',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                        <span>{f.controllability === 'constant' ? '🔒' : f.controllability === 'uncontrollable_noise' ? '🌪️' : '🎯'}</span>
-                        <span>{f.name} ({f.code}) [{f.unit}]</span>
-                      </div>
-                    </th>
-                  ))}
-                  {/* Coded Headers */}
-                  {project.factors.map((f) => (
-                    <th key={`head-coded-${f.id}`} style={{ backgroundColor: '#f1f5f9', color: '#475569', textAlign: 'center' }}>
-                      {f.code} (Mã)
-                    </th>
-                  ))}
-                  {/* CQA Response Headers */}
-                  {project.cqas.map((c) => (
-                    <th key={`head-cqa-${c.id}`} style={{ backgroundColor: '#ccfbf1', color: '#0f766e' }}>
-                      {c.name} ({c.code}) {c.dataType?.startsWith('qualitative') ? '[Định tính]' : `[${c.unit}]`}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {project.runs.map((run) => (
-                  <tr key={run.id}>
-                    <td style={{ textAlign: 'center', fontWeight: '600', color: '#64748b' }}>
-                      {run.stdOrder}
-                    </td>
-                    <td style={{ textAlign: 'center', fontWeight: '700', color: '#1e3a8a' }}>
-                      {run.runOrder}
-                    </td>
+          <div>
+            <div
+              style={{
+                backgroundColor: '#f0fdfa',
+                border: '1px solid #ccfbf1',
+                borderRadius: '0.375rem',
+                padding: '0.45rem 0.75rem',
+                marginBottom: '0.65rem',
+                fontSize: '0.76rem',
+                color: '#0f766e',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+              }}
+            >
+              <span>💡</span>
+              <span>
+                <strong>Hiệu chỉnh thực nghiệm:</strong> Bạn có thể sửa trực tiếp số liệu các biến X thực tế (đặc biệt là biến nhiễu <em>Uncontrolled Noise</em> hoặc khi điều kiện vận hành thực tế bị lệch so với thiết kế). Hệ thống sẽ tự động cập nhật mức mã hóa (Coded) và truyền số liệu này sang mô hình ANOVA / Mạng nơ-ron.
+              </span>
+            </div>
 
-                    {/* Actual Values */}
+            <div className="table-container" style={{ maxHeight: '550px' }}>
+              <table className="qbd-table">
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                  <tr>
+                    <th style={{ width: '45px', textAlign: 'center' }}>Std</th>
+                    <th style={{ width: '45px', textAlign: 'center' }}>Run</th>
+                    {/* Factor Actual Headers */}
                     {project.factors.map((f) => (
-                      <td
-                        key={`actual-${run.id}-${f.code}`}
+                      <th
+                        key={`head-fac-${f.id}`}
                         style={{
-                          fontWeight: '500',
-                          backgroundColor: f.controllability === 'constant' ? '#f8fafc' : f.controllability === 'uncontrollable_noise' ? '#fffbeb' : 'inherit',
+                          backgroundColor: f.controllability === 'constant' ? '#f1f5f9' : f.controllability === 'uncontrollable_noise' ? '#fef3c7' : '#eff6ff',
+                          color: f.controllability === 'constant' ? '#475569' : f.controllability === 'uncontrollable_noise' ? '#92400e' : '#1e40af',
+                          minWidth: '130px',
                         }}
                       >
-                        {run.factorActual[f.code] ?? '-'}
-                      </td>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                            <span>{f.controllability === 'constant' ? '🔒' : f.controllability === 'uncontrollable_noise' ? '🌪️' : '🎯'}</span>
+                            <span>{f.name} ({f.code}) [{f.unit}]</span>
+                          </div>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 'normal', opacity: 0.85 }}>
+                            {f.controllability === 'uncontrollable_noise' ? '(Biến nhiễu - Đo thực tế)' : '(Giá trị thực tế)'}
+                          </span>
+                        </div>
+                      </th>
                     ))}
-
-                    {/* Coded Values */}
+                    {/* Coded Headers */}
                     {project.factors.map((f) => (
-                      <td key={`coded-${run.id}-${f.code}`} style={{ textAlign: 'center', color: '#64748b' }} className="font-mono">
-                        {f.controllability === 'constant' ? 'C' : run.factorCoded[f.code]}
-                      </td>
+                      <th key={`head-coded-${f.id}`} style={{ backgroundColor: '#f1f5f9', color: '#475569', textAlign: 'center', minWidth: '70px' }}>
+                        {f.code} (Mã)
+                      </th>
                     ))}
-
-                    {/* CQA Responses (Editable Input) */}
+                    {/* CQA Response Headers */}
                     {project.cqas.map((c) => (
-                      <td key={`resp-${run.id}-${c.code}`} style={{ backgroundColor: '#f0fdfa' }}>
-                        {c.dataType === 'qualitative_binary' ? (
-                          <select
-                            className="input-field"
-                            style={{ padding: '0.2rem 0.4rem', fontWeight: '600', color: '#0f766e', fontSize: '0.8rem' }}
-                            value={run.responses[c.code] ?? 'Đạt'}
-                            onChange={(e) => handleResponseChange(run.id, c.code, e.target.value)}
-                          >
-                            <option value="Đạt">✓ Đạt (Pass)</option>
-                            <option value="Không đạt">✗ Không đạt (Fail)</option>
-                          </select>
-                        ) : (
-                          <input
-                            type="number"
-                            step="any"
-                            className="input-field"
-                            style={{
-                              padding: '0.25rem 0.5rem',
-                              fontWeight: '600',
-                              color: '#0f766e',
-                              backgroundColor: '#ffffff',
-                            }}
-                            value={run.responses[c.code] ?? ''}
-                            placeholder="Nhập..."
-                            onChange={(e) => handleResponseChange(run.id, c.code, e.target.value)}
-                          />
-                        )}
-                      </td>
+                      <th key={`head-cqa-${c.id}`} style={{ backgroundColor: '#ccfbf1', color: '#0f766e', minWidth: '120px' }}>
+                        {c.name} ({c.code}) {c.dataType?.startsWith('qualitative') ? '[Định tính]' : `[${c.unit}]`}
+                      </th>
                     ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {project.runs.map((run) => (
+                    <tr key={run.id}>
+                      <td style={{ textAlign: 'center', fontWeight: '600', color: '#64748b' }}>
+                        {run.stdOrder}
+                      </td>
+                      <td style={{ textAlign: 'center', fontWeight: '700', color: '#1e3a8a' }}>
+                        {run.runOrder}
+                      </td>
+
+                      {/* Editable Factor Actual Inputs */}
+                      {project.factors.map((f) => {
+                        const isConstant = f.controllability === 'constant';
+                        const isUncontrolled = f.controllability === 'uncontrollable_noise';
+                        const val = run.factorActual[f.code];
+
+                        return (
+                          <td
+                            key={`actual-${run.id}-${f.code}`}
+                            style={{
+                              backgroundColor: isConstant ? '#f8fafc' : isUncontrolled ? '#fffbeb' : '#ffffff',
+                              padding: '0.25rem 0.35rem',
+                            }}
+                          >
+                            {f.dataType === 'qualitative' ? (
+                              <select
+                                className="input-field"
+                                style={{
+                                  padding: '0.2rem 0.35rem',
+                                  fontSize: '0.8rem',
+                                  fontWeight: '600',
+                                  color: '#1e3a8a',
+                                  width: '100%',
+                                }}
+                                value={typeof val === 'string' ? val : ''}
+                                onChange={(e) => handleFactorActualChange(run.id, f.code, e.target.value)}
+                              >
+                                {f.categories && f.categories.length > 0 ? (
+                                  f.categories.map((cat) => (
+                                    <option key={cat} value={cat}>
+                                      {cat}
+                                    </option>
+                                  ))
+                                ) : (
+                                  <>
+                                    <option value="Mức 1">Mức 1</option>
+                                    <option value="Mức 2">Mức 2</option>
+                                  </>
+                                )}
+                              </select>
+                            ) : (
+                              <input
+                                type="number"
+                                step="any"
+                                className="input-field"
+                                style={{
+                                  padding: '0.25rem 0.4rem',
+                                  fontSize: '0.82rem',
+                                  fontWeight: '600',
+                                  width: '100%',
+                                  color: isUncontrolled ? '#b45309' : isConstant ? '#475569' : '#1e3a8a',
+                                  backgroundColor: isConstant ? '#f1f5f9' : isUncontrolled ? '#fef3c7' : '#ffffff',
+                                  borderColor: isUncontrolled ? '#f59e0b' : undefined,
+                                }}
+                                value={val !== undefined && val !== null ? val : ''}
+                                placeholder="Nhập số..."
+                                title={isUncontrolled ? 'Biến nhiễu không kiểm soát (Uncontrolled Noise) - Nhập giá trị thực tế đo được' : `${f.name} [${f.unit}]`}
+                                onChange={(e) => handleFactorActualChange(run.id, f.code, e.target.value)}
+                              />
+                            )}
+                          </td>
+                        );
+                      })}
+
+                      {/* Recalculated Coded Values */}
+                      {project.factors.map((f) => (
+                        <td key={`coded-${run.id}-${f.code}`} style={{ textAlign: 'center', color: '#64748b' }} className="font-mono">
+                          {f.controllability === 'constant'
+                            ? '🔒 C'
+                            : typeof run.factorCoded[f.code] === 'number'
+                            ? Number(run.factorCoded[f.code]).toFixed(2)
+                            : run.factorCoded[f.code] ?? '-'}
+                        </td>
+                      ))}
+
+                      {/* CQA Responses (Editable Input) */}
+                      {project.cqas.map((c) => (
+                        <td key={`resp-${run.id}-${c.code}`} style={{ backgroundColor: '#f0fdfa' }}>
+                          {c.dataType === 'qualitative_binary' ? (
+                            <select
+                              className="input-field"
+                              style={{ padding: '0.2rem 0.4rem', fontWeight: '600', color: '#0f766e', fontSize: '0.8rem' }}
+                              value={run.responses[c.code] ?? 'Đạt'}
+                              onChange={(e) => handleResponseChange(run.id, c.code, e.target.value)}
+                            >
+                              <option value="Đạt">✓ Đạt (Pass)</option>
+                              <option value="Không đạt">✗ Không đạt (Fail)</option>
+                            </select>
+                          ) : (
+                            <input
+                              type="number"
+                              step="any"
+                              className="input-field"
+                              style={{
+                                padding: '0.25rem 0.5rem',
+                                fontWeight: '600',
+                                color: '#0f766e',
+                                backgroundColor: '#ffffff',
+                              }}
+                              value={run.responses[c.code] ?? ''}
+                              placeholder="Nhập..."
+                              onChange={(e) => handleResponseChange(run.id, c.code, e.target.value)}
+                            />
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
