@@ -97,7 +97,8 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
   const [showConstraints, setShowConstraints] = useState<boolean>(true);
   const [showRegionPolygon, setShowRegionPolygon] = useState<boolean>(true);
   const [showSpecLimits, setShowSpecLimits] = useState<boolean>(true);
-  const [ternaryResolution, setTernaryResolution] = useState<number>(140);
+  const [ternaryResolution, setTernaryResolution] = useState<number>(180);
+  const [ternarySmoothness, setTernarySmoothness] = useState<number>(1.0);
 
   // Color Scale
   const [colorScale, setColorScale] = useState<string>('Viridis');
@@ -269,6 +270,8 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
         showConstraints,
         showRegionPolygon,
         showSpecLimits,
+        ternaryLevels,
+        smoothness: ternarySmoothness,
       }
     );
     plotlyData = ternaryPlotly.traces;
@@ -878,18 +881,41 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                   <span style={{ fontWeight: '600', color: '#475569' }}>Độ mịn lưới tam giác (Anti-alias):</span>
                   <span className="font-mono font-bold" style={{ color: '#0f766e' }}>{ternaryResolution}x{ternaryResolution}</span>
                 </div>
-                <div style={{ display: 'flex', gap: '0.25rem' }}>
-                  {[100, 140, 180].map((res) => (
+                <div style={{ display: 'flex', gap: '0.2rem' }}>
+                  {[
+                    { label: 'Nhanh', val: 100, desc: '100x100' },
+                    { label: 'Chuẩn', val: 180, desc: '180x180' },
+                    { label: 'Mịn', val: 260, desc: '260x260' },
+                    { label: 'Cực Mịn', val: 320, desc: '320x320' },
+                  ].map((preset) => (
                     <button
-                      key={res}
-                      onClick={() => setTernaryResolution(res)}
-                      className={`btn ${ternaryResolution === res ? 'btn-teal' : 'btn-secondary'}`}
-                      style={{ fontSize: '0.7rem', padding: '0.2rem 0.4rem', flex: 1, justifyContent: 'center' }}
+                      key={preset.val}
+                      onClick={() => setTernaryResolution(preset.val)}
+                      className={`btn ${ternaryResolution === preset.val ? 'btn-teal' : 'btn-secondary'}`}
+                      style={{ fontSize: '0.68rem', padding: '0.2rem 0.35rem', flex: 1, justifyContent: 'center' }}
+                      title={preset.desc}
                     >
-                      {res === 100 ? 'Mịn' : res === 140 ? 'Rất Mịn' : 'Cực Mịn (HD)'} ({res})
+                      {preset.label}
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Ternary Smoothness Slider */}
+              <div style={{ marginBottom: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.2rem' }}>
+                  <span style={{ fontWeight: '600', color: '#475569' }}>Độ mượt đường đồng mức:</span>
+                  <span className="font-mono font-bold" style={{ color: '#0f766e' }}>{ternarySmoothness.toFixed(2)}</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={1.3}
+                  step={0.05}
+                  value={ternarySmoothness}
+                  onChange={(e) => setTernarySmoothness(Number(e.target.value))}
+                  style={{ width: '100%', cursor: 'pointer' }}
+                />
               </div>
 
               {/* Toggle Checkboxes */}

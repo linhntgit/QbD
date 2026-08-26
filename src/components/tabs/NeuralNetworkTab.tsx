@@ -197,7 +197,8 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
   const [showConstraints, setShowConstraints] = useState<boolean>(true);
   const [showRegionPolygon, setShowRegionPolygon] = useState<boolean>(true);
   const [showSpecLimits, setShowSpecLimits] = useState<boolean>(true);
-  const [ternaryResolution, setTernaryResolution] = useState<number>(140);
+  const [ternaryResolution, setTernaryResolution] = useState<number>(180);
+  const [ternarySmoothness, setTernarySmoothness] = useState<number>(1.0);
 
   // Active factors for Ternary
   const factorA = project.factors.find((f) => f.code === ternaryA) || mixtureFactors[0] || project.factors[0];
@@ -299,6 +300,8 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           showConstraints,
           showRegionPolygon,
           showSpecLimits,
+          ternaryLevels,
+          smoothness: ternarySmoothness,
         }
       );
       return traces;
@@ -2204,17 +2207,39 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                      <span style={{ fontSize: '0.7rem', color: '#475569', fontWeight: '600' }}>Độ mịn:</span>
-                      {[100, 140, 180].map((res) => (
+                      <span style={{ fontSize: '0.7rem', color: '#475569', fontWeight: '600' }}>Lưới:</span>
+                      {[
+                        { label: 'Nhanh', val: 100, desc: '100x100' },
+                        { label: 'Chuẩn', val: 180, desc: '180x180' },
+                        { label: 'Mịn', val: 260, desc: '260x260' },
+                        { label: 'Cực Mịn', val: 320, desc: '320x320' },
+                      ].map((preset) => (
                         <button
-                          key={res}
-                          onClick={() => setTernaryResolution(res)}
-                          className={`btn ${ternaryResolution === res ? 'btn-teal' : 'btn-secondary'}`}
+                          key={preset.val}
+                          onClick={() => setTernaryResolution(preset.val)}
+                          className={`btn ${ternaryResolution === preset.val ? 'btn-teal' : 'btn-secondary'}`}
                           style={{ fontSize: '0.68rem', padding: '0.2rem 0.35rem' }}
+                          title={preset.desc}
                         >
-                          {res === 100 ? 'Mịn' : res === 140 ? 'Rất Mịn' : 'Cực Mịn (HD)'}
+                          {preset.label}
                         </button>
                       ))}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <span style={{ fontSize: '0.7rem', color: '#475569', fontWeight: '600' }}>Độ mượt:</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={1.3}
+                        step={0.05}
+                        value={ternarySmoothness}
+                        onChange={(e) => setTernarySmoothness(Number(e.target.value))}
+                        style={{ width: '60px', cursor: 'pointer' }}
+                      />
+                      <span className="font-mono" style={{ fontSize: '0.72rem', fontWeight: '700', color: '#0f766e', minWidth: '22px' }}>
+                        {ternarySmoothness.toFixed(2)}
+                      </span>
                     </div>
                   </div>
                 </div>

@@ -533,6 +533,7 @@ export function buildTernaryPlotlyData(
     showRegionPolygon?: boolean;
     showSpecLimits?: boolean;
     ternaryLevels?: number;
+    smoothness?: number;
   } = {}
 ) {
   const {
@@ -546,6 +547,7 @@ export function buildTernaryPlotlyData(
     showRegionPolygon = true,
     showSpecLimits = true,
     ternaryLevels = 14,
+    smoothness = 1.0,
   } = options;
 
   const traces: any[] = [];
@@ -566,6 +568,7 @@ export function buildTernaryPlotlyData(
       labelfont: { family: 'Inter, sans-serif', size: 11, color: '#ffffff' },
     },
     line: {
+      smoothing: smoothness,
       width: displayMode === 'lines_only' ? 2.0 : 1.1,
       color: displayMode === 'lines_only' ? '#0f172a' : 'rgba(255, 255, 255, 0.45)',
     },
@@ -979,6 +982,7 @@ export function generateTernaryDesignSpace(
     showConstraints?: boolean;
     showRegionPolygon?: boolean;
     showOptimum?: boolean;
+    smoothness?: number;
   }
 ) {
   const {
@@ -988,6 +992,7 @@ export function generateTernaryDesignSpace(
     showConstraints = true,
     showRegionPolygon = true,
     showOptimum = true,
+    smoothness = 1.0,
   } = options || {};
 
   const otherMixFactors = allFactors.filter(
@@ -1148,6 +1153,7 @@ export function generateTernaryDesignSpace(
       showlabels: false,
     },
     line: {
+      smoothing: smoothness,
       width: 0.8,
       color: 'rgba(255, 255, 255, 0.35)',
     },

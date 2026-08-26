@@ -272,7 +272,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
       sliceFactorsCoded,
       models,
       cqas,
-      240,
+      resolution,
       {
         optimum,
         doeRuns: project.runs,
@@ -280,9 +280,10 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
         showConstraints: true,
         showRegionPolygon: true,
         showOptimum: true,
+        smoothness,
       }
     );
-  }, [overlayMode, factorA, factorB, factorC, factors, sliceFactorsCoded, models, cqas, optimum, project.runs]);
+  }, [overlayMode, factorA, factorB, factorC, factors, sliceFactorsCoded, models, cqas, resolution, smoothness, optimum, project.runs]);
 
   // Sweet Spot Plotly Data
   const overlayPlotData = useMemo(() => {
@@ -517,54 +518,52 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                 </div>
               )}
 
-              {/* Resolution Selector (for 2D) */}
-              {overlayMode === '2d' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', backgroundColor: '#f8fafc', padding: '0.2rem 0.4rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
-                  <span style={{ fontSize: '0.73rem', color: '#475569', fontWeight: '600' }}>Lưới:</span>
-                  <div style={{ display: 'flex', gap: '0.15rem' }}>
-                    {[
-                      { label: 'Nhanh', val: 70, desc: '70x70' },
-                      { label: 'Chuẩn', val: 180, desc: '180x180' },
-                      { label: 'Mịn', val: 260, desc: '260x260' },
-                    ].map((preset) => (
-                      <button
-                        key={preset.val}
-                        onClick={() => setResolution(preset.val)}
-                        className={`btn ${resolution === preset.val ? 'btn-primary' : 'btn-secondary'}`}
-                        style={{
-                          fontSize: '0.68rem',
-                          padding: '0.18rem 0.4rem',
-                          borderRadius: '0.25rem',
-                          fontWeight: resolution === preset.val ? '700' : '500',
-                        }}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
-                  </div>
+              {/* Resolution Selector (both 2D and Ternary) */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', backgroundColor: '#f8fafc', padding: '0.2rem 0.4rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
+                <span style={{ fontSize: '0.73rem', color: '#475569', fontWeight: '600' }}>Lưới:</span>
+                <div style={{ display: 'flex', gap: '0.15rem' }}>
+                  {[
+                    { label: 'Nhanh', val: 100, desc: '100x100' },
+                    { label: 'Chuẩn', val: 180, desc: '180x180' },
+                    { label: 'Mịn', val: 260, desc: '260x260' },
+                    { label: 'Cực Mịn', val: 320, desc: '320x320' },
+                  ].map((preset) => (
+                    <button
+                      key={preset.val}
+                      onClick={() => setResolution(preset.val)}
+                      className={`btn ${resolution === preset.val ? (overlayMode === 'ternary' ? 'btn-teal' : 'btn-primary') : 'btn-secondary'}`}
+                      style={{
+                        fontSize: '0.68rem',
+                        padding: '0.18rem 0.4rem',
+                        borderRadius: '0.25rem',
+                        fontWeight: resolution === preset.val ? '700' : '500',
+                      }}
+                      title={preset.desc}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
                 </div>
-              )}
+              </div>
 
-              {/* Smoothness Slider (for 2D) */}
-              {overlayMode === '2d' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <span style={{ fontSize: '0.73rem', fontWeight: '600', color: '#475569' }}>
-                    Độ mượt:
-                  </span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1.3}
-                    step={0.05}
-                    value={smoothness}
-                    onChange={(e) => setSmoothness(Number(e.target.value))}
-                    style={{ width: '60px', cursor: 'pointer' }}
-                  />
-                  <span className="font-mono" style={{ fontSize: '0.72rem', fontWeight: '700', color: '#1e40af', minWidth: '22px' }}>
-                    {smoothness.toFixed(2)}
-                  </span>
-                </div>
-              )}
+              {/* Smoothness Slider (both 2D and Ternary) */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <span style={{ fontSize: '0.73rem', fontWeight: '600', color: '#475569' }}>
+                  Độ mượt:
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={1.3}
+                  step={0.05}
+                  value={smoothness}
+                  onChange={(e) => setSmoothness(Number(e.target.value))}
+                  style={{ width: '60px', cursor: 'pointer' }}
+                />
+                <span className="font-mono" style={{ fontSize: '0.72rem', fontWeight: '700', color: overlayMode === 'ternary' ? '#0f766e' : '#1e40af', minWidth: '22px' }}>
+                  {smoothness.toFixed(2)}
+                </span>
+              </div>
 
               {/* Boundary Lines Toggle (for 2D) */}
               {overlayMode === '2d' && (
