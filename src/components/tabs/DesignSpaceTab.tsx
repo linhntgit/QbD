@@ -272,74 +272,22 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
       sliceFactorsCoded,
       models,
       cqas,
-      140
+      240,
+      {
+        optimum,
+        doeRuns: project.runs,
+        showDoERuns: true,
+        showConstraints: true,
+        showRegionPolygon: true,
+        showOptimum: true,
+      }
     );
-  }, [overlayMode, factorA, factorB, factorC, factors, sliceFactorsCoded, models, cqas]);
+  }, [overlayMode, factorA, factorB, factorC, factors, sliceFactorsCoded, models, cqas, optimum, project.runs]);
 
   // Sweet Spot Plotly Data
   const overlayPlotData = useMemo(() => {
     if (overlayMode === 'ternary' && ternaryDS && factorA && factorB && factorC) {
-      const data: any[] = [...ternaryDS.sweetSpotTraces];
-
-      // Add Constraint Boundary Lines
-      if (ternaryDS.constraints.lines.length > 0) {
-        ternaryDS.constraints.lines.forEach((cl) => {
-          data.push({
-            type: 'scatterternary',
-            mode: 'lines',
-            name: cl.label,
-            a: [cl.p1.a, cl.p2.a],
-            b: [cl.p1.b, cl.p2.b],
-            c: [cl.p1.c, cl.p2.c],
-            line: { color: cl.color, width: 2, dash: cl.dash },
-            hoverinfo: 'name',
-            showlegend: true,
-          });
-        });
-      }
-
-      // Add Experimental Region Polygon Outline
-      if (ternaryDS.constraints.polygonVertices.length >= 3) {
-        data.push({
-          type: 'scatterternary',
-          mode: 'lines+markers',
-          name: `Khung Khảo Sát DoE (${factorA.low}≤${factorA.code}≤${factorA.high}...)`,
-          a: ternaryDS.constraints.polygonVertices.map((p) => p.a),
-          b: ternaryDS.constraints.polygonVertices.map((p) => p.b),
-          c: ternaryDS.constraints.polygonVertices.map((p) => p.c),
-          line: { color: '#c2410c', width: 2.8 },
-          marker: { size: 6, color: '#c2410c' },
-          hoverinfo: 'name',
-          showlegend: true,
-        });
-      }
-
-      // Plot Optimum Target Star
-      if (optimum) {
-        const rawA = optimum.actualFactors[factorA.code];
-        const rawB = optimum.actualFactors[factorB.code];
-        const rawC = optimum.actualFactors[factorC.code];
-        const optA = typeof rawA === 'number' ? rawA : parseFloat(String(rawA)) || 0;
-        const optB = typeof rawB === 'number' ? rawB : parseFloat(String(rawB)) || 0;
-        const optC = typeof rawC === 'number' ? rawC : parseFloat(String(rawC)) || 0;
-
-        data.push({
-          type: 'scatterternary',
-          mode: 'markers+text',
-          a: [optA],
-          b: [optB],
-          c: [optC],
-          text: ['★ ĐIỂM TỐI ƯU'],
-          textposition: 'bottom center',
-          textfont: { family: 'Inter', size: 11, color: '#1e3a8a', weight: 700 },
-          marker: { size: 16, color: '#1e3a8a', symbol: 'star' },
-          name: 'Target Setpoint (Optimum)',
-          hoverinfo: 'text',
-          hovertext: [`Điểm Tối Ưu Đề Xuất<br>${factorA.name}: ${optA}%<br>${factorB.name}: ${optB}%<br>${factorC.name}: ${optC}%`],
-        });
-      }
-
-      return data;
+      return ternaryDS.traces;
     }
 
     if (!sweetSpotGrid || !factorX || !factorY) return [];
@@ -395,53 +343,8 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
   }, [overlayMode, ternaryDS, factorA, factorB, factorC, sweetSpotGrid, factorX, factorY, optimum, smoothness, showBoundaryLines]);
 
   const overlayLayout = useMemo(() => {
-    if (overlayMode === 'ternary' && factorA && factorB && factorC) {
-      return {
-        title: {
-          text: `Vùng Thiết Kế Tam Giác Hỗn Hợp (Ternary Sweet Spot) - 100% CQAs Đạt Chuẩn`,
-          font: { size: 13, color: '#0f172a', family: 'Inter' },
-        },
-        autosize: true,
-        margin: { l: 65, r: 65, b: 65, t: 55, pad: 4 },
-        ternary: {
-          sum: 100,
-          aaxis: {
-            title: { text: formatAxisTitle(factorA.name, factorA.code, factorA.unit || '%'), font: { size: 11, color: '#0f172a' } },
-            min: 0.01,
-            linewidth: 2,
-            ticks: 'outside',
-            gridcolor: '#e2e8f0',
-          },
-          baxis: {
-            title: { text: formatAxisTitle(factorB.name, factorB.code, factorB.unit || '%'), font: { size: 11, color: '#0f172a' } },
-            min: 0.01,
-            linewidth: 2,
-            ticks: 'outside',
-            gridcolor: '#e2e8f0',
-          },
-          caxis: {
-            title: { text: formatAxisTitle(factorC.name, factorC.code, factorC.unit || '%'), font: { size: 11, color: '#0f172a' } },
-            min: 0.01,
-            linewidth: 2,
-            ticks: 'outside',
-            gridcolor: '#e2e8f0',
-          },
-        },
-        annotations: [
-          {
-            xref: 'paper',
-            yref: 'paper',
-            x: 0.02,
-            y: 0.98,
-            text: '🟩 Vùng Xanh: Design Space (100% CQAs Đạt Chuẩn)<br>🟥 Vùng Đỏ: Không đạt tiêu chuẩn (OOS)',
-            showarrow: false,
-            bgcolor: '#ffffff',
-            bordercolor: '#cbd5e1',
-            borderwidth: 1,
-            font: { size: 10 },
-          },
-        ],
-      };
+    if (overlayMode === 'ternary' && ternaryDS) {
+      return ternaryDS.layout;
     }
 
     return {

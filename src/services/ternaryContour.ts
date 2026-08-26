@@ -971,8 +971,25 @@ export function generateTernaryDesignSpace(
   fixedFactorsCoded: Record<string, number>,
   models: Record<string, StatisticalModelResult | NeuralNetModelResult>,
   cqas: CQA[],
-  resolution: number = 240
+  resolution: number = 240,
+  options?: {
+    optimum?: DesirabilitySolution | null;
+    doeRuns?: DoERun[];
+    showDoERuns?: boolean;
+    showConstraints?: boolean;
+    showRegionPolygon?: boolean;
+    showOptimum?: boolean;
+  }
 ) {
+  const {
+    optimum = null,
+    doeRuns = [],
+    showDoERuns = true,
+    showConstraints = true,
+    showRegionPolygon = true,
+    showOptimum = true,
+  } = options || {};
+
   const otherMixFactors = allFactors.filter(
     (f) =>
       (f.role === 'mixture_component' || f.type === 'Mixture') &&
@@ -1116,6 +1133,9 @@ export function generateTernaryDesignSpace(
     x: xGrid,
     y: yGrid,
     z: marginGrid,
+    zmin: -0.35,
+    zmax: 0.35,
+    zmid: 0.0,
     colorscale: [
       [0.0, 'rgba(239, 68, 68, 0.75)'],
       [0.499, 'rgba(254, 240, 138, 0.65)'],
@@ -1135,10 +1155,11 @@ export function generateTernaryDesignSpace(
       title: {
         text: 'Margin Chất Lượng (≥ 0 là Đạt)',
         side: 'right',
-        font: { size: 11, color: '#1e293b' },
+        font: { size: 10.5, color: '#1e293b' },
       },
-      len: 0.85,
-      thickness: 18,
+      len: 0.75,
+      thickness: 16,
+      x: 1.02,
     },
     hoverinfo: 'none',
   });
@@ -1155,7 +1176,73 @@ export function generateTernaryDesignSpace(
     showlegend: false,
   });
 
-  // 3. Exact Design Space Boundary Line (Margin = 0.0) using Marching Squares
+  // 3. Triangle Grid (%) Lines
+  const gridX: (number | null)[] = [];
+  const gridY: (number | null)[] = [];
+
+  for (let p = 10; p <= 90; p += 10) {
+    // Constant A = p (horizontal lines)
+    gridX.push(p / 2, 100 - p / 2, null);
+    gridY.push(p * (H / 100), p * (H / 100), null);
+
+    // Constant B = p (lines parallel to AC)
+    gridX.push(100 - p, (100 - p) / 2, null);
+    gridY.push(0, (100 - p) * (H / 100), null);
+
+    // Constant C = p (lines parallel to AB)
+    gridX.push(p, 50 + p / 2, null);
+    gridY.push(0, (100 - p) * (H / 100), null);
+  }
+
+  sweetSpotTraces.push({
+    type: 'scatter',
+    mode: 'lines',
+    name: 'Lưới Tam Giác (%)',
+    x: gridX,
+    y: gridY,
+    line: { color: 'rgba(148, 163, 184, 0.45)', width: 0.9, dash: 'dot' },
+    hoverinfo: 'none',
+    showlegend: false,
+  });
+
+  // 4. Tick Labels along the 3 Edges
+  const tickX: number[] = [];
+  const tickY: number[] = [];
+  const tickTexts: string[] = [];
+
+  // Base BC (Axis C: 0 to 100%)
+  for (let c = 20; c <= 80; c += 20) {
+    tickX.push(c);
+    tickY.push(-3.2);
+    tickTexts.push(`${c}%`);
+  }
+  // Right Edge CA (Axis A: 0 to 100%)
+  for (let a = 20; a <= 80; a += 20) {
+    tickX.push(100 - a / 2 + 4.2);
+    tickY.push(a * (H / 100));
+    tickTexts.push(`${a}%`);
+  }
+  // Left Edge AB (Axis B: 0 to 100%)
+  for (let b = 20; b <= 80; b += 20) {
+    tickX.push((100 - b) / 2 - 4.2);
+    tickY.push((100 - b) * (H / 100));
+    tickTexts.push(`${b}%`);
+  }
+
+  sweetSpotTraces.push({
+    type: 'scatter',
+    mode: 'text',
+    name: 'Chỉ số %',
+    x: tickX,
+    y: tickY,
+    text: tickTexts,
+    textposition: 'middle center',
+    textfont: { family: 'Inter, sans-serif', size: 9.5, color: '#64748b', weight: 600 },
+    hoverinfo: 'none',
+    showlegend: false,
+  });
+
+  // 5. Exact Design Space Boundary Line (Margin = 0.0) using Marching Squares
   const marginGridClean: number[][] = marginGrid.map((row) => row.map((v) => (v === null ? -999999 : v)));
   const boundarySegs = extract2DContourSegments(xGrid, yGrid, marginGridClean, 0.0);
 
@@ -1176,14 +1263,58 @@ export function generateTernaryDesignSpace(
       y: boundY,
       line: {
         color: '#15803d',
-        width: 3.2,
+        width: 3.4,
       },
       hoverinfo: 'name',
       showlegend: true,
     });
   }
 
-  // 4. Legend Indicators
+  // 6. Constraint Boundary Lines (Li <= Xi <= Ui)
+  if (showConstraints && constraints.lines.length > 0) {
+    constraints.lines.forEach((cl) => {
+      if (cl.p1.x !== undefined && cl.p1.y !== undefined && cl.p2.x !== undefined && cl.p2.y !== undefined) {
+        sweetSpotTraces.push({
+          type: 'scatter',
+          mode: 'lines',
+          name: cl.label,
+          x: [cl.p1.x, cl.p2.x],
+          y: [cl.p1.y, cl.p2.y],
+          line: {
+            color: cl.color,
+            width: 2.4,
+            dash: cl.dash,
+          },
+          hoverinfo: 'name',
+          showlegend: true,
+        });
+      }
+    });
+  }
+
+  // 7. Feasible DoE Region Polygon
+  if (showRegionPolygon && constraints.polygonVertices.length >= 3) {
+    const polyX = constraints.polygonVertices.map((v) => v.x ?? 0);
+    const polyY = constraints.polygonVertices.map((v) => v.y ?? 0);
+    polyX.push(polyX[0]);
+    polyY.push(polyY[0]);
+
+    sweetSpotTraces.push({
+      type: 'scatter',
+      mode: 'lines',
+      name: `Khung Khảo Sát DoE (${factorA.low}≤${factorA.code}≤${factorA.high}...)`,
+      x: polyX,
+      y: polyY,
+      line: {
+        color: '#c2410c',
+        width: 3.0,
+      },
+      hoverinfo: 'name',
+      showlegend: true,
+    });
+  }
+
+  // 8. Legend Indicators
   sweetSpotTraces.push({
     type: 'scatter',
     mode: 'lines',
@@ -1204,7 +1335,118 @@ export function generateTernaryDesignSpace(
     showlegend: true,
   });
 
-  // 5. Hover Probing Layer
+  // 9. Experimental DoE Runs (◆)
+  if (showDoERuns && doeRuns && doeRuns.length > 0) {
+    const runX: number[] = [];
+    const runY: number[] = [];
+    const runTexts: string[] = [];
+    const runHovers: string[] = [];
+
+    doeRuns.forEach((run, idx) => {
+      const valA = run.factorActual[factorA.code];
+      const valB = run.factorActual[factorB.code];
+      const valC = run.factorActual[factorC.code];
+
+      if (valA !== undefined && valB !== undefined && valC !== undefined) {
+        const rawA = typeof valA === 'number' ? valA : parseFloat(String(valA)) || 0;
+        const rawB = typeof valB === 'number' ? valB : parseFloat(String(valB)) || 0;
+        const rawC = typeof valC === 'number' ? valC : parseFloat(String(valC)) || 0;
+
+        const aPct = factorA.role === 'mixture_component' ? rawA * 100 : rawA;
+        const bPct = factorB.role === 'mixture_component' ? rawB * 100 : rawB;
+        const cPct = factorC.role === 'mixture_component' ? rawC * 100 : rawC;
+
+        const sum = aPct + bPct + cPct;
+        const total = activeFraction * 100;
+        const aNorm = sum > 0 ? (aPct / total) * 100 : 0;
+        const bNorm = sum > 0 ? (bPct / total) * 100 : 0;
+        const cNorm = sum > 0 ? (cPct / total) * 100 : 0;
+
+        const cart = ternaryToCartesian(aNorm, bNorm, cNorm);
+        runX.push(cart.x);
+        runY.push(cart.y);
+        runTexts.push(`R${run.runOrder || idx + 1}`);
+
+        runHovers.push(
+          `<b>Thí nghiệm ${run.runOrder || idx + 1} (DoE Run)</b><br>` +
+          `${factorA.name}: ${aPct.toFixed(1)}%<br>` +
+          `${factorB.name}: ${bPct.toFixed(1)}%<br>` +
+          `${factorC.name}: ${cPct.toFixed(1)}%`
+        );
+      }
+    });
+
+    if (runX.length > 0) {
+      sweetSpotTraces.push({
+        type: 'scatter',
+        mode: 'markers+text',
+        name: 'Điểm Thực Nghiệm DoE (◆)',
+        x: runX,
+        y: runY,
+        text: runTexts,
+        textposition: 'top center',
+        textfont: { family: 'Inter, sans-serif', size: 10, color: '#0f172a', weight: 700 },
+        hoverinfo: 'text',
+        hovertext: runHovers,
+        marker: {
+          symbol: 'diamond',
+          color: '#fbbf24',
+          line: { color: '#0f172a', width: 2 },
+          size: 11,
+        },
+        showlegend: true,
+      });
+    }
+  }
+
+  // 10. Optimum Target Point (★)
+  if (showOptimum && optimum) {
+    const rawA = optimum.actualFactors[factorA.code];
+    const rawB = optimum.actualFactors[factorB.code];
+    const rawC = optimum.actualFactors[factorC.code];
+
+    const optA = typeof rawA === 'number' ? rawA : parseFloat(String(rawA)) || 0;
+    const optB = typeof rawB === 'number' ? rawB : parseFloat(String(rawB)) || 0;
+    const optC = typeof rawC === 'number' ? rawC : parseFloat(String(rawC)) || 0;
+
+    const aPct = factorA.role === 'mixture_component' ? optA * 100 : optA;
+    const bPct = factorB.role === 'mixture_component' ? optB * 100 : optB;
+    const cPct = factorC.role === 'mixture_component' ? optC * 100 : optC;
+
+    const total = activeFraction * 100;
+    const aNorm = (aPct / total) * 100;
+    const bNorm = (bPct / total) * 100;
+    const cNorm = (cPct / total) * 100;
+
+    const cart = ternaryToCartesian(aNorm, bNorm, cNorm);
+
+    sweetSpotTraces.push({
+      type: 'scatter',
+      mode: 'markers+text',
+      name: '★ Target Setpoint (Optimum)',
+      x: [cart.x],
+      y: [cart.y],
+      text: ['★ ĐIỂM TỐI ƯU'],
+      textposition: 'bottom center',
+      textfont: { family: 'Inter, sans-serif', size: 11, color: '#1e3a8a', weight: 700 },
+      hoverinfo: 'text',
+      hovertext: [
+        `<b>★ ĐIỂM TỐI ƯU DESIRABILITY (D = ${(optimum.overallDesirability * 100).toFixed(1)}%)</b><br>` +
+        `${factorA.name}: ${aPct.toFixed(1)}%<br>` +
+        `${factorB.name}: ${bPct.toFixed(1)}%<br>` +
+        `${factorC.name}: ${cPct.toFixed(1)}%`
+      ],
+      marker: {
+        symbol: 'star',
+        color: '#1e3a8a',
+        line: { color: '#ffffff', width: 2 },
+        size: 16,
+      },
+      showlegend: true,
+    });
+  }
+
+  // 11. Hover Probing Layer
   sweetSpotTraces.push({
     type: 'scatter',
     mode: 'markers',
@@ -1221,7 +1463,83 @@ export function generateTernaryDesignSpace(
     showlegend: false,
   });
 
-  return { sweetSpotTraces, constraints, sweetSpotFraction };
+  // 12. Complete 2D Cartesian Simplex Projection Layout
+  const layout = {
+    title: {
+      text: `Vùng Thiết Kế Tam Giác Hỗn Hợp (Ternary Sweet Spot) - 100% CQAs Đạt Chuẩn`,
+      font: { size: 13, color: '#0f172a', family: 'Inter, sans-serif' },
+    },
+    autosize: true,
+    margin: { l: 65, r: 65, b: 75, t: 55, pad: 4 },
+    xaxis: {
+      range: [-15, 115],
+      fixedrange: true,
+      zeroline: false,
+      showgrid: false,
+      showline: false,
+      showticklabels: false,
+    },
+    yaxis: {
+      range: [-10, 98],
+      fixedrange: true,
+      zeroline: false,
+      showgrid: false,
+      showline: false,
+      showticklabels: false,
+      scaleanchor: 'x',
+      scaleratio: 1,
+    },
+    annotations: [
+      // Status badge top-left
+      {
+        xref: 'paper',
+        yref: 'paper',
+        x: 0.01,
+        y: 0.99,
+        text: '🟩 Vùng Xanh: Design Space (100% CQAs Đạt Chuẩn)<br>🟥 Vùng Đỏ: Không đạt tiêu chuẩn (OOS)',
+        showarrow: false,
+        bgcolor: '#ffffff',
+        bordercolor: '#cbd5e1',
+        borderwidth: 1,
+        font: { size: 9.5, color: '#1e293b' },
+        align: 'left',
+      },
+      // Apex A (Top)
+      {
+        x: 50,
+        y: H + 5.5,
+        text: `<b>▲ ${factorA.name} (${factorA.code})</b>`,
+        showarrow: false,
+        font: { size: 12, color: '#0f172a', family: 'Inter, sans-serif' },
+      },
+      // Apex B (Bottom-Left)
+      {
+        x: -4,
+        y: -6.5,
+        text: `<b>◀ ${factorB.name} (${factorB.code})</b>`,
+        showarrow: false,
+        font: { size: 12, color: '#0f172a', family: 'Inter, sans-serif' },
+      },
+      // Apex C (Bottom-Right)
+      {
+        x: 104,
+        y: -6.5,
+        text: `<b>▶ ${factorC.name} (${factorC.code})</b>`,
+        showarrow: false,
+        font: { size: 12, color: '#0f172a', family: 'Inter, sans-serif' },
+      },
+    ],
+    showlegend: true,
+    legend: {
+      orientation: 'h',
+      x: 0.5,
+      xanchor: 'center',
+      y: -0.16,
+      font: { size: 10 },
+    },
+  };
+
+  return { traces: sweetSpotTraces, sweetSpotTraces, layout, constraints, sweetSpotFraction };
 }
 
 export { buildTernaryPlotlyData as buildTernaryPlotlyTraces };
