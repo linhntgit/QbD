@@ -11,6 +11,7 @@ import type {
   DesirabilitySolution,
 } from '../types/qbd';
 import { calculateIndividualDesirability } from './mathUtils';
+import { projectToBoundedMixture, isWithinSurveyBounds } from './statistics';
 
 /**
  * Seedable pseudo-random number generator (Mulberry32)
@@ -1473,6 +1474,11 @@ export function optimizeNeuralDesirability(
   const k = factors.length;
 
   const evaluateOverallDesirability = (coded: Record<string, number>): { dOverall: number; dMap: Record<string, number> } => {
+    // 1. Strict Survey Boundary Check: Reject any point outside the experimental bounding box
+    if (!isWithinSurveyBounds(coded, factors)) {
+      return { dOverall: 0, dMap: {} };
+    }
+
     let logSum = 0;
     const dMap: Record<string, number> = {};
 
@@ -1497,26 +1503,53 @@ export function optimizeNeuralDesirability(
     return { dOverall, dMap };
   };
 
+  // Identify mixture and process factors and their survey bounds
+  const mixFactors = factors.filter((f) => f.role === 'mixture_component' || f.type === 'Mixture');
+  const procFactors = factors.filter((f) => f.role !== 'mixture_component' && f.type !== 'Mixture');
+  const hasMixture = mixFactors.length >= 2;
+
+  const mixLowProps = mixFactors.map((f) => (f.high <= 1.0 && f.unit !== '%' ? f.low : f.low / 100));
+  const mixHighProps = mixFactors.map((f) => (f.high <= 1.0 && f.unit !== '%' ? f.high : f.high / 100));
+
   let bestD = -1;
   let bestCoded: Record<string, number> = {};
   let bestDMap: Record<string, number> = {};
 
-  const mixFactors = factors.filter((f) => f.role === 'mixture_component');
-  const hasMixture = mixFactors.length >= 2;
+  // 1. Seed candidate with Feasible Polytope Centroid
+  const initialCandidate: Record<string, number> = {};
+  procFactors.forEach((f) => {
+    initialCandidate[f.code] = 0.0;
+  });
 
-  const gridSteps = k <= 3 ? 15 : (k <= 4 ? 9 : 5);
-  const stepSize = 2.0 / (gridSteps - 1);
+  if (hasMixture) {
+    const rawMid = mixFactors.map((_, i) => (mixLowProps[i] + mixHighProps[i]) / 2);
+    const projMid = projectToBoundedMixture(rawMid, mixLowProps, mixHighProps, 1.0);
+    mixFactors.forEach((f, i) => {
+      initialCandidate[f.code] = projMid[i];
+    });
+  } else if (mixFactors.length === 1) {
+    initialCandidate[mixFactors[0].code] = 1.0;
+  }
+
+  const { dOverall: initD, dMap: initDMap } = evaluateOverallDesirability(initialCandidate);
+  if (initD > bestD) {
+    bestD = initD;
+    bestCoded = { ...initialCandidate };
+    bestDMap = { ...initDMap };
+  }
+
+  // 2. High-Density Grid Exploration inside the Survey Bounds [L_i, U_i]
+  const gridSteps = k <= 3 ? 18 : (k <= 4 ? 12 : 7);
 
   const exploreGrid = (factorIdx: number, currentCoded: Record<string, number>) => {
     if (factorIdx >= k) {
       let evalCoded = { ...currentCoded };
       if (hasMixture) {
-        const rawSum = mixFactors.reduce((sum, f) => sum + Math.max(0, evalCoded[f.code] ?? 0), 0);
-        if (rawSum > 0) {
-          mixFactors.forEach((f) => {
-            evalCoded[f.code] = Number((Math.max(0, evalCoded[f.code] ?? 0) / rawSum).toFixed(4));
-          });
-        }
+        const rawVals = mixFactors.map((f) => evalCoded[f.code] ?? 0);
+        const projVals = projectToBoundedMixture(rawVals, mixLowProps, mixHighProps, 1.0);
+        mixFactors.forEach((f, i) => {
+          evalCoded[f.code] = projVals[i];
+        });
       }
       const { dOverall, dMap } = evaluateOverallDesirability(evalCoded);
       if (dOverall > bestD) {
@@ -1528,42 +1561,48 @@ export function optimizeNeuralDesirability(
     }
 
     const factor = factors[factorIdx];
+    const isMix = factor.role === 'mixture_component' || factor.type === 'Mixture';
+    const lowVal = isMix ? (factor.high <= 1.0 && factor.unit !== '%' ? factor.low : factor.low / 100) : -1.0;
+    const highVal = isMix ? (factor.high <= 1.0 && factor.unit !== '%' ? factor.high : factor.high / 100) : 1.0;
+
     for (let step = 0; step < gridSteps; step++) {
-      const val = factor.role === 'mixture_component' ? step / (gridSteps - 1) : -1.0 + step * stepSize;
-      currentCoded[factor.code] = Number(val.toFixed(3));
+      const val = lowVal + (step / (gridSteps - 1)) * (highVal - lowVal);
+      currentCoded[factor.code] = Number(val.toFixed(4));
       exploreGrid(factorIdx + 1, currentCoded);
     }
   };
 
   exploreGrid(0, {});
 
-  // Local Fine-Tuning around best grid point
-  for (let iter = 0; iter < 300; iter++) {
+  // 3. Multi-Start Local Fine-Tuning strictly inside Bounded Simplex
+  const numStarts = 400;
+  for (let iter = 0; iter < numStarts; iter++) {
     const candidateCoded: Record<string, number> = {};
-    factors.forEach((f) => {
+    procFactors.forEach((f) => {
       const current = bestCoded[f.code] ?? 0;
-      const jitter = (Math.random() - 0.5) * 0.15;
-      if (f.role === 'mixture_component') {
-        candidateCoded[f.code] = Math.max(0.01, current + jitter);
-      } else {
-        candidateCoded[f.code] = Math.max(-1.0, Math.min(1.0, Number((current + jitter).toFixed(3))));
-      }
+      const jitter = (Math.random() - 0.5) * 0.25;
+      candidateCoded[f.code] = Math.max(-1.0, Math.min(1.0, Number((current + jitter).toFixed(4))));
     });
 
     if (hasMixture) {
-      const rawSum = mixFactors.reduce((sum, f) => sum + candidateCoded[f.code], 0);
-      if (rawSum > 0) {
-        mixFactors.forEach((f) => {
-          candidateCoded[f.code] = Number((candidateCoded[f.code] / rawSum).toFixed(4));
-        });
-      }
+      const rawJittered = mixFactors.map((f, i) => {
+        const current = bestCoded[f.code] ?? (mixLowProps[i] + mixHighProps[i]) / 2;
+        const range = mixHighProps[i] - mixLowProps[i];
+        const jitter = (Math.random() - 0.5) * range * 0.4;
+        return current + jitter;
+      });
+
+      const proj = projectToBoundedMixture(rawJittered, mixLowProps, mixHighProps, 1.0);
+      mixFactors.forEach((f, i) => {
+        candidateCoded[f.code] = proj[i];
+      });
     }
 
     const { dOverall, dMap } = evaluateOverallDesirability(candidateCoded);
     if (dOverall > bestD) {
       bestD = dOverall;
-      bestCoded = candidateCoded;
-      bestDMap = dMap;
+      bestCoded = { ...candidateCoded };
+      bestDMap = { ...dMap };
     }
   }
 

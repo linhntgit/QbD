@@ -45,12 +45,27 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
 }) => {
   const validCQAs = useMemo(() => cqas.filter((c) => models[c.code]), [cqas, models]);
 
-  // Current interactive factor settings (coded values [-1, +1])
+  // Current interactive factor settings (coded values [-1, +1] or proportions [0, 1])
   const [currentCoded, setCurrentCoded] = useState<Record<string, number>>(() => {
     const init: Record<string, number> = {};
+    const mixFactors = factors.filter((f) => f.role === 'mixture_component' || f.type === 'Mixture');
     factors.forEach((f) => {
-      init[f.code] = 0;
+      if (f.role === 'mixture_component' || f.type === 'Mixture') {
+        const lowProp = f.high <= 1.0 && f.unit !== '%' ? f.low : f.low / 100;
+        const highProp = f.high <= 1.0 && f.unit !== '%' ? f.high : f.high / 100;
+        init[f.code] = Number(((lowProp + highProp) / 2).toFixed(4));
+      } else {
+        init[f.code] = 0;
+      }
     });
+    if (mixFactors.length > 0) {
+      const sum = mixFactors.reduce((s, f) => s + (init[f.code] ?? 0), 0);
+      if (sum > 0) {
+        mixFactors.forEach((f) => {
+          init[f.code] = Number((init[f.code] / sum).toFixed(4));
+        });
+      }
+    }
     return init;
   });
 
@@ -119,8 +134,13 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
     // Convert coded factors to actual values
     const actualFactors: Record<string, number | string> = {};
     factors.forEach((f) => {
-      const c = currentCoded[f.code] ?? 0;
-      actualFactors[f.code] = codedToActual(c, f);
+      if (f.role === 'mixture_component' || f.type === 'Mixture') {
+        const frac = currentCoded[f.code] ?? 0;
+        actualFactors[f.code] = Number((frac * 100).toFixed(2));
+      } else {
+        const c = currentCoded[f.code] ?? 0;
+        actualFactors[f.code] = codedToActual(c, f);
+      }
     });
 
     return {
@@ -158,12 +178,27 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
     }
   };
 
-  // Reset all factors to Center (0)
+  // Reset all factors to Center (0 for process, mid-proportion for mixture)
   const handleResetToCenter = () => {
     const centerCoded: Record<string, number> = {};
+    const mixFactors = factors.filter((f) => f.role === 'mixture_component' || f.type === 'Mixture');
     factors.forEach((f) => {
-      centerCoded[f.code] = 0;
+      if (f.role === 'mixture_component' || f.type === 'Mixture') {
+        const lowProp = f.high <= 1.0 && f.unit !== '%' ? f.low : f.low / 100;
+        const highProp = f.high <= 1.0 && f.unit !== '%' ? f.high : f.high / 100;
+        centerCoded[f.code] = Number(((lowProp + highProp) / 2).toFixed(4));
+      } else {
+        centerCoded[f.code] = 0;
+      }
     });
+    if (mixFactors.length > 0) {
+      const sum = mixFactors.reduce((s, f) => s + (centerCoded[f.code] ?? 0), 0);
+      if (sum > 0) {
+        mixFactors.forEach((f) => {
+          centerCoded[f.code] = Number((centerCoded[f.code] / sum).toFixed(4));
+        });
+      }
+    }
     setCurrentCoded(centerCoded);
   };
 
@@ -204,10 +239,6 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
     if (validCQAs.length === 0 || factors.length === 0) return null;
 
     const N_POINTS = 35;
-    const xCodedRange: number[] = [];
-    for (let i = 0; i < N_POINTS; i++) {
-      xCodedRange.push(-1.0 + (2.0 * i) / (N_POINTS - 1));
-    }
 
     // Grid data structure: traces[cqaCode][factorCode]
     const responseTraces: Record<
@@ -240,11 +271,20 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
 
     // Compute for each factor column
     factors.forEach((f) => {
+      const isMix = f.role === 'mixture_component' || f.type === 'Mixture';
+      const lowVal = isMix ? (f.high <= 1.0 && f.unit !== '%' ? f.low : f.low / 100) : -1.0;
+      const highVal = isMix ? (f.high <= 1.0 && f.unit !== '%' ? f.high : f.high / 100) : 1.0;
+
+      const xRange: number[] = [];
+      for (let i = 0; i < N_POINTS; i++) {
+        xRange.push(lowVal + (i / (N_POINTS - 1)) * (highVal - lowVal));
+      }
+
       const xActualArr: number[] = [];
       const dOverallArr: number[] = [];
 
-      xCodedRange.forEach((xc) => {
-        const xAct = codedToActual(xc, f);
+      xRange.forEach((xc) => {
+        const xAct = isMix ? Number((xc * 100).toFixed(2)) : codedToActual(xc, f);
         xActualArr.push(typeof xAct === 'number' ? xAct : Number(xAct) || xc);
 
         // Build point holding other factors at current settings
@@ -272,7 +312,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
         dOverallArr.push(zero ? 0 : Math.exp(logSum / totalWeight));
       });
 
-      const currXAct = codedToActual(currentCoded[f.code] ?? 0, f);
+      const currXAct = isMix ? Number(((currentCoded[f.code] ?? 0) * 100).toFixed(2)) : codedToActual(currentCoded[f.code] ?? 0, f);
       dTraces[f.code] = {
         xActual: xActualArr,
         dOverall: dOverallArr,
@@ -292,7 +332,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
         const ciUpArr: number[] = [];
         const ciLowArr: number[] = [];
 
-        xCodedRange.forEach((xc) => {
+        xRange.forEach((xc) => {
           const testPoint: Record<string, number> = { ...currentCoded, [f.code]: xc };
           const yp = model.predict(testPoint);
           yPredArr.push(Number(yp.toFixed(3)));
@@ -798,42 +838,73 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                         onChange={(e) => {
                           const val = Number(e.target.value);
                           if (!isNaN(val)) {
-                            const newCoded = actualToCoded(val, f);
+                            const isMix = f.role === 'mixture_component' || f.type === 'Mixture';
+                            const newCoded = isMix ? val / 100 : actualToCoded(val, f);
                             setCurrentCoded((prev) => ({
                               ...prev,
-                              [f.code]: Number(Math.max(-1.5, Math.min(1.5, newCoded)).toFixed(4)),
+                              [f.code]: Number(newCoded.toFixed(4)),
                             }));
                           }
                         }}
                       />
                       <span style={{ fontSize: '0.72rem', color: '#64748b', minWidth: '24px' }}>
-                        {f.unit}
+                        {f.unit || (f.role === 'mixture_component' || f.type === 'Mixture' ? '%' : '')}
                       </span>
                     </div>
 
                     {/* Range Slider */}
-                    <input
-                      type="range"
-                      min={-1}
-                      max={1}
-                      step={0.01}
-                      disabled={f.controllability === 'constant'}
-                      value={coded}
-                      onChange={(e) => {
-                        setCurrentCoded((prev) => ({
-                          ...prev,
-                          [f.code]: Number(e.target.value),
-                        }));
-                      }}
-                      style={{ width: '100%', cursor: 'pointer' }}
-                    />
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: '#94a3b8' }}>
-                      <span>{f.low}</span>
-                      <span className="font-mono" style={{ color: '#0284c7' }}>
-                        {coded >= 0 ? `+${coded.toFixed(2)}` : coded.toFixed(2)}
-                      </span>
-                      <span>{f.high}</span>
-                    </div>
+                    {f.role === 'mixture_component' || f.type === 'Mixture' ? (
+                      <>
+                        <input
+                          type="range"
+                          min={f.low}
+                          max={f.high}
+                          step={0.1}
+                          disabled={f.controllability === 'constant'}
+                          value={typeof actual === 'number' ? actual : Number(actual) || 0}
+                          onChange={(e) => {
+                            const valPct = Number(e.target.value);
+                            setCurrentCoded((prev) => ({
+                              ...prev,
+                              [f.code]: Number((valPct / 100).toFixed(4)),
+                            }));
+                          }}
+                          style={{ width: '100%', cursor: 'pointer' }}
+                        />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: '#94a3b8' }}>
+                          <span>{f.low}%</span>
+                          <span className="font-mono font-bold" style={{ color: '#0f766e' }}>
+                            {typeof actual === 'number' ? `${actual}%` : `${actual}`}
+                          </span>
+                          <span>{f.high}%</span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <input
+                          type="range"
+                          min={-1}
+                          max={1}
+                          step={0.01}
+                          disabled={f.controllability === 'constant'}
+                          value={coded}
+                          onChange={(e) => {
+                            setCurrentCoded((prev) => ({
+                              ...prev,
+                              [f.code]: Number(e.target.value),
+                            }));
+                          }}
+                          style={{ width: '100%', cursor: 'pointer' }}
+                        />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: '#94a3b8' }}>
+                          <span>{f.low}</span>
+                          <span className="font-mono" style={{ color: '#0284c7' }}>
+                            {coded >= 0 ? `+${coded.toFixed(2)}` : coded.toFixed(2)}
+                          </span>
+                          <span>{f.high}</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 );
               })}
