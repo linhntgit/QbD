@@ -234,6 +234,7 @@ export interface MonteCarloResult {
   failCount: number;
   defectRatePPM: number;
   reliabilityPercent: number;
+  executionTimeMs?: number;
   cqaStats: Record<string, {
     mean: number;
     sd: number;

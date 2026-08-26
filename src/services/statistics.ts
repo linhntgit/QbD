@@ -711,6 +711,7 @@ export function runMonteCarloSimulation(
   variabilityPercent: number = 2.0, // % RSD of process parameters
   simulations: number = 10000
 ): MonteCarloResult {
+  const startTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
   const validCQAs = cqas.filter((c) => models[c.code]);
   let passCount = 0;
   let failCount = 0;
@@ -720,18 +721,31 @@ export function runMonteCarloSimulation(
     cqaValues[c.code] = [];
   });
 
+  const mixFactors = factors.filter((f) => f.role === 'mixture_component' || f.type === 'Mixture');
+  const hasMixture = mixFactors.length >= 2;
+
   for (let s = 0; s < simulations; s++) {
-    // Generate randomized factor actuals and convert to coded
+    // Generate randomized factor actuals and convert to coded/proportion
     const sampleCoded: Record<string, number> = {};
+
+    // 1. Process factors
     factors.forEach((f) => {
       if (f.controllability === 'constant') {
-        sampleCoded[f.code] = 0;
+        const constNum = typeof f.constantValue === 'number' ? f.constantValue : Number(f.constantValue) || f.low;
+        sampleCoded[f.code] = f.role === 'mixture_component' || f.type === 'Mixture' ? constNum / 100 : 0;
         return;
       }
+
+      if (f.role === 'mixture_component' || f.type === 'Mixture') {
+        // Will handle collectively below
+        return;
+      }
+
       const rawMean = setpointActual[f.code];
-      const mean = typeof rawMean === 'number' ? rawMean : (f.low + f.high) / 2;
-      const sd = mean * (variabilityPercent / 100.0);
-      // Box-Muller normal transform
+      const mean: number = typeof rawMean === 'number' ? rawMean : Number(rawMean) || (f.low + f.high) / 2;
+      const sd = Math.max(1e-5, Math.abs(mean) * (variabilityPercent / 100.0));
+
+      // Box-Muller standard normal transform
       const u1 = Math.max(1e-9, Math.random());
       const u2 = Math.random();
       const z = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
@@ -742,11 +756,50 @@ export function runMonteCarloSimulation(
       sampleCoded[f.code] = half > 0 ? (actualVal - center) / half : 0;
     });
 
+    // 2. Mixture factors (sample & normalize to maintain 100% total)
+    if (mixFactors.length > 0) {
+      const sampledProps: number[] = [];
+      mixFactors.forEach((f) => {
+        if (f.controllability === 'constant') {
+          const constNum = typeof f.constantValue === 'number' ? f.constantValue : Number(f.constantValue) || f.low;
+          sampledProps.push(constNum / 100);
+          return;
+        }
+        const rawMean = setpointActual[f.code];
+        const mean: number = typeof rawMean === 'number' ? rawMean : Number(rawMean) || (f.low + f.high) / 2; // mean in %
+        const sd = Math.max(1e-5, mean * (variabilityPercent / 100.0));
+
+        const u1 = Math.max(1e-9, Math.random());
+        const u2 = Math.random();
+        const z = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+        const actualValPct = Math.max(0.01, mean + z * sd);
+        sampledProps.push(actualValPct / 100);
+      });
+
+      if (hasMixture) {
+        const sumProps = sampledProps.reduce((a, b) => a + b, 0);
+        mixFactors.forEach((f, idx) => {
+          sampleCoded[f.code] = sumProps > 0 ? sampledProps[idx] / sumProps : 1 / mixFactors.length;
+        });
+      } else {
+        mixFactors.forEach((f, idx) => {
+          sampleCoded[f.code] = sampledProps[idx];
+        });
+      }
+    }
+
+    // 3. Evaluate each CQA with True Gaussian Model Residual Noise
     let batchPass = true;
     for (const cqa of validCQAs) {
       const model = models[cqa.code];
-      const noiseStd = (model.diagnostics as any).stdDev ?? (model.diagnostics as any).rmseTrain ?? 0.1;
-      const resError = noiseStd * (Math.random() + Math.random() - 1); // error noise
+      const noiseStd = (model.diagnostics as any).stdDev ?? (model.diagnostics as any).rmseTrain ?? (model.diagnostics as any).rmseOverall ?? 0.1;
+
+      // Exact Box-Muller Gaussian Noise for model residual variance
+      const uNoise1 = Math.max(1e-9, Math.random());
+      const uNoise2 = Math.random();
+      const zNoise = Math.sqrt(-2.0 * Math.log(uNoise1)) * Math.cos(2.0 * Math.PI * uNoise2);
+      const resError = noiseStd * zNoise;
+
       const yPred = model.predict(sampleCoded) + resError;
       cqaValues[cqa.code].push(yPred);
 
@@ -774,10 +827,16 @@ export function runMonteCarloSimulation(
     const max = Math.max(...vals);
 
     let cpk: number | undefined = undefined;
-    if (cqa.lowerLimit !== undefined && cqa.upperLimit !== undefined && sd > 0) {
-      const cpl = (mean - cqa.lowerLimit) / (3 * sd);
-      const cpu = (cqa.upperLimit - mean) / (3 * sd);
-      cpk = Number(Math.min(cpl, cpu).toFixed(2));
+    if (sd > 0) {
+      if (cqa.lowerLimit !== undefined && cqa.upperLimit !== undefined) {
+        const cpl = (mean - cqa.lowerLimit) / (3 * sd);
+        const cpu = (cqa.upperLimit - mean) / (3 * sd);
+        cpk = Number(Math.min(cpl, cpu).toFixed(2));
+      } else if (cqa.lowerLimit !== undefined) {
+        cpk = Number(((mean - cqa.lowerLimit) / (3 * sd)).toFixed(2));
+      } else if (cqa.upperLimit !== undefined) {
+        cpk = Number(((cqa.upperLimit - mean) / (3 * sd)).toFixed(2));
+      }
     }
 
     let oosCount = 0;
@@ -797,12 +856,16 @@ export function runMonteCarloSimulation(
     };
   });
 
+  const endTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const executionTimeMs = Number((endTime - startTime).toFixed(2));
+
   return {
     simulations,
     passCount,
     failCount,
     defectRatePPM,
     reliabilityPercent,
+    executionTimeMs,
     cqaStats,
   };
 }
