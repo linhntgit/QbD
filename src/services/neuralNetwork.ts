@@ -89,6 +89,65 @@ export const DEFAULT_NEURAL_CONFIG: NeuralNetConfig = {
 };
 
 /**
+ * Calculate Neural Network Learnable Parameter Count and Overfitting Risk Metrics
+ */
+export function calculateNeuralArchitectureMetrics(
+  numInputs: number,
+  hidden1: number,
+  hidden2: number,
+  numOutputs: number,
+  numSamples: number
+): {
+  numInputs: number;
+  hidden1: number;
+  hidden2: number;
+  numOutputs: number;
+  totalParameters: number;
+  numSamples: number;
+  sampleToParamRatio: number;
+  overfittingRisk: 'safe' | 'warning' | 'danger';
+  recommendation: string;
+} {
+  const h1 = Math.max(1, hidden1);
+  const h2 = Math.max(0, hidden2);
+  const m = Math.max(1, numOutputs);
+
+  const p1 = (numInputs + 1) * h1; // W1 (numInputs x h1) + b1 (h1)
+  const p2 = h2 > 0 ? (h1 + 1) * h2 : 0; // W2 (h1 x h2) + b2 (h2)
+  const lastHidden = h2 > 0 ? h2 : h1;
+  const pOut = (lastHidden + 1) * m; // WOut (lastHidden x m) + bOut (m)
+  const totalParameters = p1 + p2 + pOut;
+
+  const sampleToParamRatio = totalParameters > 0 ? Number((numSamples / totalParameters).toFixed(2)) : 0;
+
+  let overfittingRisk: 'safe' | 'warning' | 'danger' = 'safe';
+  let recommendation = '';
+
+  if (sampleToParamRatio >= 2.0) {
+    overfittingRisk = 'safe';
+    recommendation = 'Kích thước mẫu đủ lớn so với số tham số mạng (N/P ≥ 2.0). Nguy cơ quá khớp rất thấp, mô hình có độ tự do tốt.';
+  } else if (sampleToParamRatio >= 1.0) {
+    overfittingRisk = 'warning';
+    recommendation = 'Cảnh báo nguy cơ quá khớp trung bình (1.0 ≤ N/P < 2.0). Khuyến nghị bật L2 Regularization (Weight Decay ≥ 0.01) hoặc giảm bớt số neuron.';
+  } else {
+    overfittingRisk = 'danger';
+    recommendation = `BÁO ĐỘNG OVERFITTING: Số tham số mạng (${totalParameters}) lớn hơn số thí nghiệm (${numSamples}) (N/P < 1.0)! Mạng nơ-ron rất dễ ghi nhớ dữ liệu thực nghiệm thay vì khái quát hóa. Hãy giảm số neuron tầng 1, tắt tầng 2 (Nodes = 0) hoặc tăng Weight Decay (≥ 0.05).`;
+  }
+
+  return {
+    numInputs,
+    hidden1: h1,
+    hidden2: h2,
+    numOutputs: m,
+    totalParameters,
+    numSamples,
+    sampleToParamRatio,
+    overfittingRisk,
+    recommendation,
+  };
+}
+
+/**
  * Fit a Neural Network Model for Experimental Data (MLP Architecture)
  */
 export function fitNeuralNetModel(
@@ -710,7 +769,693 @@ export function fitNeuralNetModel(
     formulaString,
     pythonCode,
     excelFormula,
+    architectureMode: 'independent',
+    parameterCount: calculateNeuralArchitectureMetrics(numInputs, h1, h2, 1, N).totalParameters,
   };
+}
+
+/**
+ * Fit a Unified Multi-Output Neural Network Model for All CQAs simultaneously (Shared MLP Architecture)
+ */
+export function fitMultiOutputNeuralNet(
+  cqas: CQA[],
+  factors: Factor[],
+  runs: DoERun[],
+  userConfig: Partial<NeuralNetConfig> = {}
+): Record<string, NeuralNetModelResult> {
+  const config: NeuralNetConfig = { ...DEFAULT_NEURAL_CONFIG, ...userConfig };
+  const activeFactors = factors.filter((f) => f.controllability !== 'constant');
+  const numInputs = activeFactors.length;
+  const numOutputs = cqas.length;
+
+  if (numInputs === 0 || numOutputs === 0) return {};
+
+  const parseResponse = (raw: number | string | null | undefined): number | null => {
+    if (raw === null || raw === undefined || raw === '') return null;
+    if (typeof raw === 'number') return isNaN(raw) ? null : raw;
+    if (typeof raw === 'string') {
+      const lower = raw.trim().toLowerCase();
+      if (lower === 'đạt' || lower === 'pass' || lower === 'yes' || lower === 'true') return 100.0;
+      if (lower === 'không đạt' || lower === 'fail' || lower === 'no' || lower === 'false') return 0.0;
+      const num = Number(raw);
+      return isNaN(num) ? null : num;
+    }
+    return null;
+  };
+
+  // Filter runs where at least one CQA is valid
+  const validData = runs
+    .map((r) => {
+      const x = activeFactors.map((f) => r.factorCoded[f.code] ?? 0);
+      const yArr = cqas.map((cqa) => parseResponse(r.responses[cqa.code]));
+      return { run: r, x, yArr };
+    })
+    .filter((d) => d.yArr.some((v) => v !== null));
+
+  const N = validData.length;
+  if (N < 4) return {};
+
+  // Normalization parameters per CQA
+  const cqaNorms = cqas.map((_, cIdx) => {
+    const validVals = validData
+      .map((d) => d.yArr[cIdx])
+      .filter((v): v is number => v !== null);
+    const count = validVals.length;
+    const mean = count > 0 ? validVals.reduce((a, b) => a + b, 0) / count : 0;
+    const variance =
+      count > 1
+        ? validVals.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / (count - 1)
+        : 1;
+    const sd = Math.sqrt(Math.max(1e-6, variance));
+    return { mean, sd, count };
+  });
+
+  const X_all = validData.map((d) => [...d.x]);
+  const Y_norm_all = validData.map((d) =>
+    d.yArr.map((val, cIdx) =>
+      val !== null ? (val - cqaNorms[cIdx].mean) / cqaNorms[cIdx].sd : 0
+    )
+  );
+  const Y_valid_mask = validData.map((d) => d.yArr.map((val) => val !== null));
+
+  const h1 = Math.max(1, config.hiddenNodes1);
+  const h2 = Math.max(0, config.hiddenNodes2);
+  const hasLayer2 = h2 > 0;
+  const lastHidden = hasLayer2 ? h2 : h1;
+  const act = config.activation;
+  const lambda = config.weightDecay;
+  const lr = config.learningRate;
+
+  const totalParams = calculateNeuralArchitectureMetrics(numInputs, h1, h2, numOutputs, N).totalParameters;
+
+  let bestGlobalValLoss = Infinity;
+  let bestGlobalWeights: {
+    W1: number[][];
+    b1: number[];
+    W2?: number[][];
+    b2?: number[];
+    WOut: number[][]; // lastHidden x numOutputs
+    bOut: number[]; // numOutputs
+  } | null = null;
+  let bestGlobalTourIndex = 0;
+  let bestGlobalLossHistory: { epoch: number; trainLoss: number; valLoss?: number }[] = [];
+  let bestGlobalSplit: { trainIdx: number[]; valIdx: number[] } | null = null;
+
+  // Multi-Tour Training loop
+  for (let tour = 0; tour < config.numTours; tour++) {
+    const tourSeed = config.seed + tour * 10007;
+    const rng = createRNG(tourSeed);
+
+    const indices = Array.from({ length: N }, (_, i) => i);
+    for (let i = N - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+
+    let trainIdx: number[] = [];
+    let valIdx: number[] = [];
+
+    if (config.validationMethod === 'holdout' && config.holdoutRatio > 0 && N >= 6) {
+      const valCount = Math.max(1, Math.min(Math.floor(N * 0.4), Math.round(N * config.holdoutRatio)));
+      valIdx = indices.slice(0, valCount);
+      trainIdx = indices.slice(valCount);
+    } else {
+      trainIdx = indices;
+      valIdx = [];
+    }
+
+    const nTrain = trainIdx.length;
+    const nVal = valIdx.length;
+
+    // Xavier/Glorot Initialization
+    const std1 = Math.sqrt(2.0 / (numInputs + h1));
+    const W1: number[][] = Array.from({ length: numInputs }, () =>
+      Array.from({ length: h1 }, () => randomNormal(rng, 0, std1))
+    );
+    const b1: number[] = new Array(h1).fill(0);
+
+    let W2: number[][] = [];
+    let b2: number[] = [];
+    if (hasLayer2) {
+      const std2 = Math.sqrt(2.0 / (h1 + h2));
+      W2 = Array.from({ length: h1 }, () =>
+        Array.from({ length: h2 }, () => randomNormal(rng, 0, std2))
+      );
+      b2 = new Array(h2).fill(0);
+    }
+
+    const stdOut = Math.sqrt(2.0 / (lastHidden + numOutputs));
+    const WOut: number[][] = Array.from({ length: lastHidden }, () =>
+      Array.from({ length: numOutputs }, () => randomNormal(rng, 0, stdOut))
+    );
+    const bOut: number[] = new Array(numOutputs).fill(0);
+
+    // Adam optimizer moment states
+    const mW1 = Array.from({ length: numInputs }, () => new Array(h1).fill(0));
+    const vW1 = Array.from({ length: numInputs }, () => new Array(h1).fill(0));
+    const mb1 = new Array(h1).fill(0);
+    const vb1 = new Array(h1).fill(0);
+
+    const mW2 = hasLayer2 ? Array.from({ length: h1 }, () => new Array(h2).fill(0)) : [];
+    const vW2 = hasLayer2 ? Array.from({ length: h1 }, () => new Array(h2).fill(0)) : [];
+    const mb2 = hasLayer2 ? new Array(h2).fill(0) : [];
+    const vb2 = hasLayer2 ? new Array(h2).fill(0) : [];
+
+    const mWOut = Array.from({ length: lastHidden }, () => new Array(numOutputs).fill(0));
+    const vWOut = Array.from({ length: lastHidden }, () => new Array(numOutputs).fill(0));
+    const mbOut = new Array(numOutputs).fill(0);
+    const vbOut = new Array(numOutputs).fill(0);
+
+    const beta1 = 0.9;
+    const beta2 = 0.999;
+    const eps = 1e-8;
+
+    let tourBestValLoss = Infinity;
+    let tourBestWeights = {
+      W1: W1.map((r) => [...r]),
+      b1: [...b1],
+      W2: hasLayer2 ? W2.map((r) => [...r]) : undefined,
+      b2: hasLayer2 ? [...b2] : undefined,
+      WOut: WOut.map((r) => [...r]),
+      bOut: [...bOut],
+    };
+
+    const lossHistory: { epoch: number; trainLoss: number; valLoss?: number }[] = [];
+
+    for (let epoch = 1; epoch <= config.maxEpochs; epoch++) {
+      const gradW1 = Array.from({ length: numInputs }, () => new Array(h1).fill(0));
+      const gradB1 = new Array(h1).fill(0);
+      const gradW2 = hasLayer2 ? Array.from({ length: h1 }, () => new Array(h2).fill(0)) : [];
+      const gradB2 = hasLayer2 ? new Array(h2).fill(0) : [];
+      const gradWOut = Array.from({ length: lastHidden }, () => new Array(numOutputs).fill(0));
+      const gradBOut = new Array(numOutputs).fill(0);
+
+      let trainSSE = 0;
+      let trainPointsCount = 0;
+
+      for (let i = 0; i < nTrain; i++) {
+        const idx = trainIdx[i];
+        const x = X_all[idx];
+        const yTrueArr = Y_norm_all[idx];
+        const yMask = Y_valid_mask[idx];
+
+        // Layer 1
+        const z1: number[] = new Array(h1).fill(0);
+        const a1: number[] = new Array(h1).fill(0);
+        for (let j = 0; j < h1; j++) {
+          let sum = b1[j];
+          for (let k = 0; k < numInputs; k++) sum += x[k] * W1[k][j];
+          z1[j] = sum;
+          a1[j] = activate(sum, act);
+        }
+
+        // Layer 2
+        let z2: number[] = [];
+        let a2: number[] = [];
+        if (hasLayer2) {
+          z2 = new Array(h2).fill(0);
+          a2 = new Array(h2).fill(0);
+          for (let j = 0; j < h2; j++) {
+            let sum = b2[j];
+            for (let k = 0; k < h1; k++) sum += a1[k] * W2[k][j];
+            z2[j] = sum;
+            a2[j] = activate(sum, act);
+          }
+        }
+
+        const aLast = hasLayer2 ? a2 : a1;
+        const deltaOut: number[] = new Array(numOutputs).fill(0);
+
+        for (let c = 0; c < numOutputs; c++) {
+          if (!yMask[c]) continue;
+          let yPredNorm = bOut[c];
+          for (let k = 0; k < lastHidden; k++) {
+            yPredNorm += aLast[k] * WOut[k][c];
+          }
+          const err = yPredNorm - yTrueArr[c];
+          trainSSE += err * err;
+          trainPointsCount++;
+
+          deltaOut[c] = err;
+          gradBOut[c] += err;
+          for (let k = 0; k < lastHidden; k++) {
+            gradWOut[k][c] += err * aLast[k];
+          }
+        }
+
+        // Backprop to last hidden layer
+        if (hasLayer2) {
+          const delta2: number[] = new Array(h2).fill(0);
+          for (let j = 0; j < h2; j++) {
+            const dAct = activateDerivative(z2[j], a2[j], act);
+            let sumDelta = 0;
+            for (let c = 0; c < numOutputs; c++) {
+              if (yMask[c]) sumDelta += deltaOut[c] * WOut[j][c];
+            }
+            delta2[j] = sumDelta * dAct;
+            gradB2[j] += delta2[j];
+            for (let k = 0; k < h1; k++) {
+              gradW2[k][j] += delta2[j] * a1[k];
+            }
+          }
+
+          // Backprop to Layer 1
+          for (let j = 0; j < h1; j++) {
+            const dAct1 = activateDerivative(z1[j], a1[j], act);
+            let sumDelta1 = 0;
+            for (let k = 0; k < h2; k++) {
+              sumDelta1 += delta2[k] * W2[j][k];
+            }
+            const delta1 = sumDelta1 * dAct1;
+            gradB1[j] += delta1;
+            for (let k = 0; k < numInputs; k++) {
+              gradW1[k][j] += delta1 * x[k];
+            }
+          }
+        } else {
+          // Single hidden layer backprop
+          for (let j = 0; j < h1; j++) {
+            const dAct1 = activateDerivative(z1[j], a1[j], act);
+            let sumDelta1 = 0;
+            for (let c = 0; c < numOutputs; c++) {
+              if (yMask[c]) sumDelta1 += deltaOut[c] * WOut[j][c];
+            }
+            const delta1 = sumDelta1 * dAct1;
+            gradB1[j] += delta1;
+            for (let k = 0; k < numInputs; k++) {
+              gradW1[k][j] += delta1 * x[k];
+            }
+          }
+        }
+      }
+
+      // L2 Regularization
+      let l2Sum = 0;
+      for (let k = 0; k < numInputs; k++) {
+        for (let j = 0; j < h1; j++) {
+          gradW1[k][j] += lambda * W1[k][j];
+          l2Sum += W1[k][j] * W1[k][j];
+        }
+      }
+      if (hasLayer2) {
+        for (let k = 0; k < h1; k++) {
+          for (let j = 0; j < h2; j++) {
+            gradW2[k][j] += lambda * W2[k][j];
+            l2Sum += W2[k][j] * W2[k][j];
+          }
+        }
+      }
+      for (let k = 0; k < lastHidden; k++) {
+        for (let c = 0; c < numOutputs; c++) {
+          gradWOut[k][c] += lambda * WOut[k][c];
+          l2Sum += WOut[k][c] * WOut[k][c];
+        }
+      }
+
+      // Adam Updates for W1, b1
+      for (let k = 0; k < numInputs; k++) {
+        for (let j = 0; j < h1; j++) {
+          const g = gradW1[k][j] / Math.max(1, nTrain);
+          mW1[k][j] = beta1 * mW1[k][j] + (1 - beta1) * g;
+          vW1[k][j] = beta2 * vW1[k][j] + (1 - beta2) * g * g;
+          const mHat = mW1[k][j] / (1 - Math.pow(beta1, epoch));
+          const vHat = vW1[k][j] / (1 - Math.pow(beta2, epoch));
+          W1[k][j] -= (lr * mHat) / (Math.sqrt(vHat) + eps);
+        }
+      }
+      for (let j = 0; j < h1; j++) {
+        const g = gradB1[j] / Math.max(1, nTrain);
+        mb1[j] = beta1 * mb1[j] + (1 - beta1) * g;
+        vb1[j] = beta2 * vb1[j] + (1 - beta2) * g * g;
+        const mHat = mb1[j] / (1 - Math.pow(beta1, epoch));
+        const vHat = vb1[j] / (1 - Math.pow(beta2, epoch));
+        b1[j] -= (lr * mHat) / (Math.sqrt(vHat) + eps);
+      }
+
+      // Adam Updates for W2, b2
+      if (hasLayer2) {
+        for (let k = 0; k < h1; k++) {
+          for (let j = 0; j < h2; j++) {
+            const g = gradW2[k][j] / Math.max(1, nTrain);
+            mW2[k][j] = beta1 * mW2[k][j] + (1 - beta1) * g;
+            vW2[k][j] = beta2 * vW2[k][j] + (1 - beta2) * g * g;
+            const mHat = mW2[k][j] / (1 - Math.pow(beta1, epoch));
+            const vHat = vW2[k][j] / (1 - Math.pow(beta2, epoch));
+            W2[k][j] -= (lr * mHat) / (Math.sqrt(vHat) + eps);
+          }
+        }
+        for (let j = 0; j < h2; j++) {
+          const g = gradB2[j] / Math.max(1, nTrain);
+          mb2[j] = beta1 * mb2[j] + (1 - beta1) * g;
+          vb2[j] = beta2 * vb2[j] + (1 - beta2) * g * g;
+          const mHat = mb2[j] / (1 - Math.pow(beta1, epoch));
+          const vHat = vb2[j] / (1 - Math.pow(beta2, epoch));
+          b2[j] -= (lr * mHat) / (Math.sqrt(vHat) + eps);
+        }
+      }
+
+      // Adam Updates for WOut, bOut
+      for (let k = 0; k < lastHidden; k++) {
+        for (let c = 0; c < numOutputs; c++) {
+          const g = gradWOut[k][c] / Math.max(1, nTrain);
+          mWOut[k][c] = beta1 * mWOut[k][c] + (1 - beta1) * g;
+          vWOut[k][c] = beta2 * vWOut[k][c] + (1 - beta2) * g * g;
+          const mHat = mWOut[k][c] / (1 - Math.pow(beta1, epoch));
+          const vHat = vWOut[k][c] / (1 - Math.pow(beta2, epoch));
+          WOut[k][c] -= (lr * mHat) / (Math.sqrt(vHat) + eps);
+        }
+      }
+      for (let c = 0; c < numOutputs; c++) {
+        const g = gradBOut[c] / Math.max(1, nTrain);
+        mbOut[c] = beta1 * mbOut[c] + (1 - beta1) * g;
+        vbOut[c] = beta2 * vbOut[c] + (1 - beta2) * g * g;
+        const mHat = mbOut[c] / (1 - Math.pow(beta1, epoch));
+        const vHat = vbOut[c] / (1 - Math.pow(beta2, epoch));
+        bOut[c] -= (lr * mHat) / (Math.sqrt(vHat) + eps);
+      }
+
+      // Validation evaluation
+      let valLoss: number | undefined = undefined;
+      let totalTrainLoss = trainSSE / Math.max(1, trainPointsCount) + 0.5 * lambda * l2Sum;
+
+      if (nVal > 0) {
+        let valSSE = 0;
+        let valPointsCount = 0;
+        for (let i = 0; i < nVal; i++) {
+          const idx = valIdx[i];
+          const x = X_all[idx];
+          const yTrueArr = Y_norm_all[idx];
+          const yMask = Y_valid_mask[idx];
+
+          const a1: number[] = new Array(h1).fill(0);
+          for (let j = 0; j < h1; j++) {
+            let sum = b1[j];
+            for (let k = 0; k < numInputs; k++) sum += x[k] * W1[k][j];
+            a1[j] = activate(sum, act);
+          }
+
+          let aLast = a1;
+          if (hasLayer2) {
+            const a2: number[] = new Array(h2).fill(0);
+            for (let j = 0; j < h2; j++) {
+              let sum = b2[j];
+              for (let k = 0; k < h1; k++) sum += a1[k] * W2[k][j];
+              a2[j] = activate(sum, act);
+            }
+            aLast = a2;
+          }
+
+          for (let c = 0; c < numOutputs; c++) {
+            if (!yMask[c]) continue;
+            let yPredNorm = bOut[c];
+            for (let k = 0; k < lastHidden; k++) {
+              yPredNorm += aLast[k] * WOut[k][c];
+            }
+            const err = yPredNorm - yTrueArr[c];
+            valSSE += err * err;
+            valPointsCount++;
+          }
+        }
+        valLoss = valSSE / Math.max(1, valPointsCount);
+
+        if (valLoss < tourBestValLoss) {
+          tourBestValLoss = valLoss;
+          tourBestWeights = {
+            W1: W1.map((r) => [...r]),
+            b1: [...b1],
+            W2: hasLayer2 ? W2.map((r) => [...r]) : undefined,
+            b2: hasLayer2 ? [...b2] : undefined,
+            WOut: WOut.map((r) => [...r]),
+            bOut: [...bOut],
+          };
+        }
+      } else {
+        if (totalTrainLoss < tourBestValLoss) {
+          tourBestValLoss = totalTrainLoss;
+          tourBestWeights = {
+            W1: W1.map((r) => [...r]),
+            b1: [...b1],
+            W2: hasLayer2 ? W2.map((r) => [...r]) : undefined,
+            b2: hasLayer2 ? [...b2] : undefined,
+            WOut: WOut.map((r) => [...r]),
+            bOut: [...bOut],
+          };
+        }
+      }
+
+      if (epoch % 20 === 0 || epoch === config.maxEpochs) {
+        lossHistory.push({
+          epoch,
+          trainLoss: Number(totalTrainLoss.toFixed(5)),
+          valLoss: valLoss !== undefined ? Number(valLoss.toFixed(5)) : undefined,
+        });
+      }
+    }
+
+    const currentCrit = nVal > 0 ? tourBestValLoss : tourBestValLoss;
+    if (currentCrit < bestGlobalValLoss) {
+      bestGlobalValLoss = currentCrit;
+      bestGlobalWeights = tourBestWeights;
+      bestGlobalTourIndex = tour + 1;
+      bestGlobalLossHistory = lossHistory;
+      bestGlobalSplit = { trainIdx, valIdx };
+    }
+  }
+
+  if (!bestGlobalWeights || !bestGlobalSplit) return {};
+
+  // Extract individual NeuralNetModelResult for each CQA
+  const results: Record<string, NeuralNetModelResult> = {};
+  const { W1, b1, W2, b2, WOut, bOut } = bestGlobalWeights;
+  const inputCodes = activeFactors.map((f) => f.code);
+  const valSet = new Set(bestGlobalSplit.valIdx);
+
+  cqas.forEach((cqa, cIdx) => {
+    const yMean = cqaNorms[cIdx].mean;
+    const ySd = cqaNorms[cIdx].sd;
+
+    const singleWOut: number[][] = Array.from({ length: lastHidden }, (_, k) => [WOut[k][cIdx]]);
+    const singleBOut = bOut[cIdx];
+
+    const predictNorm = (xVector: number[]): number => {
+      const a1: number[] = new Array(h1).fill(0);
+      for (let j = 0; j < h1; j++) {
+        let sum = b1[j];
+        for (let k = 0; k < numInputs; k++) sum += xVector[k] * W1[k][j];
+        a1[j] = activate(sum, act);
+      }
+      let aLast = a1;
+      if (hasLayer2 && W2 && b2) {
+        const a2: number[] = new Array(h2).fill(0);
+        for (let j = 0; j < h2; j++) {
+          let sum = b2[j];
+          for (let k = 0; k < h1; k++) sum += a1[k] * W2[k][j];
+          a2[j] = activate(sum, act);
+        }
+        aLast = a2;
+      }
+      let predNorm = singleBOut;
+      for (let k = 0; k < lastHidden; k++) {
+        predNorm += aLast[k] * singleWOut[k][0];
+      }
+      return predNorm;
+    };
+
+    const predict = (coded: Record<string, number>): number => {
+      const xVec = inputCodes.map((code) => coded[code] ?? 0);
+      const pNorm = predictNorm(xVec);
+      return pNorm * ySd + yMean;
+    };
+
+    // Diagnostics for this CQA
+    const residuals: NeuralResidual[] = [];
+    let trainSSE = 0;
+    let trainSAE = 0;
+    let valSSE = 0;
+    let valSAE = 0;
+    let overallSSE = 0;
+    let overallSAE = 0;
+
+    const yTrainVals: number[] = [];
+    const yValVals: number[] = [];
+
+    validData.forEach((d, i) => {
+      const actualY = d.yArr[cIdx];
+      if (actualY === null) return;
+
+      const isVal = valSet.has(i);
+      const predVal = predict(d.run.factorCoded);
+      const res = actualY - predVal;
+
+      residuals.push({
+        runOrder: d.run.runOrder,
+        actual: Number(actualY.toFixed(3)),
+        predicted: Number(predVal.toFixed(3)),
+        residual: Number(res.toFixed(3)),
+        isValidation: isVal,
+      });
+
+      overallSSE += res * res;
+      overallSAE += Math.abs(res);
+
+      if (isVal) {
+        valSSE += res * res;
+        valSAE += Math.abs(res);
+        yValVals.push(actualY);
+      } else {
+        trainSSE += res * res;
+        trainSAE += Math.abs(res);
+        yTrainVals.push(actualY);
+      }
+    });
+
+    const nCqaTrain = yTrainVals.length;
+    const nCqaVal = yValVals.length;
+    const nCqaTotal = residuals.length;
+
+    const meanTrainY = nCqaTrain > 0 ? yTrainVals.reduce((a, b) => a + b, 0) / nCqaTrain : yMean;
+    const sstTrain = yTrainVals.reduce((sum, v) => sum + Math.pow(v - meanTrainY, 2), 0);
+    const r2Train = sstTrain > 0 ? Math.max(0, Math.min(1, 1 - trainSSE / sstTrain)) : 1.0;
+
+    const meanValY = nCqaVal > 0 ? yValVals.reduce((a, b) => a + b, 0) / nCqaVal : yMean;
+    const sstVal = yValVals.reduce((sum, v) => sum + Math.pow(v - meanValY, 2), 0);
+    const r2Val = sstVal > 0 ? Math.max(0, Math.min(1, 1 - valSSE / sstVal)) : r2Train;
+
+    const allActualY = residuals.map((r) => r.actual);
+    const sstOverall = allActualY.reduce((sum, v) => sum + Math.pow(v - yMean, 2), 0);
+    const r2Overall = sstOverall > 0 ? Math.max(0, Math.min(1, 1 - overallSSE / sstOverall)) : 1.0;
+
+    const rmseTrain = Math.sqrt(trainSSE / Math.max(1, nCqaTrain));
+    const rmseVal = nCqaVal > 0 ? Math.sqrt(valSSE / Math.max(1, nCqaVal)) : rmseTrain;
+    const rmseOverall = Math.sqrt(overallSSE / Math.max(1, nCqaTotal));
+
+    const maeTrain = trainSAE / Math.max(1, nCqaTrain);
+    const maeVal = nCqaVal > 0 ? valSAE / Math.max(1, nCqaVal) : maeTrain;
+    const maeOverall = overallSAE / Math.max(1, nCqaTotal);
+
+    // Variable Sensitivity for this CQA
+    const rawSensitivities: number[] = new Array(numInputs).fill(0);
+    const numGrid = 200;
+    const rngSens = createRNG(12345 + cIdx * 77);
+
+    for (let s = 0; s < numGrid; s++) {
+      const baseCoded = activeFactors.map(() => rngSens() * 2 - 1);
+      const basePred = predictNorm(baseCoded);
+      const delta = 0.01;
+      for (let k = 0; k < numInputs; k++) {
+        const perturbed = [...baseCoded];
+        perturbed[k] = Math.max(-1.0, Math.min(1.0, perturbed[k] + delta));
+        const diff = Math.abs(predictNorm(perturbed) - basePred) / delta;
+        rawSensitivities[k] += diff;
+      }
+    }
+
+    const sumSens = rawSensitivities.reduce((a, b) => a + b, 0) || 1.0;
+    const variableImportance: FactorSensitivity[] = activeFactors.map((f, k) => {
+      const sens = rawSensitivities[k] / numGrid;
+      const relImp = (rawSensitivities[k] / sumSens) * 100;
+      return {
+        factorCode: f.code,
+        factorName: f.name,
+        importance: Number(sens.toFixed(4)),
+        relativeImportance: Number(relImp.toFixed(2)),
+      };
+    });
+    variableImportance.sort((a, b) => b.importance - a.importance);
+
+    // Formula & Code Strings
+    const formulaString = `MultiOutputNeuralNet(${act.toUpperCase()} [${h1}${hasLayer2 ? `, ${h2}` : ''}] -> ${numOutputs} CQAs) [Output: ${cqa.name}]`;
+
+    const pyLines = [
+      `import numpy as np`,
+      ``,
+      `def predict_${cqa.code.toLowerCase()}_multi(factors_dict):`,
+      `    # Multi-Output Shared Network Inference for ${cqa.name}`,
+      `    # Factors order: ${inputCodes.join(', ')} (in coded scale [-1, 1])`,
+      `    x = np.array([factors_dict.get(k, 0.0) for k in [${inputCodes.map((c) => `'${c}'`).join(', ')}]])`,
+      `    W1 = np.array(${JSON.stringify(W1)})`,
+      `    b1 = np.array(${JSON.stringify(b1)})`,
+    ];
+    if (act === 'tanh') pyLines.push(`    a1 = np.tanh(np.dot(x, W1) + b1)`);
+    else if (act === 'relu') pyLines.push(`    a1 = np.maximum(0, np.dot(x, W1) + b1)`);
+    else if (act === 'sigmoid') pyLines.push(`    a1 = 1 / (1 + np.exp(-np.dot(x, W1) + b1))`);
+    else if (act === 'gaussian') pyLines.push(`    z1 = np.dot(x, W1) + b1; a1 = np.exp(-z1*z1)`);
+    else pyLines.push(`    a1 = np.dot(x, W1) + b1`);
+
+    if (hasLayer2 && W2 && b2) {
+      pyLines.push(`    W2 = np.array(${JSON.stringify(W2)})`);
+      pyLines.push(`    b2 = np.array(${JSON.stringify(b2)})`);
+      pyLines.push(`    a2 = np.tanh(np.dot(a1, W2) + b2)`);
+      pyLines.push(`    a_last = a2`);
+    } else {
+      pyLines.push(`    a_last = a1`);
+    }
+
+    pyLines.push(`    W_out_c = np.array(${JSON.stringify(singleWOut)})`);
+    pyLines.push(`    b_out_c = ${singleBOut.toFixed(6)}`);
+    pyLines.push(`    y_norm = np.dot(a_last, W_out_c)[0] + b_out_c`);
+    pyLines.push(`    y_actual = y_norm * ${ySd.toFixed(6)} + ${yMean.toFixed(6)}`);
+    pyLines.push(`    return float(y_actual)`);
+    const pythonCode = pyLines.join('\n');
+
+    let excelFormula = `=(${singleBOut.toFixed(4)}`;
+    for (let j = 0; j < h1; j++) {
+      const wOutJ = singleWOut[j][0].toFixed(4);
+      let inner = `${b1[j].toFixed(4)}`;
+      for (let k = 0; k < numInputs; k++) {
+        const w1KJ = W1[k][j].toFixed(4);
+        inner += ` + (${w1KJ} * [Cell_${inputCodes[k]}])`;
+      }
+      excelFormula += ` + (${wOutJ} * TANH(${inner}))`;
+    }
+    excelFormula += `) * ${ySd.toFixed(4)} + ${yMean.toFixed(4)}`;
+
+    results[cqa.code] = {
+      cqaCode: cqa.code,
+      config,
+      weights: {
+        W1,
+        b1,
+        W2: hasLayer2 ? W2 : undefined,
+        b2: hasLayer2 ? b2 : undefined,
+        WOut: singleWOut,
+        bOut: singleBOut,
+      },
+      inputFactorCodes: inputCodes,
+      normParams: {
+        xMeans: activeFactors.map(() => 0),
+        xSds: activeFactors.map(() => 1),
+        yMean,
+        ySd,
+      },
+      diagnostics: {
+        rSquaredTrain: Number(r2Train.toFixed(4)),
+        rSquaredVal: Number(r2Val.toFixed(4)),
+        rSquaredOverall: Number(r2Overall.toFixed(4)),
+        rmseTrain: Number(rmseTrain.toFixed(4)),
+        rmseVal: Number(rmseVal.toFixed(4)),
+        rmseOverall: Number(rmseOverall.toFixed(4)),
+        maeTrain: Number(maeTrain.toFixed(4)),
+        maeVal: Number(maeVal.toFixed(4)),
+        maeOverall: Number(maeOverall.toFixed(4)),
+        sseTrain: Number(trainSSE.toFixed(4)),
+        sseVal: Number(valSSE.toFixed(4)),
+        sseOverall: Number(overallSSE.toFixed(4)),
+        lossHistory: bestGlobalLossHistory,
+        residuals,
+        variableImportance,
+        bestTourIndex: bestGlobalTourIndex,
+      },
+      predict,
+      formulaString,
+      pythonCode,
+      excelFormula,
+      architectureMode: 'shared',
+      parameterCount: totalParams,
+    };
+  });
+
+  return results;
 }
 
 /**

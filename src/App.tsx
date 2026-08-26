@@ -5,11 +5,12 @@ import type {
   StatisticalModelResult,
   NeuralNetConfig,
   NeuralNetModelResult,
+  NeuralTrainingMode,
   ModelingEngine,
 } from './types/qbd';
 import { CASE_STUDIES } from './data/caseStudies';
 import { fitModel, optimizeDesirability, runMonteCarloSimulation } from './services/statistics';
-import { fitNeuralNetModel } from './services/neuralNetwork';
+import { fitNeuralNetModel, fitMultiOutputNeuralNet, DEFAULT_NEURAL_CONFIG } from './services/neuralNetwork';
 import { exportQBDWordReport } from './services/reportGenerator';
 import { Navbar } from './components/Navbar';
 import { TabNavigation, type TabKey } from './components/TabNavigation';
@@ -28,6 +29,8 @@ export function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('qtpp');
   const [selectedCQA, setSelectedCQA] = useState<string>(CASE_STUDIES[0].cqas[0]?.code || 'Y1');
   const [modelTypes, setModelTypes] = useState<Record<string, ModelType>>({});
+  const [neuralTrainingMode, setNeuralTrainingMode] = useState<NeuralTrainingMode>('independent');
+  const [sharedNeuralConfig, setSharedNeuralConfig] = useState<NeuralNetConfig>({ ...DEFAULT_NEURAL_CONFIG });
   const [neuralConfigs, setNeuralConfigs] = useState<Record<string, NeuralNetConfig>>({});
   const [modelingEngine, setModelingEngine] = useState<ModelingEngine>('polynomial');
 
@@ -44,18 +47,21 @@ export function App() {
     return result;
   }, [project.cqas, project.factors, project.runs, modelTypes]);
 
-  // Calculate Neural Network Models dynamically for all CQAs (Neural MLP)
+  // Calculate Neural Network Models dynamically for all CQAs (Unified Multi-Output or Independent Per-CQA)
   const neuralModels = useMemo<Record<string, NeuralNetModelResult>>(() => {
+    if (neuralTrainingMode === 'shared') {
+      return fitMultiOutputNeuralNet(project.cqas, project.factors, project.runs, sharedNeuralConfig);
+    }
     const result: Record<string, NeuralNetModelResult> = {};
     project.cqas.forEach((cqa) => {
-      const cfg = neuralConfigs[cqa.code];
+      const cfg = neuralConfigs[cqa.code] || DEFAULT_NEURAL_CONFIG;
       const nm = fitNeuralNetModel(cqa, project.factors, project.runs, cfg);
       if (nm) {
         result[cqa.code] = nm;
       }
     });
     return result;
-  }, [project.cqas, project.factors, project.runs, neuralConfigs]);
+  }, [project.cqas, project.factors, project.runs, neuralTrainingMode, sharedNeuralConfig, neuralConfigs]);
 
   // Active Models based on selected Modeling Engine (Polynomial or Neural)
   const activeModels = useMemo<Record<string, StatisticalModelResult | NeuralNetModelResult>>(() => {
@@ -65,12 +71,43 @@ export function App() {
     return models;
   }, [modelingEngine, models, neuralModels]);
 
-  // Handle Training specific Neural Network model with custom hyperparameters
-  const handleTrainNeuralModel = (cqaCode: string, config: NeuralNetConfig) => {
+  // Handle Training Shared Neural Network model (fits all CQAs at once)
+  const handleTrainSharedNeuralModel = (config: NeuralNetConfig) => {
+    setSharedNeuralConfig({
+      ...config,
+      seed: Math.floor(Math.random() * 100000),
+    });
+  };
+
+  // Handle Training specific Independent Neural Network model with custom hyperparameters
+  const handleTrainIndependentNeuralModel = (cqaCode: string, config: NeuralNetConfig) => {
     setNeuralConfigs((prev) => ({
       ...prev,
-      [cqaCode]: { ...config, seed: Math.floor(Math.random() * 100000) }, // new seed triggers retrain with fresh tours
+      [cqaCode]: { ...config, seed: Math.floor(Math.random() * 100000) },
     }));
+  };
+
+  // Handle Batch Training all Independent Neural Network models
+  const handleTrainAllIndependentNeuralModels = () => {
+    setNeuralConfigs((prev) => {
+      const next: Record<string, NeuralNetConfig> = {};
+      project.cqas.forEach((cqa) => {
+        const existing = prev[cqa.code] || DEFAULT_NEURAL_CONFIG;
+        next[cqa.code] = { ...existing, seed: Math.floor(Math.random() * 100000) };
+      });
+      return next;
+    });
+  };
+
+  // Handle Copying config to all CQAs
+  const handleCopyNeuralConfigToAll = (sourceConfig: NeuralNetConfig) => {
+    setNeuralConfigs(() => {
+      const next: Record<string, NeuralNetConfig> = {};
+      project.cqas.forEach((cqa) => {
+        next[cqa.code] = { ...sourceConfig, seed: Math.floor(Math.random() * 100000) };
+      });
+      return next;
+    });
   };
 
   // Calculate Desirability Optimum dynamically from active modeling engine
@@ -261,8 +298,14 @@ export function App() {
             project={project}
             models={models}
             neuralModels={neuralModels}
+            neuralTrainingMode={neuralTrainingMode}
+            onSetNeuralTrainingMode={setNeuralTrainingMode}
+            sharedNeuralConfig={sharedNeuralConfig}
+            onTrainSharedModel={handleTrainSharedNeuralModel}
             neuralConfigs={neuralConfigs}
-            onTrainModel={handleTrainNeuralModel}
+            onTrainIndependentModel={handleTrainIndependentNeuralModel}
+            onTrainAllIndependentModels={handleTrainAllIndependentNeuralModels}
+            onCopyConfigToAll={handleCopyNeuralConfigToAll}
             selectedCQA={selectedCQA}
             onSelectCQA={setSelectedCQA}
             modelingEngine={modelingEngine}

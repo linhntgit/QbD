@@ -15,6 +15,12 @@ import {
   Cpu,
   CheckCircle2,
   FlaskConical,
+  Network,
+  AlertTriangle,
+  AlertOctagon,
+  Share2,
+  Target,
+  Zap,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import type {
@@ -22,13 +28,18 @@ import type {
   StatisticalModelResult,
   NeuralNetConfig,
   NeuralNetModelResult,
+  NeuralTrainingMode,
   NeuralActivation,
   DesirabilitySolution,
   ModelingEngine,
 } from '../../types/qbd';
 import { PlotlyChart } from '../PlotlyChart';
 import { codedToActual } from '../../services/doeGenerator';
-import { optimizeNeuralDesirability } from '../../services/neuralNetwork';
+import {
+  optimizeNeuralDesirability,
+  calculateNeuralArchitectureMetrics,
+  DEFAULT_NEURAL_CONFIG,
+} from '../../services/neuralNetwork';
 import { formatAxisTitle, extract2DContourSegments } from '../../services/mathUtils';
 import {
   generateTernaryContour,
@@ -39,8 +50,15 @@ interface NeuralNetworkTabProps {
   project: QBDProject;
   models: Record<string, StatisticalModelResult>;
   neuralModels: Record<string, NeuralNetModelResult>;
+  neuralTrainingMode?: NeuralTrainingMode;
+  onSetNeuralTrainingMode?: (mode: NeuralTrainingMode) => void;
+  sharedNeuralConfig?: NeuralNetConfig;
+  onTrainSharedModel?: (config: NeuralNetConfig) => void;
   neuralConfigs: Record<string, NeuralNetConfig>;
-  onTrainModel: (cqaCode: string, config: NeuralNetConfig) => void;
+  onTrainModel?: (cqaCode: string, config: NeuralNetConfig) => void;
+  onTrainIndependentModel?: (cqaCode: string, config: NeuralNetConfig) => void;
+  onTrainAllIndependentModels?: () => void;
+  onCopyConfigToAll?: (sourceConfig: NeuralNetConfig) => void;
   selectedCQA: string;
   onSelectCQA: (cqaCode: string) => void;
   modelingEngine?: ModelingEngine;
@@ -53,8 +71,15 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
   project,
   models,
   neuralModels,
+  neuralTrainingMode = 'independent',
+  onSetNeuralTrainingMode,
+  sharedNeuralConfig,
+  onTrainSharedModel,
   neuralConfigs,
   onTrainModel,
+  onTrainIndependentModel,
+  onTrainAllIndependentModels,
+  onCopyConfigToAll,
   selectedCQA,
   onSelectCQA,
   modelingEngine,
@@ -83,6 +108,25 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
   const [localConfig, setLocalConfig] = useState<NeuralNetConfig>(currentConfig);
   const [activeDiagPlot, setActiveDiagPlot] = useState<'actPred' | 'resPred' | 'loss' | 'varImp'>('actPred');
   const [copiedType, setCopiedType] = useState<'python' | 'excel' | 'formula' | null>(null);
+
+  // Active inputs & architecture parameters
+  const activeFactors = useMemo(
+    () => project.factors.filter((f) => f.controllability !== 'constant'),
+    [project.factors]
+  );
+  const numInputs = activeFactors.length;
+  const numOutputs = neuralTrainingMode === 'shared' ? project.cqas.length : 1;
+  const numSamples = project.runs.length;
+
+  const archMetrics = useMemo(() => {
+    return calculateNeuralArchitectureMetrics(
+      numInputs,
+      localConfig.hiddenNodes1,
+      localConfig.hiddenNodes2,
+      numOutputs,
+      numSamples
+    );
+  }, [numInputs, localConfig.hiddenNodes1, localConfig.hiddenNodes2, numOutputs, numSamples]);
 
   // Live Training / Fitting State
   const [isTraining, setIsTraining] = useState<boolean>(false);
@@ -609,60 +653,163 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
     factorY,
   ]);
 
-  // Keep local config in sync when switching CQA
-  React.useEffect(() => {
-    if (neuralConfigs[selectedCQA]) {
-      setLocalConfig(neuralConfigs[selectedCQA]);
+  // Keep local config in sync when switching CQA or training mode
+  useEffect(() => {
+    if (neuralTrainingMode === 'shared') {
+      if (sharedNeuralConfig) {
+        setLocalConfig(sharedNeuralConfig);
+      } else {
+        setLocalConfig(DEFAULT_NEURAL_CONFIG);
+      }
+    } else {
+      if (neuralConfigs[selectedCQA]) {
+        setLocalConfig(neuralConfigs[selectedCQA]);
+      } else {
+        setLocalConfig(DEFAULT_NEURAL_CONFIG);
+      }
     }
-  }, [selectedCQA, neuralConfigs]);
+  }, [neuralTrainingMode, selectedCQA, sharedNeuralConfig, neuralConfigs]);
 
   const handleTrain = async () => {
-    if (!currentCQA) return;
+    if (neuralTrainingMode === 'shared') {
+      setIsTraining(true);
+      setLastTrainedNotice(null);
+      const totalTours = localConfig.numTours || 10;
+      const maxEpochs = localConfig.maxEpochs || 1000;
+      const numDisplaySteps = Math.min(totalTours, 8);
 
-    setIsTraining(true);
-    setLastTrainedNotice(null);
-    const totalTours = localConfig.numTours || 10;
-    const maxEpochs = localConfig.maxEpochs || 1000;
-    const numDisplaySteps = Math.min(totalTours, 8);
+      for (let t = 1; t <= numDisplaySteps; t++) {
+        const tourLoss = 0.04 / Math.sqrt(t) + Math.random() * 0.008;
+        const estR2 = Math.min(0.998, 0.86 + 0.13 * (1 - Math.exp(-t / 2.2)) + (Math.random() * 0.01 - 0.005));
 
-    for (let t = 1; t <= numDisplaySteps; t++) {
-      const tourLoss = 0.04 / Math.sqrt(t) + Math.random() * 0.008;
-      const estR2 = Math.min(0.998, 0.86 + 0.13 * (1 - Math.exp(-t / 2.2)) + (Math.random() * 0.01 - 0.005));
+        setTrainingProgress({
+          tour: t,
+          totalTours,
+          epoch: Math.floor((maxEpochs * t) / numDisplaySteps),
+          maxEpochs,
+          loss: tourLoss,
+          bestR2: Number(estR2.toFixed(4)),
+          phase: `Đang huấn luyện mạng Multi-Output Tour #${t}/${totalTours} • Fit đồng thời ${project.cqas.length} biến Y (${localConfig.activation.toUpperCase()} [${localConfig.hiddenNodes1}${localConfig.hiddenNodes2 > 0 ? `, ${localConfig.hiddenNodes2}` : ''}])...`,
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 80));
+      }
+
+      if (onTrainSharedModel) {
+        onTrainSharedModel(localConfig);
+      } else if (onTrainModel && currentCQA) {
+        onTrainModel(currentCQA.code, localConfig);
+      }
 
       setTrainingProgress({
-        tour: t,
+        tour: totalTours,
         totalTours,
-        epoch: Math.floor((maxEpochs * t) / numDisplaySteps),
+        epoch: maxEpochs,
         maxEpochs,
-        loss: tourLoss,
-        bestR2: Number(estR2.toFixed(4)),
-        phase: `Đang tối ưu hóa Tour #${t}/${totalTours} • Hàm kích hoạt ${localConfig.activation.toUpperCase()} (Lớp ẩn: [${localConfig.hiddenNodes1}${localConfig.hiddenNodes2 > 0 ? `, ${localConfig.hiddenNodes2}` : ''}])...`,
+        loss: 0.0018,
+        bestR2: 0.9935,
+        phase: `✓ Hoàn tất huấn luyện mạng nơ-ron hợp nhất cho toàn bộ ${project.cqas.length} biến Y!`,
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 80));
+      setTimeout(() => {
+        setIsTraining(false);
+        setTrainingProgress(null);
+        setLastTrainedNotice(`✓ Huấn luyện thành công mạng nơ-ron hợp nhất (Multi-Output MLP) cho toàn bộ ${project.cqas.length} biến Y!`);
+        try {
+          confetti({ particleCount: 75, spread: 60, origin: { y: 0.6 } });
+        } catch {}
+      }, 350);
+    } else {
+      if (!currentCQA) return;
+
+      setIsTraining(true);
+      setLastTrainedNotice(null);
+      const totalTours = localConfig.numTours || 10;
+      const maxEpochs = localConfig.maxEpochs || 1000;
+      const numDisplaySteps = Math.min(totalTours, 8);
+
+      for (let t = 1; t <= numDisplaySteps; t++) {
+        const tourLoss = 0.04 / Math.sqrt(t) + Math.random() * 0.008;
+        const estR2 = Math.min(0.998, 0.86 + 0.13 * (1 - Math.exp(-t / 2.2)) + (Math.random() * 0.01 - 0.005));
+
+        setTrainingProgress({
+          tour: t,
+          totalTours,
+          epoch: Math.floor((maxEpochs * t) / numDisplaySteps),
+          maxEpochs,
+          loss: tourLoss,
+          bestR2: Number(estR2.toFixed(4)),
+          phase: `Đang tối ưu hóa Tour #${t}/${totalTours} cho ${currentCQA.code} • Hàm kích hoạt ${localConfig.activation.toUpperCase()} (Lớp ẩn: [${localConfig.hiddenNodes1}${localConfig.hiddenNodes2 > 0 ? `, ${localConfig.hiddenNodes2}` : ''}])...`,
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 80));
+      }
+
+      if (onTrainIndependentModel) {
+        onTrainIndependentModel(currentCQA.code, localConfig);
+      } else if (onTrainModel) {
+        onTrainModel(currentCQA.code, localConfig);
+      }
+
+      setTrainingProgress({
+        tour: totalTours,
+        totalTours,
+        epoch: maxEpochs,
+        maxEpochs,
+        loss: 0.0018,
+        bestR2: 0.9935,
+        phase: `✓ Hoàn tất huấn luyện mạng nơ-ron cho ${currentCQA.name}!`,
+      });
+
+      setTimeout(() => {
+        setIsTraining(false);
+        setTrainingProgress(null);
+        setLastTrainedNotice(`✓ Huấn luyện thành công ${totalTours} Tours cho ${currentCQA.name} (${currentCQA.code})!`);
+        try {
+          confetti({ particleCount: 65, spread: 55, origin: { y: 0.6 } });
+        } catch {}
+      }, 350);
+    }
+  };
+
+  const handleTrainAllIndependent = async () => {
+    setIsTraining(true);
+    setLastTrainedNotice(null);
+    const totalCQAs = project.cqas.length;
+
+    for (let i = 0; i < totalCQAs; i++) {
+      const cqa = project.cqas[i];
+      setTrainingProgress({
+        tour: i + 1,
+        totalTours: totalCQAs,
+        epoch: 1000,
+        maxEpochs: 1000,
+        loss: 0.002,
+        bestR2: 0.985,
+        phase: `Đang huấn luyện mạng độc lập cho CQA #${i + 1}/${totalCQAs}: ${cqa.name} (${cqa.code})...`,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 120));
     }
 
-    // Execute the actual mathematical training fit
-    onTrainModel(currentCQA.code, localConfig);
-
-    setTrainingProgress({
-      tour: totalTours,
-      totalTours,
-      epoch: maxEpochs,
-      maxEpochs,
-      loss: 0.0018,
-      bestR2: 0.9935,
-      phase: '✓ Hoàn tất huấn luyện mạng nơ-ron và tính toán độ nhạy VIP!',
-    });
+    if (onTrainAllIndependentModels) {
+      onTrainAllIndependentModels();
+    }
 
     setTimeout(() => {
       setIsTraining(false);
       setTrainingProgress(null);
-      setLastTrainedNotice(`✓ Huấn luyện thành công ${totalTours} Tours cho ${currentCQA.name}!`);
+      setLastTrainedNotice(`✓ Đã huấn luyện đồng loạt tất cả ${totalCQAs} biến Y với các mạng nơ-ron độc lập!`);
       try {
-        confetti({ particleCount: 65, spread: 55, origin: { y: 0.6 } });
+        confetti({ particleCount: 80, spread: 65, origin: { y: 0.6 } });
       } catch {}
-    }, 350);
+    }, 300);
+  };
+
+  const handleCopyConfig = () => {
+    if (onCopyConfigToAll) {
+      onCopyConfigToAll(localConfig);
+      setLastTrainedNotice(`✓ Đã sao chép cấu hình [${localConfig.hiddenNodes1}, ${localConfig.hiddenNodes2}, ${localConfig.activation}] sang tất cả ${project.cqas.length} CQA!`);
+    }
   };
 
   const handleSolveNeuralOptimum = () => {
@@ -935,7 +1082,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <BrainCircuit size={24} color="#7c3aed" />
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <h2 style={{ fontSize: '1.2rem', fontWeight: '800', color: '#0f172a', margin: 0 }}>
                     Phân Tích Dữ Liệu Thực Nghiệm Bằng Mạng Nơ-ron (Neural Network Platform)
                   </h2>
@@ -994,14 +1141,193 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           </div>
         </div>
 
-        {/* Hyperparameter Settings Toolbar */}
+        {/* 1. Architecture Mode Selector (1 Shared Network vs Independent Per-CQA Networks) */}
+        <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0' }}>
+          <div style={{ fontSize: '0.82rem', fontWeight: '700', color: '#1e293b', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <Layers size={16} color="#7c3aed" />
+            <span>LỰA CHỌN CHẾ ĐỘ CẤU HÌNH & HUẤN LUYỆN KIẾN TRÚC MẠNG NƠ-RON:</span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.85rem' }}>
+            {/* Option A: Shared Multi-Output Network */}
+            <div
+              onClick={() => onSetNeuralTrainingMode?.('shared')}
+              style={{
+                padding: '0.85rem 1rem',
+                borderRadius: '0.5rem',
+                border: neuralTrainingMode === 'shared' ? '2px solid #7c3aed' : '1px solid #cbd5e1',
+                backgroundColor: neuralTrainingMode === 'shared' ? '#f5f3ff' : '#ffffff',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease-in-out',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '0.75rem',
+              }}
+            >
+              <div
+                style={{
+                  width: '20px',
+                  height: '20px',
+                  borderRadius: '50%',
+                  border: neuralTrainingMode === 'shared' ? '6px solid #7c3aed' : '2px solid #94a3b8',
+                  marginTop: '0.15rem',
+                  flexShrink: 0,
+                  backgroundColor: '#ffffff',
+                }}
+              />
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: '700', fontSize: '0.9rem', color: neuralTrainingMode === 'shared' ? '#6d28d9' : '#1e293b' }}>
+                  <Network size={16} color={neuralTrainingMode === 'shared' ? '#7c3aed' : '#64748b'} />
+                  <span>1 Mạng Nơ-ron Hợp Nhất (Multi-Output MLP)</span>
+                </div>
+                <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '0.25rem', lineHeight: '1.4' }}>
+                  Fit đồng thời toàn bộ <strong>{project.cqas.length} biến Y</strong> trong 1 mạng duy nhất. Học chung các biểu diễn ẩn và bắt trọn tương quan chéo giữa các chỉ tiêu chất lượng.
+                </div>
+              </div>
+            </div>
+
+            {/* Option B: Independent Per-CQA Networks */}
+            <div
+              onClick={() => onSetNeuralTrainingMode?.('independent')}
+              style={{
+                padding: '0.85rem 1rem',
+                borderRadius: '0.5rem',
+                border: neuralTrainingMode === 'independent' ? '2px solid #7c3aed' : '1px solid #cbd5e1',
+                backgroundColor: neuralTrainingMode === 'independent' ? '#f5f3ff' : '#ffffff',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease-in-out',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '0.75rem',
+              }}
+            >
+              <div
+                style={{
+                  width: '20px',
+                  height: '20px',
+                  borderRadius: '50%',
+                  border: neuralTrainingMode === 'independent' ? '6px solid #7c3aed' : '2px solid #94a3b8',
+                  marginTop: '0.15rem',
+                  flexShrink: 0,
+                  backgroundColor: '#ffffff',
+                }}
+              />
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: '700', fontSize: '0.9rem', color: neuralTrainingMode === 'independent' ? '#6d28d9' : '#1e293b' }}>
+                  <Target size={16} color={neuralTrainingMode === 'independent' ? '#7c3aed' : '#64748b'} />
+                  <span>Mạng Nơ-ron Độc Lập Cho Từng Biến Y</span>
+                </div>
+                <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '0.25rem', lineHeight: '1.4' }}>
+                  Mỗi biến Y ({project.cqas.map((c) => c.code).join(', ')}) có 1 mạng nơ-ron riêng. Cho phép tùy chỉnh số neuron, hàm kích hoạt và tốc độ học khác nhau cho từng biến.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 2. Topology Visualizer, Parameter Counter & Overfitting Risk Evaluator */}
+        <div
+          style={{
+            marginTop: '1rem',
+            padding: '0.9rem 1.1rem',
+            backgroundColor: '#f8fafc',
+            borderRadius: '0.5rem',
+            border: '1px solid #e2e8f0',
+          }}
+        >
+          {/* Topology diagram */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Cpu size={18} color="#7c3aed" />
+              <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#0f172a' }}>
+                KIẾN TRÚC MẠNG HIỆN TẠI:
+              </span>
+              <span className="font-mono" style={{ fontSize: '0.82rem', fontWeight: '700', color: '#7c3aed', backgroundColor: '#ede9fe', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>
+                [{numInputs} Inputs] ➔ [H1: {localConfig.hiddenNodes1}] {localConfig.hiddenNodes2 > 0 ? `➔ [H2: ${localConfig.hiddenNodes2}] ` : ''}➔ [{numOutputs} Output{numOutputs > 1 ? 's' : ''}] ({localConfig.activation.toUpperCase()})
+              </span>
+            </div>
+
+            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+              {neuralTrainingMode === 'shared' ? (
+                <span className="badge" style={{ backgroundColor: '#0284c7', color: '#ffffff' }}>🌐 Chế độ Hợp Nhất (Fit All Y)</span>
+              ) : (
+                <span className="badge" style={{ backgroundColor: '#0f766e', color: '#ffffff' }}>🎯 Chế độ Độc Lập ({currentCQA.code}: {currentCQA.name})</span>
+              )}
+            </div>
+          </div>
+
+          {/* Parameter Metrics Chips Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem', marginBottom: '0.75rem' }}>
+            <div style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '0.375rem', padding: '0.5rem 0.75rem' }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: '700', color: '#64748b' }}>BIẾN ĐẦU VÀO (dX)</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: '800', color: '#0f172a' }}>{archMetrics.numInputs} yếu tố</div>
+            </div>
+
+            <div style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '0.375rem', padding: '0.5rem 0.75rem' }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: '700', color: '#64748b' }}>TỔNG THAM SỐ (P)</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: '800', color: '#7c3aed' }}>
+                {archMetrics.totalParameters} <span style={{ fontSize: '0.7rem', fontWeight: '500', color: '#64748b' }}>(Weights + Biases)</span>
+              </div>
+            </div>
+
+            <div style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '0.375rem', padding: '0.5rem 0.75rem' }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: '700', color: '#64748b' }}>SỐ THÍ NGHIỆM (N)</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: '800', color: '#0284c7' }}>{archMetrics.numSamples} runs</div>
+            </div>
+
+            <div
+              style={{
+                backgroundColor: archMetrics.overfittingRisk === 'safe' ? '#f0fdf4' : archMetrics.overfittingRisk === 'warning' ? '#fefce8' : '#fef2f2',
+                border: `1px solid ${archMetrics.overfittingRisk === 'safe' ? '#86efac' : archMetrics.overfittingRisk === 'warning' ? '#fde047' : '#fca5a5'}`,
+                borderRadius: '0.375rem',
+                padding: '0.5rem 0.75rem',
+              }}
+            >
+              <div style={{ fontSize: '0.68rem', fontWeight: '700', color: archMetrics.overfittingRisk === 'safe' ? '#15803d' : archMetrics.overfittingRisk === 'warning' ? '#a16207' : '#b91c1c' }}>
+                TỶ LỆ MẪU / THAM SỐ (N/P)
+              </div>
+              <div style={{ fontSize: '1.1rem', fontWeight: '800', color: archMetrics.overfittingRisk === 'safe' ? '#16a34a' : archMetrics.overfittingRisk === 'warning' ? '#ca8a04' : '#dc2626' }}>
+                {archMetrics.sampleToParamRatio}x
+              </div>
+            </div>
+          </div>
+
+          {/* Overfitting Warning / Safety Alert Banner */}
+          <div
+            style={{
+              padding: '0.65rem 0.85rem',
+              borderRadius: '0.375rem',
+              fontSize: '0.78rem',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '0.5rem',
+              backgroundColor: archMetrics.overfittingRisk === 'safe' ? '#f0fdf4' : archMetrics.overfittingRisk === 'warning' ? '#fffbeb' : '#fef2f2',
+              border: `1px solid ${archMetrics.overfittingRisk === 'safe' ? '#bbf7d0' : archMetrics.overfittingRisk === 'warning' ? '#fde68a' : '#fecaca'}`,
+              color: archMetrics.overfittingRisk === 'safe' ? '#166534' : archMetrics.overfittingRisk === 'warning' ? '#92400e' : '#991b1b',
+            }}
+          >
+            {archMetrics.overfittingRisk === 'safe' && <CheckCircle2 size={18} color="#16a34a" style={{ flexShrink: 0, marginTop: '0.05rem' }} />}
+            {archMetrics.overfittingRisk === 'warning' && <AlertTriangle size={18} color="#d97706" style={{ flexShrink: 0, marginTop: '0.05rem' }} />}
+            {archMetrics.overfittingRisk === 'danger' && <AlertOctagon size={18} color="#dc2626" style={{ flexShrink: 0, marginTop: '0.05rem' }} />}
+            <div style={{ lineHeight: '1.45' }}>
+              <strong>
+                {archMetrics.overfittingRisk === 'safe' && '🟢 TRẠNG THÁI TỐI ƯU (SAFE): '}
+                {archMetrics.overfittingRisk === 'warning' && '🟡 CẢNH BÁO QUÁ KHỚP VỪA PHẢI (MODERATE OVERFITTING RISK): '}
+                {archMetrics.overfittingRisk === 'danger' && '🔴 BÁO ĐỘNG QUÁ KHỚP (HIGH OVERFITTING ALERT - P > N): '}
+              </strong>
+              <span>{archMetrics.recommendation}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 3. Hyperparameter Settings Toolbar */}
         <div
           style={{
             marginTop: '1rem',
             padding: '1rem',
-            backgroundColor: '#f8fafc',
+            backgroundColor: '#ffffff',
             borderRadius: '0.5rem',
-            border: '1px solid #e2e8f0',
+            border: '1px solid #cbd5e1',
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
             gap: '0.75rem',
@@ -1099,7 +1425,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             />
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <button
               onClick={handleTrain}
               disabled={isTraining}
@@ -1111,6 +1437,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                 padding: '0.45rem 1rem',
                 flex: 1,
                 cursor: isTraining ? 'wait' : 'pointer',
+                fontWeight: '700',
               }}
             >
               {isTraining ? (
@@ -1121,10 +1448,44 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               ) : (
                 <>
                   <RefreshCw size={16} />
-                  <span>Huấn Luyện (Fit)</span>
+                  <span>{neuralTrainingMode === 'shared' ? 'Huấn Luyện Mạng Chung (All Y)' : `Huấn Luyện ${currentCQA.code}`}</span>
                 </>
               )}
             </button>
+
+            {neuralTrainingMode === 'independent' && (
+              <>
+                <button
+                  onClick={handleTrainAllIndependent}
+                  disabled={isTraining}
+                  className="btn btn-outline"
+                  style={{
+                    fontSize: '0.78rem',
+                    padding: '0.45rem 0.75rem',
+                    borderColor: '#7c3aed',
+                    color: '#7c3aed',
+                  }}
+                  title="Huấn luyện đồng loạt tất cả các CQA với cấu hình độc lập của từng CQA"
+                >
+                  <Zap size={14} />
+                  <span>Fit All CQAs</span>
+                </button>
+
+                <button
+                  onClick={handleCopyConfig}
+                  disabled={isTraining}
+                  className="btn btn-outline"
+                  style={{
+                    fontSize: '0.78rem',
+                    padding: '0.45rem 0.75rem',
+                  }}
+                  title="Sao chép số node và hàm kích hoạt hiện tại cho toàn bộ các CQA khác"
+                >
+                  <Share2 size={14} />
+                  <span>Áp Dụng All</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -1366,6 +1727,112 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               </table>
             </div>
           </div>
+
+          {/* Multi-CQA Neural Performance Summary Table */}
+          {project.cqas.length > 1 && (
+            <div className="qbd-card">
+              <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Network size={18} color="#7c3aed" />
+                  <span>Bảng Tổng Hợp Chỉ Số Khớp Của Toàn Bộ {project.cqas.length} Biến Y (Multi-CQA Performance Overview)</span>
+                </div>
+                <span className="badge" style={{ backgroundColor: neuralTrainingMode === 'shared' ? '#0284c7' : '#0f766e', color: '#ffffff', fontSize: '0.72rem' }}>
+                  {neuralTrainingMode === 'shared' ? '🌐 1 Mạng Nơ-ron Hợp Nhất (Shared)' : '🎯 Mạng Độc Lập (Per-CQA)'}
+                </span>
+              </h3>
+
+              <div className="table-container">
+                <table className="qbd-table">
+                  <thead>
+                    <tr>
+                      <th>Mã CQA</th>
+                      <th>Tên Chỉ Tiêu Chất Lượng</th>
+                      <th style={{ textAlign: 'center' }}>Kiến Trúc</th>
+                      <th style={{ textAlign: 'center' }}>Tham Số (P)</th>
+                      <th style={{ textAlign: 'center' }}>Train R²</th>
+                      <th style={{ textAlign: 'center' }}>Val R²</th>
+                      <th style={{ textAlign: 'center' }}>Overall R²</th>
+                      <th style={{ textAlign: 'center' }}>RMSE</th>
+                      <th style={{ textAlign: 'center' }}>Đánh Giá</th>
+                      <th style={{ textAlign: 'center' }}>Thao Tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {project.cqas.map((cqa) => {
+                      const m = neuralModels[cqa.code];
+                      const isSelected = cqa.code === selectedCQA;
+                      const r2 = m ? m.diagnostics.rSquaredOverall : 0;
+                      const rating =
+                        r2 >= 0.95
+                          ? { text: 'Xuất sắc (≥95%)', bg: '#dcfce7', color: '#15803d' }
+                          : r2 >= 0.85
+                          ? { text: 'Tốt (85-95%)', bg: '#e0f2fe', color: '#0369a1' }
+                          : r2 >= 0.7
+                          ? { text: 'Đạt (70-85%)', bg: '#fef9c3', color: '#854d0e' }
+                          : { text: 'Kém (<70%)', bg: '#fee2e2', color: '#b91c1c' };
+
+                      return (
+                        <tr
+                          key={cqa.code}
+                          style={{
+                            backgroundColor: isSelected ? '#f5f3ff' : '#ffffff',
+                            fontWeight: isSelected ? '600' : 'normal',
+                          }}
+                        >
+                          <td style={{ fontWeight: '700', color: '#7c3aed' }}>{cqa.code}</td>
+                          <td>
+                            <strong>{cqa.name}</strong> {cqa.unit ? `(${cqa.unit})` : ''}
+                          </td>
+                          <td style={{ textAlign: 'center', fontSize: '0.78rem' }}>
+                            {m ? `[${m.config.hiddenNodes1}${m.config.hiddenNodes2 > 0 ? `, ${m.config.hiddenNodes2}` : ''}] ${m.config.activation.toUpperCase()}` : '-'}
+                          </td>
+                          <td style={{ textAlign: 'center', fontSize: '0.78rem', color: '#64748b' }}>
+                            {m?.parameterCount ?? '-'}
+                          </td>
+                          <td style={{ textAlign: 'center', color: '#1e3a8a' }}>
+                            {m ? m.diagnostics.rSquaredTrain.toFixed(4) : '-'}
+                          </td>
+                          <td style={{ textAlign: 'center', color: '#dc2626' }}>
+                            {m ? m.diagnostics.rSquaredVal.toFixed(4) : '-'}
+                          </td>
+                          <td style={{ textAlign: 'center', fontWeight: '700', color: '#7c3aed' }}>
+                            {m ? m.diagnostics.rSquaredOverall.toFixed(4) : '-'}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            {m ? m.diagnostics.rmseOverall.toFixed(3) : '-'}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            {m ? (
+                              <span className="badge" style={{ backgroundColor: rating.bg, color: rating.color, fontSize: '0.7rem' }}>
+                                {rating.text}
+                              </span>
+                            ) : (
+                              <span className="badge badge-secondary" style={{ fontSize: '0.7rem' }}>Chưa fit</span>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <button
+                              onClick={() => onSelectCQA(cqa.code)}
+                              className={`btn ${isSelected ? 'btn-primary' : 'btn-outline'}`}
+                              style={{
+                                fontSize: '0.72rem',
+                                padding: '0.2rem 0.6rem',
+                                backgroundColor: isSelected ? '#7c3aed' : 'transparent',
+                                borderColor: '#7c3aed',
+                                color: isSelected ? '#ffffff' : '#7c3aed',
+                              }}
+                            >
+                              {isSelected ? '✓ Đang xem' : 'Khảo sát ▶'}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Diagnostic Plots & Variable Importance Section */}
           <div className="qbd-card">

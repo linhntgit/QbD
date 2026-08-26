@@ -1,5 +1,18 @@
 export type NeuralActivation = 'tanh' | 'linear' | 'gaussian' | 'sigmoid' | 'relu';
 export type NeuralValidationMethod = 'holdout' | 'kfold' | 'none';
+export type NeuralTrainingMode = 'shared' | 'independent';
+
+export interface NeuralArchitectureMetrics {
+  numInputs: number;
+  hidden1: number;
+  hidden2: number;
+  numOutputs: number;
+  totalParameters: number;
+  numSamples: number;
+  sampleToParamRatio: number;
+  overfittingRisk: 'safe' | 'warning' | 'danger';
+  recommendation: string;
+}
 
 export interface NeuralNetConfig {
   hiddenNodes1: number; // e.g. 3 (Layer 1 nodes)
@@ -73,4 +86,6 @@ export interface NeuralNetModelResult {
   formulaString: string;
   pythonCode: string;
   excelFormula: string;
+  architectureMode?: NeuralTrainingMode;
+  parameterCount?: number;
 }
