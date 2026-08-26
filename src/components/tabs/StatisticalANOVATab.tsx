@@ -68,14 +68,14 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
           // If pure single factor like X1
           const singleFactor = project.factors.find((f) => f.code === termName);
           if (singleFactor) {
-            return `${singleFactor.name} (${singleFactor.code})${singleFactor.unit ? ` [${singleFactor.unit}]` : ''}`;
+            return `${singleFactor.code}: ${singleFactor.name}${singleFactor.unit ? ` [${singleFactor.unit}]` : ''}`;
           }
           // If squared term like X1²
           if (termName.endsWith('²')) {
             const baseCode = termName.replace('²', '');
             const f = project.factors.find((fac) => fac.code === baseCode);
             if (f) {
-              return `${f.name}² (${termName})`;
+              return `${termName}: ${f.name}²`;
             }
           }
           // If interaction like X1*X2
@@ -84,7 +84,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
             const f1 = project.factors.find((fac) => fac.code === parts[0]);
             const f2 = project.factors.find((fac) => fac.code === parts[1]);
             if (f1 && f2) {
-              return `${f1.code}*${f2.code} (${f1.name} * ${f2.name})`;
+              return `${parts[0]}*${parts[1]}: ${f1.name} × ${f2.name}`;
             }
           }
           return termName;
@@ -115,8 +115,13 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
               standoff: 10,
             },
             tickfont: { size: 10 },
+            automargin: true,
           },
-          yaxis: { autorange: 'reversed', tickfont: { size: 11 } },
+          yaxis: {
+            autorange: 'reversed',
+            tickfont: { size: 11 },
+            automargin: true,
+          },
           shapes: [
             {
               type: 'line',
@@ -139,10 +144,10 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
               font: { color: '#dc2626', size: 11 },
             },
           ],
-          margin: { l: 220, r: 40, t: 50, b: 70, pad: 4 },
+          margin: { l: 280, r: 40, t: 50, b: 70, pad: 10 },
         };
 
-        return <PlotlyChart data={data} layout={layout} style={{ height: '350px' }} />;
+        return <PlotlyChart data={data} layout={layout} style={{ height: '380px' }} />;
       }
 
       case 'resPred': {
@@ -169,6 +174,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
               standoff: 10,
             },
             tickfont: { size: 10 },
+            automargin: true,
           },
           yaxis: {
             title: {
@@ -178,6 +184,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
             },
             range: [-3.5, 3.5],
             tickfont: { size: 10 },
+            automargin: true,
           },
           shapes: [
             { type: 'line', x0: Math.min(...xPred) * 0.95, x1: Math.max(...xPred) * 1.05, y0: 0, y1: 0, line: { color: '#64748b', width: 1 } },
@@ -226,6 +233,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
             },
             range: [-3.5, 3.5],
             tickfont: { size: 10 },
+            automargin: true,
           },
           yaxis: {
             title: {
@@ -235,6 +243,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
             },
             range: [-3.5, 3.5],
             tickfont: { size: 10 },
+            automargin: true,
           },
           margin: { l: 80, r: 40, t: 50, b: 70, pad: 4 },
         };
@@ -265,6 +274,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
               standoff: 10,
             },
             tickfont: { size: 10 },
+            automargin: true,
           },
           yaxis: {
             title: {
@@ -273,6 +283,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
               standoff: 10,
             },
             tickfont: { size: 10 },
+            automargin: true,
           },
           shapes: [
             {

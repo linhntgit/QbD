@@ -340,20 +340,17 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
         const trainPts = diag.residuals.filter((r) => !r.isValidation);
         const valPts = diag.residuals.filter((r) => r.isValidation);
 
-        const allActuals = diag.residuals.map((r) => r.actual);
-        const minVal = Math.min(...allActuals, ...diag.residuals.map((r) => r.predicted));
-        const maxVal = Math.max(...allActuals, ...diag.residuals.map((r) => r.predicted));
-        const padding = (maxVal - minVal) * 0.1 || 1.0;
-
         const data: any[] = [
           {
             type: 'scatter',
             mode: 'markers',
-            name: `Tập Huấn Luyện (Train, R²=${diag.rSquaredTrain})`,
-            x: trainPts.map((p) => p.predicted),
-            y: trainPts.map((p) => p.actual),
-            marker: { size: 9, color: '#1e3a8a', symbol: 'circle' },
-            text: trainPts.map((p) => `Run #${p.runOrder}: Act=${p.actual}, Pred=${p.predicted}`),
+            name: `Tập Huấn Luyện (Train, R²=${diag.rSquaredTrain.toFixed(4)})`,
+            x: trainPts.map((r) => r.predicted),
+            y: trainPts.map((r) => r.actual),
+            marker: { size: 9, color: '#1e3a8a' },
+            text: trainPts.map(
+              (r) => `Run #${r.runOrder}: Thực tế=${r.actual} ${currentCQA.unit || ''}, Dự đoán=${r.predicted} ${currentCQA.unit || ''}`
+            ),
           },
         ];
 
@@ -361,21 +358,27 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           data.push({
             type: 'scatter',
             mode: 'markers',
-            name: `Tập Kiểm Định (Validation, R²=${diag.rSquaredVal})`,
-            x: valPts.map((p) => p.predicted),
-            y: valPts.map((p) => p.actual),
-            marker: { size: 10, color: '#dc2626', symbol: 'triangle-up' },
-            text: valPts.map((p) => `[Val] Run #${p.runOrder}: Act=${p.actual}, Pred=${p.predicted}`),
+            name: `Tập Kiểm Định (Validation, R²=${diag.rSquaredVal.toFixed(4)})`,
+            x: valPts.map((r) => r.predicted),
+            y: valPts.map((r) => r.actual),
+            marker: { size: 9, color: '#dc2626', symbol: 'triangle-up' },
+            text: valPts.map(
+              (r) => `[Validation] Run #${r.runOrder}: Thực tế=${r.actual} ${currentCQA.unit || ''}, Dự đoán=${r.predicted} ${currentCQA.unit || ''}`
+            ),
           });
         }
 
-        // 45-degree reference line
+        // 45-degree reference line (Ideal Y = Y_pred)
+        const allVals = [...diag.residuals.map((r) => r.actual), ...diag.residuals.map((r) => r.predicted)];
+        const minVal = Math.min(...allVals) * 0.95;
+        const maxVal = Math.max(...allVals) * 1.05;
+
         data.push({
           type: 'line',
           name: 'Đường Chuẩn Y = Ý (Ideal 45°)',
-          x: [minVal - padding, maxVal + padding],
-          y: [minVal - padding, maxVal + padding],
-          line: { color: '#64748b', width: 2, dash: 'dash' },
+          x: [minVal, maxVal],
+          y: [minVal, maxVal],
+          line: { color: '#64748b', width: 1.5, dash: 'dash' },
         });
 
         const layout = {
@@ -387,6 +390,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               standoff: 10,
             },
             tickfont: { size: 10 },
+            automargin: true,
           },
           yaxis: {
             title: {
@@ -395,6 +399,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               standoff: 10,
             },
             tickfont: { size: 10 },
+            automargin: true,
           },
           legend: { orientation: 'h', y: -0.25 },
           margin: { l: 80, r: 40, t: 50, b: 80, pad: 4 },
@@ -438,6 +443,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               standoff: 10,
             },
             tickfont: { size: 10 },
+            automargin: true,
           },
           yaxis: {
             title: {
@@ -446,6 +452,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               standoff: 10,
             },
             tickfont: { size: 10 },
+            automargin: true,
           },
           shapes: [
             { type: 'line', x0: minX, x1: maxX, y0: 0, y1: 0, line: { color: '#64748b', width: 1.5 } },
@@ -496,6 +503,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               standoff: 10,
             },
             tickfont: { size: 10 },
+            automargin: true,
           },
           yaxis: {
             title: {
@@ -505,6 +513,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             },
             type: 'log',
             tickfont: { size: 10 },
+            automargin: true,
           },
           legend: { orientation: 'h', y: -0.25 },
           margin: { l: 80, r: 40, t: 50, b: 80, pad: 4 },
@@ -517,7 +526,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
         const sortedImp = [...diag.variableImportance];
         const names = sortedImp.map((v) => {
           const factor = project.factors.find((f) => f.code === v.factorCode);
-          return `${v.factorName} (${v.factorCode})${factor?.unit ? ` [${factor.unit}]` : ''}`;
+          return `${v.factorCode}: ${v.factorName}${factor?.unit ? ` [${factor.unit}]` : ''}`;
         });
         const rels = sortedImp.map((v) => v.relativeImportance);
 
@@ -542,9 +551,14 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               standoff: 10,
             },
             tickfont: { size: 10 },
+            automargin: true,
           },
-          yaxis: { autorange: 'reversed', tickfont: { size: 11 } },
-          margin: { l: 220, r: 40, t: 50, b: 70, pad: 4 },
+          yaxis: {
+            autorange: 'reversed',
+            tickfont: { size: 11 },
+            automargin: true,
+          },
+          margin: { l: 280, r: 40, t: 50, b: 70, pad: 10 },
         };
 
         return <PlotlyChart data={data} layout={layout} style={{ height: '360px' }} />;

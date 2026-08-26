@@ -281,6 +281,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
         standoff: 12,
       },
       tickfont: { size: 11 },
+      automargin: true,
     },
     yaxis: {
       title: {
@@ -289,6 +290,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
         standoff: 12,
       },
       tickfont: { size: 11 },
+      automargin: true,
     },
     annotations: [
       {

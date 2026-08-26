@@ -310,6 +310,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
           standoff: 12,
         },
         tickfont: { size: 11 },
+        automargin: true,
       },
       yaxis: {
         title: {
@@ -318,6 +319,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
           standoff: 12,
         },
         tickfont: { size: 11 },
+        automargin: true,
       },
     };
   }
