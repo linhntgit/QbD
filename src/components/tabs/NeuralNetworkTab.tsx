@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   BrainCircuit,
   Sliders,
@@ -14,6 +14,7 @@ import {
   Loader2,
   Cpu,
   CheckCircle2,
+  FlaskConical,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import type {
@@ -28,7 +29,11 @@ import type {
 import { PlotlyChart } from '../PlotlyChart';
 import { codedToActual } from '../../services/doeGenerator';
 import { optimizeNeuralDesirability } from '../../services/neuralNetwork';
-import { formatAxisTitle } from '../../services/mathUtils';
+import { formatAxisTitle, extract2DContourSegments } from '../../services/mathUtils';
+import {
+  generateTernaryContour,
+  buildTernaryPlotlyTraces,
+} from '../../services/ternaryContour';
 
 interface NeuralNetworkTabProps {
   project: QBDProject;
@@ -101,11 +106,59 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
     return init;
   });
 
+  // Mixture factors filter
+  const mixtureFactors = useMemo(() => {
+    return project.factors.filter((f) => f.role === 'mixture_component' || f.type === 'Mixture');
+  }, [project.factors]);
+  const hasMixture = mixtureFactors.length >= 3;
+
   // 3D/2D Surface Profiler factor axes
   const [xAxisFactor, setXAxisFactor] = useState<string>(project.factors[0]?.code || 'X1');
   const [yAxisFactor, setYAxisFactor] = useState<string>(project.factors[1]?.code || 'X2');
-  const [plotType, setPlotType] = useState<'3d' | 'contour'>('3d');
+  const [plotType, setPlotType] = useState<'3d' | 'contour' | 'ternary'>(() =>
+    hasMixture ? 'ternary' : '3d'
+  );
   const [colorScale, setColorScale] = useState<string>('Plasma');
+
+  // If project changes and has mixture, sync default plot type
+  useEffect(() => {
+    if (hasMixture && plotType === '3d') {
+      setPlotType('ternary');
+    }
+  }, [project.id, hasMixture]);
+
+  // Selected Vertices for 3-Component Mixture Triangle
+  const [ternaryA, setTernaryA] = useState<string>(() => mixtureFactors[0]?.code || project.factors[0]?.code || 'X1');
+  const [ternaryB, setTernaryB] = useState<string>(() => mixtureFactors[1]?.code || project.factors[1]?.code || 'X2');
+  const [ternaryC, setTernaryC] = useState<string>(() => mixtureFactors[2]?.code || project.factors[2]?.code || 'X3');
+
+  // Sync ternary factors when project or factors change
+  useEffect(() => {
+    if (mixtureFactors.length >= 3) {
+      setTernaryA(mixtureFactors[0].code);
+      setTernaryB(mixtureFactors[1].code);
+      setTernaryC(mixtureFactors[2].code);
+    } else if (project.factors.length >= 3) {
+      setTernaryA(project.factors[0].code);
+      setTernaryB(project.factors[1].code);
+      setTernaryC(project.factors[2].code);
+    }
+  }, [project.id, project.factors, mixtureFactors]);
+
+  // Ternary Contour Options
+  const [ternaryDisplayMode, setTernaryDisplayMode] = useState<'both' | 'lines_only' | 'heatmap'>('both');
+  const [ternaryLevels, setTernaryLevels] = useState<number>(12);
+  const [showDoERuns, setShowDoERuns] = useState<boolean>(true);
+  const [showOptimum, setShowOptimum] = useState<boolean>(true);
+  const [showConstraints, setShowConstraints] = useState<boolean>(true);
+  const [showRegionPolygon, setShowRegionPolygon] = useState<boolean>(true);
+  const [showSpecLimits, setShowSpecLimits] = useState<boolean>(true);
+  const [ternaryResolution, setTernaryResolution] = useState<number>(140);
+
+  // Active factors for Ternary
+  const factorA = project.factors.find((f) => f.code === ternaryA) || mixtureFactors[0] || project.factors[0];
+  const factorB = project.factors.find((f) => f.code === ternaryB) || mixtureFactors[1] || project.factors[1];
+  const factorC = project.factors.find((f) => f.code === ternaryC) || mixtureFactors[2] || project.factors[2];
 
   // Neural Optimum State
   const [neuralOptimum, setNeuralOptimum] = useState<DesirabilitySolution | null>(null);
@@ -153,57 +206,343 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
     return { xActualArr, yActualArr, zGrid };
   }, [neuralModel, factorX, factorY, profilerCoded]);
 
+  // Ternary Mesh & Contour Calculation for Neural Model
+  const ternaryResult = useMemo(() => {
+    if (plotType !== 'ternary' || !neuralModel || !factorA || !factorB || !factorC || !currentCQA) {
+      return null;
+    }
+
+    return generateTernaryContour(
+      factorA,
+      factorB,
+      factorC,
+      project.factors,
+      profilerCoded,
+      neuralModel,
+      currentCQA,
+      ternaryResolution,
+      ternaryLevels
+    );
+  }, [
+    plotType,
+    neuralModel,
+    factorA,
+    factorB,
+    factorC,
+    project.factors,
+    profilerCoded,
+    currentCQA,
+    ternaryResolution,
+    ternaryLevels,
+  ]);
+
   const surfacePlotData = useMemo(() => {
-    if (!surfaceGrid || !factorX || !factorY) return [];
+    if (plotType === 'ternary') {
+      if (!ternaryResult || !factorA || !factorB || !factorC || !currentCQA) return [];
+      const { traces } = buildTernaryPlotlyTraces(
+        ternaryResult,
+        factorA,
+        factorB,
+        factorC,
+        currentCQA,
+        {
+          colorScale,
+          displayMode: ternaryDisplayMode,
+          showDoERuns,
+          doeRuns: project.runs,
+          showOptimum,
+          optimum: neuralOptimum,
+          showConstraints,
+          showRegionPolygon,
+          showSpecLimits,
+        }
+      );
+      return traces;
+    }
+
+    if (!surfaceGrid || !factorX || !factorY || !currentCQA) return [];
+    const traces: any[] = [];
 
     if (plotType === '3d') {
-      return [
-        {
-          type: 'surface',
-          x: surfaceGrid.xActualArr,
-          y: surfaceGrid.yActualArr,
-          z: surfaceGrid.zGrid,
-          colorscale: colorScale,
-          colorbar: {
-            title: {
-              text: `${currentCQA?.name || ''} (${currentCQA?.code || ''})${currentCQA?.unit ? ` [${currentCQA.unit}]` : ''}`,
-              side: 'right',
-              font: { size: 11, color: '#1e293b' },
-            },
-            len: 0.85,
-            thickness: 18,
+      traces.push({
+        type: 'surface',
+        x: surfaceGrid.xActualArr,
+        y: surfaceGrid.yActualArr,
+        z: surfaceGrid.zGrid,
+        colorscale: colorScale,
+        colorbar: {
+          title: {
+            text: `${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+            side: 'right',
+            font: { size: 11, color: '#1e293b' },
           },
-          contours: {
-            z: { show: true, usecolormap: true, highlightcolor: '#ffffff', project: { z: true } },
-          },
-          hoverinfo: 'x+y+z',
+          len: 0.85,
+          thickness: 18,
         },
-      ];
+        contours: {
+          z: { show: true, usecolormap: true, highlightcolor: '#ffffff', project: { z: true } },
+        },
+        hoverinfo: 'x+y+z',
+      });
+
+      // 3D Spec Limit Horizontal Planes & Intersection Curves
+      if (showSpecLimits) {
+        const xMin = surfaceGrid.xActualArr[0];
+        const xMax = surfaceGrid.xActualArr[surfaceGrid.xActualArr.length - 1];
+        const yMin = surfaceGrid.yActualArr[0];
+        const yMax = surfaceGrid.yActualArr[surfaceGrid.yActualArr.length - 1];
+
+        // LSL Plane & Curve
+        if (currentCQA.lowerLimit !== undefined) {
+          const LSL = currentCQA.lowerLimit;
+          traces.push({
+            type: 'surface',
+            name: `🔴 Giới Hạn Dưới (LSL = ${LSL} ${currentCQA.unit || ''})`,
+            x: [xMin, xMax],
+            y: [yMin, yMax],
+            z: [
+              [LSL, LSL],
+              [LSL, LSL],
+            ],
+            opacity: 0.35,
+            showscale: false,
+            colorscale: [
+              [0, 'rgba(239, 68, 68, 0.45)'],
+              [1, 'rgba(239, 68, 68, 0.45)'],
+            ],
+            hoverinfo: 'name',
+            showlegend: true,
+          });
+
+          const lslSegs = extract2DContourSegments(
+            surfaceGrid.xActualArr,
+            surfaceGrid.yActualArr,
+            surfaceGrid.zGrid,
+            LSL
+          );
+          if (lslSegs.length > 0) {
+            traces.push({
+              type: 'scatter3d',
+              mode: 'lines',
+              name: `🔴 Đường Cắt LSL = ${LSL} ${currentCQA.unit || ''}`,
+              x: lslSegs.flatMap((s) => [s.x1, s.x2, null]),
+              y: lslSegs.flatMap((s) => [s.y1, s.y2, null]),
+              z: lslSegs.flatMap(() => [LSL, LSL, null]),
+              line: { color: '#dc2626', width: 6 },
+              hoverinfo: 'name',
+              showlegend: false,
+            });
+          }
+        }
+
+        // USL Plane & Curve
+        if (currentCQA.upperLimit !== undefined) {
+          const USL = currentCQA.upperLimit;
+          traces.push({
+            type: 'surface',
+            name: `🔴 Giới Hạn Trên (USL = ${USL} ${currentCQA.unit || ''})`,
+            x: [xMin, xMax],
+            y: [yMin, yMax],
+            z: [
+              [USL, USL],
+              [USL, USL],
+            ],
+            opacity: 0.35,
+            showscale: false,
+            colorscale: [
+              [0, 'rgba(185, 28, 28, 0.45)'],
+              [1, 'rgba(185, 28, 28, 0.45)'],
+            ],
+            hoverinfo: 'name',
+            showlegend: true,
+          });
+
+          const uslSegs = extract2DContourSegments(
+            surfaceGrid.xActualArr,
+            surfaceGrid.yActualArr,
+            surfaceGrid.zGrid,
+            USL
+          );
+          if (uslSegs.length > 0) {
+            traces.push({
+              type: 'scatter3d',
+              mode: 'lines',
+              name: `🔴 Đường Cắt USL = ${USL} ${currentCQA.unit || ''}`,
+              x: uslSegs.flatMap((s) => [s.x1, s.x2, null]),
+              y: uslSegs.flatMap((s) => [s.y1, s.y2, null]),
+              z: uslSegs.flatMap(() => [USL, USL, null]),
+              line: { color: '#b91c1c', width: 6 },
+              hoverinfo: 'name',
+              showlegend: false,
+            });
+          }
+        }
+
+        // Target Plane
+        if (currentCQA.target !== undefined && currentCQA.objective === 'target') {
+          const T = currentCQA.target;
+          traces.push({
+            type: 'surface',
+            name: `🟢 Mục Tiêu (Target = ${T} ${currentCQA.unit || ''})`,
+            x: [xMin, xMax],
+            y: [yMin, yMax],
+            z: [
+              [T, T],
+              [T, T],
+            ],
+            opacity: 0.25,
+            showscale: false,
+            colorscale: [
+              [0, 'rgba(5, 150, 105, 0.35)'],
+              [1, 'rgba(5, 150, 105, 0.35)'],
+            ],
+            hoverinfo: 'name',
+            showlegend: true,
+          });
+        }
+      }
     } else {
-      return [
-        {
-          type: 'contour',
-          x: surfaceGrid.xActualArr,
-          y: surfaceGrid.yActualArr,
-          z: surfaceGrid.zGrid,
-          colorscale: colorScale,
-          colorbar: {
-            title: {
-              text: `${currentCQA?.name || ''} (${currentCQA?.code || ''})${currentCQA?.unit ? ` [${currentCQA.unit}]` : ''}`,
-              side: 'right',
-              font: { size: 11, color: '#1e293b' },
-            },
-            len: 0.85,
-            thickness: 18,
+      // 2D Contour
+      traces.push({
+        type: 'contour',
+        x: surfaceGrid.xActualArr,
+        y: surfaceGrid.yActualArr,
+        z: surfaceGrid.zGrid,
+        colorscale: colorScale,
+        colorbar: {
+          title: {
+            text: `${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+            side: 'right',
+            font: { size: 11, color: '#1e293b' },
           },
-          contours: { coloring: 'heatmap', showlabels: true },
-          hoverinfo: 'x+y+z',
+          len: 0.85,
+          thickness: 18,
         },
-      ];
+        contours: { coloring: 'heatmap', showlabels: true },
+        hoverinfo: 'x+y+z',
+      });
+
+      // 2D Spec Limit Isolines
+      if (showSpecLimits) {
+        if (currentCQA.lowerLimit !== undefined) {
+          const LSL = currentCQA.lowerLimit;
+          const lslSegs = extract2DContourSegments(
+            surfaceGrid.xActualArr,
+            surfaceGrid.yActualArr,
+            surfaceGrid.zGrid,
+            LSL
+          );
+          if (lslSegs.length > 0) {
+            traces.push({
+              type: 'scatter',
+              mode: 'lines',
+              name: `🔴 Giới Hạn Dưới (LSL = ${LSL} ${currentCQA.unit || ''})`,
+              x: lslSegs.flatMap((s) => [s.x1, s.x2, null]),
+              y: lslSegs.flatMap((s) => [s.y1, s.y2, null]),
+              line: { color: '#dc2626', width: 3.2, dash: 'dash' },
+              hoverinfo: 'name',
+              showlegend: true,
+            });
+          }
+        }
+
+        if (currentCQA.upperLimit !== undefined) {
+          const USL = currentCQA.upperLimit;
+          const uslSegs = extract2DContourSegments(
+            surfaceGrid.xActualArr,
+            surfaceGrid.yActualArr,
+            surfaceGrid.zGrid,
+            USL
+          );
+          if (uslSegs.length > 0) {
+            traces.push({
+              type: 'scatter',
+              mode: 'lines',
+              name: `🔴 Giới Hạn Trên (USL = ${USL} ${currentCQA.unit || ''})`,
+              x: uslSegs.flatMap((s) => [s.x1, s.x2, null]),
+              y: uslSegs.flatMap((s) => [s.y1, s.y2, null]),
+              line: { color: '#b91c1c', width: 3.2, dash: 'dash' },
+              hoverinfo: 'name',
+              showlegend: true,
+            });
+          }
+        }
+
+        if (currentCQA.target !== undefined && currentCQA.objective === 'target') {
+          const T = currentCQA.target;
+          const targetSegs = extract2DContourSegments(
+            surfaceGrid.xActualArr,
+            surfaceGrid.yActualArr,
+            surfaceGrid.zGrid,
+            T
+          );
+          if (targetSegs.length > 0) {
+            traces.push({
+              type: 'scatter',
+              mode: 'lines',
+              name: `🟢 Mục Tiêu (Target = ${T} ${currentCQA.unit || ''})`,
+              x: targetSegs.flatMap((s) => [s.x1, s.x2, null]),
+              y: targetSegs.flatMap((s) => [s.y1, s.y2, null]),
+              line: { color: '#059669', width: 2.6, dash: 'solid' },
+              hoverinfo: 'name',
+              showlegend: true,
+            });
+          }
+        }
+      }
     }
-  }, [surfaceGrid, plotType, colorScale, factorX, factorY, currentCQA]);
+
+    return traces;
+  }, [
+    plotType,
+    ternaryResult,
+    factorA,
+    factorB,
+    factorC,
+    currentCQA,
+    colorScale,
+    ternaryDisplayMode,
+    showDoERuns,
+    project.runs,
+    showOptimum,
+    neuralOptimum,
+    showConstraints,
+    showRegionPolygon,
+    showSpecLimits,
+    surfaceGrid,
+    factorX,
+    factorY,
+  ]);
 
   const surfaceLayout = useMemo(() => {
+    if (plotType === 'ternary') {
+      if (!ternaryResult || !factorA || !factorB || !factorC || !currentCQA) return {};
+      const { layout } = buildTernaryPlotlyTraces(
+        ternaryResult,
+        factorA,
+        factorB,
+        factorC,
+        currentCQA,
+        {
+          colorScale,
+          displayMode: ternaryDisplayMode,
+          showDoERuns,
+          doeRuns: project.runs,
+          showOptimum,
+          optimum: neuralOptimum,
+          showConstraints,
+          showRegionPolygon,
+        }
+      );
+      return {
+        ...layout,
+        title: {
+          text: `Bề Mặt Tam Giác Mô Phỏng Bởi Mạng Nơ-ron: ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+          font: { size: 13, color: '#0f172a', family: 'Inter, sans-serif' },
+        },
+      };
+    }
+
     return {
       title: `${plotType === '3d' ? 'Bề Mặt Đáp Ứng Mạng Nơ-ron 3D' : 'Đường Đồng Mức 2D'}: ${currentCQA?.name || ''} (${currentCQA?.code || ''})${currentCQA?.unit ? ` [${currentCQA.unit}]` : ''}`,
       autosize: true,
@@ -251,7 +590,24 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
         automargin: true,
       },
     };
-  }, [plotType, currentCQA, factorX, factorY]);
+  }, [
+    plotType,
+    ternaryResult,
+    factorA,
+    factorB,
+    factorC,
+    currentCQA,
+    colorScale,
+    ternaryDisplayMode,
+    showDoERuns,
+    project.runs,
+    showOptimum,
+    neuralOptimum,
+    showConstraints,
+    showRegionPolygon,
+    factorX,
+    factorY,
+  ]);
 
   // Keep local config in sync when switching CQA
   React.useEffect(() => {
@@ -1218,43 +1574,24 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             </div>
           </div>
 
-          {/* 3D Response Surface & 2D Contour (Neural Net Engine) */}
+          {/* 3D Response Surface, 2D Contour & Ternary Mixture (Neural Net Engine) */}
           <div className="qbd-card">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
               <div>
                 <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Compass size={18} color="#0f766e" />
-                  <span>Bề Mặt Đáp Ứng Mô Phỏng Bởi Mạng Nơ-ron (Neural Response Surface 3D)</span>
+                  <span>Bề Mặt Đáp Ứng Mô Phỏng Bởi Mạng Nơ-ron (Neural Response Surface & Ternary Mixture)</span>
                 </h3>
                 <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.2rem' }}>
-                  Khảo sát miền không gian tương tác phi tuyến tính giữa 2 yếu tố đầu vào bất kỳ.
+                  {plotType === 'ternary'
+                    ? 'Khảo sát không gian 3 thành phần hỗn hợp trên đồ thị tam giác (Simplex Ternary Contour).'
+                    : 'Khảo sát miền không gian tương tác phi tuyến tính giữa 2 yếu tố đầu vào bất kỳ.'}
                 </p>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: '600' }}>Trục X:</label>
-                  <select className="input-field" style={{ width: '180px', fontSize: '0.78rem' }} value={xAxisFactor} onChange={(e) => setXAxisFactor(e.target.value)}>
-                    {project.factors.map((f) => (
-                      <option key={f.code} value={f.code} disabled={f.code === yAxisFactor}>
-                        {f.name} ({f.code}) {f.unit ? `[${f.unit}]` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: '600' }}>Trục Y:</label>
-                  <select className="input-field" style={{ width: '180px', fontSize: '0.78rem' }} value={yAxisFactor} onChange={(e) => setYAxisFactor(e.target.value)}>
-                    {project.factors.map((f) => (
-                      <option key={f.code} value={f.code} disabled={f.code === xAxisFactor}>
-                        {f.name} ({f.code}) {f.unit ? `[${f.unit}]` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div style={{ display: 'flex', backgroundColor: '#f1f5f9', borderRadius: '0.5rem', padding: '0.2rem' }}>
+                {/* Plot Type Mode Toggle */}
+                <div style={{ display: 'flex', backgroundColor: '#f1f5f9', borderRadius: '0.5rem', padding: '0.2rem', gap: '0.2rem' }}>
                   <button
                     onClick={() => setPlotType('3d')}
                     className={`btn ${plotType === '3d' ? 'btn-primary' : 'btn-secondary'}`}
@@ -1269,8 +1606,20 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                   >
                     2D
                   </button>
+                  {(hasMixture || project.factors.length >= 3) && (
+                    <button
+                      onClick={() => setPlotType('ternary')}
+                      className={`btn ${plotType === 'ternary' ? 'btn-teal' : 'btn-secondary'}`}
+                      style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', border: 'none', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                      title="Vẽ đồ thị tam giác hỗn hợp 3 thành phần"
+                    >
+                      <FlaskConical size={13} />
+                      <span>Tam Giác Hỗn Hợp</span>
+                    </button>
+                  )}
                 </div>
 
+                {/* Color Scale */}
                 <select
                   className="input-field"
                   style={{ width: '110px', fontSize: '0.78rem' }}
@@ -1279,13 +1628,233 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                 >
                   <option value="Plasma">Plasma</option>
                   <option value="Viridis">Viridis</option>
+                  <option value="Turbo">Turbo</option>
                   <option value="Jet">Jet</option>
                   <option value="Hot">Hot</option>
                 </select>
               </div>
             </div>
 
-            <div style={{ height: '480px' }}>
+            {/* Controls Bar for 2D/3D vs Ternary */}
+            {plotType === 'ternary' ? (
+              <div
+                style={{
+                  marginBottom: '1rem',
+                  padding: '0.85rem 1rem',
+                  backgroundColor: '#f0fdfa',
+                  borderRadius: '0.5rem',
+                  border: '1px solid #ccfbf1',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.75rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  {/* Vertex Selectors */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: '700', color: '#0f766e' }}>Đỉnh A (Top):</label>
+                      <select
+                        className="input-field"
+                        style={{ width: '150px', fontSize: '0.78rem', borderColor: '#0f766e' }}
+                        value={ternaryA}
+                        onChange={(e) => setTernaryA(e.target.value)}
+                      >
+                        {project.factors.map((f) => (
+                          <option key={f.code} value={f.code} disabled={f.code === ternaryB || f.code === ternaryC}>
+                            {f.name} ({f.code})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: '700', color: '#0f766e' }}>Đỉnh B (Trái):</label>
+                      <select
+                        className="input-field"
+                        style={{ width: '150px', fontSize: '0.78rem', borderColor: '#0f766e' }}
+                        value={ternaryB}
+                        onChange={(e) => setTernaryB(e.target.value)}
+                      >
+                        {project.factors.map((f) => (
+                          <option key={f.code} value={f.code} disabled={f.code === ternaryA || f.code === ternaryC}>
+                            {f.name} ({f.code})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: '700', color: '#0f766e' }}>Đỉnh C (Phải):</label>
+                      <select
+                        className="input-field"
+                        style={{ width: '150px', fontSize: '0.78rem', borderColor: '#0f766e' }}
+                        value={ternaryC}
+                        onChange={(e) => setTernaryC(e.target.value)}
+                      >
+                        {project.factors.map((f) => (
+                          <option key={f.code} value={f.code} disabled={f.code === ternaryA || f.code === ternaryB}>
+                            {f.name} ({f.code})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Display Mode & Resolution */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', backgroundColor: '#ffffff', borderRadius: '0.375rem', border: '1px solid #99f6e4', padding: '0.15rem' }}>
+                      <button
+                        onClick={() => setTernaryDisplayMode('both')}
+                        className={`btn ${ternaryDisplayMode === 'both' ? 'btn-teal' : 'btn-secondary'}`}
+                        style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
+                      >
+                        Đường + Màu
+                      </button>
+                      <button
+                        onClick={() => setTernaryDisplayMode('lines_only')}
+                        className={`btn ${ternaryDisplayMode === 'lines_only' ? 'btn-teal' : 'btn-secondary'}`}
+                        style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
+                      >
+                        Chỉ Đường
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                      <span style={{ fontSize: '0.7rem', color: '#475569', fontWeight: '600' }}>Số mức:</span>
+                      <select
+                        className="input-field"
+                        style={{ width: '80px', fontSize: '0.7rem', padding: '0.2rem 0.3rem' }}
+                        value={ternaryLevels}
+                        onChange={(e) => setTernaryLevels(Number(e.target.value))}
+                      >
+                        {[8, 12, 16, 20].map((lvl) => (
+                          <option key={lvl} value={lvl}>
+                            {lvl} mức
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                      <span style={{ fontSize: '0.7rem', color: '#475569', fontWeight: '600' }}>Độ mịn:</span>
+                      {[100, 140, 180].map((res) => (
+                        <button
+                          key={res}
+                          onClick={() => setTernaryResolution(res)}
+                          className={`btn ${ternaryResolution === res ? 'btn-teal' : 'btn-secondary'}`}
+                          style={{ fontSize: '0.68rem', padding: '0.2rem 0.35rem' }}
+                        >
+                          {res === 100 ? 'Mịn' : res === 140 ? 'Rất Mịn' : 'Cực Mịn (HD)'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Constraint and Feature Checkboxes */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap', fontSize: '0.75rem', borderTop: '1px dashed #99f6e4', paddingTop: '0.5rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showConstraints}
+                      onChange={(e) => setShowConstraints(e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span>
+                      📏 <strong>Vạch giới hạn biến X</strong> ({factorA.low} ≤ {factorA.code} ≤ {factorA.high}...)
+                    </span>
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showRegionPolygon}
+                      onChange={(e) => setShowRegionPolygon(e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span>🔷 Đa giác miền thực nghiệm</span>
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showSpecLimits}
+                      onChange={(e) => setShowSpecLimits(e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span>
+                      🏷️ <strong>Vạch giới hạn CQA ({currentCQA.code})</strong>
+                      {currentCQA.lowerLimit !== undefined || currentCQA.upperLimit !== undefined ? (
+                        <span style={{ color: '#dc2626', marginLeft: '0.25rem', fontWeight: '700' }}>
+                          ({currentCQA.lowerLimit !== undefined ? `${currentCQA.lowerLimit} ≤ ` : ''}{currentCQA.code}{currentCQA.upperLimit !== undefined ? ` ≤ ${currentCQA.upperLimit}` : ''} {currentCQA.unit || ''})
+                        </span>
+                      ) : ''}
+                    </span>
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showDoERuns}
+                      onChange={(e) => setShowDoERuns(e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span>🔵 Điểm DoE Thực Nghiệm</span>
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showOptimum}
+                      onChange={(e) => setShowOptimum(e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span>⭐ Điểm Tối Ưu Desirability</span>
+                  </label>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: '600' }}>Trục X:</label>
+                    <select className="input-field" style={{ width: '180px', fontSize: '0.78rem' }} value={xAxisFactor} onChange={(e) => setXAxisFactor(e.target.value)}>
+                      {project.factors.map((f) => (
+                        <option key={f.code} value={f.code} disabled={f.code === yAxisFactor}>
+                          {f.name} ({f.code}) {f.unit ? `[${f.unit}]` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: '600' }}>Trục Y:</label>
+                    <select className="input-field" style={{ width: '180px', fontSize: '0.78rem' }} value={yAxisFactor} onChange={(e) => setYAxisFactor(e.target.value)}>
+                      {project.factors.map((f) => (
+                        <option key={f.code} value={f.code} disabled={f.code === xAxisFactor}>
+                          {f.name} ({f.code}) {f.unit ? `[${f.unit}]` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.78rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={showSpecLimits}
+                    onChange={(e) => setShowSpecLimits(e.target.checked)}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <span>
+                    🔴 <strong>Vạch đường / mặt phẳng giới hạn CQA</strong> ({currentCQA.lowerLimit !== undefined ? `${currentCQA.lowerLimit} ≤ ` : ''}{currentCQA.code}{currentCQA.upperLimit !== undefined ? ` ≤ ${currentCQA.upperLimit}` : ''} {currentCQA.unit || ''})
+                  </span>
+                </label>
+              </div>
+            )}
+
+            <div style={{ height: plotType === 'ternary' ? '540px' : '480px' }}>
               <PlotlyChart data={surfacePlotData} layout={surfaceLayout} style={{ width: '100%', height: '100%' }} />
             </div>
           </div>

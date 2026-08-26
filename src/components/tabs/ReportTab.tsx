@@ -16,6 +16,7 @@ import type {
 } from '../../types/qbd';
 import { exportQBDWordReport } from '../../services/reportGenerator';
 import { calculateDesignEfficiency } from '../../services/doeGenerator';
+import { generateUpdatedRiskAssessment, generateControlStrategy } from '../../services/statistics';
 
 interface ReportTabProps {
   project: QBDProject;
@@ -478,35 +479,84 @@ export const ReportTab: React.FC<ReportTabProps> = ({
           </div>
         )}
 
-        {/* 7. Control Strategy & Ranges */}
+        {/* 6. Updated Risk Assessment Table (ICH Q9 & FDA ANDA) */}
         <div style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
-            7. Chiến Lược Kiểm Soát & Vùng Thiết Kế Liên Tục (Design Space - ICH Q8/Q10)
+            6. Đánh Giá Rủi Ro Cập Nhật Sau DoE (Updated Risk Assessment - ICH Q9 & FDA)
           </h2>
-          <table className="qbd-table">
-            <thead>
-              <tr style={{ backgroundColor: '#f1f5f9' }}>
-                <th>Thông Số (Factor)</th>
-                <th>Miền Khảo Sát (Knowledge Space)</th>
-                <th>Phạm Vi Chấp Nhận (PAR)</th>
-                <th>Phạm Vi Vận Hành Thường Quy (NOR)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {project.designSpace.map((ds) => {
-                const factor = project.factors.find((f) => f.code === ds.factorCode);
-                const unit = factor ? factor.unit : '';
-                return (
-                  <tr key={ds.factorCode}>
-                    <td style={{ fontWeight: '600' }}>{factor?.name} ({ds.factorCode})</td>
-                    <td>{ds.knowledgeLow} - {ds.knowledgeHigh} {unit}</td>
-                    <td style={{ color: '#1e40af', fontWeight: '600' }}>{ds.parLow} - {ds.parHigh} {unit}</td>
-                    <td style={{ color: '#0f766e', fontWeight: '700' }}>{ds.norLow} - {ds.norHigh} {unit} (Mục tiêu: {ds.target})</td>
+          <div className="table-container">
+            <table className="qbd-table">
+              <thead>
+                <tr style={{ backgroundColor: '#f1f5f9' }}>
+                  <th>Yếu Tố (Factor)</th>
+                  <th>Chỉ Tiêu (CQA)</th>
+                  <th style={{ textAlign: 'center' }}>Rủi Ro Ban Đầu</th>
+                  <th style={{ textAlign: 'center' }}>Ý Nghĩa DoE</th>
+                  <th style={{ textAlign: 'center' }}>Rủi Ro Cập Nhật</th>
+                  <th>Luận Giải Khoa Học Giảm Rủi Ro</th>
+                </tr>
+              </thead>
+              <tbody>
+                {generateUpdatedRiskAssessment(project, models).map((item, idx) => (
+                  <tr key={idx}>
+                    <td style={{ fontWeight: '600' }}>{item.factorCode} ({item.factorName})</td>
+                    <td style={{ fontWeight: '600' }}>{item.cqaCode} ({item.cqaName})</td>
+                    <td style={{ textAlign: 'center' }}>
+                      <span className={`badge ${item.initialRisk === 'High' ? 'badge-danger' : item.initialRisk === 'Medium' ? 'badge-warning' : 'badge-success'}`}>
+                        {item.initialRisk === 'High' ? 'Cao' : item.initialRisk === 'Medium' ? 'Trung bình' : 'Thấp'}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <span className="font-mono font-bold" style={{ color: item.isSignificantInModel ? '#1e3a8a' : '#64748b' }}>
+                        {item.isSignificantInModel ? 'Có (p < 0.05)' : 'Không'}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <span className="badge badge-success">Thấp (Low)</span>
+                    </td>
+                    <td style={{ fontSize: '0.75rem', color: '#334155' }}>{item.justification}</td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* 7. Comprehensive Control Strategy (ICH Q10) */}
+        <div style={{ marginBottom: '2rem' }}>
+          <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
+            7. Bảng Chiến Lược Kiểm Soát Toàn Diện (ICH Q10 Comprehensive Control Strategy)
+          </h2>
+          <div className="table-container">
+            <table className="qbd-table">
+              <thead>
+                <tr style={{ backgroundColor: '#f1f5f9' }}>
+                  <th>Phân Loại</th>
+                  <th>Thông Số / Thuộc Tính</th>
+                  <th>Mục Tiêu (Target)</th>
+                  <th>Khoảng NOR</th>
+                  <th>Khoảng PAR</th>
+                  <th>Phương Pháp Kiểm Soát</th>
+                </tr>
+              </thead>
+              <tbody>
+                {generateControlStrategy(project, optimum).map((item, idx) => (
+                  <tr key={idx}>
+                    <td>
+                      <span className={`badge ${item.category.includes('CMA') ? 'badge-primary' : item.category.includes('CPP') ? 'badge-warning' : item.category.includes('IPC') ? 'badge-teal' : 'badge-success'}`} style={{ fontSize: '0.7rem' }}>
+                        {item.category}
+                      </span>
+                    </td>
+                    <td style={{ fontWeight: '600' }}>{item.parameterName} {item.parameterCode ? `(${item.parameterCode})` : ''}</td>
+                    <td className="font-mono font-bold" style={{ color: '#0f766e' }}>{item.target}</td>
+                    <td className="font-mono" style={{ color: '#2563eb' }}>{item.nor}</td>
+                    <td className="font-mono" style={{ color: '#15803d' }}>{item.par}</td>
+                    <td style={{ fontSize: '0.75rem', color: '#334155' }}>{item.controlMethod}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* 8. Monte Carlo Reliability */}

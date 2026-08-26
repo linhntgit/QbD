@@ -402,3 +402,92 @@ export function formatAxisTitle(
   return `${name}<br>(${code})${cleanUnit}`;
 }
 
+/**
+ * 2D Marching Squares Contour Line Segment Extractor
+ * Extracts vector segments (x1, y1, x2, y2) where a 2D scalar field zGrid(y, x) equals isoValue.
+ */
+export interface Contour2DSegment {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+export function extract2DContourSegments(
+  xArr: number[],
+  yArr: number[],
+  zGrid: number[][],
+  isoValue: number
+): Contour2DSegment[] {
+  const segments: Contour2DSegment[] = [];
+  const Ny = yArr.length;
+  const Nx = xArr.length;
+  if (Ny < 2 || Nx < 2 || zGrid.length < 2) return segments;
+
+  const interp = (x1: number, y1: number, z1: number, x2: number, y2: number, z2: number) => {
+    if (Math.abs(z2 - z1) < 1e-12) return { x: (x1 + x2) / 2, y: (y1 + y2) / 2 };
+    const t = Math.max(0, Math.min(1, (isoValue - z1) / (z2 - z1)));
+    return {
+      x: x1 + t * (x2 - x1),
+      y: y1 + t * (y2 - y1),
+    };
+  };
+
+  // Process each quad by splitting into 2 triangles
+  for (let j = 0; j < Ny - 1; j++) {
+    const y0 = yArr[j];
+    const y1 = yArr[j + 1];
+
+    for (let i = 0; i < Nx - 1; i++) {
+      const x0 = xArr[i];
+      const x1 = xArr[i + 1];
+
+      const z00 = zGrid[j][i];
+      const z10 = zGrid[j][i + 1];
+      const z01 = zGrid[j + 1][i];
+      const z11 = zGrid[j + 1][i + 1];
+
+      if (
+        z00 === undefined ||
+        z10 === undefined ||
+        z01 === undefined ||
+        z11 === undefined
+      ) {
+        continue;
+      }
+
+      // Triangle 1: (x0, y0), (x1, y0), (x0, y1)
+      const pts1: { x: number; y: number }[] = [];
+      if ((z00 <= isoValue && z10 >= isoValue) || (z10 <= isoValue && z00 >= isoValue)) {
+        if (z00 !== z10) pts1.push(interp(x0, y0, z00, x1, y0, z10));
+      }
+      if ((z10 <= isoValue && z01 >= isoValue) || (z01 <= isoValue && z10 >= isoValue)) {
+        if (z10 !== z01) pts1.push(interp(x1, y0, z10, x0, y1, z01));
+      }
+      if ((z01 <= isoValue && z00 >= isoValue) || (z00 <= isoValue && z01 >= isoValue)) {
+        if (z01 !== z00) pts1.push(interp(x0, y1, z01, x0, y0, z00));
+      }
+      if (pts1.length >= 2) {
+        segments.push({ x1: pts1[0].x, y1: pts1[0].y, x2: pts1[1].x, y2: pts1[1].y });
+      }
+
+      // Triangle 2: (x1, y0), (x1, y1), (x0, y1)
+      const pts2: { x: number; y: number }[] = [];
+      if ((z10 <= isoValue && z11 >= isoValue) || (z11 <= isoValue && z10 >= isoValue)) {
+        if (z10 !== z11) pts2.push(interp(x1, y0, z10, x1, y1, z11));
+      }
+      if ((z11 <= isoValue && z01 >= isoValue) || (z01 <= isoValue && z11 >= isoValue)) {
+        if (z11 !== z01) pts2.push(interp(x1, y1, z11, x0, y1, z01));
+      }
+      if ((z01 <= isoValue && z10 >= isoValue) || (z10 <= isoValue && z01 >= isoValue)) {
+        if (z01 !== z10) pts2.push(interp(x0, y1, z01, x1, y0, z10));
+      }
+      if (pts2.length >= 2) {
+        segments.push({ x1: pts2[0].x, y1: pts2[0].y, x2: pts2[1].x, y2: pts2[1].y });
+      }
+    }
+  }
+
+  return segments;
+}
+

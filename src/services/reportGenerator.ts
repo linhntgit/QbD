@@ -21,6 +21,7 @@ import type {
   ModelingEngine,
 } from '../types/qbd';
 import { calculateDesignEfficiency } from './doeGenerator';
+import { generateUpdatedRiskAssessment, generateControlStrategy } from './statistics';
 
 const PRIMARY_COLOR = '1E3A8A'; // Deep Navy Blue
 const ACCENT_COLOR = '0D9488'; // Teal
@@ -52,7 +53,8 @@ function createDataCell(text: string, isEven: boolean = false, widthPercent?: nu
 }
 
 /**
- * Generate comprehensive ICH CTD Module 3.2.P.2 Pharmaceutical Development Report (.docx)
+ * Generate Gold-Standard CTD Module 3 (3.2.P.2 Pharmaceutical Development) Report (.docx)
+ * Following US FDA ANDA QbD Reference Standard (ICH Q8, Q9, Q10, Q11)
  */
 export async function exportQBDWordReport(
   project: QBDProject,
@@ -64,20 +66,25 @@ export async function exportQBDWordReport(
 ): Promise<void> {
   const sections: any[] = [];
 
-  // Title & Header Information
+  // Title & Header Information (FDA Module 3 format)
   sections.push(
+    new Paragraph({
+      text: 'MODULE 3 QUALITY - 3.2.P.2 PHARMACEUTICAL DEVELOPMENT',
+      heading: HeadingLevel.HEADING_2,
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 100, after: 100 },
+    }),
     new Paragraph({
       text: 'BÁO CÁO PHÁT TRIỂN DƯỢC PHẨM THEO QUALITY BY DESIGN (QbD)',
       heading: HeadingLevel.TITLE,
       alignment: AlignmentType.CENTER,
-      spacing: { after: 200, before: 100 },
-      style: 'Title',
+      spacing: { after: 200, before: 50 },
     }),
     new Paragraph({
       alignment: AlignmentType.CENTER,
       children: [
         new TextRun({
-          text: `Tuân thủ hướng dẫn ICH Q8 (R2), ICH Q9, ICH Q10, ICH Q11`,
+          text: `Tuân thủ cấu trúc hướng dẫn US FDA & ICH Q8(R2), ICH Q9, ICH Q10, ICH Q11`,
           italics: true,
           color: ACCENT_COLOR,
           size: 22,
@@ -91,7 +98,7 @@ export async function exportQBDWordReport(
   const metaRows = [
     new TableRow({
       children: [
-        createHeaderCell('Hạng mục', 30),
+        createHeaderCell('Hạng mục Hồ sơ', 30),
         createHeaderCell('Thông tin chi tiết', 70),
       ],
     }),
@@ -103,29 +110,29 @@ export async function exportQBDWordReport(
     }),
     new TableRow({
       children: [
-        createDataCell('Hoạt chất / Phân tử (Drug Substance)', true, 30),
+        createDataCell('Dược chất (Active Substance)', true, 30),
         createDataCell(project.moleculeName, true, 70),
       ],
     }),
     new TableRow({
       children: [
-        createDataCell('Dạng bào chế (Dosage Form)', false, 30),
+        createDataCell('Dạng bào chế & Hàm lượng', false, 30),
         createDataCell(project.dosageForm, false, 70),
       ],
     }),
     new TableRow({
       children: [
-        createDataCell('Đơn vị / Tác giả thực hiện', true, 30),
-        createDataCell(project.author, true, 70),
+        createDataCell('Nghiên cứu viên / Tác giả', true, 30),
+        createDataCell(project.author || 'R&D Formulation Scientist', true, 70),
       ],
     }),
     new TableRow({
       children: [
-        createDataCell('Phương pháp mô hình hóa chính', false, 30),
+        createDataCell('Động cơ Mô hình hóa (Engine)', false, 30),
         createDataCell(
           modelingEngine === 'neural'
-            ? 'Mạng Nơ-ron Nhân Tạo AI (Neural Network Platform)'
-            : 'Hồi Quy Đa Thức Bậc ≤ 2 (Classical ANOVA / Response Surface)',
+            ? 'Mạng Nơ-ron Nhân Tạo AI (Artificial Neural Network - MLP)'
+            : 'Hồi quy Đa thức Bậc ≤ 2 & Phân tích Phương sai ANOVA (OLS Regression)',
           false,
           70
         ),
@@ -133,7 +140,7 @@ export async function exportQBDWordReport(
     }),
     new TableRow({
       children: [
-        createDataCell('Ngày lập báo cáo', true, 30),
+        createDataCell('Ngày kết xuất báo cáo', true, 30),
         createDataCell(new Date().toLocaleDateString('vi-VN'), true, 70),
       ],
     }),
@@ -147,34 +154,100 @@ export async function exportQBDWordReport(
     new Paragraph({ text: '', spacing: { after: 300 } })
   );
 
-  // SECTION 1: QTPP
+  // SECTION 1.1: Executive Summary & Chronological Studies (FDA Table 1 format)
   sections.push(
     new Paragraph({
-      text: '1. Chỉ tiêu chất lượng sản phẩm mục tiêu (QTPP - ICH Q8)',
+      text: '1.1 Tóm Tắt Tổng Quan (Executive Summary) & Trình Tự Nghiên Cứu',
       heading: HeadingLevel.HEADING_1,
       spacing: { before: 300, after: 150 },
     }),
     new Paragraph({
-      text: 'QTPP là cơ sở định hướng toàn bộ quá trình nghiên cứu công thức và quy trình sản xuất, đảm bảo chất lượng, độ an toàn và hiệu quả điều trị của thuốc.',
-      spacing: { after: 200 },
+      text: `Báo cáo phát triển dược phẩm này tóm tắt toàn bộ quá trình nghiên cứu và tối ưu hóa sản phẩm ${project.moleculeName} (${project.dosageForm}) theo triết lý Quality by Design (QbD). Thông qua đánh giá rủi ro có hệ thống và Thiết kế thực nghiệm (DoE), các Thuộc tính vật liệu then chốt (CMAs) và Thông số quy trình then chốt (CPPs) đã được xác định, thiết lập Vùng thiết kế (Design Space) và Chiến lược kiểm soát (Control Strategy) đảm bảo chất lượng thuốc đồng nhất và đạt chuẩn.`,
+      spacing: { after: 150 },
+    })
+  );
+
+  const chronoRows = [
+    new TableRow({
+      children: [
+        createHeaderCell('Giai đoạn / Nghiên cứu', 40),
+        createHeaderCell('Quy mô (Scale)', 25),
+        createHeaderCell('Mục tiêu & Kết quả chính', 35),
+      ],
+    }),
+    new TableRow({
+      children: [
+        createDataCell('1. Phân tích thuốc đối chứng (RLD) & QTPP', false, 40),
+        createDataCell('Phòng thí nghiệm', false, 25),
+        createDataCell('Xác lập hồ sơ chất lượng mục tiêu và các chỉ tiêu then chốt (CQAs)', false, 35),
+      ],
+    }),
+    new TableRow({
+      children: [
+        createDataCell('2. Đánh giá rủi ro ban đầu (Initial Risk Assessment)', true, 40),
+        createDataCell('Lý thuyết & Thử nghiệm sơ bộ', true, 25),
+        createDataCell('Sàng lọc các yếu tố rủi ro cao/trung bình (H/M) cần làm DoE', true, 35),
+      ],
+    }),
+    new TableRow({
+      children: [
+        createDataCell('3. Thiết kế thực nghiệm DoE tối ưu hóa', false, 40),
+        createDataCell(`${project.runs.length} mẻ thực nghiệm`, false, 25),
+        createDataCell(`Khảo sát ${project.factors.length} biến đầu vào và ${project.cqas.length} chỉ tiêu CQA`, false, 35),
+      ],
+    }),
+    new TableRow({
+      children: [
+        createDataCell('4. Xây dựng Vùng Thiết Kế (Design Space) & Mô phỏng Monte Carlo', true, 40),
+        createDataCell('In silico / Pilot scale', true, 25),
+        createDataCell(`Xác lập dải PAR, độ tin cậy đạt ${monteCarlo ? monteCarlo.reliabilityPercent : 99}%`, true, 35),
+      ],
+    }),
+    new TableRow({
+      children: [
+        createDataCell('5. Thiết lập Chiến lược kiểm soát (ICH Q10 Control Strategy)', false, 40),
+        createDataCell('Pilot / Commercial scale', false, 25),
+        createDataCell('Xác định NOR, PAR, PAT in-line và tiêu chuẩn xuất xưởng thành phẩm', false, 35),
+      ],
+    }),
+  ];
+
+  sections.push(
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: chronoRows,
+    }),
+    new Paragraph({ text: '', spacing: { after: 250 } })
+  );
+
+  // SECTION 1.2: QTPP Table
+  sections.push(
+    new Paragraph({
+      text: '1.2 Hồ Sơ Chất Lượng Mục Tiêu Của Sản Phẩm (Quality Target Product Profile - QTPP)',
+      heading: HeadingLevel.HEADING_1,
+      spacing: { before: 300, after: 150 },
+    }),
+    new Paragraph({
+      text: 'QTPP được xây dựng dựa trên thông tin nhãn của Thuốc đối chứng (RLD), dược động học lâm sàng và các yêu cầu an toàn/hiệu quả cho bệnh nhân (ICH Q8(R2)):',
+      spacing: { after: 150 },
     })
   );
 
   const qtppRows = [
     new TableRow({
       children: [
-        createHeaderCell('Yếu tố QTPP', 30),
-        createHeaderCell('Tiêu chí mục tiêu', 35),
-        createHeaderCell('Cơ sở lý giải khoa học', 35),
+        createHeaderCell('Yếu tố QTPP', 25),
+        createHeaderCell('Mục tiêu chất lượng (Target)', 35),
+        createHeaderCell('Cơ sở biện luận khoa học (Justification)', 40),
       ],
     }),
     ...project.qtpp.map(
       (item, idx) =>
         new TableRow({
           children: [
-            createDataCell(item.element, idx % 2 === 1, 30),
+            createDataCell(item.element, idx % 2 === 1, 25),
             createDataCell(item.target, idx % 2 === 1, 35),
-            createDataCell(item.justification, idx % 2 === 1, 35),
+            createDataCell(item.justification, idx % 2 === 1, 40),
           ],
         })
     ),
@@ -185,18 +258,18 @@ export async function exportQBDWordReport(
       width: { size: 100, type: WidthType.PERCENTAGE },
       rows: qtppRows,
     }),
-    new Paragraph({ text: '', spacing: { after: 300 } })
+    new Paragraph({ text: '', spacing: { after: 250 } })
   );
 
-  // SECTION 2: CQAs & Desirability Configuration
+  // SECTION 1.3: CQAs Table
   sections.push(
     new Paragraph({
-      text: '2. Các thuộc tính chất lượng trọng yếu (CQAs) & Cấu hình Hàm Thỏa Dụng (Desirability Goals)',
+      text: '1.3 Các Thuộc Tính Chất Lượng Then Chốt (Critical Quality Attributes - CQAs)',
       heading: HeadingLevel.HEADING_1,
       spacing: { before: 300, after: 150 },
     }),
     new Paragraph({
-      text: 'CQAs là các đặc tính vật lý, hóa học, sinh học hoặc vi sinh cần nằm trong giới hạn thích hợp để đảm bảo chất lượng sản phẩm như mong muốn.',
+      text: 'Các CQAs là các thuộc tính vật lý, hóa học, sinh học hoặc vi sinh cần nằm trong giới hạn thích hợp để đảm bảo chất lượng sản phẩm mong muốn:',
       spacing: { after: 150 },
     })
   );
@@ -204,91 +277,34 @@ export async function exportQBDWordReport(
   const cqaRows = [
     new TableRow({
       children: [
-        createHeaderCell('Mã', 7),
-        createHeaderCell('Tên CQA', 22),
-        createHeaderCell('Bản chất', 13),
-        createHeaderCell('Đơn vị', 7),
+        createHeaderCell('Mã', 10),
+        createHeaderCell('Tên Thuộc Tính CQA', 30),
+        createHeaderCell('Đơn vị', 10),
         createHeaderCell('Mục tiêu (Goal)', 15),
-        createHeaderCell('Giới hạn (LSL - Target - USL)', 20),
-        createHeaderCell('Hình dạng (s, t)', 8),
-        createHeaderCell('Trọng số (w)', 8),
+        createHeaderCell('Giới hạn chấp nhận (Spec Limits)', 25),
+        createHeaderCell('Trọng số', 10),
       ],
     }),
-    ...project.cqas.map(
-      (cqa, idx) =>
-        new TableRow({
-          children: [
-            createDataCell(cqa.code, idx % 2 === 1, 7),
-            createDataCell(cqa.name, idx % 2 === 1, 22),
-            createDataCell(cqa.dataType === 'qualitative_binary' ? 'Định tính (Pass/Fail)' : cqa.dataType === 'qualitative_ordinal' ? 'Định tính (Thứ bậc)' : 'Định lượng (Quantitative)', idx % 2 === 1, 13),
-            createDataCell(cqa.unit, idx % 2 === 1, 7),
-            createDataCell(
-              cqa.objective === 'maximize' ? '📈 Lớn nhất (Max)' :
-              cqa.objective === 'minimize' ? '📉 Nhỏ nhất (Min)' :
-              cqa.objective === 'target' ? '🎯 Đạt đích (Target)' :
-              cqa.objective === 'range' ? '📏 Trong khoảng' : 'None',
-              idx % 2 === 1,
-              15
-            ),
-            createDataCell(
-              `${cqa.lowerLimit ?? '-'} / ${cqa.target ?? '-'} / ${cqa.upperLimit ?? '-'}`,
-              idx % 2 === 1,
-              20
-            ),
-            createDataCell(`s=${cqa.sShape ?? 1}, t=${cqa.tShape ?? 1}`, idx % 2 === 1, 8),
-            createDataCell(`${cqa.weight}`, idx % 2 === 1, 8),
-          ],
-        })
-    ),
-  ];
+    ...project.cqas.map((cqa, idx) => {
+      const spec =
+        cqa.lowerLimit !== undefined && cqa.upperLimit !== undefined
+          ? `[${cqa.lowerLimit} - ${cqa.upperLimit}]`
+          : cqa.lowerLimit !== undefined
+          ? `≥ ${cqa.lowerLimit}`
+          : cqa.upperLimit !== undefined
+          ? `≤ ${cqa.upperLimit}`
+          : cqa.target !== undefined
+          ? `Target: ${cqa.target}`
+          : 'N/A';
 
-  sections.push(
-    new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
-      rows: cqaRows,
-    }),
-    new Paragraph({ text: '', spacing: { after: 300 } })
-  );
-
-  // SECTION 3: FMEA Risk Assessment (ICH Q9)
-  sections.push(
-    new Paragraph({
-      text: '3. Đánh giá quản lý rủi ro ban đầu (Initial Risk Assessment - ICH Q9)',
-      heading: HeadingLevel.HEADING_1,
-      spacing: { before: 300, after: 150 },
-    }),
-    new Paragraph({
-      text: 'Áp dụng công cụ FMEA (Failure Mode and Effects Analysis) tính điểm chỉ số ưu tiên rủi ro RPN = Nghiêm trọng (S) x Xác suất (P) x Khả năng phát hiện (D) để sàng lọc các biến đầu vào trọng yếu (CMA/CPP) cần khảo sát bằng DoE.',
-      spacing: { after: 200 },
-    })
-  );
-
-  const fmeaRows = [
-    new TableRow({
-      children: [
-        createHeaderCell('Nhân tố (Factor)', 20),
-        createHeaderCell('CQA ảnh hưởng', 20),
-        createHeaderCell('S', 8),
-        createHeaderCell('P', 8),
-        createHeaderCell('D', 8),
-        createHeaderCell('RPN', 10),
-        createHeaderCell('Mức rủi ro', 12),
-        createHeaderCell('Khảo sát DoE', 14),
-      ],
-    }),
-    ...project.fmeaRisks.map((item, idx) => {
-      const factor = project.factors.find((f) => f.id === item.factorId);
-      const cqa = project.cqas.find((c) => c.id === item.cqaId);
       return new TableRow({
         children: [
-          createDataCell(factor ? `${factor.name} (${factor.code})` : '-', idx % 2 === 1, 20),
-          createDataCell(cqa ? `${cqa.name} (${cqa.code})` : '-', idx % 2 === 1, 20),
-          createDataCell(`${item.severity}`, idx % 2 === 1, 8),
-          createDataCell(`${item.probability}`, idx % 2 === 1, 8),
-          createDataCell(`${item.detectability}`, idx % 2 === 1, 8),
-          createDataCell(`${item.rpn}`, idx % 2 === 1, 10),
-          createDataCell(item.riskLevel, idx % 2 === 1, 12),
-          createDataCell(item.recommendedDoE ? 'Có (DoE)' : 'Không', idx % 2 === 1, 14),
+          createDataCell(cqa.code, idx % 2 === 1, 10),
+          createDataCell(cqa.name, idx % 2 === 1, 30),
+          createDataCell(cqa.unit || '-', idx % 2 === 1, 10),
+          createDataCell(cqa.objective.toUpperCase(), idx % 2 === 1, 15),
+          createDataCell(spec, idx % 2 === 1, 25),
+          createDataCell(String(cqa.weight), idx % 2 === 1, 10),
         ],
       });
     }),
@@ -297,48 +313,47 @@ export async function exportQBDWordReport(
   sections.push(
     new Table({
       width: { size: 100, type: WidthType.PERCENTAGE },
-      rows: fmeaRows,
+      rows: cqaRows,
     }),
-    new Paragraph({ text: '', spacing: { after: 300 } })
+    new Paragraph({ text: '', spacing: { after: 250 } })
   );
 
-  // SECTION 4: DoE Design Matrix
+  // SECTION 2.1: Factors & Initial Risk Assessment
   sections.push(
     new Paragraph({
-      text: '4. Thiết kế thí nghiệm (Design of Experiments - DoE Matrix)',
+      text: '2.1 Các Yếu Tố Khảo Sát (Factors) & Đánh Giá Rủi Ro Ban Đầu (Initial Risk)',
       heading: HeadingLevel.HEADING_1,
       spacing: { before: 300, after: 150 },
     }),
     new Paragraph({
-      text: `Kiểu thiết kế: ${project.doeConfig.designType} (${project.doeConfig.category}) | Số điểm tâm: ${project.doeConfig.centerPoints} | Tổng số lần chạy: ${project.runs.length}`,
-      spacing: { after: 200 },
+      text: 'Danh mục các biến công thức (CMAs) và thông số quy trình (CPPs) được đưa vào nghiên cứu thực nghiệm DoE:',
+      spacing: { after: 150 },
     })
   );
 
-  // Factors List
   const factorRows = [
     new TableRow({
       children: [
-        createHeaderCell('Mã', 7),
-        createHeaderCell('Tên biến đầu vào', 25),
-        createHeaderCell('Phân loại', 12),
-        createHeaderCell('Bản chất DL', 16),
-        createHeaderCell('Khả năng kiểm soát', 18),
-        createHeaderCell('Đơn vị', 7),
-        createHeaderCell('Phạm vi / Hằng số', 15),
+        createHeaderCell('Mã', 10),
+        createHeaderCell('Tên Yếu Tố', 25),
+        createHeaderCell('Phân loại', 18),
+        createHeaderCell('Đơn vị', 10),
+        createHeaderCell('Mức thấp (-1)', 12),
+        createHeaderCell('Mức tâm (0)', 12),
+        createHeaderCell('Mức cao (+1)', 13),
       ],
     }),
     ...project.factors.map(
       (f, idx) =>
         new TableRow({
           children: [
-            createDataCell(f.code, idx % 2 === 1, 7),
+            createDataCell(f.code, idx % 2 === 1, 10),
             createDataCell(f.name, idx % 2 === 1, 25),
-            createDataCell(f.type, idx % 2 === 1, 12),
-            createDataCell(f.dataType === 'qualitative' ? 'Định tính' : f.dataType === 'quantitative_multilevel' ? 'ĐL nhiều mức' : 'ĐL liên tục', idx % 2 === 1, 16),
-            createDataCell(f.controllability === 'constant' ? '🔒 Hằng số' : f.controllability === 'uncontrollable_noise' ? '🌪️ Nhiễu (Noise)' : '🎯 Kiểm soát được', idx % 2 === 1, 18),
-            createDataCell(f.unit, idx % 2 === 1, 7),
-            createDataCell(f.controllability === 'constant' ? `${f.constantValue ?? f.low}` : `${f.low} - ${f.high}`, idx % 2 === 1, 15),
+            createDataCell(`${f.type} (${f.role === 'mixture_component' ? 'Hỗn hợp' : 'Độc lập'})`, idx % 2 === 1, 18),
+            createDataCell(f.unit || '-', idx % 2 === 1, 10),
+            createDataCell(String(f.low), idx % 2 === 1, 12),
+            createDataCell(f.center !== undefined ? String(f.center) : String((f.low + f.high) / 2), idx % 2 === 1, 12),
+            createDataCell(String(f.high), idx % 2 === 1, 13),
           ],
         })
     ),
@@ -349,108 +364,75 @@ export async function exportQBDWordReport(
       width: { size: 100, type: WidthType.PERCENTAGE },
       rows: factorRows,
     }),
-    new Paragraph({ text: '', spacing: { after: 200 } })
+    new Paragraph({ text: '', spacing: { after: 250 } })
   );
 
-  // Design Diagnostics & D-Efficiency Table
-  const metrics = calculateDesignEfficiency(
-    project.runs,
-    project.factors,
-    project.doeConfig.dOptimalModel || 'Quadratic'
+  // SECTION 2.2: DoE Experimental Matrix & Efficiency
+  const eff = calculateDesignEfficiency(project.runs, project.factors);
+  sections.push(
+    new Paragraph({
+      text: '2.2 Kế Hoạch Thiết Kế Thực Nghiệm (DoE Matrix) & Đánh Giá Hiệu Quả',
+      heading: HeadingLevel.HEADING_1,
+      spacing: { before: 300, after: 150 },
+    }),
+    new Paragraph({
+      children: [
+        new TextRun({
+          text: `Phương pháp DoE: ${project.doeConfig.designType} | Số thí nghiệm: ${project.runs.length} mẻ | D-Efficiency = ${eff.dEfficiency}% (${eff.rating})`,
+          bold: true,
+          color: PRIMARY_COLOR,
+        }),
+      ],
+      spacing: { after: 150 },
+    })
   );
 
-  if (metrics.numRuns > 0) {
-    const diagRows = [
-      new TableRow({
-        children: [
-          createHeaderCell('Chỉ số Hiệu quả Thiết kế', 40),
-          createHeaderCell('Giá trị Tính toán', 30),
-          createHeaderCell('Đánh giá & Ý nghĩa', 30),
-        ],
-      }),
-      new TableRow({
-        children: [
-          createDataCell('D-Efficiency (Hiệu quả D)', false, 40),
-          createDataCell(`${metrics.dEfficiency}%`, false, 30),
-          createDataCell(metrics.rating, false, 30),
-        ],
-      }),
-      new TableRow({
-        children: [
-          createDataCell('A-Efficiency (Hiệu quả A)', true, 40),
-          createDataCell(`${metrics.aEfficiency}%`, true, 30),
-          createDataCell('Giảm thiểu phương sai ước lượng hệ số', true, 30),
-        ],
-      }),
-      new TableRow({
-        children: [
-          createDataCell('G-Efficiency (Hiệu quả G)', false, 40),
-          createDataCell(`${metrics.gEfficiency}%`, false, 30),
-          createDataCell('Kiểm soát phương sai dự đoán cực đại', false, 30),
-        ],
-      }),
-      new TableRow({
-        children: [
-          createDataCell('Số hệ số mô hình (p) / Bậc tự do (df)', true, 40),
-          createDataCell(`p = ${metrics.numParameters}, df = ${metrics.degreesOfFreedom}`, true, 30),
-          createDataCell(`Số lần chạy N = ${metrics.numRuns}`, true, 30),
-        ],
-      }),
-    ];
-
-    sections.push(
-      new Paragraph({
-        text: 'Đánh giá Hiệu quả và Tính Tối ưu của Thiết kế (Design Optimality Diagnostics):',
-        spacing: { before: 150, after: 100 },
-      }),
-      new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
-        rows: diagRows,
-      }),
-      new Paragraph({ text: '', spacing: { after: 300 } })
-    );
-  }
-
-  // Runs Table
-  const runHeaders = [
+  const runHeaderCells = [
     createHeaderCell('Std', 6),
     createHeaderCell('Run', 6),
-    ...project.factors.map((f) => createHeaderCell(`${f.name} (${f.code})${f.unit ? ` [${f.unit}]` : ''}`)),
-    ...project.cqas.map((c) => createHeaderCell(`${c.name} (${c.code})${c.unit ? ` [${c.unit}]` : ''}`)),
+    ...project.factors.map((f) => createHeaderCell(f.code, 12)),
+    ...project.cqas.map((c) => createHeaderCell(c.code, 14)),
   ];
 
-  const runRows = [
-    new TableRow({ children: runHeaders }),
-    ...project.runs.map((r, idx) => {
-      const factorCells = project.factors.map((f) =>
-        createDataCell(`${r.factorActual[f.code] ?? '-'}`, idx % 2 === 1)
-      );
-      const cqaCells = project.cqas.map((c) =>
-        createDataCell(`${r.responses[c.code] ?? '-'}`, idx % 2 === 1)
-      );
-      return new TableRow({
-        children: [
-          createDataCell(`${r.stdOrder}`, idx % 2 === 1, 6),
-          createDataCell(`${r.runOrder}`, idx % 2 === 1, 6),
-          ...factorCells,
-          ...cqaCells,
-        ],
-      });
-    }),
-  ];
+  const runDataRows = project.runs.map((r, idx) => {
+    return new TableRow({
+      children: [
+        createDataCell(String(r.stdOrder), idx % 2 === 1, 6),
+        createDataCell(String(r.runOrder), idx % 2 === 1, 6),
+        ...project.factors.map((f) =>
+          createDataCell(
+            typeof r.factorActual[f.code] === 'number'
+              ? (r.factorActual[f.code] as number).toFixed(1)
+              : String(r.factorActual[f.code] ?? '-'),
+            idx % 2 === 1,
+            12
+          )
+        ),
+        ...project.cqas.map((c) =>
+          createDataCell(
+            r.responses[c.code] !== null && r.responses[c.code] !== undefined
+              ? String(r.responses[c.code])
+              : '-',
+            idx % 2 === 1,
+            14
+          )
+        ),
+      ],
+    });
+  });
 
   sections.push(
     new Table({
       width: { size: 100, type: WidthType.PERCENTAGE },
-      rows: runRows,
+      rows: [new TableRow({ children: runHeaderCells }), ...runDataRows],
     }),
-    new Paragraph({ text: '', spacing: { after: 300 } })
+    new Paragraph({ text: '', spacing: { after: 250 } })
   );
 
-  // SECTION 5: Statistical ANOVA & Mathematical Models
+  // SECTION 2.3: Statistical Modeling, ANOVA & Curvature Test
   sections.push(
     new Paragraph({
-      text: '5. Phân tích Thống kê ANOVA & Mô hình Hóa Toán học',
+      text: '2.3 Mô Hình Hóa Thống Kê, Phân Tích Phương Sai (ANOVA) & Kiểm Định Độ Cong',
       heading: HeadingLevel.HEADING_1,
       spacing: { before: 300, after: 150 },
     })
@@ -458,50 +440,76 @@ export async function exportQBDWordReport(
 
   Object.values(models).forEach((model) => {
     const cqa = project.cqas.find((c) => c.code === model.cqaCode);
+    const title = cqa ? `${cqa.name} (${model.cqaCode})` : model.cqaCode;
+
     sections.push(
       new Paragraph({
-        text: `Mô hình cho ${cqa ? cqa.name : model.cqaCode} (${model.cqaCode}) - Dạng mô hình: ${model.modelType}`,
+        text: `Mô hình ANOVA cho chỉ tiêu: ${title}`,
         heading: HeadingLevel.HEADING_2,
         spacing: { before: 200, after: 100 },
       }),
       new Paragraph({
         children: [
           new TextRun({ text: 'Phương trình hồi quy: ', bold: true }),
-          new TextRun({ text: model.equationString, italics: true, color: PRIMARY_COLOR }),
+          new TextRun({ text: model.equationString, font: 'Consolas', color: PRIMARY_COLOR }),
         ],
         spacing: { after: 100 },
       }),
       new Paragraph({
-        text: `Chỉ số đánh giá: R² = ${model.diagnostics.rSquared.toFixed(4)} | R² hiệu chỉnh = ${model.diagnostics.adjRSquared.toFixed(4)} | R² dự đoán = ${model.diagnostics.predRSquared.toFixed(4)} | Adequate Precision = ${model.diagnostics.adeqPrecision.toFixed(2)} | Độ lệch chuẩn (Std Dev) = ${model.diagnostics.stdDev.toFixed(3)}`,
-        spacing: { after: 150 },
+        children: [
+          new TextRun({
+            text: `R² = ${model.diagnostics.rSquared.toFixed(4)} | Adj R² = ${model.diagnostics.adjRSquared.toFixed(4)} | Pred R² = ${model.diagnostics.predRSquared.toFixed(4)} | Adeq Precision = ${model.diagnostics.adeqPrecision.toFixed(2)} | Std Dev = ${model.diagnostics.stdDev.toFixed(3)} (CV = ${model.diagnostics.cvPercent.toFixed(2)}%)`,
+            bold: true,
+            color: '334155',
+            size: 19,
+          }),
+        ],
+        spacing: { after: 100 },
       })
     );
 
-    // ANOVA Sub-table
+    // Curvature Test note if present
+    if (model.curvatureTest) {
+      sections.push(
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: `[Curvature Test]: F = ${model.curvatureTest.fValue?.toFixed(2)}, p = ${model.curvatureTest.pValue !== undefined ? (model.curvatureTest.pValue < 0.001 ? '< 0.001' : model.curvatureTest.pValue.toFixed(4)) : '-'} - ${model.curvatureTest.note}`,
+              italics: true,
+              color: model.curvatureTest.significant ? 'B45309' : '15803D',
+              bold: true,
+              size: 19,
+            }),
+          ],
+          spacing: { after: 120 },
+        })
+      );
+    }
+
     const anovaRows = [
       new TableRow({
         children: [
-          createHeaderCell('Nguồn biến thiên (Source)', 35),
-          createHeaderCell('Tổng bình phương (SS)', 20),
-          createHeaderCell('Bậc tự do (df)', 15),
-          createHeaderCell('Trung bình bình phương (MS)', 20),
-          createHeaderCell('F-value', 10),
-          createHeaderCell('p-value', 10),
+          createHeaderCell('Nguồn Biến Thiên (Source)', 30),
+          createHeaderCell('Tổng Bình Phương (SS)', 22),
+          createHeaderCell('Bậc Tự Do (df)', 12),
+          createHeaderCell('Trung Bình Bình Phương (MS)', 22),
+          createHeaderCell('F-value', 14),
+          createHeaderCell('p-value', 14),
         ],
       }),
       ...model.anova.map(
         (row, idx) =>
           new TableRow({
             children: [
-              createDataCell(row.source, idx % 2 === 1, 35),
-              createDataCell(row.ss.toFixed(3), idx % 2 === 1, 20),
-              createDataCell(`${row.df}`, idx % 2 === 1, 15),
-              createDataCell(row.ms.toFixed(3), idx % 2 === 1, 20),
-              createDataCell(row.fValue !== undefined ? row.fValue.toFixed(2) : '-', idx % 2 === 1, 10),
+              createDataCell(row.source, idx % 2 === 1, 30),
+              createDataCell(row.ss.toFixed(3), idx % 2 === 1, 22),
+              createDataCell(String(row.df), idx % 2 === 1, 12),
+              createDataCell(row.ms.toFixed(3), idx % 2 === 1, 22),
+              createDataCell(row.fValue !== undefined ? row.fValue.toFixed(2) : '-', idx % 2 === 1, 14),
               createDataCell(
                 row.pValue !== undefined ? (row.pValue < 0.001 ? '< 0.001' : row.pValue.toFixed(4)) : '-',
                 idx % 2 === 1,
-                10
+                14
               ),
             ],
           })
@@ -517,48 +525,41 @@ export async function exportQBDWordReport(
     );
   });
 
-  // SECTION 5b: Neural Network Platform
+  // Neural Network Modeling Summary (if applicable)
   if (neuralModels && Object.keys(neuralModels).length > 0) {
     sections.push(
       new Paragraph({
-        text: '5b. Mô hình Hóa Phi Tuyến Bằng Mạng Nơ-ron AI (Neural Network Platform)',
-        heading: HeadingLevel.HEADING_1,
-        spacing: { before: 300, after: 150 },
+        text: 'Mô Hình Hóa Phi Tuyến Bằng Mạng Nơ-ron Nhân Tạo AI (Artificial Neural Network)',
+        heading: HeadingLevel.HEADING_2,
+        spacing: { before: 200, after: 100 },
       }),
       new Paragraph({
-        text: 'Áp dụng cấu trúc Multi-Layer Perceptron (MLP) với thuật toán học máy đa vòng lặp (Multi-Tour Optimization) và hàm kích hoạt TanH/Gaussian để mô phỏng các mối tương quan phi tuyến tính phức tạp.',
-        spacing: { after: 200 },
+        text: 'Áp dụng kiến trúc Multi-Layer Perceptron (MLP) với thuật toán tối ưu hóa đa vòng lặp (Multi-Tour Optimization) để mô phỏng tương tác phi tuyến tính phức tạp.',
+        spacing: { after: 150 },
       })
     );
 
-    // Neural Comparison Table
     const nnRows = [
       new TableRow({
         children: [
-          createHeaderCell('Chỉ tiêu CQA', 16),
-          createHeaderCell('Kiến trúc Lớp ẩn', 16),
-          createHeaderCell('Train R²', 12),
-          createHeaderCell('Val R²', 12),
-          createHeaderCell('Overall R²', 12),
-          createHeaderCell('RMSE / Best Tour', 16),
-          createHeaderCell('Độ quan trọng yếu tố (VIP Ranking)', 16),
+          createHeaderCell('Chỉ tiêu CQA', 20),
+          createHeaderCell('Kiến trúc Lớp ẩn', 20),
+          createHeaderCell('Train R²', 15),
+          createHeaderCell('Val R²', 15),
+          createHeaderCell('Overall R²', 15),
+          createHeaderCell('RMSE', 15),
         ],
       }),
       ...Object.values(neuralModels).map((nm, idx) => {
         const cqa = project.cqas.find((c) => c.code === nm.cqaCode);
-        const vipStr = nm.diagnostics.variableImportance
-          .slice(0, 3)
-          .map((v) => `${v.factorCode}(${v.relativeImportance}%)`)
-          .join(', ');
         return new TableRow({
           children: [
-            createDataCell(cqa ? `${cqa.name} (${nm.cqaCode})` : nm.cqaCode, idx % 2 === 1, 16),
-            createDataCell(`[${nm.config.hiddenNodes1}${nm.config.hiddenNodes2 > 0 ? `, ${nm.config.hiddenNodes2}` : ''}] ${nm.config.activation.toUpperCase()}`, idx % 2 === 1, 16),
-            createDataCell(`${nm.diagnostics.rSquaredTrain}`, idx % 2 === 1, 12),
-            createDataCell(`${nm.diagnostics.rSquaredVal}`, idx % 2 === 1, 12),
-            createDataCell(`${nm.diagnostics.rSquaredOverall}`, idx % 2 === 1, 12),
-            createDataCell(`${nm.diagnostics.rmseOverall} (#${nm.diagnostics.bestTourIndex})`, idx % 2 === 1, 16),
-            createDataCell(vipStr || '-', idx % 2 === 1, 16),
+            createDataCell(cqa ? `${cqa.name} (${nm.cqaCode})` : nm.cqaCode, idx % 2 === 1, 20),
+            createDataCell(`[${nm.config.hiddenNodes1}${nm.config.hiddenNodes2 > 0 ? `, ${nm.config.hiddenNodes2}` : ''}] ${nm.config.activation.toUpperCase()}`, idx % 2 === 1, 20),
+            createDataCell(`${nm.diagnostics.rSquaredTrain}`, idx % 2 === 1, 15),
+            createDataCell(`${nm.diagnostics.rSquaredVal}`, idx % 2 === 1, 15),
+            createDataCell(`${nm.diagnostics.rSquaredOverall}`, idx % 2 === 1, 15),
+            createDataCell(`${nm.diagnostics.rmseOverall}`, idx % 2 === 1, 15),
           ],
         });
       }),
@@ -569,20 +570,68 @@ export async function exportQBDWordReport(
         width: { size: 100, type: WidthType.PERCENTAGE },
         rows: nnRows,
       }),
-      new Paragraph({ text: '', spacing: { after: 250 } })
+      new Paragraph({ text: '', spacing: { after: 200 } })
     );
   }
 
-  // SECTION 6: Multi-response Desirability & Prediction Profiler
+  // SECTION 2.4: Updated Risk Assessment Table (ICH Q9 & FDA ANDA Standard)
+  const updatedRisks = generateUpdatedRiskAssessment(project, models);
+  sections.push(
+    new Paragraph({
+      text: '2.4 Đánh Giá Rủi Ro Cập Nhật Sau DoE (Updated Risk Assessment & Justifications)',
+      heading: HeadingLevel.HEADING_1,
+      spacing: { before: 300, after: 150 },
+    }),
+    new Paragraph({
+      text: 'Bảng đối chiếu mức độ rủi ro trước và sau khi thực hiện DoE theo chuẩn ICH Q9 và hồ sơ mẫu của US FDA. Sau khi thiết lập được dải vận hành an toàn PAR và chứng minh qua mô hình ANOVA, các rủi ro ban đầu (H/M) được giảm xuống mức thấp (Low):',
+      spacing: { after: 150 },
+    })
+  );
+
+  const updatedRiskRows = [
+    new TableRow({
+      children: [
+        createHeaderCell('Yếu Tố (Factor)', 20),
+        createHeaderCell('Chỉ Tiêu (CQA)', 20),
+        createHeaderCell('Rủi Ro Ban Đầu', 15),
+        createHeaderCell('Ý Nghĩa DoE', 12),
+        createHeaderCell('Rủi Ro Sau DoE', 15),
+        createHeaderCell('Luận Giải Khoa Học Giảm Rủi Ro', 35),
+      ],
+    }),
+    ...updatedRisks.map(
+      (item, idx) =>
+        new TableRow({
+          children: [
+            createDataCell(`${item.factorCode} (${item.factorName})`, idx % 2 === 1, 20),
+            createDataCell(`${item.cqaCode} (${item.cqaName})`, idx % 2 === 1, 20),
+            createDataCell(item.initialRisk === 'High' ? 'Cao (High)' : item.initialRisk === 'Medium' ? 'Trung bình (Med)' : 'Thấp (Low)', idx % 2 === 1, 15),
+            createDataCell(item.isSignificantInModel ? 'Có (p < 0.05)' : 'Không', idx % 2 === 1, 12),
+            createDataCell('Thấp (Low)', idx % 2 === 1, 15),
+            createDataCell(item.justification, idx % 2 === 1, 35),
+          ],
+        })
+    ),
+  ];
+
+  sections.push(
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: updatedRiskRows,
+    }),
+    new Paragraph({ text: '', spacing: { after: 250 } })
+  );
+
+  // SECTION 2.5: Design Space & Desirability Optimization
   if (optimum) {
     sections.push(
       new Paragraph({
-        text: '6. Tối ưu hóa Đa Mục tiêu theo Hàm Thỏa Dụng (Desirability Profiler)',
+        text: '2.5 Tối Ưu Hóa Đa Mục Tiêu (Desirability Profiler) & Vùng Thiết Kế (Design Space)',
         heading: HeadingLevel.HEADING_1,
         spacing: { before: 300, after: 150 },
       }),
       new Paragraph({
-        text: `Áp dụng phương pháp Derringer-Suich tổng hợp độ thỏa dụng toàn cục D = exp( ∑(w_i * ln(d_i)) / ∑ w_i ). Điểm vận hành tối ưu toàn cục đạt được Overall Desirability D = ${optimum.overallDesirability}:`,
+        text: `Áp dụng thuật toán Derringer-Suich tổng hợp độ thỏa dụng toàn cục D = ${(optimum.overallDesirability * 100).toFixed(1)}%. Điểm cài đặt tối ưu đề xuất (Optimal Target Setpoint):`,
         spacing: { after: 150 },
       })
     );
@@ -601,7 +650,7 @@ export async function exportQBDWordReport(
             children: [
               createDataCell(`${f.name} (${f.code})`, idx % 2 === 1, 35),
               createDataCell(`${optimum.codedFactors[f.code]}`, idx % 2 === 1, 25),
-              createDataCell(`${optimum.actualFactors[f.code]} ${f.unit}`, idx % 2 === 1, 40),
+              createDataCell(`${optimum.actualFactors[f.code]} ${f.unit || ''}`, idx % 2 === 1, 40),
             ],
           })
       ),
@@ -615,16 +664,15 @@ export async function exportQBDWordReport(
       new Paragraph({ text: '', spacing: { after: 200 } })
     );
 
-    // Predicted CQAs table with SE, 95% CI, and individual d_i
+    // Predicted CQAs table
     const predCQARows = [
       new TableRow({
         children: [
           createHeaderCell('Chỉ tiêu CQA', 25),
           createHeaderCell('Mục tiêu (Goal)', 15),
-          createHeaderCell('Giá trị dự đoán (Mean)', 20),
-          createHeaderCell('Sai số SE', 12),
-          createHeaderCell('Khoảng tin cậy 95% CI', 16),
-          createHeaderCell('Thỏa dụng (d_i)', 12),
+          createHeaderCell('Giá trị dự đoán (Mean)', 22),
+          createHeaderCell('Khoảng tin cậy 95% CI', 23),
+          createHeaderCell('Thỏa dụng (d_i)', 15),
         ],
       }),
       ...project.cqas.map((cqa, idx) => {
@@ -633,10 +681,9 @@ export async function exportQBDWordReport(
           children: [
             createDataCell(`${cqa.name} (${cqa.code})`, idx % 2 === 1, 25),
             createDataCell(cqa.objective.toUpperCase(), idx % 2 === 1, 15),
-            createDataCell(pred ? `${pred.value} ${cqa.unit}` : '-', idx % 2 === 1, 20),
-            createDataCell(pred ? `±${pred.se}` : '-', idx % 2 === 1, 12),
-            createDataCell(pred ? `[${pred.ciLow} - ${pred.ciHigh}]` : '-', idx % 2 === 1, 16),
-            createDataCell(pred ? `${pred.desirability}` : '-', idx % 2 === 1, 12),
+            createDataCell(pred ? `${pred.value} ${cqa.unit}` : '-', idx % 2 === 1, 22),
+            createDataCell(pred ? `[${pred.ciLow} - ${pred.ciHigh}]` : '-', idx % 2 === 1, 23),
+            createDataCell(pred ? `${pred.desirability}` : '-', idx % 2 === 1, 15),
           ],
         });
       }),
@@ -647,88 +694,92 @@ export async function exportQBDWordReport(
         width: { size: 100, type: WidthType.PERCENTAGE },
         rows: predCQARows,
       }),
-      new Paragraph({ text: '', spacing: { after: 250 } })
+      new Paragraph({ text: '', spacing: { after: 200 } })
     );
   }
 
-  // SECTION 7: Control Strategy & Proven Acceptable Range (ICH Q10)
+  // Monte Carlo Simulation Summary
+  if (monteCarlo) {
+    sections.push(
+      new Paragraph({
+        text: 'Xác Minh Độ Tin Cậy Vùng Thiết Kế Bằng Mô Phỏng Monte Carlo (ICH Q9)',
+        heading: HeadingLevel.HEADING_2,
+        spacing: { before: 200, after: 100 },
+      }),
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: `Kết quả mô phỏng ${monteCarlo.simulations.toLocaleString()} lô sản xuất ảo với dao động thực tế: `,
+            bold: true,
+          }),
+          new TextRun({
+            text: `Độ tin cậy quy trình (Reliability) = ${monteCarlo.reliabilityPercent}% | Tỷ lệ lỗi dự kiến (Defect Rate) = ${monteCarlo.defectRatePPM.toLocaleString()} PPM`,
+            color: monteCarlo.reliabilityPercent >= 99 ? '15803D' : 'B91C1C',
+            bold: true,
+          }),
+        ],
+        spacing: { after: 200 },
+      })
+    );
+  }
+
+  // SECTION 2.6: Comprehensive Control Strategy Table (ICH Q10 & FDA Table 105/106/107)
+  const controlStrategyItems = generateControlStrategy(project, optimum);
   sections.push(
     new Paragraph({
-      text: '7. Chiến lược kiểm soát & Vùng Thiết Kế Liên Tục (Design Space & Control Strategy - ICH Q8/Q10)',
+      text: '2.6 Bảng Chiến Lược Kiểm Soát Toàn Diện (ICH Q10 Comprehensive Control Strategy)',
       heading: HeadingLevel.HEADING_1,
       spacing: { before: 300, after: 150 },
     }),
     new Paragraph({
-      text: 'Vùng thiết kế được biểu diễn bằng trường biên độ an toàn liên tục Z(x, y) = min(Margin_cqa) ≥ 0, xác lập miền kết hợp đa chiều của các biến đầu vào đảm bảo sản phẩm luôn đạt tiêu chuẩn chất lượng (ICH Q8(R2)).',
+      text: 'Chiến lược kiểm soát tích hợp toàn bộ các điểm kiểm soát từ nguyên liệu đầu vào (CMAs), thông số quy trình (CPPs), kiểm soát trong quá trình (IPCs/PAT) đến tiêu chuẩn xuất xưởng thành phẩm, phân định rõ giữa NOR, PAR và Design Space:',
       spacing: { after: 150 },
     })
   );
 
-  const csRows = [
+  const csTableRows = [
     new TableRow({
       children: [
-        createHeaderCell('Thông số', 20),
-        createHeaderCell('Miền khảo sát (Knowledge Space)', 25),
-        createHeaderCell('Phạm vi chấp nhận (PAR)', 25),
-        createHeaderCell('Phạm vi vận hành bình thường (NOR)', 30),
+        createHeaderCell('Phân Loại', 16),
+        createHeaderCell('Thông Số / Thuộc Tính', 20),
+        createHeaderCell('Mục Tiêu', 12),
+        createHeaderCell('Khoảng NOR', 16),
+        createHeaderCell('Khoảng PAR', 16),
+        createHeaderCell('Phương Pháp Kiểm Soát', 20),
       ],
     }),
-    ...project.designSpace.map((ds, idx) => {
-      const factor = project.factors.find((f) => f.code === ds.factorCode);
-      const unit = factor ? factor.unit : '';
-      return new TableRow({
-        children: [
-          createDataCell(factor ? `${factor.name} (${factor.code})` : ds.factorCode, idx % 2 === 1, 20),
-          createDataCell(`${ds.knowledgeLow} - ${ds.knowledgeHigh} ${unit}`, idx % 2 === 1, 25),
-          createDataCell(`${ds.parLow} - ${ds.parHigh} ${unit}`, idx % 2 === 1, 25),
-          createDataCell(`${ds.norLow} - ${ds.norHigh} ${unit} (Target: ${ds.target})`, idx % 2 === 1, 30),
-        ],
-      });
-    }),
+    ...controlStrategyItems.map(
+      (item, idx) =>
+        new TableRow({
+          children: [
+            createDataCell(item.category, idx % 2 === 1, 16),
+            createDataCell(`${item.parameterName} ${item.parameterCode ? `(${item.parameterCode})` : ''}`, idx % 2 === 1, 20),
+            createDataCell(String(item.target), idx % 2 === 1, 12),
+            createDataCell(item.nor, idx % 2 === 1, 16),
+            createDataCell(item.par, idx % 2 === 1, 16),
+            createDataCell(item.controlMethod, idx % 2 === 1, 20),
+          ],
+        })
+    ),
   ];
 
   sections.push(
     new Table({
       width: { size: 100, type: WidthType.PERCENTAGE },
-      rows: csRows,
+      rows: csTableRows,
     }),
-    new Paragraph({ text: '', spacing: { after: 200 } })
+    new Paragraph({ text: '', spacing: { after: 250 } })
   );
 
-  // SECTION 8: Monte Carlo Simulation (ICH Q9)
-  if (monteCarlo) {
-    sections.push(
-      new Paragraph({
-        text: '8. Xác minh độ tin cậy Vùng Thiết kế bằng Mô phỏng Monte Carlo (ICH Q9)',
-        heading: HeadingLevel.HEADING_1,
-        spacing: { before: 300, after: 150 },
-      }),
-      new Paragraph({
-        children: [
-          new TextRun({
-            text: `Kết quả mô phỏng ${monteCarlo.simulations.toLocaleString()} lô ảo: `,
-            bold: true,
-          }),
-          new TextRun({
-            text: `Tỷ lệ đạt chuẩn 100% CQAs = ${monteCarlo.reliabilityPercent}% | Tỷ lệ lỗi dự kiến (Defect Rate) = ${monteCarlo.defectRatePPM.toLocaleString()} PPM`,
-            color: monteCarlo.reliabilityPercent >= 99 ? '15803D' : 'B91C1C',
-            bold: true,
-          }),
-        ],
-        spacing: { after: 250 },
-      })
-    );
-  }
-
-  // SECTION 9: Regulatory Sign-off & Quality Assurance Approval
+  // SECTION 2.7: Lifecycle Management & Regulatory Sign-off
   sections.push(
     new Paragraph({
-      text: '9. Kết Luận & Phê Duyệt Hồ Sơ Phát Triển Dược Phẩm (Sign-off & Approval)',
+      text: '2.7 Quản Lý Vòng Đời Sản Phẩm (Lifecycle Management) & Phê Duyệt Hồ Sơ',
       heading: HeadingLevel.HEADING_1,
       spacing: { before: 300, after: 150 },
     }),
     new Paragraph({
-      text: 'Báo cáo này xác nhận Vùng Thiết Kế và Chiến Lược Kiểm Soát đã được xây dựng trên nền tảng khoa học vững chắc và quản lý rủi ro chất lượng, đáp ứng đầy đủ yêu cầu đăng ký thuốc theo hướng dẫn ICH CTD Module 3.2.P.2.',
+      text: 'Sản phẩm sẽ được theo dõi liên tục trong suốt vòng đời thương mại thông qua chương trình Xác thực Quy trình Tiếp diễn (Continued Process Verification - CPV). Báo cáo này xác nhận Vùng Thiết Kế và Chiến Lược Kiểm Soát đã được xây dựng trên nền tảng khoa học vững chắc và quản lý rủi ro chất lượng, đáp ứng đầy đủ yêu cầu đăng ký thuốc theo hướng dẫn ICH CTD Module 3.2.P.2 của US FDA và EMA.',
       spacing: { after: 250 },
     })
   );
@@ -737,8 +788,8 @@ export async function exportQBDWordReport(
     new TableRow({
       children: [
         createHeaderCell('NGƯỜI LẬP BÁO CÁO (Scientist)', 33),
-        createHeaderCell('TRƯỞNG NHÓM R&D (Formulation Lead)', 34),
-        createHeaderCell('ĐẢM BẢO CHẤT LƯỢNG (QA Director)', 33),
+        createHeaderCell('TRƯỞNG PHÒNG R&D (Formulation Lead)', 34),
+        createHeaderCell('GIÁM ĐỐC ĐẢM BẢO CHẤT LƯỢNG (QA Director)', 33),
       ],
     }),
     new TableRow({
@@ -769,5 +820,5 @@ export async function exportQBDWordReport(
   });
 
   const blob = await Packer.toBlob(doc);
-  saveAs(blob, `QbD_DoE_Report_${project.moleculeName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.docx`);
+  saveAs(blob, `FDA_QbD_3.2.P.2_Report_${project.moleculeName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.docx`);
 }

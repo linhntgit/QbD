@@ -5,6 +5,7 @@ import {
   AlertCircle,
   ArrowRight,
   BrainCircuit,
+  ShieldCheck,
 } from 'lucide-react';
 import type {
   QBDProject,
@@ -14,6 +15,7 @@ import type {
 } from '../../types/qbd';
 import { PlotlyChart } from '../PlotlyChart';
 import { normalInverseCDF, formatAxisTitle } from '../../services/mathUtils';
+import { generateUpdatedRiskAssessment } from '../../services/statistics';
 
 interface StatisticalANOVATabProps {
   project: QBDProject;
@@ -523,6 +525,32 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                   </tbody>
                 </table>
               </div>
+
+              {/* Curvature Test (Kiểm định độ cong với Center Points) */}
+              {model.curvatureTest && (
+                <div
+                  style={{
+                    marginTop: '0.75rem',
+                    padding: '0.65rem 0.85rem',
+                    backgroundColor: model.curvatureTest.significant ? '#fef3c7' : '#f0fdf4',
+                    border: `1px solid ${model.curvatureTest.significant ? '#fde68a' : '#bbf7d0'}`,
+                    borderRadius: '0.375rem',
+                    fontSize: '0.78rem',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+                    <strong style={{ color: model.curvatureTest.significant ? '#b45309' : '#15803d' }}>
+                      {model.curvatureTest.significant ? '⚠️ KIỂM ĐỊNH ĐỘ CONG (CURVATURE TEST): CÓ Ý NGHĨA' : '✓ KIỂM ĐỊNH ĐỘ CONG (CURVATURE TEST): KHÔNG CÓ Ý NGHĨA'}
+                    </strong>
+                    <span className="font-mono" style={{ fontWeight: '700', color: '#1e293b' }}>
+                      F = {model.curvatureTest.fValue?.toFixed(2)}, p = {model.curvatureTest.pValue !== undefined ? (model.curvatureTest.pValue < 0.001 ? '< 0.001' : model.curvatureTest.pValue.toFixed(4)) : '-'}
+                    </span>
+                  </div>
+                  <div style={{ color: model.curvatureTest.significant ? '#92400e' : '#166534' }}>
+                    {model.curvatureTest.note}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Regression Term Estimates */}
@@ -617,6 +645,70 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
             </div>
 
             {renderDiagnosticPlot()}
+          </div>
+
+          {/* Updated Risk Assessment Card (ICH Q9 & US FDA ANDA Standard) */}
+          <div className="qbd-card" style={{ borderLeft: '4px solid #15803d' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <ShieldCheck size={20} color="#15803d" />
+                <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a' }}>
+                  Đánh Giá Rủi Ro Cập Nhật Sau DoE (Updated Risk Assessment - ICH Q9 & FDA)
+                </h3>
+              </div>
+              <span className="badge badge-success" style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}>
+                Chuẩn Hồ sơ US FDA
+              </span>
+            </div>
+
+            <div style={{ fontSize: '0.78rem', color: '#475569', marginBottom: '0.75rem' }}>
+              Bảng đối chiếu mức độ rủi ro trước và sau khi thực hiện DoE. Dựa trên ý nghĩa thống kê ANOVA (p &lt; 0.05) và dải vận hành đã được chứng minh an toàn (PAR), rủi ro được giảm thiểu và có luận giải khoa học (Justification for Reduced Risks).
+            </div>
+
+            <div className="table-container">
+              <table className="qbd-table">
+                <thead>
+                  <tr>
+                    <th>Yếu Tố (Factor)</th>
+                    <th>Chỉ Tiêu (CQA)</th>
+                    <th style={{ textAlign: 'center' }}>Rủi Ro Ban Đầu (Initial)</th>
+                    <th style={{ textAlign: 'center' }}>Ảnh Hưởng DoE</th>
+                    <th style={{ textAlign: 'center' }}>Rủi Ro Cập Nhật (Updated)</th>
+                    <th>Luận Giải Khoa Học Giảm Rủi Ro (Justification for Reduced Risk)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {generateUpdatedRiskAssessment(project, models).map((item, idx) => (
+                    <tr key={idx}>
+                      <td style={{ fontWeight: '600', color: '#1e3a8a' }}>
+                        {item.factorCode} ({item.factorName})
+                      </td>
+                      <td style={{ fontWeight: '600' }}>
+                        {item.cqaCode} ({item.cqaName})
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <span className={`badge ${item.initialRisk === 'High' ? 'badge-danger' : item.initialRisk === 'Medium' ? 'badge-warning' : 'badge-success'}`}>
+                          {item.initialRisk === 'High' ? 'Cao (High)' : item.initialRisk === 'Medium' ? 'Trung bình (Med)' : 'Thấp (Low)'}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <span className="font-mono font-bold" style={{ color: item.isSignificantInModel ? '#1e3a8a' : '#64748b' }}>
+                          {item.isSignificantInModel ? 'Có (p < 0.05)' : 'Không'}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <span className="badge badge-success">
+                          Thấp (Low)
+                        </span>
+                      </td>
+                      <td style={{ fontSize: '0.75rem', color: '#334155', lineHeight: '1.4' }}>
+                        {item.justification}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </>
       )}

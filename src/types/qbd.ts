@@ -171,9 +171,33 @@ export interface StatisticalModelResult {
   lackOfFit?: ANOVASource;
   pureError?: ANOVASource;
   totalError?: ANOVASource;
+  curvatureTest?: ANOVASource & { significant: boolean; note: string };
   diagnostics: ModelDiagnostics;
   equationString: string;
   predict: (codedFactors: Record<string, number>) => number;
+}
+
+export interface UpdatedRiskItem {
+  factorCode: string;
+  factorName: string;
+  cqaCode: string;
+  cqaName: string;
+  initialRisk: 'High' | 'Medium' | 'Low';
+  updatedRisk: 'Low' | 'Medium';
+  isSignificantInModel: boolean;
+  justification: string;
+}
+
+export interface ControlStrategyItem {
+  category: 'Material Attribute (CMA)' | 'Process Parameter (CPP)' | 'In-Process Control (IPC)' | 'Finished Product Specification';
+  parameterName: string;
+  parameterCode?: string;
+  unit: string;
+  target: string | number;
+  nor: string; // Normal Operating Range (Khoảng vận hành thông thường)
+  par: string; // Proven Acceptable Range (Khoảng chấp nhận đã chứng minh)
+  designSpaceLimit: string; // Giới hạn vùng thiết kế
+  controlMethod: string; // Phương pháp kiểm soát (PAT/IPC/Release)
 }
 
 export interface DesirabilitySolution {

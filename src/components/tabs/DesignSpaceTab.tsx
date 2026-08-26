@@ -1,15 +1,16 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Boxes,
   Play,
   ShieldCheck,
   ArrowRight,
   Sliders,
-  RotateCcw,
   Lock,
-  Settings2,
   Calculator,
   BrainCircuit,
+  FlaskConical,
+  Sparkles,
+  ClipboardList,
 } from 'lucide-react';
 import type {
   QBDProject,
@@ -25,9 +26,11 @@ import { DesirabilityProfiler } from '../DesirabilityProfiler';
 import {
   optimizeDesirability,
   runMonteCarloSimulation,
+  generateControlStrategy,
 } from '../../services/statistics';
 import { codedToActual, actualToCoded } from '../../services/doeGenerator';
 import { formatAxisTitle } from '../../services/mathUtils';
+import { generateTernaryDesignSpace } from '../../services/ternaryContour';
 
 interface DesignSpaceTabProps {
   project: QBDProject;
@@ -49,12 +52,48 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
   const factors = project.factors;
   const cqas = project.cqas;
 
-  // Selected Axis Factors for Overlay Plot
+  // Mixture factors filter
+  const mixtureFactors = useMemo(() => {
+    return factors.filter((f) => f.role === 'mixture_component' || f.type === 'Mixture');
+  }, [factors]);
+  const hasMixture = mixtureFactors.length >= 3;
+
+  // Mode: 2D Cartesian Overlay vs Ternary Design Space
+  const [overlayMode, setOverlayMode] = useState<'2d' | 'ternary'>(() =>
+    hasMixture ? 'ternary' : '2d'
+  );
+
+  // Sync mode if project changes
+  useEffect(() => {
+    if (hasMixture) {
+      setOverlayMode('ternary');
+    }
+  }, [project.id, hasMixture]);
+
+  // Selected Axis Factors for 2D Overlay Plot
   const [xAxisFactor, setXAxisFactor] = useState<string>(factors[0]?.code || 'X1');
   const [yAxisFactor, setYAxisFactor] = useState<string>(factors[1]?.code || 'X2');
 
+  // Selected Vertices for Ternary Design Space
+  const [ternaryA, setTernaryA] = useState<string>(() => mixtureFactors[0]?.code || factors[0]?.code || 'X1');
+  const [ternaryB, setTernaryB] = useState<string>(() => mixtureFactors[1]?.code || factors[1]?.code || 'X2');
+  const [ternaryC, setTernaryC] = useState<string>(() => mixtureFactors[2]?.code || factors[2]?.code || 'X3');
+
+  // Sync ternary factors when project or factors change
+  useEffect(() => {
+    if (mixtureFactors.length >= 3) {
+      setTernaryA(mixtureFactors[0].code);
+      setTernaryB(mixtureFactors[1].code);
+      setTernaryC(mixtureFactors[2].code);
+    }
+  }, [project.id, mixtureFactors]);
+
   const factorX = factors.find((f) => f.code === xAxisFactor) || factors[0];
   const factorY = factors.find((f) => f.code === yAxisFactor) || factors[1];
+
+  const factorA = factors.find((f) => f.code === ternaryA) || mixtureFactors[0] || factors[0];
+  const factorB = factors.find((f) => f.code === ternaryB) || mixtureFactors[1] || factors[1];
+  const factorC = factors.find((f) => f.code === ternaryC) || mixtureFactors[2] || factors[2];
 
   // Resolution and Smoothness state for Design Space rendering
   const [resolution, setResolution] = useState<number>(180); // 40 to 300 (grid density)
@@ -139,9 +178,9 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
     setMcResult(mc);
   };
 
-  // Sweet Spot / Design Space Overlay Grid Computation (Continuous Signed Margin Field)
+  // Sweet Spot / Design Space Overlay Grid Computation (2D Cartesian)
   const sweetSpotGrid = useMemo(() => {
-    if (!factorX || !factorY || Object.keys(models).length === 0) return null;
+    if (overlayMode !== '2d' || !factorX || !factorY || Object.keys(models).length === 0) return null;
 
     const N = Math.max(40, Math.min(300, resolution));
     const xActualArr: number[] = [];
@@ -159,7 +198,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
       yActualArr.push(typeof yAct === 'number' ? yAct : Number(yAct) || coded);
     }
 
-    const zScoreGrid: number[][] = []; // Continuous signed margin (>= 0 inside Design Space, < 0 outside)
+    const zScoreGrid: number[][] = [];
     const validCQAs = cqas.filter((c) => models[c.code]);
 
     for (let j = 0; j < N; j++) {
@@ -217,10 +256,92 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
       yActualArr,
       zScoreGrid,
     };
-  }, [factorX, factorY, models, cqas, factors, sliceFactorsCoded, resolution]);
+  }, [overlayMode, factorX, factorY, models, cqas, factors, sliceFactorsCoded, resolution]);
 
-  // Sweet Spot Plotly Data (Continuous Sub-Pixel Interpolation)
+  // Ternary Design Space Mesh Computation
+  const ternaryDS = useMemo(() => {
+    if (overlayMode !== 'ternary' || !factorA || !factorB || !factorC || Object.keys(models).length === 0) {
+      return null;
+    }
+
+    return generateTernaryDesignSpace(
+      factorA,
+      factorB,
+      factorC,
+      factors,
+      sliceFactorsCoded,
+      models,
+      cqas,
+      140
+    );
+  }, [overlayMode, factorA, factorB, factorC, factors, sliceFactorsCoded, models, cqas]);
+
+  // Sweet Spot Plotly Data
   const overlayPlotData = useMemo(() => {
+    if (overlayMode === 'ternary' && ternaryDS && factorA && factorB && factorC) {
+      const data: any[] = [...ternaryDS.sweetSpotTraces];
+
+      // Add Constraint Boundary Lines
+      if (ternaryDS.constraints.lines.length > 0) {
+        ternaryDS.constraints.lines.forEach((cl) => {
+          data.push({
+            type: 'scatterternary',
+            mode: 'lines',
+            name: cl.label,
+            a: [cl.p1.a, cl.p2.a],
+            b: [cl.p1.b, cl.p2.b],
+            c: [cl.p1.c, cl.p2.c],
+            line: { color: cl.color, width: 2, dash: cl.dash },
+            hoverinfo: 'name',
+            showlegend: true,
+          });
+        });
+      }
+
+      // Add Experimental Region Polygon Outline
+      if (ternaryDS.constraints.polygonVertices.length >= 3) {
+        data.push({
+          type: 'scatterternary',
+          mode: 'lines+markers',
+          name: `Khung Khảo Sát DoE (${factorA.low}≤${factorA.code}≤${factorA.high}...)`,
+          a: ternaryDS.constraints.polygonVertices.map((p) => p.a),
+          b: ternaryDS.constraints.polygonVertices.map((p) => p.b),
+          c: ternaryDS.constraints.polygonVertices.map((p) => p.c),
+          line: { color: '#c2410c', width: 2.8 },
+          marker: { size: 6, color: '#c2410c' },
+          hoverinfo: 'name',
+          showlegend: true,
+        });
+      }
+
+      // Plot Optimum Target Star
+      if (optimum) {
+        const rawA = optimum.actualFactors[factorA.code];
+        const rawB = optimum.actualFactors[factorB.code];
+        const rawC = optimum.actualFactors[factorC.code];
+        const optA = typeof rawA === 'number' ? rawA : parseFloat(String(rawA)) || 0;
+        const optB = typeof rawB === 'number' ? rawB : parseFloat(String(rawB)) || 0;
+        const optC = typeof rawC === 'number' ? rawC : parseFloat(String(rawC)) || 0;
+
+        data.push({
+          type: 'scatterternary',
+          mode: 'markers+text',
+          a: [optA],
+          b: [optB],
+          c: [optC],
+          text: ['★ ĐIỂM TỐI ƯU'],
+          textposition: 'bottom center',
+          textfont: { family: 'Inter', size: 11, color: '#1e3a8a', weight: 700 },
+          marker: { size: 16, color: '#1e3a8a', symbol: 'star' },
+          name: 'Target Setpoint (Optimum)',
+          hoverinfo: 'text',
+          hovertext: [`Điểm Tối Ưu Đề Xuất<br>${factorA.name}: ${optA}%<br>${factorB.name}: ${optB}%<br>${factorC.name}: ${optC}%`],
+        });
+      }
+
+      return data;
+    }
+
     if (!sweetSpotGrid || !factorX || !factorY) return [];
 
     const data: any[] = [
@@ -271,44 +392,106 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
     }
 
     return data;
-  }, [sweetSpotGrid, factorX, factorY, optimum, smoothness, showBoundaryLines]);
+  }, [overlayMode, ternaryDS, factorA, factorB, factorC, sweetSpotGrid, factorX, factorY, optimum, smoothness, showBoundaryLines]);
 
-  const overlayLayout = {
-    title: `Vùng Thiết Kế (Design Space Overlay) - Giao điểm Tất cả các CQAs`,
-    xaxis: {
+  const overlayLayout = useMemo(() => {
+    if (overlayMode === 'ternary' && factorA && factorB && factorC) {
+      return {
+        title: {
+          text: `Vùng Thiết Kế Tam Giác Hỗn Hợp (Ternary Sweet Spot) - 100% CQAs Đạt Chuẩn`,
+          font: { size: 13, color: '#0f172a', family: 'Inter' },
+        },
+        autosize: true,
+        margin: { l: 65, r: 65, b: 65, t: 55, pad: 4 },
+        ternary: {
+          sum: 100,
+          aaxis: {
+            title: { text: formatAxisTitle(factorA.name, factorA.code, factorA.unit || '%'), font: { size: 11, color: '#0f172a' } },
+            min: 0.01,
+            linewidth: 2,
+            ticks: 'outside',
+            gridcolor: '#e2e8f0',
+          },
+          baxis: {
+            title: { text: formatAxisTitle(factorB.name, factorB.code, factorB.unit || '%'), font: { size: 11, color: '#0f172a' } },
+            min: 0.01,
+            linewidth: 2,
+            ticks: 'outside',
+            gridcolor: '#e2e8f0',
+          },
+          caxis: {
+            title: { text: formatAxisTitle(factorC.name, factorC.code, factorC.unit || '%'), font: { size: 11, color: '#0f172a' } },
+            min: 0.01,
+            linewidth: 2,
+            ticks: 'outside',
+            gridcolor: '#e2e8f0',
+          },
+        },
+        annotations: [
+          {
+            xref: 'paper',
+            yref: 'paper',
+            x: 0.02,
+            y: 0.98,
+            text: '🟩 Vùng Xanh: Design Space (100% CQAs Đạt Chuẩn)<br>🟥 Vùng Đỏ: Không đạt tiêu chuẩn (OOS)',
+            showarrow: false,
+            bgcolor: '#ffffff',
+            bordercolor: '#cbd5e1',
+            borderwidth: 1,
+            font: { size: 10 },
+          },
+        ],
+      };
+    }
+
+    return {
       title: {
-        text: formatAxisTitle(factorX.name, factorX.code, factorX.unit),
-        font: { size: 13, color: '#1e293b' },
-        standoff: 12,
+        text: `Vùng Thiết Kế (Design Space Overlay) - Giao điểm Tất cả các CQAs`,
+        font: { size: 13, color: '#0f172a', family: 'Inter' },
       },
-      tickfont: { size: 11 },
-      automargin: true,
-    },
-    yaxis: {
-      title: {
-        text: formatAxisTitle(factorY.name, factorY.code, factorY.unit),
-        font: { size: 13, color: '#1e293b' },
-        standoff: 12,
+      xaxis: {
+        title: {
+          text: formatAxisTitle(factorX.name, factorX.code, factorX.unit),
+          font: { size: 13, color: '#1e293b' },
+          standoff: 12,
+        },
+        tickfont: { size: 11 },
+        automargin: true,
       },
-      tickfont: { size: 11 },
-      automargin: true,
-    },
-    annotations: [
-      {
-        xref: 'paper',
-        yref: 'paper',
-        x: 0.05,
-        y: 0.95,
-        text: '🟩 Vùng Xanh: Design Space (100% CQAs Đạt Chuẩn)<br>🟥 Vùng Đỏ: Không đạt tiêu chuẩn (OOS)',
-        showarrow: false,
-        bgcolor: '#ffffff',
-        bordercolor: '#cbd5e1',
-        borderwidth: 1,
-        font: { size: 11 },
+      yaxis: {
+        title: {
+          text: formatAxisTitle(factorY.name, factorY.code, factorY.unit),
+          font: { size: 13, color: '#1e293b' },
+          standoff: 12,
+        },
+        tickfont: { size: 11 },
+        automargin: true,
       },
-    ],
-    margin: { l: 85, r: 40, t: 50, b: 75, pad: 4 },
-  };
+      annotations: [
+        {
+          xref: 'paper',
+          yref: 'paper',
+          x: 0.05,
+          y: 0.95,
+          text: '🟩 Vùng Xanh: Design Space (100% CQAs Đạt Chuẩn)<br>🟥 Vùng Đỏ: Không đạt tiêu chuẩn (OOS)',
+          showarrow: false,
+          bgcolor: '#ffffff',
+          bordercolor: '#cbd5e1',
+          borderwidth: 1,
+          font: { size: 11 },
+        },
+      ],
+      margin: { l: 85, r: 40, t: 50, b: 75, pad: 4 },
+    };
+  }, [overlayMode, factorA, factorB, factorC, factorX, factorY]);
+
+  // Determine fixed factors list based on active overlay mode
+  const activeAxisCodes =
+    overlayMode === 'ternary'
+      ? [factorA?.code, factorB?.code, factorC?.code]
+      : [factorX?.code, factorY?.code];
+
+  const fixedFactorsList = factors.filter((f) => !activeAxisCodes.includes(f.code));
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -340,31 +523,43 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
               </div>
               <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
                 {modelingEngine === 'neural'
-                  ? 'Desirability Profiler, Sweet Spot 2D và Mô phỏng Monte Carlo đang tính toán trực tiếp trên trọng số Mạng Nơ-ron.'
-                  : 'Desirability Profiler, Sweet Spot 2D và Mô phỏng Monte Carlo đang tính toán trực tiếp từ hệ số hồi quy Đa thức.'}
+                  ? 'Desirability Profiler, Sweet Spot và Mô phỏng Monte Carlo đang tính toán trực tiếp trên trọng số Mạng Nơ-ron.'
+                  : 'Desirability Profiler, Sweet Spot và Mô phỏng Monte Carlo đang tính toán trực tiếp từ hệ số hồi quy Đa thức.'}
               </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', backgroundColor: '#f1f5f9', borderRadius: '0.5rem', padding: '0.2rem', gap: '0.2rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', backgroundColor: '#f1f5f9', borderRadius: '0.5rem', padding: '0.2rem', gap: '0.2rem' }}>
+              <button
+                onClick={() => onToggleEngine('polynomial')}
+                className={`btn ${modelingEngine === 'polynomial' ? 'btn-teal' : 'btn-secondary'}`}
+                style={{ fontSize: '0.76rem', padding: '0.35rem 0.75rem' }}
+              >
+                📐 Hồi Quy Đa Thức
+              </button>
+              <button
+                onClick={() => onToggleEngine('neural')}
+                className={`btn ${modelingEngine === 'neural' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{
+                  fontSize: '0.76rem',
+                  padding: '0.35rem 0.75rem',
+                  backgroundColor: modelingEngine === 'neural' ? '#7c3aed' : undefined,
+                  borderColor: modelingEngine === 'neural' ? '#7c3aed' : undefined,
+                }}
+              >
+                🧠 Mạng Nơ-ron AI
+              </button>
+            </div>
+
             <button
-              onClick={() => onToggleEngine('polynomial')}
-              className={`btn ${modelingEngine === 'polynomial' ? 'btn-teal' : 'btn-secondary'}`}
-              style={{ fontSize: '0.76rem', padding: '0.35rem 0.75rem' }}
+              onClick={onNavigateToReport}
+              className="btn btn-teal"
+              style={{ fontSize: '0.78rem', padding: '0.38rem 0.8rem', gap: '0.35rem' }}
+              title="Chuyển sang Tab Báo Cáo QbD & Xuất Word"
             >
-              📐 Hồi Quy Đa Thức
-            </button>
-            <button
-              onClick={() => onToggleEngine('neural')}
-              className={`btn ${modelingEngine === 'neural' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{
-                fontSize: '0.76rem',
-                padding: '0.35rem 0.75rem',
-                backgroundColor: modelingEngine === 'neural' ? '#7c3aed' : undefined,
-                borderColor: modelingEngine === 'neural' ? '#7c3aed' : undefined,
-              }}
-            >
-              🧠 Mạng Nơ-ron AI
+              <span>Xem Báo Cáo QbD</span>
+              <ArrowRight size={14} />
             </button>
           </div>
         </div>
@@ -379,150 +574,207 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
         onApplyOptimum={handleApplyOptimumFromProfiler}
       />
 
-      {/* 2. Sweet Spot / Design Space 2D Overlay Section Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          <Boxes size={22} color="#1e3a8a" />
-          <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
-            Mặt Cắt 2D Vùng Thiết Kế (Design Space Overlay Sweet Spot - ICH Q8/Q10)
-          </h2>
-        </div>
-        <button
-          onClick={onNavigateToReport}
-          className="btn btn-teal"
-          style={{ fontSize: '0.82rem', padding: '0.4rem 0.9rem' }}
-        >
-          <span>Xem Báo Cáo Hồ Sơ</span>
-          <ArrowRight size={15} />
-        </button>
-      </div>
-
-      {/* Sweet Spot Overlay & Range Controls */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '1.5rem' }}>
+      {/* 2. Sweet Spot / Design Space Overlay Plot */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '1.5rem' }}>
         
-        {/* Sweet Spot Plotly Chart with Resolution & Smoothness Toolbar */}
-        <div className="qbd-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', padding: '0.75rem' }}>
-          {/* Resolution & Smoothness Controls Toolbar */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '0.6rem',
-              padding: '0.5rem 0.75rem',
-              backgroundColor: '#f8fafc',
-              borderRadius: '0.5rem',
-              border: '1px solid #e2e8f0',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Settings2 size={16} color="#1e3a8a" />
-              <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#0f172a' }}>
-                Độ phân giải & Đường đồng mức:
-              </span>
+        {/* Main Plot Area */}
+        <div className="qbd-card">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.6rem' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Boxes size={20} color="#1e3a8a" />
+                <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a' }}>
+                  Không Gian Thiết Kế (Design Space Overlay)
+                </h3>
+              </div>
+              <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.15rem' }}>
+                Miền kết hợp đa biến đảm bảo tất cả các chỉ tiêu chất lượng (CQAs) đồng thời đạt tiêu chuẩn.
+              </p>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-              {/* Resolution Buttons & Slider */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                <span style={{ fontSize: '0.73rem', fontWeight: '600', color: '#475569' }}>
-                  Lưới (Resolution):
-                </span>
-                <div style={{ display: 'flex', gap: '0.2rem' }}>
-                  {[
-                    { label: '60×60', val: 60, desc: 'Nhanh' },
-                    { label: '120×120', val: 120, desc: 'Chuẩn' },
-                    { label: '180×180', val: 180, desc: 'Mịn (Khuyến nghị)' },
-                    { label: '250×250', val: 250, desc: 'Siêu Mịn (Ultra HD)' },
-                    { label: '300×300', val: 300, desc: 'Vector Smooth (Siêu Nét)' },
-                  ].map((preset) => (
-                    <button
-                      key={preset.val}
-                      onClick={() => setResolution(preset.val)}
-                      className={`btn ${resolution === preset.val ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{
-                        fontSize: '0.68rem',
-                        padding: '0.18rem 0.4rem',
-                        borderRadius: '0.25rem',
-                        fontWeight: resolution === preset.val ? '700' : '500',
-                      }}
-                      title={`Độ phân giải lưới ${preset.label} (${preset.desc})`}
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+              {/* Overlay Mode Toggle: 2D vs Ternary */}
+              {hasMixture && (
+                <div style={{ display: 'flex', backgroundColor: '#f1f5f9', borderRadius: '0.375rem', padding: '0.15rem', gap: '0.15rem' }}>
+                  <button
+                    onClick={() => setOverlayMode('2d')}
+                    className={`btn ${overlayMode === '2d' ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ fontSize: '0.72rem', padding: '0.25rem 0.5rem' }}
+                  >
+                    2D Cartesian
+                  </button>
+                  <button
+                    onClick={() => setOverlayMode('ternary')}
+                    className={`btn ${overlayMode === 'ternary' ? 'btn-teal' : 'btn-secondary'}`}
+                    style={{ fontSize: '0.72rem', padding: '0.25rem 0.5rem', fontWeight: '700' }}
+                  >
+                    <FlaskConical size={12} style={{ display: 'inline', marginRight: '0.2rem' }} />
+                    <span>Tam Giác Hỗn Hợp</span>
+                  </button>
                 </div>
-              </div>
+              )}
 
-              {/* Smoothness Slider */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                <span style={{ fontSize: '0.73rem', fontWeight: '600', color: '#475569' }}>
-                  Độ mượt (Smooth):
-                </span>
-                <input
-                  type="range"
-                  min={0}
-                  max={1.3}
-                  step={0.05}
-                  value={smoothness}
-                  onChange={(e) => setSmoothness(Number(e.target.value))}
-                  style={{ width: '70px', cursor: 'pointer' }}
-                  title={`Độ mượt: ${smoothness.toFixed(2)}`}
-                />
-                <span className="font-mono" style={{ fontSize: '0.72rem', fontWeight: '700', color: '#1e40af', minWidth: '24px' }}>
-                  {smoothness.toFixed(2)}
-                </span>
-              </div>
+              {/* Resolution Selector (for 2D) */}
+              {overlayMode === '2d' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', backgroundColor: '#f8fafc', padding: '0.2rem 0.4rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
+                  <span style={{ fontSize: '0.73rem', color: '#475569', fontWeight: '600' }}>Lưới:</span>
+                  <div style={{ display: 'flex', gap: '0.15rem' }}>
+                    {[
+                      { label: 'Nhanh', val: 70, desc: '70x70' },
+                      { label: 'Chuẩn', val: 180, desc: '180x180' },
+                      { label: 'Mịn', val: 260, desc: '260x260' },
+                    ].map((preset) => (
+                      <button
+                        key={preset.val}
+                        onClick={() => setResolution(preset.val)}
+                        className={`btn ${resolution === preset.val ? 'btn-primary' : 'btn-secondary'}`}
+                        style={{
+                          fontSize: '0.68rem',
+                          padding: '0.18rem 0.4rem',
+                          borderRadius: '0.25rem',
+                          fontWeight: resolution === preset.val ? '700' : '500',
+                        }}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-              {/* Boundary Lines Toggle */}
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.73rem', color: '#334155', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={showBoundaryLines}
-                  onChange={(e) => setShowBoundaryLines(e.target.checked)}
-                  style={{ cursor: 'pointer' }}
-                />
-                <span>Đường viền ranh giới</span>
-              </label>
+              {/* Smoothness Slider (for 2D) */}
+              {overlayMode === '2d' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <span style={{ fontSize: '0.73rem', fontWeight: '600', color: '#475569' }}>
+                    Độ mượt:
+                  </span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1.3}
+                    step={0.05}
+                    value={smoothness}
+                    onChange={(e) => setSmoothness(Number(e.target.value))}
+                    style={{ width: '60px', cursor: 'pointer' }}
+                  />
+                  <span className="font-mono" style={{ fontSize: '0.72rem', fontWeight: '700', color: '#1e40af', minWidth: '22px' }}>
+                    {smoothness.toFixed(2)}
+                  </span>
+                </div>
+              )}
+
+              {/* Boundary Lines Toggle (for 2D) */}
+              {overlayMode === '2d' && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.73rem', color: '#334155', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={showBoundaryLines}
+                    onChange={(e) => setShowBoundaryLines(e.target.checked)}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <span>Đường viền ranh giới</span>
+                </label>
+              )}
             </div>
           </div>
 
           {/* Plotly Canvas */}
-          <div style={{ height: '520px', width: '100%' }}>
+          <div style={{ height: '540px', width: '100%' }}>
             <PlotlyChart data={overlayPlotData} layout={overlayLayout} style={{ width: '100%', height: '100%' }} />
           </div>
         </div>
 
-        {/* Axis & Control Strategy Ranges */}
+        {/* Axis & Fixed Factors Panel */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           
-          {/* Axis Selector */}
+          {/* Axis / Vertices Selector Card */}
           <div className="qbd-card">
             <h3 style={{ fontSize: '0.88rem', fontWeight: '700', color: '#0f172a', marginBottom: '0.5rem' }}>
-              Trục Tọa Độ Sweet Spot
+              {overlayMode === 'ternary' ? '3 Đỉnh Tam Giác Sweet Spot' : 'Trục Tọa Độ Sweet Spot'}
             </h3>
-            <div style={{ marginBottom: '0.5rem' }}>
-              <label style={{ fontSize: '0.75rem', color: '#64748b' }}>Trục X (Hoành):</label>
-              <select className="input-field" value={xAxisFactor} onChange={(e) => setXAxisFactor(e.target.value)}>
-                {factors.map((f) => (
-                  <option key={f.code} value={f.code} disabled={f.code === yAxisFactor}>
-                    {f.name} ({f.code})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label style={{ fontSize: '0.75rem', color: '#64748b' }}>Trục Y (Tung):</label>
-              <select className="input-field" value={yAxisFactor} onChange={(e) => setYAxisFactor(e.target.value)}>
-                {factors.map((f) => (
-                  <option key={f.code} value={f.code} disabled={f.code === xAxisFactor}>
-                    {f.name} ({f.code})
-                  </option>
-                ))}
-              </select>
-            </div>
+
+            {overlayMode === 'ternary' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.75rem', color: '#0f766e', fontWeight: '600' }}>🔺 Đỉnh A (Đỉnh Trên):</label>
+                  <select className="input-field" value={ternaryA} onChange={(e) => setTernaryA(e.target.value)}>
+                    {factors.map((f) => (
+                      <option key={f.code} value={f.code} disabled={f.code === ternaryB || f.code === ternaryC}>
+                        {f.name} ({f.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.75rem', color: '#1e40af', fontWeight: '600' }}>◀️ Đỉnh B (Đỉnh Trái):</label>
+                  <select className="input-field" value={ternaryB} onChange={(e) => setTernaryB(e.target.value)}>
+                    {factors.map((f) => (
+                      <option key={f.code} value={f.code} disabled={f.code === ternaryA || f.code === ternaryC}>
+                        {f.name} ({f.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.75rem', color: '#b45309', fontWeight: '600' }}>▶️ Đỉnh C (Đỉnh Phải):</label>
+                  <select className="input-field" value={ternaryC} onChange={(e) => setTernaryC(e.target.value)}>
+                    {factors.map((f) => (
+                      <option key={f.code} value={f.code} disabled={f.code === ternaryA || f.code === ternaryB}>
+                        {f.name} ({f.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div style={{ marginBottom: '0.5rem' }}>
+                  <label style={{ fontSize: '0.75rem', color: '#64748b' }}>Trục X (Hoành):</label>
+                  <select className="input-field" value={xAxisFactor} onChange={(e) => setXAxisFactor(e.target.value)}>
+                    {factors.map((f) => (
+                      <option key={f.code} value={f.code} disabled={f.code === yAxisFactor}>
+                        {f.name} ({f.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.75rem', color: '#64748b' }}>Trục Y (Tung):</label>
+                  <select className="input-field" value={yAxisFactor} onChange={(e) => setYAxisFactor(e.target.value)}>
+                    {factors.map((f) => (
+                      <option key={f.code} value={f.code} disabled={f.code === xAxisFactor}>
+                        {f.name} ({f.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* Active Mixture Constraints Card */}
+          {overlayMode === 'ternary' && factorA && factorB && factorC && (
+            <div className="qbd-card" style={{ backgroundColor: '#fffbeb', border: '1px solid #fef3c7' }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: '700', color: '#b45309', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <FlaskConical size={14} />
+                <span>GIỚI HẠN KHẢO SÁT 3 BIẾN HỖN HỢP:</span>
+              </div>
+              <div style={{ fontSize: '0.76rem', color: '#92400e', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>• <strong>{factorA.code}</strong> ({factorA.name}):</span>
+                  <span className="font-mono font-bold">{factorA.low}% ≤ {factorA.code} ≤ {factorA.high}%</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>• <strong>{factorB.code}</strong> ({factorB.name}):</span>
+                  <span className="font-mono font-bold">{factorB.low}% ≤ {factorB.code} ≤ {factorB.high}%</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>• <strong>{factorC.code}</strong> ({factorC.name}):</span>
+                  <span className="font-mono font-bold">{factorC.low}% ≤ {factorC.code} ≤ {factorC.high}%</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Remaining Factors Slice Adjuster (Input Box + Range Slider) */}
           <div className="qbd-card">
@@ -531,7 +783,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                 <Sliders size={16} color="#b45309" />
                 <span>Điều Chỉnh Các Biến X Còn Lại</span>
               </h3>
-              {optimum && factors.length > 2 && (
+              {optimum && fixedFactorsList.length > 0 && (
                 <button
                   onClick={() => {
                     setSliceFactorsCoded({ ...optimum.codedFactors });
@@ -540,153 +792,125 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                   style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', gap: '0.25rem' }}
                   title="Khôi phục toàn bộ các biến về điểm tối ưu"
                 >
-                  <RotateCcw size={11} />
+                  <Sparkles size={11} color="#b45309" />
                   <span>Về Điểm Tối Ưu</span>
                 </button>
               )}
             </div>
 
             <p style={{ fontSize: '0.72rem', color: '#64748b', marginBottom: '0.75rem', lineHeight: '1.4' }}>
-              Mặt cắt 2D của Vùng thiết kế phụ thuộc vào giá trị cài đặt của các biến X còn lại. Nhập số hoặc kéo thanh trượt để khảo sát không gian đa chiều:
+              Mặt cắt của Vùng thiết kế phụ thuộc vào giá trị cài đặt của các biến X còn lại. Nhập số hoặc kéo thanh trượt để khảo sát:
             </p>
 
-            {factors.filter((f) => f.code !== xAxisFactor && f.code !== yAxisFactor).length === 0 ? (
+            {fixedFactorsList.length === 0 ? (
               <div style={{ fontSize: '0.78rem', color: '#64748b', backgroundColor: '#f8fafc', padding: '0.75rem', borderRadius: '0.375rem', textAlign: 'center' }}>
-                Tất cả các biến đã được hiển thị trên Trục X và Trục Y.
+                Tất cả các biến đã được hiển thị trên các trục đồ thị.
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                {factors
-                  .filter((f) => f.code !== xAxisFactor && f.code !== yAxisFactor)
-                  .map((f) => {
-                    const coded = sliceFactorsCoded[f.code] ?? 0;
-                    const actual = codedToActual(coded, f);
-                    const optActual = optimum?.actualFactors[f.code];
+                {fixedFactorsList.map((f) => {
+                  const coded = sliceFactorsCoded[f.code] ?? 0;
+                  const actual = codedToActual(coded, f);
+                  const actualNum = typeof actual === 'number' ? actual : parseFloat(String(actual)) || f.low;
+                  const optActual = optimum?.actualFactors[f.code];
 
-                    if (f.controllability === 'constant') {
-                      return (
-                        <div key={f.code} style={{ backgroundColor: '#f8fafc', padding: '0.6rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
-                          <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                            <Lock size={13} color="#64748b" />
-                            <span>{f.name} ({f.code}): <strong>{f.constantValue ?? f.low} {f.unit}</strong> (Hằng số)</span>
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    if (f.dataType === 'qualitative' && f.categories && f.categories.length > 0) {
-                      return (
-                        <div key={f.code} style={{ backgroundColor: '#f8fafc', padding: '0.6rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
-                          <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#1e293b', marginBottom: '0.3rem' }}>
-                            {f.name} ({f.code}):
-                          </div>
-                          <select
-                            className="input-field"
-                            style={{ fontSize: '0.78rem' }}
-                            value={typeof actual === 'string' ? actual : f.categories[0]}
-                            onChange={(e) => {
-                              const newCoded = actualToCoded(e.target.value, f);
-                              setSliceFactorsCoded((prev) => ({ ...prev, [f.code]: newCoded }));
-                            }}
-                          >
-                            {f.categories.map((cat) => (
-                              <option key={cat} value={cat}>{cat}</option>
-                            ))}
-                          </select>
-                        </div>
-                      );
-                    }
-
+                  if (f.controllability === 'constant') {
                     return (
-                      <div
-                        key={f.code}
-                        style={{
-                          backgroundColor: '#f8fafc',
-                          padding: '0.75rem',
-                          borderRadius: '0.5rem',
-                          border: '1px solid #e2e8f0',
-                        }}
-                      >
-                        {/* Header: Factor Name & Quick Reset */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                          <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#1e293b' }}>
-                            {f.name} ({f.code}):
-                          </span>
-                          {optActual !== undefined && (
-                            <button
-                              onClick={() => {
-                                if (optimum) {
-                                  setSliceFactorsCoded((prev) => ({ ...prev, [f.code]: optimum.codedFactors[f.code] ?? 0 }));
-                                }
-                              }}
-                              style={{
-                                border: 'none',
-                                background: 'none',
-                                fontSize: '0.7rem',
-                                color: '#0284c7',
-                                cursor: 'pointer',
-                                textDecoration: 'underline',
-                                padding: 0,
-                              }}
-                              title="Khôi phục thông số này về điểm tối ưu"
-                            >
-                              Opt: {optActual} {f.unit}
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Numeric Input for Actual Value */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
-                          <label style={{ fontSize: '0.72rem', color: '#64748b', whiteSpace: 'nowrap' }}>Giá trị thực:</label>
-                          <input
-                            type="number"
-                            step="any"
-                            className="input-field font-mono"
-                            style={{ flex: 1, padding: '0.25rem 0.5rem', fontSize: '0.82rem', fontWeight: '700', color: '#b45309' }}
-                            value={typeof actual === 'number' ? actual : Number(actual) || 0}
-                            onChange={(e) => {
-                              const val = Number(e.target.value);
-                              if (!isNaN(val)) {
-                                const center = f.center !== undefined ? f.center : (f.low + f.high) / 2;
-                                const half = (f.high - f.low) / 2;
-                                const newCoded = half > 0 ? (val - center) / half : 0;
-                                setSliceFactorsCoded((prev) => ({
-                                  ...prev,
-                                  [f.code]: Number(Math.max(-1.5, Math.min(1.5, newCoded)).toFixed(4)),
-                                }));
-                              }
-                            }}
-                          />
-                          <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#475569', minWidth: '28px' }}>
-                            {f.unit}
-                          </span>
-                        </div>
-
-                        {/* Range Slider for Coded Value */}
-                        <div style={{ marginTop: '0.2rem' }}>
-                          <input
-                            type="range"
-                            min={-1}
-                            max={1}
-                            step={0.01}
-                            value={coded}
-                            onChange={(e) => {
-                              setSliceFactorsCoded((prev) => ({
-                                ...prev,
-                                [f.code]: Number(e.target.value),
-                              }));
-                            }}
-                            style={{ width: '100%', cursor: 'pointer' }}
-                          />
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: '#94a3b8' }}>
-                            <span>{f.low} {f.unit} (-1)</span>
-                            <span className="font-mono">Mã: {coded >= 0 ? `+${coded.toFixed(2)}` : coded.toFixed(2)}</span>
-                            <span>{f.high} {f.unit} (+1)</span>
-                          </div>
+                      <div key={f.code} style={{ backgroundColor: '#f8fafc', padding: '0.6rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                          <Lock size={13} color="#64748b" />
+                          <span>{f.name} ({f.code}): <strong>{f.constantValue ?? f.low} {f.unit}</strong> (Hằng số)</span>
                         </div>
                       </div>
                     );
-                  })}
+                  }
+
+                  return (
+                    <div
+                      key={f.code}
+                      style={{
+                        backgroundColor: '#f8fafc',
+                        padding: '0.65rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #e2e8f0',
+                      }}
+                    >
+                      {/* Header: Factor Name & Quick Reset */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                        <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#1e293b' }}>
+                          {f.name} ({f.code}):
+                        </span>
+                        {optActual !== undefined && (
+                          <button
+                            onClick={() => {
+                              if (optimum) {
+                                setSliceFactorsCoded((prev) => ({ ...prev, [f.code]: optimum.codedFactors[f.code] ?? 0 }));
+                              }
+                            }}
+                            style={{
+                              border: 'none',
+                              background: 'none',
+                              fontSize: '0.7rem',
+                              color: '#0284c7',
+                              cursor: 'pointer',
+                              textDecoration: 'underline',
+                              padding: 0,
+                            }}
+                            title="Khôi phục thông số này về điểm tối ưu"
+                          >
+                            Opt: {optActual} {f.unit}
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Numeric Input for Actual Value */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem' }}>
+                        <label style={{ fontSize: '0.72rem', color: '#64748b', whiteSpace: 'nowrap' }}>Giá trị thực:</label>
+                        <input
+                          type="number"
+                          step="any"
+                          className="input-field font-mono"
+                          style={{ flex: 1, padding: '0.2rem 0.45rem', fontSize: '0.8rem', fontWeight: '700', color: '#b45309' }}
+                          value={actualNum}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            if (!isNaN(val)) {
+                              const newCoded = actualToCoded(val, f);
+                              setSliceFactorsCoded((prev) => ({
+                                ...prev,
+                                [f.code]: Number(Math.max(-1.5, Math.min(1.5, newCoded)).toFixed(4)),
+                              }));
+                            }
+                          }}
+                        />
+                        <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#475569', minWidth: '28px' }}>
+                          {f.unit}
+                        </span>
+                      </div>
+
+                      {/* Range Slider for Coded Value */}
+                      <input
+                        type="range"
+                        min={-1}
+                        max={1}
+                        step={0.02}
+                        value={coded}
+                        onChange={(e) => {
+                          setSliceFactorsCoded((prev) => ({
+                            ...prev,
+                            [f.code]: Number(e.target.value),
+                          }));
+                        }}
+                        style={{ width: '100%', cursor: 'pointer' }}
+                      />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.15rem' }}>
+                        <span>{f.low} {f.unit} (-1)</span>
+                        <span className="font-mono">Mã: {coded >= 0 ? `+${coded.toFixed(2)}` : coded.toFixed(2)}</span>
+                        <span>{f.high} {f.unit} (+1)</span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -787,6 +1011,83 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
             })}
           </div>
         )}
+      </div>
+
+      {/* 4. Comprehensive Control Strategy Table (ICH Q10 & FDA Table 105/106/107) */}
+      <div className="qbd-card" style={{ borderLeft: '4px solid #0f766e' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <ClipboardList size={20} color="#0f766e" />
+            <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a' }}>
+              Bảng Chiến Lược Kiểm Soát Toàn Diện (ICH Q10 Control Strategy Dashboard)
+            </h3>
+          </div>
+          <span className="badge badge-success" style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}>
+            Chuẩn FDA Module 3 (3.2.P.2)
+          </span>
+        </div>
+
+        <div style={{ fontSize: '0.78rem', color: '#475569', marginBottom: '0.85rem' }}>
+          Bảng thiết lập các mức kiểm soát từ nguyên liệu đầu vào (CMAs), thông số quy trình (CPPs), kiểm soát trong quá trình (IPCs/PAT) đến tiêu chuẩn xuất xưởng thành phẩm, phân định rõ giữa <strong>NOR</strong> (Normal Operating Range), <strong>PAR</strong> (Proven Acceptable Range) và <strong>Design Space</strong>.
+        </div>
+
+        <div className="table-container">
+          <table className="qbd-table">
+            <thead>
+              <tr>
+                <th>Phân Loại</th>
+                <th>Thông Số / Thuộc Tính</th>
+                <th>Đơn Vị</th>
+                <th>Mục Tiêu (Target)</th>
+                <th>Khoảng Vận Hành Thông Thường (NOR)</th>
+                <th>Khoảng Chấp Nhận Đã Chứng Minh (PAR)</th>
+                <th>Giới Hạn Design Space</th>
+                <th>Phương Pháp Kiểm Soát</th>
+              </tr>
+            </thead>
+            <tbody>
+              {generateControlStrategy(project, optimum).map((item, idx) => (
+                <tr key={idx}>
+                  <td>
+                    <span
+                      className={`badge ${
+                        item.category.includes('CMA')
+                          ? 'badge-primary'
+                          : item.category.includes('CPP')
+                          ? 'badge-warning'
+                          : item.category.includes('IPC')
+                          ? 'badge-teal'
+                          : 'badge-success'
+                      }`}
+                      style={{ fontSize: '0.7rem' }}
+                    >
+                      {item.category}
+                    </span>
+                  </td>
+                  <td style={{ fontWeight: '600', color: '#1e3a8a' }}>
+                    {item.parameterName} {item.parameterCode ? `(${item.parameterCode})` : ''}
+                  </td>
+                  <td style={{ textAlign: 'center', color: '#64748b' }}>{item.unit || '-'}</td>
+                  <td className="font-mono" style={{ fontWeight: '700', color: '#0f766e' }}>
+                    {item.target}
+                  </td>
+                  <td className="font-mono" style={{ color: '#2563eb', fontWeight: '600' }}>
+                    {item.nor}
+                  </td>
+                  <td className="font-mono" style={{ color: '#15803d', fontWeight: '600' }}>
+                    {item.par}
+                  </td>
+                  <td style={{ fontSize: '0.75rem', color: '#475569' }}>
+                    {item.designSpaceLimit}
+                  </td>
+                  <td style={{ fontSize: '0.74rem', color: '#334155' }}>
+                    {item.controlMethod}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
     </div>
