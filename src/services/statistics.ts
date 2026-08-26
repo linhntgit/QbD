@@ -1,0 +1,651 @@
+import type {
+  Factor,
+  CQA,
+  DoERun,
+  ModelType,
+  RegressionTerm,
+  ANOVASource,
+  StatisticalModelResult,
+  DesirabilitySolution,
+  MonteCarloResult,
+} from '../types/qbd';
+import {
+  matMul,
+  matTranspose,
+  matInverse,
+  fDistributionPValue,
+  tDistributionPValue,
+  calculateIndividualDesirability,
+} from './mathUtils';
+
+interface TermDef {
+  name: string;
+  factorCodes: string[];
+  power: number[];
+  evaluator: (coded: Record<string, number>) => number;
+}
+
+/**
+ * Build term definitions based on factors and model type
+ */
+function buildTerms(factors: Factor[], modelType: ModelType): TermDef[] {
+  const terms: TermDef[] = [];
+  const k = factors.length;
+
+  // 1. Intercept
+  terms.push({
+    name: 'Intercept',
+    factorCodes: [],
+    power: [],
+    evaluator: () => 1.0,
+  });
+
+  // 2. Linear terms (X1, X2, ...)
+  factors.forEach((f, idx) => {
+    const p = new Array(k).fill(0);
+    p[idx] = 1;
+    terms.push({
+      name: f.code,
+      factorCodes: [f.code],
+      power: p,
+      evaluator: (coded) => coded[f.code] ?? 0,
+    });
+  });
+
+  // 3. Two-factor interaction (2FI) terms (X1*X2, X1*X3, ...)
+  if (modelType === '2FI' || modelType === 'Quadratic' || modelType === 'Reduced') {
+    for (let i = 0; i < k; i++) {
+      for (let j = i + 1; j < k; j++) {
+        const p = new Array(k).fill(0);
+        p[i] = 1;
+        p[j] = 1;
+        const code1 = factors[i].code;
+        const code2 = factors[j].code;
+        terms.push({
+          name: `${code1}*${code2}`,
+          factorCodes: [code1, code2],
+          power: p,
+          evaluator: (coded) => (coded[code1] ?? 0) * (coded[code2] ?? 0),
+        });
+      }
+    }
+  }
+
+  // 4. Quadratic / Squared terms (X1^2, X2^2, ...)
+  if (modelType === 'Quadratic' || modelType === 'Reduced') {
+    for (let i = 0; i < k; i++) {
+      const p = new Array(k).fill(0);
+      p[i] = 2;
+      const code = factors[i].code;
+      terms.push({
+        name: `${code}²`,
+        factorCodes: [code],
+        power: p,
+        evaluator: (coded) => Math.pow(coded[code] ?? 0, 2),
+      });
+    }
+  }
+
+  return terms;
+}
+
+/**
+ * Fit OLS Regression and generate full ANOVA & Diagnostics for a given CQA
+ */
+export function fitModel(
+  cqa: CQA,
+  factors: Factor[],
+  runs: DoERun[],
+  modelType: ModelType = 'Quadratic'
+): StatisticalModelResult | null {
+  // Only vary factors that are not constant
+  const activeFactors = factors.filter((f) => f.controllability !== 'constant');
+
+  // Convert response value to numeric (handling qualitative binary / numbers)
+  const parseResponse = (raw: number | string | null | undefined): number | null => {
+    if (raw === null || raw === undefined || raw === '') return null;
+    if (typeof raw === 'number') return isNaN(raw) ? null : raw;
+    if (typeof raw === 'string') {
+      const lower = raw.trim().toLowerCase();
+      if (lower === 'đạt' || lower === 'pass' || lower === 'yes' || lower === 'true') return 100.0;
+      if (lower === 'không đạt' || lower === 'fail' || lower === 'no' || lower === 'false') return 0.0;
+      const num = Number(raw);
+      return isNaN(num) ? null : num;
+    }
+    return null;
+  };
+
+  // Filter runs with valid response for this CQA
+  const validRuns = runs
+    .map((r) => ({ run: r, parsedY: parseResponse(r.responses[cqa.code]) }))
+    .filter((item) => item.parsedY !== null);
+
+  const n = validRuns.length;
+  if (n < activeFactors.length + 2) {
+    return null; // Not enough degrees of freedom
+  }
+
+  let terms = buildTerms(activeFactors, modelType);
+  const p = terms.length;
+
+  // Build X matrix (n x p) and Y vector (n x 1)
+  const X: number[][] = validRuns.map(({ run }) => terms.map((t) => t.evaluator(run.factorCoded)));
+  const Y: number[][] = validRuns.map(({ parsedY }) => [parsedY!]);
+
+  const XT = matTranspose(X);
+  const XTX = matMul(XT, X);
+  const invXTX = matInverse(XTX);
+  const XTY = matMul(XT, Y);
+  const Beta = matMul(invXTX, XTY); // (p x 1)
+
+  // Compute Predictions and Residuals
+  const yPred = matMul(X, Beta).map((row) => row[0]);
+  const yActual = Y.map((row) => row[0]);
+  const residuals = yActual.map((act, i) => act - yPred[i]);
+
+  const yMean = yActual.reduce((a, b) => a + b, 0) / n;
+
+  // Sum of Squares
+  const ssTotal = yActual.reduce((sum, act) => sum + Math.pow(act - yMean, 2), 0);
+  const ssResidual = residuals.reduce((sum, res) => sum + Math.pow(res, 2), 0);
+  const ssModel = Math.max(0, ssTotal - ssResidual);
+
+  const dfTotal = n - 1;
+  const dfModel = p - 1;
+  const dfResidual = Math.max(1, n - p);
+
+  const msModel = dfModel > 0 ? ssModel / dfModel : 0;
+  const msResidual = dfResidual > 0 ? ssResidual / dfResidual : 0;
+
+  const fModel = msResidual > 0 ? msModel / msResidual : 0;
+  const pModel = fDistributionPValue(fModel, dfModel, dfResidual);
+
+  // Hat matrix H = X * (X^T X)^-1 * X^T for leverage & studentized residuals
+  const H = matMul(matMul(X, invXTX), XT);
+  const leverages = H.map((row, i) => Math.max(0, Math.min(1, row[i])));
+
+  // Pure Error & Lack of Fit calculation (group duplicate factor combinations)
+  const pointGroups: { [key: string]: number[] } = {};
+  validRuns.forEach(({ run }, idx) => {
+    const key = activeFactors.map((f) => run.factorCoded[f.code]?.toFixed(3) ?? '0').join('|');
+    if (!pointGroups[key]) pointGroups[key] = [];
+    pointGroups[key].push(yActual[idx]);
+  });
+
+  let ssPureError = 0;
+  let dfPureError = 0;
+  Object.values(pointGroups).forEach((group) => {
+    if (group.length > 1) {
+      const gMean = group.reduce((a, b) => a + b, 0) / group.length;
+      const gSS = group.reduce((sum, val) => sum + Math.pow(val - gMean, 2), 0);
+      ssPureError += gSS;
+      dfPureError += group.length - 1;
+    }
+  });
+
+  const ssLackOfFit = Math.max(0, ssResidual - ssPureError);
+  const dfLackOfFit = Math.max(0, dfResidual - dfPureError);
+  const msPureError = dfPureError > 0 ? ssPureError / dfPureError : 0;
+  const msLackOfFit = dfLackOfFit > 0 ? ssLackOfFit / dfLackOfFit : 0;
+
+  const fLackOfFit = msPureError > 0 && dfLackOfFit > 0 ? msLackOfFit / msPureError : undefined;
+  const pLackOfFit =
+    fLackOfFit !== undefined ? fDistributionPValue(fLackOfFit, dfLackOfFit, dfPureError) : undefined;
+
+  // Breakdown of Sum of Squares: Linear, 2FI, Quadratic
+  const k = activeFactors.length;
+  const linearCount = k;
+  const interactionCount = (modelType === '2FI' || modelType === 'Quadratic' || modelType === 'Reduced') ? (k * (k - 1)) / 2 : 0;
+  const quadraticCount = (modelType === 'Quadratic' || modelType === 'Reduced') ? k : 0;
+
+  // Compute Term Statistics (SE, t-value, p-value)
+  const regressionTerms: RegressionTerm[] = terms.map((t, idx) => {
+    const coeff = Beta[idx][0];
+    const c_jj = Math.max(0, invXTX[idx][idx]);
+    const se = Math.sqrt(msResidual * c_jj);
+    const tVal = se > 0 ? coeff / se : 0;
+    const pVal = tDistributionPValue(tVal, dfResidual);
+
+    return {
+      name: t.name,
+      factorCodes: t.factorCodes,
+      power: t.power,
+      coefficient: coeff,
+      stdError: se,
+      tValue: tVal,
+      pValue: pVal,
+      vif: 1.0, // Orthogonal designs have VIF=1
+      significant: pVal < 0.05,
+    };
+  });
+
+  // Diagnostic Metrics
+  let press = 0;
+  const residualDetails = validRuns.map(({ run }, i) => {
+    const act = yActual[i];
+    const pred = yPred[i];
+    const res = residuals[i];
+    const h_ii = leverages[i];
+    const press_i = 1 - h_ii > 1e-6 ? res / (1 - h_ii) : res;
+    press += Math.pow(press_i, 2);
+
+    const stdRes = msResidual > 0 ? res / Math.sqrt(msResidual) : 0;
+    const denom = Math.sqrt(msResidual * Math.max(1e-6, 1 - h_ii));
+    const studentized = denom > 0 ? res / denom : 0;
+
+    // Cook's Distance
+    const cooks =
+      p > 0 && 1 - h_ii > 1e-6
+        ? (Math.pow(studentized, 2) / p) * (h_ii / (1 - h_ii))
+        : 0;
+
+    return {
+      runOrder: run.runOrder,
+      actual: act,
+      predicted: pred,
+      residual: res,
+      stdResidual: stdRes,
+      studentizedResidual: studentized,
+      cooksDistance: cooks,
+      leverage: h_ii,
+    };
+  });
+
+  const rSquared = ssTotal > 0 ? Math.max(0, Math.min(1, 1 - ssResidual / ssTotal)) : 0;
+  const adjRSquared =
+    dfTotal > 0 && dfResidual > 0
+      ? Math.max(0, Math.min(1, 1 - (ssResidual / dfResidual) / (ssTotal / dfTotal)))
+      : 0;
+  const predRSquared = ssTotal > 0 ? Math.max(0, Math.min(1, 1 - press / ssTotal)) : 0;
+
+  const yRange = Math.max(...yPred) - Math.min(...yPred);
+  const adeqPrecision =
+    n > 0 && msResidual > 0 ? yRange / Math.sqrt((p * msResidual) / n) : 0;
+
+  const stdDev = Math.sqrt(msResidual);
+  const cvPercent = yMean !== 0 ? (stdDev / yMean) * 100 : 0;
+
+  // Build ANOVA Table
+  const anova: ANOVASource[] = [
+    {
+      source: 'Model',
+      ss: ssModel,
+      df: dfModel,
+      ms: msModel,
+      fValue: fModel,
+      pValue: pModel,
+    },
+  ];
+
+  if (linearCount > 0) {
+    anova.push({
+      source: 'Linear',
+      ss: ssModel * (linearCount / dfModel), // Proportional partition approximation
+      df: linearCount,
+      ms: (ssModel * (linearCount / dfModel)) / linearCount,
+    });
+  }
+  if (interactionCount > 0) {
+    anova.push({
+      source: '2-Factor Interaction (2FI)',
+      ss: ssModel * (interactionCount / dfModel),
+      df: interactionCount,
+      ms: (ssModel * (interactionCount / dfModel)) / interactionCount,
+    });
+  }
+  if (quadraticCount > 0) {
+    anova.push({
+      source: 'Quadratic',
+      ss: ssModel * (quadraticCount / dfModel),
+      df: quadraticCount,
+      ms: (ssModel * (quadraticCount / dfModel)) / quadraticCount,
+    });
+  }
+
+  anova.push({
+    source: 'Residual',
+    ss: ssResidual,
+    df: dfResidual,
+    ms: msResidual,
+  });
+
+  if (dfPureError > 0) {
+    anova.push({
+      source: 'Lack of Fit',
+      ss: ssLackOfFit,
+      df: dfLackOfFit,
+      ms: msLackOfFit,
+      fValue: fLackOfFit,
+      pValue: pLackOfFit,
+    });
+    anova.push({
+      source: 'Pure Error',
+      ss: ssPureError,
+      df: dfPureError,
+      ms: msPureError,
+    });
+  }
+
+  anova.push({
+    source: 'Cor Total',
+    ss: ssTotal,
+    df: dfTotal,
+    ms: ssTotal / dfTotal,
+  });
+
+  // Construct Equation String
+  const equationParts: string[] = [];
+  regressionTerms.forEach((term, idx) => {
+    const coeff = term.coefficient;
+    const sign = coeff >= 0 ? (idx === 0 ? '' : '+ ') : '- ';
+    const absCoeff = Math.abs(coeff).toFixed(3);
+    if (term.name === 'Intercept') {
+      equationParts.push(`${coeff < 0 ? '-' : ''}${absCoeff}`);
+    } else {
+      equationParts.push(`${sign}${absCoeff}·${term.name}`);
+    }
+  });
+  const equationString = `${cqa.name} (${cqa.code}) = ${equationParts.join(' ')}`;
+
+  // Prediction function
+  const predict = (coded: Record<string, number>): number => {
+    let result = 0;
+    terms.forEach((t, i) => {
+      result += Beta[i][0] * t.evaluator(coded);
+    });
+    return result;
+  };
+
+  return {
+    cqaCode: cqa.code,
+    modelType,
+    terms: regressionTerms,
+    anova,
+    diagnostics: {
+      rSquared,
+      adjRSquared,
+      predRSquared,
+      adeqPrecision,
+      press,
+      stdDev,
+      mean: yMean,
+      cvPercent,
+      residuals: residualDetails,
+    },
+    equationString,
+    predict,
+  };
+}
+
+/**
+ * Multi-Response Desirability Optimization (Derringer & Suich)
+ * Finds the global optimum factor combination in [-1, +1]^k that maximizes Overall Desirability D
+ */
+export function optimizeDesirability(
+  factors: Factor[],
+  cqas: CQA[],
+  models: Record<string, StatisticalModelResult>,
+  lockedFactors?: Record<string, number>
+): DesirabilitySolution | null {
+  const validCQAs = cqas.filter((c) => models[c.code]);
+  if (validCQAs.length === 0) return null;
+
+  const totalWeight = validCQAs.reduce((sum, c) => sum + (c.weight || 1), 0);
+  const k = factors.length;
+
+  const evaluateOverallDesirability = (coded: Record<string, number>): { dOverall: number; dMap: Record<string, number> } => {
+    let logSum = 0;
+    const dMap: Record<string, number> = {};
+
+    for (const cqa of validCQAs) {
+      const model = models[cqa.code];
+      const yPred = model.predict(coded);
+      const di = calculateIndividualDesirability(
+        yPred,
+        cqa.objective,
+        cqa.lowerLimit,
+        cqa.upperLimit,
+        cqa.target,
+        cqa.sShape || 1.0,
+        cqa.tShape || 1.0
+      );
+      dMap[cqa.code] = di;
+      if (di <= 0) return { dOverall: 0, dMap };
+      logSum += (cqa.weight || 1) * Math.log(di);
+    }
+
+    const dOverall = Math.exp(logSum / totalWeight);
+    return { dOverall, dMap };
+  };
+
+  // High-density Grid + Multi-Start Local Exploration
+  let bestD = -1;
+  let bestCoded: Record<string, number> = {};
+  let bestDMap: Record<string, number> = {};
+
+  const mixFactors = factors.filter((f) => f.role === 'mixture_component');
+  const hasMixture = mixFactors.length >= 2;
+
+  const gridSteps = k <= 3 ? 15 : (k <= 4 ? 9 : 5);
+  const stepSize = 2.0 / (gridSteps - 1);
+
+  // Generate grid points recursive
+  const exploreGrid = (factorIdx: number, currentCoded: Record<string, number>) => {
+    if (factorIdx >= k) {
+      let evalCoded = { ...currentCoded };
+      if (hasMixture) {
+        const rawSum = mixFactors.reduce((sum, f) => sum + Math.max(0, evalCoded[f.code] ?? 0), 0);
+        if (rawSum > 0) {
+          mixFactors.forEach((f) => {
+            evalCoded[f.code] = Number((Math.max(0, evalCoded[f.code] ?? 0) / rawSum).toFixed(4));
+          });
+        }
+      }
+      const { dOverall, dMap } = evaluateOverallDesirability(evalCoded);
+      if (dOverall > bestD) {
+        bestD = dOverall;
+        bestCoded = { ...evalCoded };
+        bestDMap = { ...dMap };
+      }
+      return;
+    }
+
+    const factor = factors[factorIdx];
+    if (lockedFactors && lockedFactors[factor.code] !== undefined) {
+      currentCoded[factor.code] = lockedFactors[factor.code];
+      exploreGrid(factorIdx + 1, currentCoded);
+    } else {
+      for (let step = 0; step < gridSteps; step++) {
+        const val = factor.role === 'mixture_component' ? step / (gridSteps - 1) : -1.0 + step * stepSize;
+        currentCoded[factor.code] = Number(val.toFixed(3));
+        exploreGrid(factorIdx + 1, currentCoded);
+      }
+    }
+  };
+
+  exploreGrid(0, {});
+
+  // Local Fine-Tuning around best grid point
+  for (let iter = 0; iter < 300; iter++) {
+    const candidateCoded: Record<string, number> = {};
+    factors.forEach((f) => {
+      if (lockedFactors && lockedFactors[f.code] !== undefined) {
+        candidateCoded[f.code] = lockedFactors[f.code];
+      } else {
+        const current = bestCoded[f.code] ?? 0;
+        const jitter = (Math.random() - 0.5) * 0.15;
+        if (f.role === 'mixture_component') {
+          candidateCoded[f.code] = Math.max(0.01, current + jitter);
+        } else {
+          candidateCoded[f.code] = Math.max(-1.0, Math.min(1.0, Number((current + jitter).toFixed(3))));
+        }
+      }
+    });
+
+    if (hasMixture) {
+      const rawSum = mixFactors.reduce((sum, f) => sum + candidateCoded[f.code], 0);
+      if (rawSum > 0) {
+        mixFactors.forEach((f) => {
+          candidateCoded[f.code] = Number((candidateCoded[f.code] / rawSum).toFixed(4));
+        });
+      }
+    }
+
+    const { dOverall, dMap } = evaluateOverallDesirability(candidateCoded);
+    if (dOverall > bestD) {
+      bestD = dOverall;
+      bestCoded = candidateCoded;
+      bestDMap = dMap;
+    }
+  }
+
+  // Calculate actual factor values and predicted responses with CI
+  const actualFactors: Record<string, number | string> = {};
+  factors.forEach((f) => {
+    if (f.controllability === 'constant') {
+      actualFactors[f.code] = f.constantValue ?? f.low;
+    } else if (f.role === 'mixture_component') {
+      const frac = bestCoded[f.code] ?? (1 / mixFactors.length);
+      actualFactors[f.code] = Number((frac * 100).toFixed(2));
+    } else {
+      const c = bestCoded[f.code] ?? 0;
+      if (f.dataType === 'qualitative' && f.categories && f.categories.length > 0) {
+        if (c <= -0.5) actualFactors[f.code] = f.categories[0];
+        else if (c >= 0.5) actualFactors[f.code] = f.categories[1] || f.categories[0];
+        else actualFactors[f.code] = f.categories[2] || f.categories[0];
+      } else {
+        const center = f.center !== undefined ? f.center : (f.low + f.high) / 2;
+        const half = (f.high - f.low) / 2;
+        actualFactors[f.code] = Number((center + c * half).toFixed(3));
+      }
+    }
+  });
+
+  const predictedResponses: Record<string, { value: number; se: number; ciLow: number; ciHigh: number; desirability: number }> = {};
+  validCQAs.forEach((cqa) => {
+    const model = models[cqa.code];
+    const val = model.predict(bestCoded);
+    const se = model.diagnostics.stdDev;
+    predictedResponses[cqa.code] = {
+      value: Number(val.toFixed(3)),
+      se: Number(se.toFixed(3)),
+      ciLow: Number((val - 1.96 * se).toFixed(3)),
+      ciHigh: Number((val + 1.96 * se).toFixed(3)),
+      desirability: Number((bestDMap[cqa.code] ?? 0).toFixed(4)),
+    };
+  });
+
+  return {
+    codedFactors: bestCoded,
+    actualFactors,
+    predictedResponses,
+    overallDesirability: Number(Math.max(0, bestD).toFixed(4)),
+  };
+}
+
+/**
+ * Monte Carlo Simulation to quantify Risk / Assurance of Quality (ICH Q9 / Q8)
+ * Generates N virtual batches with normal variability around setpoints and predicts CQA defect rates
+ */
+export function runMonteCarloSimulation(
+  setpointActual: Record<string, number | string>,
+  factors: Factor[],
+  cqas: CQA[],
+  models: Record<string, StatisticalModelResult>,
+  variabilityPercent: number = 2.0, // % RSD of process parameters
+  simulations: number = 10000
+): MonteCarloResult {
+  const validCQAs = cqas.filter((c) => models[c.code]);
+  let passCount = 0;
+  let failCount = 0;
+
+  const cqaValues: Record<string, number[]> = {};
+  validCQAs.forEach((c) => {
+    cqaValues[c.code] = [];
+  });
+
+  for (let s = 0; s < simulations; s++) {
+    // Generate randomized factor actuals and convert to coded
+    const sampleCoded: Record<string, number> = {};
+    factors.forEach((f) => {
+      if (f.controllability === 'constant') {
+        sampleCoded[f.code] = 0;
+        return;
+      }
+      const rawMean = setpointActual[f.code];
+      const mean = typeof rawMean === 'number' ? rawMean : (f.low + f.high) / 2;
+      const sd = mean * (variabilityPercent / 100.0);
+      // Box-Muller normal transform
+      const u1 = Math.max(1e-9, Math.random());
+      const u2 = Math.random();
+      const z = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+      const actualVal = mean + z * sd;
+
+      const center = f.center !== undefined ? f.center : (f.low + f.high) / 2;
+      const half = (f.high - f.low) / 2;
+      sampleCoded[f.code] = half > 0 ? (actualVal - center) / half : 0;
+    });
+
+    let batchPass = true;
+    for (const cqa of validCQAs) {
+      const model = models[cqa.code];
+      const resError = model.diagnostics.stdDev * (Math.random() + Math.random() - 1); // error noise
+      const yPred = model.predict(sampleCoded) + resError;
+      cqaValues[cqa.code].push(yPred);
+
+      if (cqa.lowerLimit !== undefined && yPred < cqa.lowerLimit) {
+        batchPass = false;
+      }
+      if (cqa.upperLimit !== undefined && yPred > cqa.upperLimit) {
+        batchPass = false;
+      }
+    }
+
+    if (batchPass) passCount++;
+    else failCount++;
+  }
+
+  const defectRatePPM = Math.round((failCount / simulations) * 1_000_000);
+  const reliabilityPercent = Number(((passCount / simulations) * 100).toFixed(2));
+
+  const cqaStats: Record<string, any> = {};
+  validCQAs.forEach((cqa) => {
+    const vals = cqaValues[cqa.code];
+    const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const sd = Math.sqrt(vals.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / vals.length);
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+
+    let cpk: number | undefined = undefined;
+    if (cqa.lowerLimit !== undefined && cqa.upperLimit !== undefined && sd > 0) {
+      const cpl = (mean - cqa.lowerLimit) / (3 * sd);
+      const cpu = (cqa.upperLimit - mean) / (3 * sd);
+      cpk = Number(Math.min(cpl, cpu).toFixed(2));
+    }
+
+    let oosCount = 0;
+    vals.forEach((v) => {
+      if ((cqa.lowerLimit !== undefined && v < cqa.lowerLimit) || (cqa.upperLimit !== undefined && v > cqa.upperLimit)) {
+        oosCount++;
+      }
+    });
+
+    cqaStats[cqa.code] = {
+      mean: Number(mean.toFixed(3)),
+      sd: Number(sd.toFixed(3)),
+      min: Number(min.toFixed(3)),
+      max: Number(max.toFixed(3)),
+      cpk,
+      outOfSpecPercent: Number(((oosCount / simulations) * 100).toFixed(2)),
+    };
+  });
+
+  return {
+    simulations,
+    passCount,
+    failCount,
+    defectRatePPM,
+    reliabilityPercent,
+    cqaStats,
+  };
+}
