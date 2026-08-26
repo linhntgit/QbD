@@ -285,7 +285,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                     backgroundColor: modelingEngine === 'neural' ? '#7c3aed' : undefined,
                     borderColor: modelingEngine === 'neural' ? '#7c3aed' : undefined,
                   }}
-                  title="Hiển thị bề mặt đáp ứng từ mô hình Mạng Nơ-ron AI (SAS JMP Neural)"
+                  title="Hiển thị bề mặt đáp ứng từ mô hình Mạng Nơ-ron Nhân Tạo"
                 >
                   <BrainCircuit size={14} />
                   <span>Mạng Nơ-ron AI</span>

@@ -124,7 +124,7 @@ export async function exportQBDWordReport(
         createDataCell('Phương pháp mô hình hóa chính', false, 30),
         createDataCell(
           modelingEngine === 'neural'
-            ? 'Mạng Nơ-ron Nhân Tạo AI (SAS JMP Neural Network Platform)'
+            ? 'Mạng Nơ-ron Nhân Tạo AI (Neural Network Platform)'
             : 'Hồi Quy Đa Thức Bậc ≤ 2 (Classical ANOVA / Response Surface)',
           false,
           70
@@ -517,11 +517,11 @@ export async function exportQBDWordReport(
     );
   });
 
-  // SECTION 5b: Neural Network Platform (SAS JMP Style)
+  // SECTION 5b: Neural Network Platform
   if (neuralModels && Object.keys(neuralModels).length > 0) {
     sections.push(
       new Paragraph({
-        text: '5b. Mô hình Hóa Phi Tuyến Bằng Mạng Nơ-ron AI (SAS JMP Neural Network Platform)',
+        text: '5b. Mô hình Hóa Phi Tuyến Bằng Mạng Nơ-ron AI (Neural Network Platform)',
         heading: HeadingLevel.HEADING_1,
         spacing: { before: 300, after: 150 },
       }),
@@ -573,11 +573,11 @@ export async function exportQBDWordReport(
     );
   }
 
-  // SECTION 6: Multi-response Desirability & SAS JMP Prediction Profiler
+  // SECTION 6: Multi-response Desirability & Prediction Profiler
   if (optimum) {
     sections.push(
       new Paragraph({
-        text: '6. Tối ưu hóa Đa Mục tiêu theo Hàm Thỏa Dụng (SAS JMP Desirability Profiler)',
+        text: '6. Tối ưu hóa Đa Mục tiêu theo Hàm Thỏa Dụng (Desirability Profiler)',
         heading: HeadingLevel.HEADING_1,
         spacing: { before: 300, after: 150 },
       }),

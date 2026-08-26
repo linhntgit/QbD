@@ -4,7 +4,7 @@ export type NeuralValidationMethod = 'holdout' | 'kfold' | 'none';
 export interface NeuralNetConfig {
   hiddenNodes1: number; // e.g. 3 (Layer 1 nodes)
   hiddenNodes2: number; // e.g. 0 (Layer 2 nodes, 0 = 1 hidden layer)
-  activation: NeuralActivation; // default 'tanh' (SAS JMP standard)
+  activation: NeuralActivation; // default 'tanh'
   weightDecay: number; // L2 penalty lambda, default 0.01
   learningRate: number; // default 0.05
   maxEpochs: number; // default 1000

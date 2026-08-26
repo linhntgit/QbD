@@ -61,7 +61,7 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({
     {
       key: 'neural' as TabKey,
       label: '5. Mạng Nơ-ron',
-      subtitle: 'SAS JMP Neural',
+      subtitle: 'Mạng Nơ-ron AI',
       icon: BrainCircuit,
       tag: 'AI Models',
     },

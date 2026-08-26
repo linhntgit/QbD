@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import {
   BrainCircuit,
   Sliders,
-  Play,
+  RefreshCw,
   Copy,
   Check,
   TrendingUp,
@@ -347,7 +347,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
         ];
 
         const layout = {
-          title: `Mức Độ Quan Trọng Của Biến Đầu Vào (Independent Variable Importance - SAS JMP)`,
+          title: `Mức Độ Quan Trọng Của Biến Đầu Vào (Independent Variable Importance)`,
           xaxis: { title: 'Tỷ Lệ Đóng Góp Ảnh Hưởng Tương Đối (Relative Importance %)' },
           yaxis: { autorange: 'reversed' },
           margin: { l: 120, r: 40, t: 40, b: 40 },
@@ -450,7 +450,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       
-      {/* Top Header Card with SAS JMP Platform Branding */}
+      {/* Top Header Card with Neural Platform Branding */}
       <div className="qbd-card">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
@@ -468,7 +468,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                   )}
                 </div>
                 <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.2rem' }}>
-                  Mô phỏng phi tuyến tính cao cấp tương tự SAS JMP Neural • Multi-Layer Perceptron (MLP) • Khảo sát bề mặt và tối ưu hóa Desirability.
+                  Mô phỏng phi tuyến tính cao cấp • Multi-Layer Perceptron (MLP) • Khảo sát bề mặt và tối ưu hóa Desirability.
                 </div>
               </div>
             </div>
@@ -516,7 +516,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           </div>
         </div>
 
-        {/* Hyperparameter Settings Toolbar (SAS JMP Neural Dialog) */}
+        {/* Hyperparameter Settings Toolbar */}
         <div
           style={{
             marginTop: '1rem',
@@ -567,7 +567,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               value={localConfig.activation}
               onChange={(e) => setLocalConfig({ ...localConfig, activation: e.target.value as NeuralActivation })}
             >
-              <option value="tanh">TanH (JMP Chuẩn)</option>
+              <option value="tanh">TanH (Chuẩn)</option>
               <option value="gaussian">Gaussian (RBF)</option>
               <option value="linear">Linear</option>
               <option value="sigmoid">Sigmoid</option>
@@ -586,7 +586,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             >
               <option value={0.0}>0.0 (Không phạt)</option>
               <option value={0.001}>0.001 (Nhẹ)</option>
-              <option value={0.01}>0.01 (Vừa - JMP)</option>
+              <option value={0.01}>0.01 (Vừa)</option>
               <option value={0.05}>0.05 (Chống Overfit)</option>
               <option value={0.1}>0.1 (Cao)</option>
             </select>
@@ -598,72 +598,51 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             </label>
             <input
               type="number"
-              min={1}
-              max={30}
+              min="1"
+              max="50"
               className="input-field"
               value={localConfig.numTours}
-              onChange={(e) => setLocalConfig({ ...localConfig, numTours: Math.max(1, Number(e.target.value)) })}
+              onChange={(e) => setLocalConfig({ ...localConfig, numTours: Math.max(1, parseInt(e.target.value) || 10) })}
             />
           </div>
 
           <div>
             <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#475569', marginBottom: '0.25rem' }}>
-              KIỂM ĐỊNH HOLDOUT
-            </label>
-            <select
-              className="input-field"
-              value={localConfig.holdoutRatio}
-              onChange={(e) =>
-                setLocalConfig({
-                  ...localConfig,
-                  holdoutRatio: Number(e.target.value),
-                  validationMethod: Number(e.target.value) > 0 ? 'holdout' : 'none',
-                })
-              }
-            >
-              <option value={0.0}>0% (Dùng toàn bộ dữ liệu)</option>
-              <option value={0.2}>20% (Train 80 / Val 20)</option>
-              <option value={0.25}>25% (Train 75 / Val 25)</option>
-              <option value={0.33}>33% (Train 67 / Val 33)</option>
-            </select>
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#475569', marginBottom: '0.25rem' }}>
-              SỐ EPOCH TỐI ĐA
+              SỐ VÒNG LẶP EPOCHS
             </label>
             <input
               type="number"
-              min={100}
-              max={5000}
-              step={100}
+              min="50"
+              max="2000"
+              step="50"
               className="input-field"
               value={localConfig.maxEpochs}
-              onChange={(e) => setLocalConfig({ ...localConfig, maxEpochs: Number(e.target.value) })}
+              onChange={(e) => setLocalConfig({ ...localConfig, maxEpochs: Math.max(50, parseInt(e.target.value) || 500) })}
             />
           </div>
 
-          <div>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end' }}>
             <button
               onClick={handleTrain}
               disabled={isTraining}
-              className={`btn ${isTraining ? 'btn-secondary' : 'btn-teal'}`}
+              className="btn btn-primary"
               style={{
-                width: '100%',
-                height: '36px',
-                justifyContent: 'center',
-                cursor: isTraining ? 'not-allowed' : 'pointer',
-                opacity: isTraining ? 0.85 : 1,
+                backgroundColor: isTraining ? '#9333ea' : '#7c3aed',
+                borderColor: '#7c3aed',
+                fontSize: '0.82rem',
+                padding: '0.45rem 1rem',
+                flex: 1,
+                cursor: isTraining ? 'wait' : 'pointer',
               }}
             >
               {isTraining ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  <span>Đang Fit ({trainingProgress?.tour || 1}/{trainingProgress?.totalTours || 10})...</span>
+                  <span>Đang Fit ({trainingProgress ? `Tour ${trainingProgress.tour}/${trainingProgress.totalTours}` : '...'})</span>
                 </>
               ) : (
                 <>
-                  <Play size={15} />
+                  <RefreshCw size={16} />
                   <span>Huấn Luyện (Fit)</span>
                 </>
               )}
@@ -672,7 +651,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
         </div>
       </div>
 
-      {/* Live Training Progress Indicator (SAS JMP Multi-Tour SGD Optimizer) */}
+      {/* Live Training Progress Indicator */}
       {isTraining && trainingProgress && (
         <div
           className="qbd-card animate-fade-in"
@@ -691,7 +670,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                 <div style={{ fontWeight: '800', fontSize: '0.98rem', color: '#38bdf8', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <span>ĐANG HUẤN LUYỆN MẠNG NƠ-RON (RUNNING...)</span>
                   <span className="badge badge-primary" style={{ backgroundColor: '#0284c7', color: '#ffffff', fontSize: '0.7rem' }}>
-                    SAS JMP Engine
+                    Neural Engine
                   </span>
                 </div>
                 <div style={{ fontSize: '0.76rem', color: '#94a3b8', marginTop: '0.15rem' }}>
@@ -794,12 +773,12 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             Chưa có mô hình mạng nơ-ron cho chỉ tiêu {currentCQA.name}
           </p>
           <p style={{ fontSize: '0.82rem', marginTop: '0.35rem' }}>
-            Bấm nút "Huấn Luyện (Fit)" ở trên để tự động chạy thuật toán học máy đa vòng lặp SAS JMP.
+            Bấm nút "Huấn Luyện (Fit)" ở trên để tự động chạy thuật toán học máy đa vòng lặp.
           </p>
         </div>
       ) : (
         <>
-          {/* Neural Fit Summary Gauges (SAS JMP Style) */}
+          {/* Neural Fit Summary Gauges */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
             
             {/* Training R-Squared */}
@@ -888,7 +867,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
 
                   {/* Neural Net */}
                   <tr style={{ backgroundColor: neuralModel && (!anovaModel || neuralModel.diagnostics.rSquaredOverall > anovaModel.diagnostics.rSquared) ? '#faf5ff' : '#ffffff' }}>
-                    <td style={{ fontWeight: '700', color: '#7c3aed' }}>2. Mạng Nơ-ron AI (SAS JMP Neural MLP)</td>
+                    <td style={{ fontWeight: '700', color: '#7c3aed' }}>2. Mạng Nơ-ron AI (Neural Network MLP)</td>
                     <td>
                       MLP [{localConfig.hiddenNodes1}{localConfig.hiddenNodes2 > 0 ? `, ${localConfig.hiddenNodes2}` : ''}] ({localConfig.activation.toUpperCase()})
                     </td>
@@ -955,13 +934,13 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             {renderDiagnosticPlot()}
           </div>
 
-          {/* SAS JMP Interactive Prediction Profiler */}
+          {/* Interactive Prediction Profiler */}
           <div className="qbd-card">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
               <div>
                 <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Sliders size={18} color="#b45309" />
-                  <span>Bộ Dự Báo Tương Tác SAS JMP (Interactive Prediction Profiler)</span>
+                  <span>Bộ Dự Báo Tương Tác (Interactive Prediction Profiler)</span>
                 </h3>
                 <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.2rem' }}>
                   Kéo thanh trượt từng thông số để quan sát sự thay đổi phản ứng CQA thời gian thực theo mô hình mạng nơ-ron.

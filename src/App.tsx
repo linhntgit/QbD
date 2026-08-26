@@ -44,7 +44,7 @@ export function App() {
     return result;
   }, [project.cqas, project.factors, project.runs, modelTypes]);
 
-  // Calculate Neural Network Models dynamically for all CQAs (SAS JMP Neural MLP)
+  // Calculate Neural Network Models dynamically for all CQAs (Neural MLP)
   const neuralModels = useMemo<Record<string, NeuralNetModelResult>>(() => {
     const result: Record<string, NeuralNetModelResult> = {};
     project.cqas.forEach((cqa) => {
@@ -315,7 +315,7 @@ export function App() {
             <strong>QbD Studio™ Pharma DoE Suite</strong> — © 2026 <strong>Tran Linh Nguyen</strong>. All rights reserved.
           </div>
           <div>
-            Tuân thủ chuẩn mực ICH Q8(R2), ICH Q9, ICH Q10, ICH Q11 • Nền tảng DoE & SAS JMP Profiler.
+            Tuân thủ chuẩn mực ICH Q8(R2), ICH Q9, ICH Q10, ICH Q11 • Nền tảng DoE & Prediction Profiler.
           </div>
         </div>
       </footer>

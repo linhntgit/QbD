@@ -89,7 +89,7 @@ export const DEFAULT_NEURAL_CONFIG: NeuralNetConfig = {
 };
 
 /**
- * Fit a Neural Network Model for Experimental Data (SAS JMP Style)
+ * Fit a Neural Network Model for Experimental Data (MLP Architecture)
  */
 export function fitNeuralNetModel(
   cqa: CQA,
@@ -151,7 +151,7 @@ export function fitNeuralNetModel(
   let bestGlobalLossHistory: { epoch: number; trainLoss: number; valLoss?: number }[] = [];
   let bestGlobalSplit: { trainIdx: number[]; valIdx: number[] } | null = null;
 
-  // 3. Multi-Tour Training loop (SAS JMP Multi-Tour Restarts)
+  // 3. Multi-Tour Training loop (Multi-Tour Optimization Restarts)
   for (let tour = 0; tour < config.numTours; tour++) {
     const tourSeed = config.seed + tour * 10007;
     const rng = createRNG(tourSeed);
@@ -588,7 +588,7 @@ export function fitNeuralNetModel(
   const maeVal = nVal > 0 ? valSAE / nVal : maeTrain;
   const maeOverall = overallSAE / N;
 
-  // 6. Independent Variable Importance / Sensitivity Analysis (SAS JMP Style)
+  // 6. Independent Variable Importance / Sensitivity Analysis
   // Compute mean absolute gradient or perturbation response across grid
   const rawSensitivities: number[] = new Array(numInputs).fill(0);
   const numGrid = 200;

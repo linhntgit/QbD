@@ -57,7 +57,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
   // Locked factors state (factors held constant during optimization)
   const [lockedFactors, setLockedFactors] = useState<Record<string, boolean>>({});
 
-  // Saved candidate solutions (JMP "Remember Settings")
+  // Saved candidate solutions (Remember Settings)
   const [savedSettings, setSavedSettings] = useState<SavedDesirabilitySetting[]>([]);
 
   // Desirability Goal / Shape parameters editor open state
@@ -131,7 +131,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
     };
   }, [currentCoded, validCQAs, models, factors]);
 
-  // Maximize Desirability (SAS JMP Optimizer)
+  // Maximize Desirability (Global Optimizer)
   const handleMaximizeDesirability = () => {
     // Build locked factor dictionary
     const lockedDict: Record<string, number> = {};
@@ -167,7 +167,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
     setCurrentCoded(centerCoded);
   };
 
-  // Remember current setting (JMP Candidate)
+  // Remember current setting (Saved Candidate)
   const handleRememberSetting = () => {
     if (!currentEvaluation) return;
     const newSaved: SavedDesirabilitySetting = {
@@ -322,7 +322,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       
-      {/* Top Banner: Overall Desirability Score & JMP Action Bar */}
+      {/* Top Banner: Overall Desirability Score & Action Bar */}
       <div
         style={{
           background: 'linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%)',
@@ -373,7 +373,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <h3 style={{ fontSize: '1.15rem', fontWeight: '700', margin: 0 }}>
-                  SAS JMP Prediction Profiler & Desirability Optimization
+                  Prediction Profiler & Desirability Optimization
                 </h3>
                 <span
                   style={{
@@ -426,7 +426,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                 color: '#ffffff',
                 fontWeight: '600',
                 fontSize: '0.8rem',
-                padding: '0.45rem 0.85rem',
+        padding: '0.45rem 0.85rem',
                 borderRadius: '0.5rem',
                 border: '1px solid rgba(255,255,255,0.3)',
                 cursor: 'pointer',
@@ -434,7 +434,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                 alignItems: 'center',
                 gap: '0.35rem',
               }}
-              title="Lưu lại điểm cài đặt hiện tại để so sánh kịch bản (JMP Remember Settings)"
+              title="Lưu lại điểm cài đặt hiện tại để so sánh kịch bản (Remember Settings)"
             >
               <BookmarkPlus size={15} />
               <span>Lưu Kịch Bản ({savedSettings.length})</span>
@@ -488,7 +488,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
         </div>
       </div>
 
-      {/* Accordion: JMP Desirability Goals & Shapes Editor */}
+      {/* Accordion: Desirability Goals & Shapes Editor */}
       {showGoalEditor && (
         <div
           className="qbd-card animate-fade-in"
@@ -673,13 +673,13 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
         </div>
       )}
 
-      {/* Main SAS JMP Prediction Profiler Matrix */}
+      {/* Main Prediction Profiler Matrix */}
       <div className="qbd-card" style={{ padding: '1rem', overflowX: 'auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <TrendingUp size={20} color="#1e3a8a" />
             <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
-              Ma Trận Đồ Thị Profiler SAS JMP (Prediction Profiler Matrix)
+              Ma Trận Đồ Thị Dự Báo (Prediction Profiler Matrix)
             </h3>
           </div>
           <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
@@ -1044,7 +1044,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
         )}
       </div>
 
-      {/* Saved Solutions Comparison Table (JMP Candidate Table) */}
+      {/* Saved Solutions Comparison Table (Candidate Table) */}
       {savedSettings.length > 0 && (
         <div className="qbd-card animate-fade-in" style={{ padding: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>

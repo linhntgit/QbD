@@ -319,7 +319,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
             )}
             <div>
               <div style={{ fontWeight: '700', fontSize: '0.9rem', color: '#0f172a' }}>
-                Động Cơ Mô Hình Hóa & Tối Ưu: {modelingEngine === 'neural' ? '🧠 Mạng Nơ-ron AI (SAS JMP Neural)' : '📐 Hồi Quy Đa Thức Bậc ≤ 2 (ANOVA)'}
+                Động Cơ Mô Hình Hóa & Tối Ưu: {modelingEngine === 'neural' ? '🧠 Mạng Nơ-ron Nhân Tạo AI' : '📐 Hồi Quy Đa Thức Bậc ≤ 2 (ANOVA)'}
               </div>
               <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
                 {modelingEngine === 'neural'
@@ -333,31 +333,27 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
             <button
               onClick={() => onToggleEngine('polynomial')}
               className={`btn ${modelingEngine === 'polynomial' ? 'btn-teal' : 'btn-secondary'}`}
-              style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', border: 'none', fontWeight: '700' }}
+              style={{ fontSize: '0.76rem', padding: '0.35rem 0.75rem' }}
             >
-              <Calculator size={14} />
-              <span>Đa Thức (ANOVA)</span>
+              📐 Hồi Quy Đa Thức
             </button>
             <button
               onClick={() => onToggleEngine('neural')}
               className={`btn ${modelingEngine === 'neural' ? 'btn-primary' : 'btn-secondary'}`}
               style={{
-                padding: '0.35rem 0.65rem',
-                fontSize: '0.78rem',
-                border: 'none',
-                fontWeight: '700',
+                fontSize: '0.76rem',
+                padding: '0.35rem 0.75rem',
                 backgroundColor: modelingEngine === 'neural' ? '#7c3aed' : undefined,
                 borderColor: modelingEngine === 'neural' ? '#7c3aed' : undefined,
               }}
             >
-              <BrainCircuit size={14} />
-              <span>Mạng Nơ-ron AI</span>
+              🧠 Mạng Nơ-ron AI
             </button>
           </div>
         </div>
       )}
 
-      {/* 1. SAS JMP Prediction Profiler & Desirability Optimization */}
+      {/* 1. Prediction Profiler & Desirability Optimization */}
       <DesirabilityProfiler
         factors={factors}
         cqas={cqas}

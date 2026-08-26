@@ -158,7 +158,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     backgroundColor: modelingEngine === 'neural' ? '#7c3aed' : 'transparent',
                     color: modelingEngine === 'neural' ? '#ffffff' : '#64748b',
                   }}
-                  title="Chuyển toàn bộ phân tích sang Mạng Nơ-ron AI (SAS JMP)"
+                  title="Chuyển toàn bộ phân tích sang Mạng Nơ-ron Nhân Tạo"
                 >
                   <BrainCircuit size={12} />
                   <span>Mạng Nơ-ron</span>

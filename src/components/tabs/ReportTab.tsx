@@ -160,7 +160,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                 <td style={{ fontWeight: '700', backgroundColor: '#f8fafc' }}>Phương Pháp Mô Hình Hóa</td>
                 <td style={{ fontWeight: '700', color: modelingEngine === 'neural' ? '#7c3aed' : '#0f766e' }}>
                   {modelingEngine === 'neural'
-                    ? '🧠 Mạng Nơ-ron Nhân Tạo AI (SAS JMP Neural Network Platform)'
+                    ? '🧠 Mạng Nơ-ron Nhân Tạo AI (Neural Network Platform)'
                     : '📐 Hồi Quy Đa Thức Bậc ≤ 2 (Classical ANOVA / Response Surface)'}
                 </td>
               </tr>
@@ -402,11 +402,11 @@ export const ReportTab: React.FC<ReportTabProps> = ({
           })}
         </div>
 
-        {/* 5b. Neural Network Models (SAS JMP Style) */}
+        {/* 5b. Neural Network Models */}
         {neuralModels && Object.keys(neuralModels).length > 0 && (
           <div style={{ marginBottom: '2rem' }}>
             <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#7c3aed', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
-              5b. Mô hình Mạng Nơ-ron AI (SAS JMP Neural Network Platform)
+              5b. Mô hình Mạng Nơ-ron AI (Neural Network Platform)
             </h2>
             {Object.values(neuralModels).map((nm) => {
               const cqa = project.cqas.find((c) => c.code === nm.cqaCode);
@@ -428,11 +428,11 @@ export const ReportTab: React.FC<ReportTabProps> = ({
           </div>
         )}
 
-        {/* 6. Optimum & SAS JMP Prediction Profiler */}
+        {/* 6. Optimum & Prediction Profiler */}
         {optimum && (
           <div style={{ marginBottom: '2rem' }}>
             <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
-              6. Tối Ưu Hóa Đa Mục Tiêu (SAS JMP Desirability Profiler: Overall D = {optimum.overallDesirability})
+              6. Tối Ưu Hóa Đa Mục Tiêu (Desirability Profiler: Overall D = {optimum.overallDesirability})
             </h2>
             
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
