@@ -3,6 +3,8 @@ import {
   Download,
   Printer,
   FileCheck2,
+  Calculator,
+  BrainCircuit,
 } from 'lucide-react';
 import type {
   QBDProject,
@@ -10,6 +12,7 @@ import type {
   DesirabilitySolution,
   MonteCarloResult,
   NeuralNetModelResult,
+  ModelingEngine,
 } from '../../types/qbd';
 import { exportQBDWordReport } from '../../services/reportGenerator';
 import { calculateDesignEfficiency } from '../../services/doeGenerator';
@@ -20,6 +23,8 @@ interface ReportTabProps {
   optimum: DesirabilitySolution | null;
   monteCarlo: MonteCarloResult | null;
   neuralModels?: Record<string, NeuralNetModelResult>;
+  modelingEngine?: ModelingEngine;
+  onToggleEngine?: (engine: ModelingEngine) => void;
 }
 
 export const ReportTab: React.FC<ReportTabProps> = ({
@@ -28,9 +33,11 @@ export const ReportTab: React.FC<ReportTabProps> = ({
   optimum,
   monteCarlo,
   neuralModels,
+  modelingEngine = 'polynomial',
+  onToggleEngine,
 }) => {
   const handleDownloadWord = () => {
-    exportQBDWordReport(project, models, optimum, monteCarlo, neuralModels);
+    exportQBDWordReport(project, models, optimum, monteCarlo, neuralModels, modelingEngine);
   };
 
   const handlePrint = () => {
@@ -54,7 +61,36 @@ export const ReportTab: React.FC<ReportTabProps> = ({
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          {/* Modeling Engine Toggle */}
+          {onToggleEngine && (
+            <div style={{ display: 'flex', backgroundColor: '#f1f5f9', borderRadius: '0.5rem', padding: '0.2rem', gap: '0.2rem' }}>
+              <button
+                onClick={() => onToggleEngine('polynomial')}
+                className={`btn ${modelingEngine === 'polynomial' ? 'btn-teal' : 'btn-secondary'}`}
+                style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', border: 'none', fontWeight: '700' }}
+              >
+                <Calculator size={14} />
+                <span>Đa Thức (ANOVA)</span>
+              </button>
+              <button
+                onClick={() => onToggleEngine('neural')}
+                className={`btn ${modelingEngine === 'neural' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{
+                  padding: '0.35rem 0.65rem',
+                  fontSize: '0.78rem',
+                  border: 'none',
+                  fontWeight: '700',
+                  backgroundColor: modelingEngine === 'neural' ? '#7c3aed' : undefined,
+                  borderColor: modelingEngine === 'neural' ? '#7c3aed' : undefined,
+                }}
+              >
+                <BrainCircuit size={14} />
+                <span>Mạng Nơ-ron AI</span>
+              </button>
+            </div>
+          )}
+
           <button
             onClick={handlePrint}
             className="btn btn-secondary"
@@ -119,6 +155,14 @@ export const ReportTab: React.FC<ReportTabProps> = ({
               <tr>
                 <td style={{ fontWeight: '700', backgroundColor: '#f8fafc' }}>Nhóm Nghiên Cứu</td>
                 <td>{project.author}</td>
+              </tr>
+              <tr>
+                <td style={{ fontWeight: '700', backgroundColor: '#f8fafc' }}>Phương Pháp Mô Hình Hóa</td>
+                <td style={{ fontWeight: '700', color: modelingEngine === 'neural' ? '#7c3aed' : '#0f766e' }}>
+                  {modelingEngine === 'neural'
+                    ? '🧠 Mạng Nơ-ron Nhân Tạo AI (SAS JMP Neural Network Platform)'
+                    : '📐 Hồi Quy Đa Thức Bậc ≤ 2 (Classical ANOVA / Response Surface)'}
+                </td>
               </tr>
               <tr>
                 <td style={{ fontWeight: '700', backgroundColor: '#f8fafc' }}>Ngày Lập Báo Cáo</td>

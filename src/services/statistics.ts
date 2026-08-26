@@ -6,6 +6,7 @@ import type {
   RegressionTerm,
   ANOVASource,
   StatisticalModelResult,
+  NeuralNetModelResult,
   DesirabilitySolution,
   MonteCarloResult,
 } from '../types/qbd';
@@ -384,7 +385,7 @@ export function fitModel(
 export function optimizeDesirability(
   factors: Factor[],
   cqas: CQA[],
-  models: Record<string, StatisticalModelResult>,
+  models: Record<string, StatisticalModelResult | NeuralNetModelResult>,
   lockedFactors?: Record<string, number>
 ): DesirabilitySolution | null {
   const validCQAs = cqas.filter((c) => models[c.code]);
@@ -525,7 +526,7 @@ export function optimizeDesirability(
   validCQAs.forEach((cqa) => {
     const model = models[cqa.code];
     const val = model.predict(bestCoded);
-    const se = model.diagnostics.stdDev;
+    const se = (model.diagnostics as any).stdDev ?? (model.diagnostics as any).rmseTrain ?? 0.1;
     predictedResponses[cqa.code] = {
       value: Number(val.toFixed(3)),
       se: Number(se.toFixed(3)),
@@ -551,7 +552,7 @@ export function runMonteCarloSimulation(
   setpointActual: Record<string, number | string>,
   factors: Factor[],
   cqas: CQA[],
-  models: Record<string, StatisticalModelResult>,
+  models: Record<string, StatisticalModelResult | NeuralNetModelResult>,
   variabilityPercent: number = 2.0, // % RSD of process parameters
   simulations: number = 10000
 ): MonteCarloResult {
@@ -589,7 +590,8 @@ export function runMonteCarloSimulation(
     let batchPass = true;
     for (const cqa of validCQAs) {
       const model = models[cqa.code];
-      const resError = model.diagnostics.stdDev * (Math.random() + Math.random() - 1); // error noise
+      const noiseStd = (model.diagnostics as any).stdDev ?? (model.diagnostics as any).rmseTrain ?? 0.1;
+      const resError = noiseStd * (Math.random() + Math.random() - 1); // error noise
       const yPred = model.predict(sampleCoded) + resError;
       cqaValues[cqa.code].push(yPred);
 

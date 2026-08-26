@@ -2,6 +2,8 @@ export type FactorType = 'CMA' | 'CPP' | 'Formulation' | 'Process' | 'Mixture';
 export type FactorDataType = 'quantitative' | 'quantitative_multilevel' | 'qualitative';
 export type FactorControllability = 'controllable' | 'uncontrollable_noise' | 'constant';
 
+export type ModelingEngine = 'polynomial' | 'neural';
+
 export type CQADataType = 'quantitative' | 'qualitative_binary' | 'qualitative_ordinal';
 export type CQAObjective = 'maximize' | 'minimize' | 'target' | 'range' | 'pass_category';
 
@@ -235,6 +237,7 @@ export interface QBDProject {
   doeConfig: DoEDesignConfig;
   runs: DoERun[];
   designSpace: DesignSpaceRanges[];
+  modelingEngine?: ModelingEngine;
 }
 
 export * from './neuralNetwork';

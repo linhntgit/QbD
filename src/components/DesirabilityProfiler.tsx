@@ -18,6 +18,7 @@ import type {
   Factor,
   CQA,
   StatisticalModelResult,
+  NeuralNetModelResult,
   DesirabilitySolution,
   SavedDesirabilitySetting,
   CQAObjective,
@@ -30,7 +31,7 @@ import { calculateIndividualDesirability } from '../services/mathUtils';
 interface DesirabilityProfilerProps {
   factors: Factor[];
   cqas: CQA[];
-  models: Record<string, StatisticalModelResult>;
+  models: Record<string, StatisticalModelResult | NeuralNetModelResult>;
   onUpdateCQAs?: (updatedCQAs: CQA[]) => void;
   onApplyOptimum?: (solution: DesirabilitySolution) => void;
 }
@@ -87,7 +88,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
     validCQAs.forEach((cqa) => {
       const model = models[cqa.code];
       const val = model.predict(currentCoded);
-      const se = model.diagnostics?.stdDev || 0.1;
+      const se = (model.diagnostics as any)?.stdDev ?? (model.diagnostics as any)?.rmseTrain ?? 0.1;
       const di = calculateIndividualDesirability(
         val,
         cqa.objective,
@@ -286,7 +287,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
         }
 
         const model = models[cqa.code];
-        const se = model.diagnostics?.stdDev || 0.1;
+        const se = (model.diagnostics as any)?.stdDev ?? (model.diagnostics as any)?.rmseTrain ?? 0.1;
         const yPredArr: number[] = [];
         const ciUpArr: number[] = [];
         const ciLowArr: number[] = [];

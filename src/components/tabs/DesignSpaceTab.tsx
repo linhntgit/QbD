@@ -8,13 +8,17 @@ import {
   RotateCcw,
   Lock,
   Settings2,
+  Calculator,
+  BrainCircuit,
 } from 'lucide-react';
 import type {
   QBDProject,
   StatisticalModelResult,
+  NeuralNetModelResult,
   DesirabilitySolution,
   DesignSpaceRanges,
   MonteCarloResult,
+  ModelingEngine,
 } from '../../types/qbd';
 import { PlotlyChart } from '../PlotlyChart';
 import { DesirabilityProfiler } from '../DesirabilityProfiler';
@@ -26,7 +30,9 @@ import { codedToActual, actualToCoded } from '../../services/doeGenerator';
 
 interface DesignSpaceTabProps {
   project: QBDProject;
-  models: Record<string, StatisticalModelResult>;
+  models: Record<string, StatisticalModelResult | NeuralNetModelResult>;
+  modelingEngine?: ModelingEngine;
+  onToggleEngine?: (engine: ModelingEngine) => void;
   onUpdateProject: (updated: Partial<QBDProject>) => void;
   onNavigateToReport: () => void;
 }
@@ -34,6 +40,8 @@ interface DesignSpaceTabProps {
 export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
   project,
   models,
+  modelingEngine = 'polynomial',
+  onToggleEngine,
   onUpdateProject,
   onNavigateToReport,
 }) => {
@@ -288,6 +296,67 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       
+      {/* Modeling Paradigm Banner & Switcher */}
+      {onToggleEngine && (
+        <div
+          className="qbd-card"
+          style={{
+            padding: '0.75rem 1.25rem',
+            backgroundColor: '#ffffff',
+            borderLeft: modelingEngine === 'neural' ? '4px solid #7c3aed' : '4px solid #0f766e',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '0.75rem',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            {modelingEngine === 'neural' ? (
+              <BrainCircuit size={22} color="#7c3aed" />
+            ) : (
+              <Calculator size={22} color="#0f766e" />
+            )}
+            <div>
+              <div style={{ fontWeight: '700', fontSize: '0.9rem', color: '#0f172a' }}>
+                Động Cơ Mô Hình Hóa & Tối Ưu: {modelingEngine === 'neural' ? '🧠 Mạng Nơ-ron AI (SAS JMP Neural)' : '📐 Hồi Quy Đa Thức Bậc ≤ 2 (ANOVA)'}
+              </div>
+              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                {modelingEngine === 'neural'
+                  ? 'Desirability Profiler, Sweet Spot 2D và Mô phỏng Monte Carlo đang tính toán trực tiếp trên trọng số Mạng Nơ-ron.'
+                  : 'Desirability Profiler, Sweet Spot 2D và Mô phỏng Monte Carlo đang tính toán trực tiếp từ hệ số hồi quy Đa thức.'}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', backgroundColor: '#f1f5f9', borderRadius: '0.5rem', padding: '0.2rem', gap: '0.2rem' }}>
+            <button
+              onClick={() => onToggleEngine('polynomial')}
+              className={`btn ${modelingEngine === 'polynomial' ? 'btn-teal' : 'btn-secondary'}`}
+              style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', border: 'none', fontWeight: '700' }}
+            >
+              <Calculator size={14} />
+              <span>Đa Thức (ANOVA)</span>
+            </button>
+            <button
+              onClick={() => onToggleEngine('neural')}
+              className={`btn ${modelingEngine === 'neural' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{
+                padding: '0.35rem 0.65rem',
+                fontSize: '0.78rem',
+                border: 'none',
+                fontWeight: '700',
+                backgroundColor: modelingEngine === 'neural' ? '#7c3aed' : undefined,
+                borderColor: modelingEngine === 'neural' ? '#7c3aed' : undefined,
+              }}
+            >
+              <BrainCircuit size={14} />
+              <span>Mạng Nơ-ron AI</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 1. SAS JMP Prediction Profiler & Desirability Optimization */}
       <DesirabilityProfiler
         factors={factors}

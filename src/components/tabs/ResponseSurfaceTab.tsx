@@ -4,19 +4,25 @@ import {
   Sliders,
   Layers,
   ArrowRight,
+  Calculator,
+  BrainCircuit,
 } from 'lucide-react';
 import type {
   QBDProject,
   StatisticalModelResult,
+  NeuralNetModelResult,
+  ModelingEngine,
 } from '../../types/qbd';
 import { PlotlyChart } from '../PlotlyChart';
 import { codedToActual } from '../../services/doeGenerator';
 
 interface ResponseSurfaceTabProps {
   project: QBDProject;
-  models: Record<string, StatisticalModelResult>;
+  models: Record<string, StatisticalModelResult | NeuralNetModelResult>;
   selectedCQA: string;
   onSelectCQA: (cqaCode: string) => void;
+  modelingEngine?: ModelingEngine;
+  onToggleEngine?: (engine: ModelingEngine) => void;
   onNavigateToDesignSpace: () => void;
 }
 
@@ -25,6 +31,8 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
   models,
   selectedCQA,
   onSelectCQA,
+  modelingEngine = 'polynomial',
+  onToggleEngine,
   onNavigateToDesignSpace,
 }) => {
   const factors = project.factors;
@@ -254,12 +262,43 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            {/* Modeling Engine Toggle */}
+            {onToggleEngine && (
+              <div style={{ display: 'flex', backgroundColor: '#f1f5f9', borderRadius: '0.5rem', padding: '0.2rem', gap: '0.2rem' }}>
+                <button
+                  onClick={() => onToggleEngine('polynomial')}
+                  className={`btn ${modelingEngine === 'polynomial' ? 'btn-teal' : 'btn-secondary'}`}
+                  style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', border: 'none', fontWeight: '700' }}
+                  title="Hiển thị bề mặt đáp ứng từ mô hình Hồi quy Đa thức bậc ≤ 2 (ANOVA)"
+                >
+                  <Calculator size={14} />
+                  <span>Đa Thức (ANOVA)</span>
+                </button>
+                <button
+                  onClick={() => onToggleEngine('neural')}
+                  className={`btn ${modelingEngine === 'neural' ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{
+                    padding: '0.35rem 0.65rem',
+                    fontSize: '0.78rem',
+                    border: 'none',
+                    fontWeight: '700',
+                    backgroundColor: modelingEngine === 'neural' ? '#7c3aed' : undefined,
+                    borderColor: modelingEngine === 'neural' ? '#7c3aed' : undefined,
+                  }}
+                  title="Hiển thị bề mặt đáp ứng từ mô hình Mạng Nơ-ron AI (SAS JMP Neural)"
+                >
+                  <BrainCircuit size={14} />
+                  <span>Mạng Nơ-ron AI</span>
+                </button>
+              </div>
+            )}
+
             {/* CQA Selector */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
               <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#475569' }}>Đáp ứng CQA:</label>
               <select
                 className="input-field"
-                style={{ width: '180px', fontWeight: '600', color: '#0f766e' }}
+                style={{ width: '180px', fontWeight: '600', color: modelingEngine === 'neural' ? '#7c3aed' : '#0f766e' }}
                 value={selectedCQA}
                 onChange={(e) => onSelectCQA(e.target.value)}
               >

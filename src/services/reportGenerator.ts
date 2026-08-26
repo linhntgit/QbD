@@ -18,6 +18,7 @@ import type {
   DesirabilitySolution,
   MonteCarloResult,
   NeuralNetModelResult,
+  ModelingEngine,
 } from '../types/qbd';
 import { calculateDesignEfficiency } from './doeGenerator';
 
@@ -58,7 +59,8 @@ export async function exportQBDWordReport(
   models: Record<string, StatisticalModelResult>,
   optimum: DesirabilitySolution | null,
   monteCarlo: MonteCarloResult | null,
-  neuralModels?: Record<string, NeuralNetModelResult>
+  neuralModels?: Record<string, NeuralNetModelResult>,
+  modelingEngine: ModelingEngine = 'polynomial'
 ): Promise<void> {
   const sections: any[] = [];
 
@@ -119,8 +121,20 @@ export async function exportQBDWordReport(
     }),
     new TableRow({
       children: [
-        createDataCell('Ngày lập báo cáo', false, 30),
-        createDataCell(new Date().toLocaleDateString('vi-VN'), false, 70),
+        createDataCell('Phương pháp mô hình hóa chính', false, 30),
+        createDataCell(
+          modelingEngine === 'neural'
+            ? 'Mạng Nơ-ron Nhân Tạo AI (SAS JMP Neural Network Platform)'
+            : 'Hồi Quy Đa Thức Bậc ≤ 2 (Classical ANOVA / Response Surface)',
+          false,
+          70
+        ),
+      ],
+    }),
+    new TableRow({
+      children: [
+        createDataCell('Ngày lập báo cáo', true, 30),
+        createDataCell(new Date().toLocaleDateString('vi-VN'), true, 70),
       ],
     }),
   ];

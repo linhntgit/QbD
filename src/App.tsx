@@ -5,6 +5,7 @@ import type {
   StatisticalModelResult,
   NeuralNetConfig,
   NeuralNetModelResult,
+  ModelingEngine,
 } from './types/qbd';
 import { CASE_STUDIES } from './data/caseStudies';
 import { fitModel, optimizeDesirability, runMonteCarloSimulation } from './services/statistics';
@@ -28,6 +29,7 @@ export function App() {
   const [selectedCQA, setSelectedCQA] = useState<string>(CASE_STUDIES[0].cqas[0]?.code || 'Y1');
   const [modelTypes, setModelTypes] = useState<Record<string, ModelType>>({});
   const [neuralConfigs, setNeuralConfigs] = useState<Record<string, NeuralNetConfig>>({});
+  const [modelingEngine, setModelingEngine] = useState<ModelingEngine>('polynomial');
 
   // Calculate ANOVA Models dynamically for all CQAs
   const models = useMemo<Record<string, StatisticalModelResult>>(() => {
@@ -55,6 +57,14 @@ export function App() {
     return result;
   }, [project.cqas, project.factors, project.runs, neuralConfigs]);
 
+  // Active Models based on selected Modeling Engine (Polynomial or Neural)
+  const activeModels = useMemo<Record<string, StatisticalModelResult | NeuralNetModelResult>>(() => {
+    if (modelingEngine === 'neural' && Object.keys(neuralModels).length > 0) {
+      return neuralModels;
+    }
+    return models;
+  }, [modelingEngine, models, neuralModels]);
+
   // Handle Training specific Neural Network model with custom hyperparameters
   const handleTrainNeuralModel = (cqaCode: string, config: NeuralNetConfig) => {
     setNeuralConfigs((prev) => ({
@@ -63,23 +73,23 @@ export function App() {
     }));
   };
 
-  // Calculate Desirability Optimum dynamically
+  // Calculate Desirability Optimum dynamically from active modeling engine
   const optimum = useMemo(() => {
-    return optimizeDesirability(project.factors, project.cqas, models);
-  }, [project.factors, project.cqas, models]);
+    return optimizeDesirability(project.factors, project.cqas, activeModels);
+  }, [project.factors, project.cqas, activeModels]);
 
-  // Calculate Monte Carlo Simulation
+  // Calculate Monte Carlo Simulation from active modeling engine
   const monteCarlo = useMemo(() => {
     if (!optimum) return null;
     return runMonteCarloSimulation(
       optimum.actualFactors,
       project.factors,
       project.cqas,
-      models,
+      activeModels,
       2.0,
       10000
     );
-  }, [optimum, project.factors, project.cqas, models]);
+  }, [optimum, project.factors, project.cqas, activeModels]);
 
   // Update Project Handler
   const handleUpdateProject = (updated: Partial<QBDProject>) => {
@@ -188,7 +198,7 @@ export function App() {
 
   // Export Word Report
   const handleExportWord = () => {
-    exportQBDWordReport(project, models, optimum, monteCarlo, neuralModels);
+    exportQBDWordReport(project, models, optimum, monteCarlo, neuralModels, modelingEngine);
   };
 
   return (
@@ -197,6 +207,8 @@ export function App() {
       <Navbar
         project={project}
         activeTab={activeTab}
+        modelingEngine={modelingEngine}
+        onToggleEngine={setModelingEngine}
         onNavigateToTab={setActiveTab}
         onLoadProject={handleLoadProject}
         onExportWord={handleExportWord}
@@ -237,6 +249,8 @@ export function App() {
             onSelectCQA={setSelectedCQA}
             modelTypes={modelTypes}
             onModelTypeChange={(code, type) => setModelTypes({ ...modelTypes, [code]: type })}
+            modelingEngine={modelingEngine}
+            onSelectEngine={setModelingEngine}
             onNavigateToRSM={() => setActiveTab('rsm')}
             onNavigateToNeural={() => setActiveTab('neural')}
           />
@@ -251,6 +265,8 @@ export function App() {
             onTrainModel={handleTrainNeuralModel}
             selectedCQA={selectedCQA}
             onSelectCQA={setSelectedCQA}
+            modelingEngine={modelingEngine}
+            onSelectEngine={setModelingEngine}
             onNavigateToRSM={() => setActiveTab('rsm')}
             onNavigateToDesignSpace={() => setActiveTab('design_space')}
           />
@@ -259,9 +275,11 @@ export function App() {
         {activeTab === 'rsm' && (
           <ResponseSurfaceTab
             project={project}
-            models={models}
+            models={activeModels}
             selectedCQA={selectedCQA}
             onSelectCQA={setSelectedCQA}
+            modelingEngine={modelingEngine}
+            onToggleEngine={setModelingEngine}
             onNavigateToDesignSpace={() => setActiveTab('design_space')}
           />
         )}
@@ -269,7 +287,9 @@ export function App() {
         {activeTab === 'design_space' && (
           <DesignSpaceTab
             project={project}
-            models={models}
+            models={activeModels}
+            modelingEngine={modelingEngine}
+            onToggleEngine={setModelingEngine}
             onUpdateProject={handleUpdateProject}
             onNavigateToReport={() => setActiveTab('report')}
           />
@@ -282,6 +302,8 @@ export function App() {
             optimum={optimum}
             monteCarlo={monteCarlo}
             neuralModels={neuralModels}
+            modelingEngine={modelingEngine}
+            onToggleEngine={setModelingEngine}
           />
         )}
       </main>

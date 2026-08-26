@@ -23,6 +23,7 @@ import type {
   NeuralNetModelResult,
   NeuralActivation,
   DesirabilitySolution,
+  ModelingEngine,
 } from '../../types/qbd';
 import { PlotlyChart } from '../PlotlyChart';
 import { codedToActual } from '../../services/doeGenerator';
@@ -36,6 +37,8 @@ interface NeuralNetworkTabProps {
   onTrainModel: (cqaCode: string, config: NeuralNetConfig) => void;
   selectedCQA: string;
   onSelectCQA: (cqaCode: string) => void;
+  modelingEngine?: ModelingEngine;
+  onSelectEngine?: (engine: ModelingEngine) => void;
   onNavigateToRSM: () => void;
   onNavigateToDesignSpace: () => void;
 }
@@ -48,6 +51,8 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
   onTrainModel,
   selectedCQA,
   onSelectCQA,
+  modelingEngine,
+  onSelectEngine,
   onNavigateToRSM,
   onNavigateToDesignSpace,
 }) => {
@@ -452,10 +457,17 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <BrainCircuit size={24} color="#7c3aed" />
               <div>
-                <h2 style={{ fontSize: '1.2rem', fontWeight: '800', color: '#0f172a' }}>
-                  Phân Tích Dữ Liệu Thực Nghiệm Bằng Mạng Nơ-ron (Neural Network Platform)
-                </h2>
-                <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <h2 style={{ fontSize: '1.2rem', fontWeight: '800', color: '#0f172a', margin: 0 }}>
+                    Phân Tích Dữ Liệu Thực Nghiệm Bằng Mạng Nơ-ron (Neural Network Platform)
+                  </h2>
+                  {modelingEngine === 'neural' && (
+                    <span className="badge" style={{ backgroundColor: '#7c3aed', color: '#ffffff', fontSize: '0.72rem' }}>
+                      ✓ Đang Chọn Làm Mô Hình Chính (Bước 6, 7, 8)
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.2rem' }}>
                   Mô phỏng phi tuyến tính cao cấp tương tự SAS JMP Neural • Multi-Layer Perceptron (MLP) • Khảo sát bề mặt và tối ưu hóa Desirability.
                 </div>
               </div>
@@ -490,11 +502,15 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             </button>
 
             <button
-              onClick={onNavigateToRSM}
-              className="btn btn-secondary"
-              style={{ fontSize: '0.82rem', padding: '0.4rem 0.85rem' }}
+              onClick={() => {
+                onSelectEngine?.('neural');
+                onNavigateToRSM();
+              }}
+              className="btn btn-primary"
+              style={{ fontSize: '0.82rem', padding: '0.4rem 0.95rem', backgroundColor: '#7c3aed', borderColor: '#7c3aed', fontWeight: '700' }}
+              title="Chọn mô hình Mạng Nơ-ron AI làm phương pháp chính cho các bước tiếp theo (Bước 6: Bề mặt, Bước 7: Vùng thiết kế, Bước 8: Báo cáo)"
             >
-              <span>Xem Đồ Thị ANOVA</span>
+              <span>Tiếp Tục Với Mạng Nơ-ron (Bước 6, 7, 8)</span>
               <ArrowRight size={16} />
             </button>
           </div>

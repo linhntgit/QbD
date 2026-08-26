@@ -10,6 +10,7 @@ import type {
   QBDProject,
   StatisticalModelResult,
   ModelType,
+  ModelingEngine,
 } from '../../types/qbd';
 import { PlotlyChart } from '../PlotlyChart';
 import { normalInverseCDF } from '../../services/mathUtils';
@@ -21,6 +22,8 @@ interface StatisticalANOVATabProps {
   onSelectCQA: (cqaCode: string) => void;
   modelTypes: Record<string, ModelType>;
   onModelTypeChange: (cqaCode: string, type: ModelType) => void;
+  modelingEngine?: ModelingEngine;
+  onSelectEngine?: (engine: ModelingEngine) => void;
   onNavigateToRSM: () => void;
   onNavigateToNeural?: () => void;
 }
@@ -32,6 +35,8 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
   onSelectCQA,
   modelTypes,
   onModelTypeChange,
+  modelingEngine,
+  onSelectEngine,
   onNavigateToRSM,
   onNavigateToNeural,
 }) => {
@@ -221,6 +226,11 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
               <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#0f172a' }}>
                 Phân Tích Thống Kê & Mô Hình Hóa ANOVA
               </h2>
+              {modelingEngine === 'polynomial' && (
+                <span className="badge badge-teal" style={{ fontSize: '0.72rem' }}>
+                  ✓ Đang Chọn Làm Mô Hình Chính (Bước 6, 7, 8)
+                </span>
+              )}
             </div>
             <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.2rem' }}>
               Ước lượng hồi quy đa thức, kiểm định mức ý nghĩa F-test, p-value và đánh giá độ phù hợp của mô hình theo ICH Q8.
@@ -263,20 +273,25 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
             {onNavigateToNeural && (
               <button
                 onClick={onNavigateToNeural}
-                className="btn btn-primary"
-                style={{ fontSize: '0.82rem', padding: '0.4rem 0.85rem', backgroundColor: '#7c3aed', borderColor: '#7c3aed' }}
+                className="btn btn-secondary"
+                style={{ fontSize: '0.82rem', padding: '0.4rem 0.85rem' }}
+                title="Chuyển sang Tab Mạng Nơ-ron AI để thử nghiệm mô hình học sâu"
               >
-                <BrainCircuit size={16} />
-                <span>Mạng Nơ-ron AI</span>
+                <BrainCircuit size={16} color="#7c3aed" />
+                <span>Thử Mạng Nơ-ron</span>
               </button>
             )}
 
             <button
-              onClick={onNavigateToRSM}
+              onClick={() => {
+                onSelectEngine?.('polynomial');
+                onNavigateToRSM();
+              }}
               className="btn btn-teal"
-              style={{ fontSize: '0.82rem', padding: '0.4rem 0.85rem' }}
+              style={{ fontSize: '0.82rem', padding: '0.4rem 0.85rem', fontWeight: '700' }}
+              title="Chọn mô hình Hồi quy Đa thức bậc ≤ 2 làm phương pháp chính cho các bước tiếp theo (Bước 6: Bề mặt, Bước 7: Vùng thiết kế, Bước 8: Báo cáo)"
             >
-              <span>Xem Đồ Thị 3D</span>
+              <span>Tiếp Tục Với Đa Thức (Bước 6, 7, 8)</span>
               <ArrowRight size={16} />
             </button>
           </div>

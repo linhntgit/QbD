@@ -7,13 +7,17 @@ import {
   PlusCircle,
   BookOpen,
   FileCheck2,
+  Calculator,
+  BrainCircuit,
 } from 'lucide-react';
-import type { QBDProject } from '../types/qbd';
+import type { QBDProject, ModelingEngine } from '../types/qbd';
 import { CASE_STUDIES } from '../data/caseStudies';
 
 interface NavbarProps {
   project: QBDProject;
   activeTab?: string;
+  modelingEngine?: ModelingEngine;
+  onToggleEngine?: (engine: ModelingEngine) => void;
   onNavigateToTab?: (tab: any) => void;
   onLoadProject: (project: QBDProject) => void;
   onExportWord: () => void;
@@ -24,6 +28,8 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({
   project,
   activeTab,
+  modelingEngine = 'polynomial',
+  onToggleEngine,
   onNavigateToTab,
   onLoadProject,
   onExportWord,
@@ -86,7 +92,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           </div>
 
-          {/* Author Copyright & ICH Compliance Badges */}
+          {/* Author Copyright, Modeling Engine & ICH Compliance Badges */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
             <span
               className="badge"
@@ -104,6 +110,62 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               © Tran Linh Nguyen
             </span>
+
+            {/* Global Modeling Paradigm Switcher */}
+            {onToggleEngine && (
+              <div
+                style={{
+                  display: 'flex',
+                  backgroundColor: '#f1f5f9',
+                  borderRadius: '0.375rem',
+                  padding: '0.15rem',
+                  border: '1px solid #cbd5e1',
+                  gap: '0.15rem',
+                }}
+              >
+                <button
+                  onClick={() => onToggleEngine('polynomial')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.25rem',
+                    padding: '0.15rem 0.45rem',
+                    fontSize: '0.72rem',
+                    fontWeight: '700',
+                    border: 'none',
+                    borderRadius: '0.25rem',
+                    cursor: 'pointer',
+                    backgroundColor: modelingEngine === 'polynomial' ? '#0f766e' : 'transparent',
+                    color: modelingEngine === 'polynomial' ? '#ffffff' : '#64748b',
+                  }}
+                  title="Chuyển toàn bộ phân tích sang Hồi quy Đa thức bậc ≤ 2"
+                >
+                  <Calculator size={12} />
+                  <span>Đa Thức</span>
+                </button>
+                <button
+                  onClick={() => onToggleEngine('neural')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.25rem',
+                    padding: '0.15rem 0.45rem',
+                    fontSize: '0.72rem',
+                    fontWeight: '700',
+                    border: 'none',
+                    borderRadius: '0.25rem',
+                    cursor: 'pointer',
+                    backgroundColor: modelingEngine === 'neural' ? '#7c3aed' : 'transparent',
+                    color: modelingEngine === 'neural' ? '#ffffff' : '#64748b',
+                  }}
+                  title="Chuyển toàn bộ phân tích sang Mạng Nơ-ron AI (SAS JMP)"
+                >
+                  <BrainCircuit size={12} />
+                  <span>Mạng Nơ-ron</span>
+                </button>
+              </div>
+            )}
+
             <span className="badge badge-teal" title="Pharmaceutical Development & Design Space">ICH Q8(R2)</span>
             <span className="badge badge-warning" title="Quality Risk Management & FMEA">ICH Q9</span>
             <span className="badge badge-success" title="Pharmaceutical Quality System & Control Strategy">ICH Q10</span>
