@@ -13,7 +13,7 @@ import type {
   ModelingEngine,
 } from '../../types/qbd';
 import { PlotlyChart } from '../PlotlyChart';
-import { normalInverseCDF } from '../../services/mathUtils';
+import { normalInverseCDF, formatAxisTitle } from '../../services/mathUtils';
 
 interface StatisticalANOVATabProps {
   project: QBDProject;
@@ -169,7 +169,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
           title: `Phần dư Chuẩn hóa vs. Giá trị Dự đoán - ${currentCQA.name} (${currentCQA.code})`,
           xaxis: {
             title: {
-              text: `Giá trị Dự đoán Ý (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+              text: formatAxisTitle('Giá trị Dự đoán Ý', currentCQA.code, currentCQA.unit),
               font: { size: 12, color: '#1e293b' },
               standoff: 10,
             },

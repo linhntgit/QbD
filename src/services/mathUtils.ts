@@ -378,3 +378,27 @@ export function matrixTrace(matrix: number[][]): number {
   return tr;
 }
 
+/**
+ * Format an axis title cleanly.
+ * If the total string length exceeds `maxSingleLine` (default: 24 characters),
+ * it smartly splits into 2 lines using `<br>`:
+ * Line 1: Variable Name
+ * Line 2: (Code) [Unit]
+ */
+export function formatAxisTitle(
+  name: string,
+  code: string,
+  unit?: string,
+  maxSingleLine: number = 24
+): string {
+  const cleanUnit = unit && unit.trim() ? ` [${unit.trim()}]` : '';
+  const singleLine = `${name} (${code})${cleanUnit}`;
+
+  if (singleLine.length <= maxSingleLine) {
+    return singleLine;
+  }
+
+  // Split into 2 lines: Name on line 1, (Code) [Unit] on line 2
+  return `${name}<br>(${code})${cleanUnit}`;
+}
+

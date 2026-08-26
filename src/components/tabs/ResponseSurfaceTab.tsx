@@ -15,6 +15,7 @@ import type {
 } from '../../types/qbd';
 import { PlotlyChart } from '../PlotlyChart';
 import { codedToActual } from '../../services/doeGenerator';
+import { formatAxisTitle } from '../../services/mathUtils';
 
 interface ResponseSurfaceTabProps {
   project: QBDProject;
@@ -280,21 +281,21 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
       scene: {
         xaxis: {
           title: {
-            text: `${factorX.name} (${factorX.code})${factorX.unit ? ` [${factorX.unit}]` : ''}`,
+            text: formatAxisTitle(factorX.name, factorX.code, factorX.unit),
             font: { size: 12, color: '#1e293b' },
           },
           tickfont: { size: 10 },
         },
         yaxis: {
           title: {
-            text: `${factorY.name} (${factorY.code})${factorY.unit ? ` [${factorY.unit}]` : ''}`,
+            text: formatAxisTitle(factorY.name, factorY.code, factorY.unit),
             font: { size: 12, color: '#1e293b' },
           },
           tickfont: { size: 10 },
         },
         zaxis: {
           title: {
-            text: `${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+            text: formatAxisTitle(currentCQA.name, currentCQA.code, currentCQA.unit),
             font: { size: 12, color: '#1e293b' },
           },
           tickfont: { size: 10 },
@@ -305,7 +306,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
       },
       xaxis: {
         title: {
-          text: `${factorX.name} (${factorX.code})${factorX.unit ? ` [${factorX.unit}]` : ''}`,
+          text: formatAxisTitle(factorX.name, factorX.code, factorX.unit),
           font: { size: 13, color: '#1e293b' },
           standoff: 12,
         },
@@ -314,7 +315,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
       },
       yaxis: {
         title: {
-          text: `${factorY.name} (${factorY.code})${factorY.unit ? ` [${factorY.unit}]` : ''}`,
+          text: formatAxisTitle(factorY.name, factorY.code, factorY.unit),
           font: { size: 13, color: '#1e293b' },
           standoff: 12,
         },

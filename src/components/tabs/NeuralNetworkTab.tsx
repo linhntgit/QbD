@@ -28,6 +28,7 @@ import type {
 import { PlotlyChart } from '../PlotlyChart';
 import { codedToActual } from '../../services/doeGenerator';
 import { optimizeNeuralDesirability } from '../../services/neuralNetwork';
+import { formatAxisTitle } from '../../services/mathUtils';
 
 interface NeuralNetworkTabProps {
   project: QBDProject;
@@ -210,21 +211,21 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
       scene: {
         xaxis: {
           title: {
-            text: `${factorX?.name || ''} (${factorX?.code || ''})${factorX?.unit ? ` [${factorX.unit}]` : ''}`,
+            text: factorX ? formatAxisTitle(factorX.name, factorX.code, factorX.unit) : '',
             font: { size: 12, color: '#1e293b' },
           },
           tickfont: { size: 10 },
         },
         yaxis: {
           title: {
-            text: `${factorY?.name || ''} (${factorY?.code || ''})${factorY?.unit ? ` [${factorY.unit}]` : ''}`,
+            text: factorY ? formatAxisTitle(factorY.name, factorY.code, factorY.unit) : '',
             font: { size: 12, color: '#1e293b' },
           },
           tickfont: { size: 10 },
         },
         zaxis: {
           title: {
-            text: `${currentCQA?.name || ''} (${currentCQA?.code || ''})${currentCQA?.unit ? ` [${currentCQA.unit}]` : ''}`,
+            text: currentCQA ? formatAxisTitle(currentCQA.name, currentCQA.code, currentCQA.unit) : '',
             font: { size: 12, color: '#1e293b' },
           },
           tickfont: { size: 10 },
@@ -233,19 +234,21 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
       },
       xaxis: {
         title: {
-          text: `${factorX?.name || ''} (${factorX?.code || ''})${factorX?.unit ? ` [${factorX.unit}]` : ''}`,
+          text: factorX ? formatAxisTitle(factorX.name, factorX.code, factorX.unit) : '',
           font: { size: 13, color: '#1e293b' },
           standoff: 12,
         },
         tickfont: { size: 11 },
+        automargin: true,
       },
       yaxis: {
         title: {
-          text: `${factorY?.name || ''} (${factorY?.code || ''})${factorY?.unit ? ` [${factorY.unit}]` : ''}`,
+          text: factorY ? formatAxisTitle(factorY.name, factorY.code, factorY.unit) : '',
           font: { size: 13, color: '#1e293b' },
           standoff: 12,
         },
         tickfont: { size: 11 },
+        automargin: true,
       },
     };
   }, [plotType, currentCQA, factorX, factorY]);
@@ -385,7 +388,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           title: `Đồ Thị Thực Tế vs. Dự Đoán - ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
           xaxis: {
             title: {
-              text: `Giá Trị Dự Đoán Ý (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+              text: formatAxisTitle('Giá Trị Dự Đoán Ý', currentCQA.code, currentCQA.unit),
               font: { size: 12, color: '#1e293b' },
               standoff: 10,
             },
@@ -394,7 +397,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           },
           yaxis: {
             title: {
-              text: `Giá Trị Thực Tế Y (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+              text: formatAxisTitle('Giá Trị Thực Tế Y', currentCQA.code, currentCQA.unit),
               font: { size: 12, color: '#1e293b' },
               standoff: 10,
             },
@@ -438,7 +441,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           title: `Phần Dư vs. Giá Trị Dự Đoán - ${currentCQA.name} (${currentCQA.code})`,
           xaxis: {
             title: {
-              text: `Giá Trị Dự Đoán Ý (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+              text: formatAxisTitle('Giá Trị Dự Đoán Ý', currentCQA.code, currentCQA.unit),
               font: { size: 12, color: '#1e293b' },
               standoff: 10,
             },
@@ -447,7 +450,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           },
           yaxis: {
             title: {
-              text: `Phần Dư Y - Ý (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+              text: formatAxisTitle('Phần Dư Y - Ý', currentCQA.code, currentCQA.unit),
               font: { size: 12, color: '#1e293b' },
               standoff: 10,
             },

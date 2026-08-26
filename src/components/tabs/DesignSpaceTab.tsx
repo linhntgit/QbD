@@ -27,6 +27,7 @@ import {
   runMonteCarloSimulation,
 } from '../../services/statistics';
 import { codedToActual, actualToCoded } from '../../services/doeGenerator';
+import { formatAxisTitle } from '../../services/mathUtils';
 
 interface DesignSpaceTabProps {
   project: QBDProject;
@@ -276,7 +277,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
     title: `Vùng Thiết Kế (Design Space Overlay) - Giao điểm Tất cả các CQAs`,
     xaxis: {
       title: {
-        text: `${factorX.name} (${factorX.code})${factorX.unit ? ` [${factorX.unit}]` : ''}`,
+        text: formatAxisTitle(factorX.name, factorX.code, factorX.unit),
         font: { size: 13, color: '#1e293b' },
         standoff: 12,
       },
@@ -285,7 +286,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
     },
     yaxis: {
       title: {
-        text: `${factorY.name} (${factorY.code})${factorY.unit ? ` [${factorY.unit}]` : ''}`,
+        text: formatAxisTitle(factorY.name, factorY.code, factorY.unit),
         font: { size: 13, color: '#1e293b' },
         standoff: 12,
       },
