@@ -694,6 +694,14 @@ export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { r
     runs.sort((a, b) => a.runOrder - b.runOrder);
   }
 
+  // Blocks describe the order in which a design is executed (for example,
+  // separate manufacturing days).  Keep the allocation balanced and assign it
+  // after randomization so each batch retains a spread of design points.
+  const blockCount = Math.min(runs.length, Math.max(1, Math.floor(config.blocks ?? 1)));
+  runs.forEach((run, index) => {
+    run.block = Math.floor((index * blockCount) / runs.length) + 1;
+  });
+
   return { runs, alpha: calculatedAlpha };
 }
 
@@ -789,6 +797,9 @@ export function validateDesignSetup(factors: Factor[], config: DoEDesignConfig):
     warnings.push('Thiết kế mixture–process nhân chéo đầy đủ có thể tạo rất nhiều run; cân nhắc D-optimal theo ngân sách.');
   }
   if ((config.replicates || 1) > 1) warnings.push('Số run hiển thị sẽ tăng theo số lặp lại đã chọn.');
+  if ((config.blocks ?? 1) > 1) {
+    warnings.push('Block hiện dùng để lập lịch chạy cân bằng. Khi có khác biệt theo ngày/mẻ, cần xem xét hiệu ứng block trong phân tích chuyên sâu.');
+  }
 
   return { isValid: errors.length === 0, errors, warnings, requiredTerms, minimumFittableRuns };
 }
@@ -836,6 +847,120 @@ export function assessDesignReadiness(
     isEstimable: rank === termCount && residualDegreesOfFreedom > 0,
     messages,
   };
+}
+
+export interface DesignAugmentationResult {
+  runs: DoERun[];
+  addedRuns: DoERun[];
+  before: DesignReadiness;
+  after: DesignReadiness;
+  warnings: string[];
+}
+
+const codedPointSignature = (point: number[]): string => point.map((value) => value.toFixed(6)).join('|');
+
+/**
+ * Add informative, previously untried points to an already executed design.
+ * The historical rows remain untouched; the added rows form the next execution
+ * block.  Selection is greedy D-optimal augmentation, prioritising model rank
+ * before the determinant of X'X.
+ */
+export function augmentDOptimalDesign(
+  factors: Factor[],
+  existingRuns: DoERun[],
+  model: 'Linear' | '2FI' | 'Quadratic',
+  additionalRuns: number,
+): DesignAugmentationResult {
+  const activeFactors = factors.filter((factor) => factor.controllability !== 'constant');
+  const before = assessDesignReadiness(factors, existingRuns, model);
+  const requested = Math.max(0, Math.floor(additionalRuns));
+  const warnings: string[] = [];
+  if (requested === 0 || activeFactors.length === 0) {
+    if (requested > 0) warnings.push('Không có nhân tố biến thiên để tăng cường thiết kế.');
+    return { runs: [...existingRuns], addedRuns: [], before, after: before, warnings };
+  }
+
+  const existingPoints = new Set(
+    existingRuns.map((run) => codedPointSignature(activeFactors.map((factor) => run.factorCoded[factor.code] ?? 0))),
+  );
+  const candidates = generateCandidatePool(activeFactors)
+    .filter((point) => !existingPoints.has(codedPointSignature(point)));
+  if (candidates.length === 0) {
+    warnings.push('Không còn điểm ứng viên mới trong không gian thiết kế hiện tại.');
+    return { runs: [...existingRuns], addedRuns: [], before, after: before, warnings };
+  }
+
+  const selected: number[][] = [];
+  const designRows = existingRuns.map((run) =>
+    expandModelVectorForFactors(activeFactors.map((factor) => run.factorCoded[factor.code] ?? 0), activeFactors, model),
+  );
+  const termCount = calculateNumModelTermsForFactors(activeFactors, model);
+  const maxToAdd = Math.min(requested, candidates.length);
+
+  for (let step = 0; step < maxToAdd; step++) {
+    let bestIndex = -1;
+    let bestRank = -1;
+    let bestDeterminant = -1;
+    for (let index = 0; index < candidates.length; index++) {
+      const candidateRow = expandModelVectorForFactors(candidates[index], activeFactors, model);
+      const rows = [...designRows, ...selected.map((point) => expandModelVectorForFactors(point, activeFactors, model)), candidateRow];
+      const rank = matrixRank(rows);
+      const determinant = rank === termCount
+        ? Math.abs(matrixDeterminant(matMul(matTranspose(rows), rows)))
+        : 0;
+      if (rank > bestRank || (rank === bestRank && determinant > bestDeterminant + 1e-12)) {
+        bestIndex = index;
+        bestRank = rank;
+        bestDeterminant = determinant;
+      }
+    }
+    if (bestIndex < 0) break;
+    selected.push(candidates.splice(bestIndex, 1)[0]);
+  }
+
+  if (selected.length < requested) warnings.push(`Chỉ thêm được ${selected.length}/${requested} điểm mới không trùng lặp.`);
+  const mixtureActiveIndexes = activeFactors
+    .map((factor, index) => (factor.role === 'mixture_component' || factor.type === 'Mixture' ? index : -1))
+    .filter((index) => index >= 0);
+  const nextStdOrder = existingRuns.reduce((maximum, run) => Math.max(maximum, run.stdOrder), 0);
+  const nextRunOrder = existingRuns.reduce((maximum, run) => Math.max(maximum, run.runOrder), 0);
+  const nextBlock = existingRuns.reduce((maximum, run) => Math.max(maximum, run.block || 1), 1) + 1;
+  const addedRuns = selected.map((rawPoint, index) => {
+    const point = [...rawPoint];
+    if (mixtureActiveIndexes.length >= 2) {
+      const mixtureTotal = mixtureActiveIndexes.reduce((sum, mixtureIndex) => sum + point[mixtureIndex], 0);
+      point[mixtureActiveIndexes[mixtureActiveIndexes.length - 1]] += 1 - mixtureTotal;
+    }
+    const factorCoded: Record<string, number> = {};
+    const factorActual: Record<string, number | string> = {};
+    factors.forEach((factor) => {
+      const activeIndex = activeFactors.indexOf(factor);
+      const coded = activeIndex >= 0 ? point[activeIndex] : 0;
+      factorCoded[factor.code] = coded;
+      if (factor.controllability === 'constant' && factor.constantValue !== undefined) {
+        factorActual[factor.code] = factor.constantValue;
+      } else if (factor.role === 'mixture_component' || factor.type === 'Mixture') {
+        factorActual[factor.code] = factor.high <= 1 && factor.unit !== '%'
+          ? Number(coded.toFixed(4))
+          : Number((coded * 100).toFixed(2));
+      } else {
+        factorActual[factor.code] = codedToActual(coded, factor);
+      }
+    });
+    return {
+      id: `augment-${nextStdOrder + index + 1}`,
+      stdOrder: nextStdOrder + index + 1,
+      runOrder: nextRunOrder + index + 1,
+      block: nextBlock,
+      factorCoded,
+      factorActual,
+      responses: {},
+    };
+  });
+  const runs = [...existingRuns, ...addedRuns];
+  const after = assessDesignReadiness(factors, runs, model);
+  if (!after.isEstimable) warnings.push('Thiết kế sau tăng cường vẫn chưa đủ để ước lượng mô hình mục tiêu.');
+  return { runs, addedRuns, before, after, warnings };
 }
 
 /**

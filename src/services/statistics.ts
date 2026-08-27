@@ -27,6 +27,38 @@ import { buildModelTerms, getModelBlockCounts, type ModelTermDefinition } from '
 
 type TermDef = ModelTermDefinition;
 
+export interface ModelCandidateAssessment {
+  modelType: Extract<ModelType, 'Linear' | '2FI' | 'Quadratic'>;
+  model: StatisticalModelResult | null;
+  isHierarchical: boolean;
+  residualDegreesOfFreedom: number;
+  aicc: number | null;
+  qSquared: number | null;
+  lackOfFitPValue: number | null;
+  outlierRunOrders: number[];
+  influentialRunOrders: number[];
+  highLeverageRunOrders: number[];
+  adequate: boolean;
+  reasons: string[];
+}
+
+export interface AnalysisWizardResult {
+  candidates: ModelCandidateAssessment[];
+  recommended: ModelCandidateAssessment | null;
+  warnings: string[];
+}
+
+export interface ConfirmationPlan {
+  sourceRunOrder: number;
+  sourceBlock: number;
+  factorActual: Record<string, number | string>;
+  predictedResponse: number;
+  meanConfidenceInterval: { low: number; high: number } | null;
+  individualPredictionInterval: { low: number; high: number } | null;
+  recommendedReplicates: number;
+  acceptanceCriterion: string;
+}
+
 function calculateSSE(X: number[][], Y: number[][]): number {
   const beta = matMul(matMul(matInverse(matMul(matTranspose(X), X)), matTranspose(X)), Y);
   const predicted = matMul(X, beta);
@@ -473,6 +505,118 @@ export function fitModel(
     predict,
     predictStandardError,
     residualDegreesOfFreedom: dfResidual,
+  };
+}
+
+/**
+ * Compare the complete hierarchical polynomial families available in the UI.
+ * AICc drives fit comparison, while residual df, Q² and lack-of-fit act as
+ * guardrails.  If candidates are within 2 AICc units, the simpler hierarchy is
+ * selected to avoid spending precision on unsupported curvature.
+ */
+export function assessModelCandidates(cqa: CQA, factors: Factor[], runs: DoERun[]): AnalysisWizardResult {
+  const modelTypes: ModelCandidateAssessment['modelType'][] = ['Linear', '2FI', 'Quadratic'];
+  const candidates = modelTypes.map((modelType): ModelCandidateAssessment => {
+    const model = fitModel(cqa, factors, runs, modelType);
+    if (!model) {
+      return {
+        modelType,
+        model: null,
+        isHierarchical: true,
+        residualDegreesOfFreedom: 0,
+        aicc: null,
+        qSquared: null,
+        lackOfFitPValue: null,
+        outlierRunOrders: [],
+        influentialRunOrders: [],
+        highLeverageRunOrders: [],
+        adequate: false,
+        reasons: ['Không đủ số liệu, bậc tự do dư hoặc ma trận không full-rank.'],
+      };
+    }
+    const residuals = model.diagnostics.residuals;
+    const parameterCount = model.terms.length;
+    const n = Math.max(1, residuals.length);
+    const outlierRunOrders = residuals.filter((item) => Math.abs(item.studentizedResidual) >= 3).map((item) => item.runOrder);
+    const influentialRunOrders = residuals.filter((item) => item.cooksDistance > 4 / n).map((item) => item.runOrder);
+    const highLeverageRunOrders = residuals.filter((item) => item.leverage > (2 * parameterCount) / n).map((item) => item.runOrder);
+    const df = model.residualDegreesOfFreedom ?? 0;
+    const aicc = Number.isFinite(model.diagnostics.aicc) ? model.diagnostics.aicc! : null;
+    const qSquared = model.diagnostics.qSquared ?? model.diagnostics.predRSquared;
+    const lackOfFitPValue = model.diagnostics.pLOF ?? null;
+    const reasons: string[] = [];
+    if (df < 4) reasons.push(`Chỉ còn ${df} df dư; kết luận cần thận trọng.`);
+    if (qSquared < 0) reasons.push('Q² âm: mô hình dự báo kém hơn trung bình quan sát.');
+    if (lackOfFitPValue !== null && lackOfFitPValue < 0.05) reasons.push('Lack-of-fit có ý nghĩa (p < 0,05).');
+    if (outlierRunOrders.length > 0) reasons.push(`Cần rà soát phần dư lớn ở run ${outlierRunOrders.join(', ')}.`);
+    if (influentialRunOrders.length > 0) reasons.push(`Cần rà soát điểm ảnh hưởng ở run ${influentialRunOrders.join(', ')}.`);
+    return {
+      modelType,
+      model,
+      isHierarchical: true,
+      residualDegreesOfFreedom: df,
+      aicc,
+      qSquared,
+      lackOfFitPValue,
+      outlierRunOrders,
+      influentialRunOrders,
+      highLeverageRunOrders,
+      adequate: df >= 4 && qSquared >= 0 && (lackOfFitPValue === null || lackOfFitPValue >= 0.05),
+      reasons,
+    };
+  });
+  const usable = candidates.filter((candidate) => candidate.model && candidate.adequate && candidate.aicc !== null);
+  const fallback = candidates.filter((candidate) => candidate.model && candidate.aicc !== null);
+  const ranked = (usable.length > 0 ? usable : fallback).sort((first, second) => (first.aicc! - second.aicc!) || first.model!.terms.length - second.model!.terms.length);
+  const best = ranked[0] ?? null;
+  const recommended = best
+    ? ranked.filter((candidate) => candidate.aicc! <= best.aicc! + 2)
+      .sort((first, second) => first.model!.terms.length - second.model!.terms.length)[0]
+    : null;
+  const warnings: string[] = [];
+  if (!recommended) warnings.push('Chưa có mô hình OLS hợp lệ để so sánh. Hãy bổ sung dữ liệu hoặc giảm bậc mô hình.');
+  else if (!recommended.adequate) warnings.push('Không có mô hình nào qua toàn bộ ngưỡng kiểm tra; đề xuất được chọn theo AICc chỉ để khởi đầu, không phải kết luận cuối cùng.');
+  if (recommended && best && recommended.modelType !== best.modelType) warnings.push('Chọn mô hình đơn giản hơn vì AICc chênh không quá 2 đơn vị.');
+  return { candidates, recommended, warnings };
+}
+
+/** Build a transparent confirmation-run plan from the best observed setting. */
+export function buildConfirmationPlan(cqa: CQA, model: StatisticalModelResult, runs: DoERun[]): ConfirmationPlan | null {
+  const eligible = runs.filter((run) => {
+    const raw = run.responses[cqa.code];
+    return typeof raw === 'number' ? Number.isFinite(raw) : typeof raw === 'string' && raw.trim() !== '' && Number.isFinite(Number(raw));
+  });
+  if (eligible.length === 0) return null;
+  const target = cqa.target ?? (cqa.lowerLimit !== undefined && cqa.upperLimit !== undefined ? (cqa.lowerLimit + cqa.upperLimit) / 2 : undefined);
+  const score = (run: DoERun): number => {
+    const value = Number(run.responses[cqa.code]);
+    if (cqa.objective === 'minimize') return value;
+    if (cqa.objective === 'maximize') return -value;
+    return Math.abs(value - (target ?? value));
+  };
+  const source = [...eligible].sort((first, second) => score(first) - score(second))[0];
+  const predictedResponse = model.predict(source.factorCoded);
+  const seMean = model.predictStandardError?.(source.factorCoded);
+  const df = model.residualDegreesOfFreedom ?? 0;
+  const critical = df > 0 ? tDistributionCritical(0.05, df) : Number.NaN;
+  const meanHalfWidth = seMean !== undefined && Number.isFinite(critical) ? critical * seMean : Number.NaN;
+  const predictionHalfWidth = seMean !== undefined && Number.isFinite(critical)
+    ? critical * Math.sqrt(seMean * seMean + model.diagnostics.stdDev * model.diagnostics.stdDev)
+    : Number.NaN;
+  const criterion = cqa.lowerLimit !== undefined || cqa.upperLimit !== undefined
+    ? `Kết quả trung bình xác nhận phải nằm trong ${cqa.lowerLimit ?? '-∞'} đến ${cqa.upperLimit ?? '+∞'} ${cqa.unit}.`
+    : cqa.objective === 'target' || cqa.objective === 'range'
+      ? `Kết quả trung bình xác nhận nên gần mục tiêu ${target ?? 'đã xác định'} ${cqa.unit}.`
+      : `Xác nhận xu hướng ${cqa.objective === 'minimize' ? 'giảm' : 'tăng'} so với các run đã quan sát.`;
+  return {
+    sourceRunOrder: source.runOrder,
+    sourceBlock: source.block,
+    factorActual: source.factorActual,
+    predictedResponse,
+    meanConfidenceInterval: Number.isFinite(meanHalfWidth) ? { low: predictedResponse - meanHalfWidth, high: predictedResponse + meanHalfWidth } : null,
+    individualPredictionInterval: Number.isFinite(predictionHalfWidth) ? { low: predictedResponse - predictionHalfWidth, high: predictedResponse + predictionHalfWidth } : null,
+    recommendedReplicates: df >= 8 ? 3 : 5,
+    acceptanceCriterion: criterion,
   };
 }
 

@@ -40,6 +40,7 @@ import {
   calculateNumModelTerms,
   actualToCoded,
   assessDesignReadiness,
+  augmentDOptimalDesign,
   recommendRunCount,
   validateDesignSetup,
 } from '../../services/doeGenerator';
@@ -71,7 +72,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
       centerPoints: 3,
       replicates: 1,
       randomized: true,
-      dOptimalModel: 'quadratic',
+      dOptimalModel: 'Quadratic',
     }
   );
 
@@ -100,6 +101,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
   const [activeCell, setActiveCell] = useState<CellCoord | null>(null);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [toastMsg, setToastMsg] = useState<{ text: string; type: 'success' | 'info' } | null>(null);
+  const [augmentationRuns, setAugmentationRuns] = useState<number>(4);
 
   const showToast = (text: string, type: 'success' | 'info' = 'success') => {
     setToastMsg({ text, type });
@@ -739,6 +741,21 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
     showToast(`✓ Đã tạo ${runs.length} run; p=${readiness.termCount}, df dư=${readiness.residualDegreesOfFreedom}.${warning}`, 'success');
   };
 
+  const handleAugmentDesign = () => {
+    if (project.runs.length === 0) {
+      showToast('Hãy tạo hoặc nhập ma trận ban đầu trước khi bổ sung tuần tự.', 'info');
+      return;
+    }
+    const result = augmentDOptimalDesign(project.factors, project.runs, selectedOptimalModel, augmentationRuns);
+    if (result.addedRuns.length === 0) {
+      showToast(result.warnings[0] || 'Không tìm thấy điểm mới phù hợp để bổ sung.', 'info');
+      return;
+    }
+    onUpdateProject({ runs: result.runs });
+    const note = result.warnings[0] ? ` ${result.warnings[0]}` : '';
+    showToast(`✓ Đã thêm ${result.addedRuns.length} run vào Block ${result.addedRuns[0].block}; rank ${result.after.rank}/${result.after.termCount}, df dư ${result.after.residualDegreesOfFreedom}.${note}`, 'success');
+  };
+
   // Manual Edit for Randomized Run Order
   const handleRunOrderChange = (runId: string, newOrder: number) => {
     const updatedRuns = project.runs.map((r) => {
@@ -981,6 +998,31 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
           {designValidation.warnings.map((warning) => <div key={warning} style={{ marginTop: '0.35rem', color: '#a16207', fontSize: '0.74rem' }}>• {warning}</div>)}
         </div>
 
+        {/* Sequential design augmentation keeps completed runs immutable. */}
+        {project.runs.length > 0 && (
+          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '0.65rem', padding: '0.9rem', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ fontWeight: '800', color: '#166534', fontSize: '0.9rem' }}>Bổ sung tuần tự D-optimal</div>
+                <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.2rem', maxWidth: '640px' }}>
+                  Giữ nguyên run đã thực hiện, chọn các điểm chưa lặp để tăng thông tin cho mô hình {selectedOptimalModel}. Các run mới được đặt trong block kế tiếp để dễ lập lịch và truy vết.
+                </div>
+              </div>
+              <span className="badge badge-success" style={{ fontSize: '0.7rem' }}>Sequential DoE</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'end', gap: '0.55rem', flexWrap: 'wrap', marginTop: '0.65rem' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: '700', color: '#166534' }}>
+                Số run bổ sung
+                <input type="number" min={1} max={30} className="input-field" style={{ width: '100px', marginLeft: '0.4rem' }} value={augmentationRuns} onChange={(e) => setAugmentationRuns(Math.max(1, Math.min(30, Number(e.target.value))))} />
+              </label>
+              <button type="button" className="btn btn-teal" style={{ fontSize: '0.78rem', padding: '0.4rem 0.7rem' }} onClick={handleAugmentDesign}>
+                <PlusCircle size={15} /> Thêm run thông tin nhất
+              </button>
+              <span style={{ fontSize: '0.73rem', color: '#475569' }}>Hiện tại: rank {currentReadiness.rank}/{currentReadiness.termCount}, df dư {currentReadiness.residualDegreesOfFreedom}.</span>
+            </div>
+          </div>
+        )}
+
         {/* Configuration Selectors */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
           <div>
@@ -1121,8 +1163,8 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
             </div>
           )}
 
-          {/* Randomization */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1.2rem' }}>
+          {/* Randomization and balanced execution blocks */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1.2rem', flexWrap: 'wrap' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', cursor: 'pointer' }}>
               <input
                 type="checkbox"
@@ -1133,6 +1175,12 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               <Shuffle size={15} color="#475569" />
               <span>Ngẫu nhiên hóa (Randomize)</span>
             </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', color: '#475569' }}>
+              Chia lịch thành
+              <input type="number" min={1} max={10} className="input-field" style={{ width: '64px', padding: '0.25rem 0.35rem' }} value={designConfig.blocks ?? 1} onChange={(e) => setDesignConfig({ ...designConfig, blocks: Math.max(1, Math.min(10, Number(e.target.value))) })} />
+              block
+            </label>
+            <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Block là kế hoạch chạy; chưa tự thêm hiệu ứng block vào ANOVA.</span>
           </div>
         </div>
       </div>

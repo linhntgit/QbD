@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Calculator,
   BarChart3,
@@ -16,7 +16,7 @@ import type {
 } from '../../types/qbd';
 import { PlotlyChart } from '../PlotlyChart';
 import { normalInverseCDF, formatAxisTitle } from '../../services/mathUtils';
-import { generateUpdatedRiskAssessment } from '../../services/statistics';
+import { assessModelCandidates, buildConfirmationPlan, generateUpdatedRiskAssessment } from '../../services/statistics';
 
 interface StatisticalANOVATabProps {
   project: QBDProject;
@@ -49,6 +49,16 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
 
   const currentCQA = project.cqas.find((c) => c.code === selectedCQA) || project.cqas[0];
   const model = currentCQA ? models[currentCQA.code] : null;
+  const analysisWizard = useMemo(
+    () => currentCQA ? assessModelCandidates(currentCQA, project.factors, project.runs) : null,
+    [currentCQA, project.factors, project.runs],
+  );
+  const confirmationPlan = useMemo(
+    () => currentCQA && analysisWizard?.recommended?.model
+      ? buildConfirmationPlan(currentCQA, analysisWizard.recommended.model, project.runs)
+      : null,
+    [analysisWizard, currentCQA, project.runs],
+  );
 
   if (!currentCQA) {
     return (
@@ -391,6 +401,60 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
           </div>
         </div>
       </div>
+
+      {analysisWizard && (
+        <div className="qbd-card" style={{ borderLeft: '4px solid #0f766e', background: '#f8fffc' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.7rem' }}>
+            <div>
+              <h3 style={{ fontSize: '1rem', fontWeight: '800', color: '#134e4a', margin: 0 }}>Analysis Wizard — chọn mô hình và xác nhận</h3>
+              <p style={{ fontSize: '0.76rem', color: '#475569', margin: '0.2rem 0 0' }}>So sánh các mô hình phân cấp hoàn chỉnh; AICc thấp hơn tốt hơn. Nếu chênh lệch ≤ 2, ưu tiên mô hình đơn giản hơn.</p>
+            </div>
+            {analysisWizard.recommended && <span className="badge badge-teal" style={{ fontSize: '0.72rem' }}>Đề xuất: {analysisWizard.recommended.modelType}</span>}
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="data-table" style={{ fontSize: '0.76rem', minWidth: '680px' }}>
+              <thead><tr><th>Mô hình</th><th>Phân cấp</th><th>AICc</th><th>Q²</th><th>LOF p</th><th>df dư</th><th>Đánh giá</th><th /></tr></thead>
+              <tbody>
+                {analysisWizard.candidates.map((candidate) => {
+                  const chosen = candidate.modelType === analysisWizard.recommended?.modelType;
+                  return <tr key={candidate.modelType} style={{ background: chosen ? '#ecfdf5' : undefined }}>
+                    <td style={{ fontWeight: '700' }}>{candidate.modelType}</td>
+                    <td>✓ Đầy đủ</td>
+                    <td>{candidate.aicc?.toFixed(1) ?? '—'}</td>
+                    <td>{candidate.qSquared?.toFixed(3) ?? '—'}</td>
+                    <td>{candidate.lackOfFitPValue?.toFixed(3) ?? '—'}</td>
+                    <td>{candidate.residualDegreesOfFreedom || '—'}</td>
+                    <td style={{ color: candidate.adequate ? '#15803d' : '#b45309' }}>{candidate.model ? (candidate.adequate ? 'Đủ điều kiện' : 'Cần rà soát') : 'Chưa khớp được'}</td>
+                    <td><button type="button" className={chosen ? 'btn btn-teal' : 'btn btn-secondary'} disabled={!candidate.model} onClick={() => onModelTypeChange(currentCQA.code, candidate.modelType)} style={{ fontSize: '0.7rem', padding: '0.25rem 0.45rem' }}>Áp dụng</button></td>
+                  </tr>;
+                })}
+              </tbody>
+            </table>
+          </div>
+          {analysisWizard.warnings.map((warning) => <div key={warning} style={{ marginTop: '0.5rem', fontSize: '0.74rem', color: '#a16207' }}>⚠ {warning}</div>)}
+          {analysisWizard.recommended && (analysisWizard.recommended.outlierRunOrders.length > 0 || analysisWizard.recommended.influentialRunOrders.length > 0 || analysisWizard.recommended.highLeverageRunOrders.length > 0) && (
+            <div style={{ marginTop: '0.55rem', padding: '0.55rem 0.65rem', borderRadius: '0.4rem', background: '#fffbeb', color: '#92400e', fontSize: '0.74rem' }}>
+              <strong>Rà soát dữ liệu, không tự động loại bỏ:</strong>{' '}
+              {analysisWizard.recommended.outlierRunOrders.length > 0 && `phần dư lớn: run ${analysisWizard.recommended.outlierRunOrders.join(', ')}. `}
+              {analysisWizard.recommended.influentialRunOrders.length > 0 && `Cook's distance cao: run ${analysisWizard.recommended.influentialRunOrders.join(', ')}. `}
+              {analysisWizard.recommended.highLeverageRunOrders.length > 0 && `leverage cao: run ${analysisWizard.recommended.highLeverageRunOrders.join(', ')}.`}
+            </div>
+          )}
+          {confirmationPlan && (
+            <div style={{ marginTop: '0.7rem', padding: '0.7rem', border: '1px solid #99f6e4', borderRadius: '0.45rem', background: '#f0fdfa' }}>
+              <div style={{ fontWeight: '800', color: '#115e59', fontSize: '0.82rem' }}>Kế hoạch thí nghiệm xác nhận</div>
+              <div style={{ fontSize: '0.75rem', color: '#334155', marginTop: '0.25rem', lineHeight: 1.55 }}>
+                Lặp <strong>{confirmationPlan.recommendedReplicates}</strong> lần tại điều kiện run #{confirmationPlan.sourceRunOrder} (block {confirmationPlan.sourceBlock}):{' '}
+                {Object.entries(confirmationPlan.factorActual).map(([code, value]) => `${code}=${value}`).join(' · ')}.<br />
+                Dự đoán: <strong>{confirmationPlan.predictedResponse.toFixed(3)} {currentCQA.unit}</strong>
+                {confirmationPlan.meanConfidenceInterval && `; CI 95% của trung bình ${confirmationPlan.meanConfidenceInterval.low.toFixed(3)}–${confirmationPlan.meanConfidenceInterval.high.toFixed(3)}`}
+                {confirmationPlan.individualPredictionInterval && `; PI 95% cá thể ${confirmationPlan.individualPredictionInterval.low.toFixed(3)}–${confirmationPlan.individualPredictionInterval.high.toFixed(3)}`}.
+                <br />{confirmationPlan.acceptanceCriterion}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {!model ? (
         <div className="qbd-card" style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>

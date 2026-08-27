@@ -101,6 +101,8 @@ export interface DoEDesignConfig {
   dOptimalModel?: 'Linear' | '2FI' | 'Quadratic';
   designGoal?: DoEDesignGoal;
   runBudget?: number; // Maximum feasible runs for design-wizard recommendations
+  /** Execution batches.  These are balanced run-plan blocks, not ANOVA terms. */
+  blocks?: number;
 }
 
 export interface DesignEvaluationMetrics {

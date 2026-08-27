@@ -631,6 +631,7 @@ export const CASE_STUDIES: QBDProject[] = [
       centerPoints: 0,
       replicates: 1,
       randomized: true,
+      blocks: 2,
     },
     runs: [
       { id: 'run-s-1', stdOrder: 1, runOrder: 1, block: 1, factorCoded: { X1: 0.10, X2: 0.70, X3: 0.20, X4: -1, X5: -1 }, factorActual: { X1: 10.0, X2: 70.0, X3: 20.0, X4: 5000.0, X5: 5.0 }, responses: { Y1: 82.4, Y2: 0.14, Y3: 96.8 } },
@@ -648,6 +649,16 @@ export const CASE_STUDIES: QBDProject[] = [
       { id: 'run-s-13', stdOrder: 13, runOrder: 13, block: 1, factorCoded: { X1: 0.15, X2: 0.60, X3: 0.25, X4: 1, X5: 0 }, factorActual: { X1: 15.0, X2: 60.0, X3: 25.0, X4: 15000.0, X5: 10.0 }, responses: { Y1: 50.4, Y2: 0.08, Y3: 99.2 } },
       { id: 'run-s-14', stdOrder: 14, runOrder: 14, block: 1, factorCoded: { X1: 0.25, X2: 0.45, X3: 0.30, X4: 1, X5: 0 }, factorActual: { X1: 25.0, X2: 45.0, X3: 30.0, X4: 15000.0, X5: 10.0 }, responses: { Y1: 58.7, Y2: 0.09, Y3: 98.9 } },
       { id: 'run-s-15', stdOrder: 15, runOrder: 15, block: 1, factorCoded: { X1: 0.45, X2: 0.35, X3: 0.20, X4: 0, X5: 1 }, factorActual: { X1: 45.0, X2: 35.0, X3: 20.0, X4: 10000.0, X5: 15.0 }, responses: { Y1: 94.6, Y2: 0.15, Y3: 95.8 } },
+      // Second execution block: D-optimal augmentation makes the 2FI model full rank (p=13, N=24).
+      { id: 'run-s-16', stdOrder: 16, runOrder: 16, block: 2, factorCoded: { X1: 0.30, X2: 0.20, X3: 0.50, X4: -1, X5: 1 }, factorActual: { X1: 30.0, X2: 20.0, X3: 50.0, X4: 5000.0, X5: 15.0 }, responses: { Y1: 139.14, Y2: 0.274, Y3: 94.02 } },
+      { id: 'run-s-17', stdOrder: 17, runOrder: 17, block: 2, factorCoded: { X1: 0.30, X2: 0.20, X3: 0.50, X4: 1, X5: -1 }, factorActual: { X1: 30.0, X2: 20.0, X3: 50.0, X4: 15000.0, X5: 5.0 }, responses: { Y1: 125.57, Y2: 0.230, Y3: 95.90 } },
+      { id: 'run-s-18', stdOrder: 18, runOrder: 18, block: 2, factorCoded: { X1: 0.60, X2: 0.20, X3: 0.20, X4: 1, X5: -1 }, factorActual: { X1: 60.0, X2: 20.0, X3: 20.0, X4: 15000.0, X5: 5.0 }, responses: { Y1: 190.73, Y2: 0.336, Y3: 100.00 } },
+      { id: 'run-s-19', stdOrder: 19, runOrder: 19, block: 2, factorCoded: { X1: 0.10, X2: 0.70, X3: 0.20, X4: -1, X5: 1 }, factorActual: { X1: 10.0, X2: 70.0, X3: 20.0, X4: 5000.0, X5: 15.0 }, responses: { Y1: 41.66, Y2: 0.068, Y3: 95.52 } },
+      { id: 'run-s-20', stdOrder: 20, runOrder: 20, block: 2, factorCoded: { X1: 0.10, X2: 0.40, X3: 0.50, X4: 1, X5: 1 }, factorActual: { X1: 10.0, X2: 40.0, X3: 50.0, X4: 15000.0, X5: 15.0 }, responses: { Y1: 55.08, Y2: 0.085, Y3: 95.11 } },
+      { id: 'run-s-21', stdOrder: 21, runOrder: 21, block: 2, factorCoded: { X1: 0.60, X2: 0.30, X3: 0.10, X4: -1, X5: 1 }, factorActual: { X1: 60.0, X2: 30.0, X3: 10.0, X4: 5000.0, X5: 15.0 }, responses: { Y1: 196.89, Y2: 0.368, Y3: 98.29 } },
+      { id: 'run-s-22', stdOrder: 22, runOrder: 22, block: 2, factorCoded: { X1: 0.40, X2: 0.50, X3: 0.10, X4: 1, X5: -1 }, factorActual: { X1: 40.0, X2: 50.0, X3: 10.0, X4: 15000.0, X5: 5.0 }, responses: { Y1: 115.12, Y2: 0.185, Y3: 99.86 } },
+      { id: 'run-s-23', stdOrder: 23, runOrder: 23, block: 2, factorCoded: { X1: 0.10, X2: 0.70, X3: 0.20, X4: 1, X5: -1 }, factorActual: { X1: 10.0, X2: 70.0, X3: 20.0, X4: 15000.0, X5: 5.0 }, responses: { Y1: 24.01, Y2: 0.030, Y3: 97.62 } },
+      { id: 'run-s-24', stdOrder: 24, runOrder: 24, block: 2, factorCoded: { X1: 0.30, X2: 0.20, X3: 0.50, X4: 1, X5: 1 }, factorActual: { X1: 30.0, X2: 20.0, X3: 50.0, X4: 15000.0, X5: 15.0 }, responses: { Y1: 125.96, Y2: 0.218, Y3: 96.30 } },
     ],
     designSpace: [
       {
