@@ -70,6 +70,7 @@ export interface FMEARiskItem {
 }
 
 export type DoECategory = 'Screening' | 'RSM' | 'Mixture' | 'Combined_Mixture_Process' | 'Custom_Optimal';
+export type DoEDesignGoal = 'screening' | 'optimization' | 'robustness';
 
 export type DoEDesignType = 
   | 'FullFactorial2k'
@@ -98,6 +99,8 @@ export interface DoEDesignConfig {
   taguchiArray?: 'L4' | 'L8' | 'L9' | 'L12' | 'L16';
   numRuns?: number; // Target number of runs for D-Optimal
   dOptimalModel?: 'Linear' | '2FI' | 'Quadratic';
+  designGoal?: DoEDesignGoal;
+  runBudget?: number; // Maximum feasible runs for design-wizard recommendations
 }
 
 export interface DesignEvaluationMetrics {

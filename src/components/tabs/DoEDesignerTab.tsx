@@ -32,12 +32,16 @@ import type {
   DoEDesignConfig,
   DoEDesignType,
   DoECategory,
+  DoEDesignGoal,
 } from '../../types/qbd';
 import {
   generateDoERuns,
   calculateDesignEfficiency,
   calculateNumModelTerms,
   actualToCoded,
+  assessDesignReadiness,
+  recommendRunCount,
+  validateDesignSetup,
 } from '../../services/doeGenerator';
 import { simulateDemoResponses } from '../../services/demoDataSimulator';
 import {
@@ -666,28 +670,73 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
     () => calculateNumModelTerms(activeFactors.length, selectedOptimalModel, activeFactors),
     [activeFactors, selectedOptimalModel]
   );
-  const recommendedOptimalRuns = useMemo(() => {
-    if (hasMixtureProcessFactors) {
-      if (selectedOptimalModel === 'Linear') return Math.max(14, minRequiredTerms + 5);
-      if (selectedOptimalModel === '2FI') return Math.max(24, minRequiredTerms + 6);
-      return Math.max(30, minRequiredTerms + 8);
-    }
-    return Math.max(minRequiredTerms + 4, 15);
-  }, [hasMixtureProcessFactors, minRequiredTerms, selectedOptimalModel]);
+  const recommendedOptimalRuns = useMemo(
+    () => recommendRunCount(activeFactors, selectedOptimalModel),
+    [activeFactors, selectedOptimalModel]
+  );
+  const designGoal: DoEDesignGoal = designConfig.designGoal || 'optimization';
+  const runBudget = Math.max(1, designConfig.runBudget || recommendedOptimalRuns);
+  const designValidation = useMemo(
+    () => validateDesignSetup(project.factors, designConfig),
+    [project.factors, designConfig]
+  );
+  const currentReadiness = useMemo(
+    () => assessDesignReadiness(project.factors, project.runs, selectedOptimalModel),
+    [project.factors, project.runs, selectedOptimalModel]
+  );
+  const wizardOptions = useMemo(() => {
+    const category: DoECategory = hasMixtureProcessFactors ? 'Combined_Mixture_Process' : 'Custom_Optimal';
+    const designType: DoEDesignType = hasMixtureProcessFactors ? 'Combined_Mixture_DOptimal' : 'DOptimal';
+    const definitions: Array<{ goal: DoEDesignGoal; label: string; model: 'Linear' | '2FI' | 'Quadratic'; description: string }> = [
+      { goal: 'screening', label: 'Sàng lọc', model: 'Linear', description: 'Xác định xu hướng chính với số run thấp nhất còn khả định.' },
+      { goal: 'optimization', label: 'Tối ưu cân bằng', model: '2FI', description: 'Ước lượng tương tác quan trọng với bậc tự do dư cho sai số.' },
+      { goal: 'robustness', label: 'Robustness / RSM', model: 'Quadratic', description: 'Đánh giá độ cong và biên vận hành với mức chính xác cao hơn.' },
+    ];
+    return definitions.map((definition) => {
+      const numRuns = recommendRunCount(activeFactors, definition.model);
+      const config: DoEDesignConfig = {
+        ...designConfig,
+        category,
+        designType,
+        dOptimalModel: definition.model,
+        numRuns,
+        centerPoints: 0,
+        replicates: 1,
+        randomized: true,
+        designGoal: definition.goal,
+        runBudget,
+      };
+      const setup = validateDesignSetup(project.factors, config);
+      const runs = setup.isValid ? generateDoERuns(project.factors, { ...config, randomized: false }).runs : [];
+      const readiness = assessDesignReadiness(project.factors, runs, definition.model);
+      return { ...definition, config, numRuns, readiness, withinBudget: numRuns <= runBudget };
+    });
+  }, [activeFactors, designConfig, hasMixtureProcessFactors, project.factors, runBudget]);
 
   // Calculate D-Efficiency and Matrix Metrics dynamically
   const designMetrics = useMemo(() => {
     return calculateDesignEfficiency(
       project.runs,
       project.factors,
-      (designConfig.dOptimalModel as any) || 'Quadratic'
+      selectedOptimalModel
     );
-  }, [project.runs, project.factors, designConfig.dOptimalModel]);
+  }, [project.runs, project.factors, selectedOptimalModel]);
 
   const handleGenerateMatrix = () => {
+    if (!designValidation.isValid) {
+      showToast(`⚠ Không thể tạo thiết kế: ${designValidation.errors[0]}`, 'info');
+      return;
+    }
     const { runs, alpha } = generateDoERuns(project.factors, designConfig);
+    const readiness = assessDesignReadiness(project.factors, runs, selectedOptimalModel);
+    if (!readiness.isEstimable) {
+      showToast(`⚠ Thiết kế chưa đủ cho mô hình: ${readiness.messages[0] || 'không khả định'}`, 'info');
+      return;
+    }
     const updatedConfig = { ...designConfig, alpha };
     onUpdateProject({ doeConfig: updatedConfig, runs });
+    const warning = designValidation.warnings[0] ? ` ${designValidation.warnings[0]}` : '';
+    showToast(`✓ Đã tạo ${runs.length} run; p=${readiness.termCount}, df dư=${readiness.residualDegreesOfFreedom}.${warning}`, 'success');
   };
 
   // Manual Edit for Randomized Run Order
@@ -876,6 +925,60 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               <ArrowRight size={16} />
             </button>
           </div>
+        </div>
+
+        {/* Model-first Design Wizard */}
+        <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '0.65rem', padding: '1rem', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+            <div>
+              <div style={{ fontWeight: '800', color: '#0c4a6e', fontSize: '0.96rem' }}>Design Wizard — mục tiêu, mô hình, ngân sách</div>
+              <div style={{ fontSize: '0.76rem', color: '#475569', marginTop: '0.2rem' }}>Chọn phương án theo số hệ số có thể ước lượng và số run bạn thực sự có thể thực hiện.</div>
+            </div>
+            <span className="badge badge-primary" style={{ fontSize: '0.72rem' }}>Model-first</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.75rem', marginBottom: '0.8rem' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', color: '#075985', marginBottom: '0.25rem' }}>Mục tiêu nghiên cứu</label>
+              <select className="input-field" value={designGoal} onChange={(e) => setDesignConfig({ ...designConfig, designGoal: e.target.value as DoEDesignGoal })}>
+                <option value="screening">Sàng lọc nhân tố</option>
+                <option value="optimization">Tối ưu hóa đa đáp ứng</option>
+                <option value="robustness">Robustness / Design Space</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', color: '#075985', marginBottom: '0.25rem' }}>Ngân sách tối đa (run)</label>
+              <input type="number" min={1} max={500} className="input-field" value={runBudget} onChange={(e) => setDesignConfig({ ...designConfig, runBudget: Math.max(1, Number(e.target.value)) })} />
+            </div>
+            <div style={{ fontSize: '0.76rem', color: '#334155', paddingTop: '1.35rem' }}>
+              Mô hình hiện chọn: <strong>{selectedOptimalModel}</strong> · p={minRequiredTerms} · N tối thiểu={minRequiredTerms + 1}
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.65rem' }}>
+            {wizardOptions.map((option) => {
+              const isRecommended = option.goal === designGoal;
+              const canApply = option.withinBudget && option.readiness.isEstimable;
+              return (
+                <div key={option.goal} style={{ background: '#ffffff', border: `1px solid ${isRecommended ? '#0284c7' : '#cbd5e1'}`, borderRadius: '0.5rem', padding: '0.75rem', boxShadow: isRecommended ? '0 1px 4px rgba(2,132,199,0.15)' : 'none' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'center' }}>
+                    <strong style={{ color: '#0f172a', fontSize: '0.84rem' }}>{option.label}</strong>
+                    {isRecommended && <span className="badge badge-primary" style={{ fontSize: '0.66rem' }}>Khuyến nghị</span>}
+                  </div>
+                  <div style={{ fontSize: '0.73rem', color: '#475569', minHeight: '2.2rem', margin: '0.35rem 0' }}>{option.description}</div>
+                  <div style={{ fontSize: '0.74rem', color: '#0f172a', lineHeight: 1.5 }}>
+                    <div><strong>{option.numRuns} run</strong> · {option.model} · p={option.readiness.termCount}</div>
+                    <div>rank {option.readiness.rank}/{option.readiness.termCount} · df dư {option.readiness.residualDegreesOfFreedom}</div>
+                  </div>
+                  {!option.withinBudget && <div style={{ fontSize: '0.7rem', color: '#b45309', marginTop: '0.35rem' }}>Vượt ngân sách {runBudget} run.</div>}
+                  {!option.readiness.isEstimable && <div style={{ fontSize: '0.7rem', color: '#b91c1c', marginTop: '0.35rem' }}>{option.readiness.messages[0]}</div>}
+                  <button type="button" className={canApply ? 'btn btn-primary' : 'btn'} disabled={!canApply} onClick={() => { setDesignConfig(option.config); showToast(`Đã chọn ${option.label}: ${option.numRuns} run, mô hình ${option.model}.`, 'info'); }} style={{ width: '100%', marginTop: '0.55rem', fontSize: '0.74rem', padding: '0.35rem 0.5rem', opacity: canApply ? 1 : 0.5 }}>
+                    Chọn phương án
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          {!designValidation.isValid && <div style={{ marginTop: '0.7rem', color: '#b91c1c', fontSize: '0.76rem', fontWeight: '600' }}>⚠ {designValidation.errors[0]}</div>}
+          {designValidation.warnings.map((warning) => <div key={warning} style={{ marginTop: '0.35rem', color: '#a16207', fontSize: '0.74rem' }}>• {warning}</div>)}
         </div>
 
         {/* Configuration Selectors */}
@@ -1111,6 +1214,11 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                 <div><strong>Leverage max (h<sub>ii</sub>):</strong> {designMetrics.maxLeverage}</div>
               </div>
             </div>
+          </div>
+          <div style={{ marginTop: '0.75rem', padding: '0.6rem 0.75rem', borderRadius: '0.45rem', background: currentReadiness.isEstimable ? '#f0fdf4' : '#fef2f2', color: currentReadiness.isEstimable ? '#166534' : '#b91c1c', fontSize: '0.78rem' }}>
+            <strong>{currentReadiness.isEstimable ? '✓ Mô hình khả định' : '⚠ Mô hình chưa khả định'}</strong>
+            {' '}rank {currentReadiness.rank}/{currentReadiness.termCount}; df dư {currentReadiness.residualDegreesOfFreedom}.
+            {currentReadiness.messages.length > 0 && ` ${currentReadiness.messages.join(' ')}`}
           </div>
         </div>
       )}

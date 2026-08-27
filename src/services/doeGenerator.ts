@@ -6,6 +6,7 @@ import {
   matrixTrace,
   matInverse,
 } from './mathUtils';
+import { buildModelVector, getModelTermCount } from './modelTerms';
 
 /**
  * Convert coded factor value (-1, 0, +1, +alpha, -alpha) to actual physical value or categorical label
@@ -715,6 +716,128 @@ export function calculateNumModelTerms(
   return 1 + linear + interaction + quadratic;
 }
 
+export interface DesignValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+  requiredTerms: number;
+  minimumFittableRuns: number;
+}
+
+export interface DesignReadiness {
+  runCount: number;
+  termCount: number;
+  rank: number;
+  residualDegreesOfFreedom: number;
+  isEstimable: boolean;
+  messages: string[];
+}
+
+function resolveOptimalModel(factors: Factor[], config: DoEDesignConfig): 'Linear' | '2FI' | 'Quadratic' {
+  if (config.dOptimalModel) return config.dOptimalModel;
+  const hasMixture = factors.some((factor) => factor.role === 'mixture_component' || factor.type === 'Mixture');
+  return hasMixture ? '2FI' : factors.length <= 3 ? 'Quadratic' : '2FI';
+}
+
+export function recommendRunCount(factors: Factor[], model: 'Linear' | '2FI' | 'Quadratic'): number {
+  const active = factors.filter((factor) => factor.controllability !== 'constant');
+  const terms = calculateNumModelTermsForFactors(active, model);
+  const hasMixture = active.some((factor) => factor.role === 'mixture_component' || factor.type === 'Mixture');
+  const hasProcess = active.some((factor) => factor.role !== 'mixture_component' && factor.type !== 'Mixture');
+  if (hasMixture && hasProcess) {
+    if (model === 'Linear') return Math.max(14, terms + 5);
+    if (model === '2FI') return Math.max(24, terms + 6);
+    return Math.max(30, terms + 8);
+  }
+  return Math.max(terms + 4, active.length <= 2 ? 10 : 15);
+}
+
+/** Checks factor bounds and model/run-count compatibility before generation. */
+export function validateDesignSetup(factors: Factor[], config: DoEDesignConfig): DesignValidationResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const active = factors.filter((factor) => factor.controllability !== 'constant');
+  const model = resolveOptimalModel(active, config);
+  const requiredTerms = calculateNumModelTermsForFactors(active, model);
+  const minimumFittableRuns = requiredTerms + 1;
+
+  if (active.length === 0) errors.push('Cần ít nhất một nhân tố không cố định để tạo thiết kế.');
+  active.forEach((factor) => {
+    if (factor.dataType !== 'qualitative' && (!Number.isFinite(factor.low) || !Number.isFinite(factor.high) || factor.high <= factor.low)) {
+      errors.push(`${factor.code}: cận trên phải lớn hơn cận dưới.`);
+    }
+  });
+
+  const mixture = active.filter((factor) => factor.role === 'mixture_component' || factor.type === 'Mixture');
+  if (mixture.length > 0) {
+    const normalize = (value: number, factor: Factor) => (factor.high > 1 || factor.unit === '%' ? value / 100 : value);
+    const sumLower = mixture.reduce((sum, factor) => sum + normalize(factor.low, factor), 0);
+    const sumUpper = mixture.reduce((sum, factor) => sum + normalize(factor.high, factor), 0);
+    if (sumLower > 1 + 1e-10 || sumUpper < 1 - 1e-10) {
+      errors.push('Giới hạn mixture không khả thi: tổng cận dưới phải ≤ 100% và tổng cận trên phải ≥ 100%.');
+    }
+  }
+
+  const isOptimal = config.designType === 'DOptimal' || config.designType === 'Combined_Mixture_DOptimal';
+  if (isOptimal && config.numRuns !== undefined && config.numRuns < minimumFittableRuns) {
+    errors.push(`Mô hình ${model} cần tối thiểu ${minimumFittableRuns} run (p=${requiredTerms}) để còn bậc tự do dư.`);
+  }
+  if (isOptimal && (config.numRuns ?? recommendRunCount(active, model)) < recommendRunCount(active, model)) {
+    warnings.push(`Ngân sách N thấp hơn mức khuyến nghị ${recommendRunCount(active, model)}; chỉ dùng khi chấp nhận độ chính xác thấp hơn.`);
+  }
+  if (config.category === 'Combined_Mixture_Process' && !isOptimal) {
+    warnings.push('Thiết kế mixture–process nhân chéo đầy đủ có thể tạo rất nhiều run; cân nhắc D-optimal theo ngân sách.');
+  }
+  if ((config.replicates || 1) > 1) warnings.push('Số run hiển thị sẽ tăng theo số lặp lại đã chọn.');
+
+  return { isValid: errors.length === 0, errors, warnings, requiredTerms, minimumFittableRuns };
+}
+
+function matrixRank(matrix: number[][], tolerance: number = 1e-9): number {
+  if (matrix.length === 0 || matrix[0].length === 0) return 0;
+  const work = matrix.map((row) => [...row]);
+  let rank = 0;
+  for (let column = 0; column < work[0].length && rank < work.length; column++) {
+    let pivot = rank;
+    for (let row = rank + 1; row < work.length; row++) {
+      if (Math.abs(work[row][column]) > Math.abs(work[pivot][column])) pivot = row;
+    }
+    if (Math.abs(work[pivot][column]) <= tolerance) continue;
+    [work[rank], work[pivot]] = [work[pivot], work[rank]];
+    for (let row = rank + 1; row < work.length; row++) {
+      const scale = work[row][column] / work[rank][column];
+      for (let index = column; index < work[row].length; index++) work[row][index] -= scale * work[rank][index];
+    }
+    rank++;
+  }
+  return rank;
+}
+
+/** Assesses whether a generated matrix can estimate the selected model. */
+export function assessDesignReadiness(
+  factors: Factor[],
+  runs: DoERun[],
+  model: 'Linear' | '2FI' | 'Quadratic',
+): DesignReadiness {
+  const active = factors.filter((factor) => factor.controllability !== 'constant');
+  const termCount = calculateNumModelTermsForFactors(active, model);
+  const X = runs.map((run) => buildModelVector(active.map((factor) => run.factorCoded[factor.code] ?? 0), active, model));
+  const rank = matrixRank(X);
+  const residualDegreesOfFreedom = runs.length - termCount;
+  const messages: string[] = [];
+  if (rank < termCount) messages.push(`Ma trận không khả định: rank ${rank}/${termCount}.`);
+  if (residualDegreesOfFreedom <= 0) messages.push('Không còn bậc tự do dư để ước lượng sai số thực nghiệm.');
+  else if (residualDegreesOfFreedom < 4) messages.push(`Chỉ còn ${residualDegreesOfFreedom} df dư; nên tăng số run hoặc giảm độ phức tạp mô hình.`);
+  return {
+    runCount: runs.length,
+    termCount,
+    rank,
+    residualDegreesOfFreedom,
+    isEstimable: rank === termCount && residualDegreesOfFreedom > 0,
+    messages,
+  };
+}
+
 /**
  * Expand a single coded point [x1, x2, ...] to full model vector [1, x1, ..., x1*x2, ..., x1^2, ...]
  */
@@ -756,39 +879,11 @@ function expandModelVectorForFactors(
   factors: Factor[],
   model: 'Linear' | '2FI' | 'Quadratic'
 ): number[] {
-  const mixtureIndexes = factors
-    .map((factor, index) => (factor.role === 'mixture_component' || factor.type === 'Mixture' ? index : -1))
-    .filter((index) => index >= 0);
-  const hasMixture = mixtureIndexes.length > 0;
-  const row: number[] = hasMixture ? [] : [1];
-  // In a mixture-process model, z_j = Σx_i·z_j. Standalone process main
-  // effects are therefore collinear with mixture × process terms and are not
-  // included in the Scheffé-style basis.
-  row.push(...(hasMixture ? mixtureIndexes.map((index) => coded[index]) : coded));
-  // A first-order mixture-process model still needs x_i·z_j terms to estimate
-  // the effect of each process variable across the mixture region.
-  if (hasMixture && model === 'Linear') {
-    for (const mixtureIndex of mixtureIndexes) {
-      for (let processIndex = 0; processIndex < coded.length; processIndex++) {
-        if (!mixtureIndexes.includes(processIndex)) row.push(coded[mixtureIndex] * coded[processIndex]);
-      }
-    }
-  }
-  if (model === '2FI' || model === 'Quadratic') {
-    for (let i = 0; i < coded.length; i++) {
-      for (let j = i + 1; j < coded.length; j++) row.push(coded[i] * coded[j]);
-    }
-  }
-  if (model === 'Quadratic') {
-    for (let i = 0; i < coded.length; i++) {
-      if (!mixtureIndexes.includes(i)) row.push(coded[i] * coded[i]);
-    }
-  }
-  return row;
+  return buildModelVector(coded, factors, model);
 }
 
 function calculateNumModelTermsForFactors(factors: Factor[], model: 'Linear' | '2FI' | 'Quadratic'): number {
-  return expandModelVectorForFactors(new Array(factors.length).fill(0), factors, model).length;
+  return getModelTermCount(factors, model);
 }
 
 /**

@@ -23,13 +23,9 @@ import {
   calculateIndividualDesirability,
   calculateInformationCriteria,
 } from './mathUtils';
+import { buildModelTerms, getModelBlockCounts, type ModelTermDefinition } from './modelTerms';
 
-interface TermDef {
-  name: string;
-  factorCodes: string[];
-  power: number[];
-  evaluator: (coded: Record<string, number>) => number;
-}
+type TermDef = ModelTermDefinition;
 
 function calculateSSE(X: number[][], Y: number[][]): number {
   const beta = matMul(matMul(matInverse(matMul(matTranspose(X), X)), matTranspose(X)), Y);
@@ -71,98 +67,7 @@ function calculateVIFs(X: number[][], firstPredictorIndex: number = 1): number[]
  * Build term definitions based on factors and model type
  */
 function buildTerms(factors: Factor[], modelType: ModelType): TermDef[] {
-  const terms: TermDef[] = [];
-  const k = factors.length;
-  const mixtureIndexes = factors
-    .map((factor, index) => (factor.role === 'mixture_component' || factor.type === 'Mixture' ? index : -1))
-    .filter((index) => index >= 0);
-  const hasMixture = mixtureIndexes.length > 0;
-
-  // Mixture components sum to one, so an explicit intercept is exactly
-  // collinear with their linear terms.  A Scheffé-style basis omits it.
-  if (!hasMixture) {
-    terms.push({
-      name: 'Intercept',
-      factorCodes: [],
-      power: [],
-      evaluator: () => 1.0,
-    });
-  }
-
-  // 2. Linear terms. In a mixture-process model, a standalone process term is
-  // collinear with the sum of its mixture × process terms. Keep only mixture
-  // components here; process effects are represented by those interactions.
-  factors.forEach((f, idx) => {
-    if (hasMixture && !mixtureIndexes.includes(idx)) return;
-    const p = new Array(k).fill(0);
-    p[idx] = 1;
-    terms.push({
-      name: f.code,
-      factorCodes: [f.code],
-      power: p,
-      evaluator: (coded) => coded[f.code] ?? 0,
-    });
-  });
-
-  // A first-order mixture-process model represents process effects through
-  // x_i·z_j rather than collinear standalone z_j terms.
-  if (hasMixture && modelType === 'Linear') {
-    for (const mixtureIndex of mixtureIndexes) {
-      for (let processIndex = 0; processIndex < k; processIndex++) {
-        if (mixtureIndexes.includes(processIndex)) continue;
-        const p = new Array(k).fill(0);
-        p[mixtureIndex] = 1;
-        p[processIndex] = 1;
-        const mixtureCode = factors[mixtureIndex].code;
-        const processCode = factors[processIndex].code;
-        terms.push({
-          name: `${mixtureCode}*${processCode}`,
-          factorCodes: [mixtureCode, processCode],
-          power: p,
-          evaluator: (coded) => (coded[mixtureCode] ?? 0) * (coded[processCode] ?? 0),
-        });
-      }
-    }
-  }
-
-  // 3. Two-factor interaction (2FI) terms (X1*X2, X1*X3, ...)
-  if (modelType === '2FI' || modelType === 'Quadratic' || modelType === 'Reduced') {
-    for (let i = 0; i < k; i++) {
-      for (let j = i + 1; j < k; j++) {
-        const p = new Array(k).fill(0);
-        p[i] = 1;
-        p[j] = 1;
-        const code1 = factors[i].code;
-        const code2 = factors[j].code;
-        terms.push({
-          name: `${code1}*${code2}`,
-          factorCodes: [code1, code2],
-          power: p,
-          evaluator: (coded) => (coded[code1] ?? 0) * (coded[code2] ?? 0),
-        });
-      }
-    }
-  }
-
-  // 4. Quadratic / Squared terms.  In a mixture basis, x_i² is redundant
-  // with x_i and x_i*x_j because sum(x_i)=1, therefore retain squared terms
-  // only for independent process factors.
-  if (modelType === 'Quadratic' || modelType === 'Reduced') {
-    for (let i = 0; i < k; i++) {
-      if (mixtureIndexes.includes(i)) continue;
-      const p = new Array(k).fill(0);
-      p[i] = 2;
-      const code = factors[i].code;
-      terms.push({
-        name: `${code}²`,
-        factorCodes: [code],
-        power: p,
-        evaluator: (coded) => Math.pow(coded[code] ?? 0, 2),
-      });
-    }
-  }
-
-  return terms;
+  return buildModelTerms(factors, modelType);
 }
 
 /**
@@ -279,10 +184,11 @@ export function fitModel(
 
   // Sequential (Type I) ANOVA blocks.  These are fitted nested models, rather
   // than distributing the model SS in proportion to the number of terms.
-  const linearCount = terms.filter((term) => term.power.reduce((sum, power) => sum + power, 0) === 1).length;
+  const modelBlocks = getModelBlockCounts(activeFactors, modelType);
+  const linearCount = modelBlocks.linear;
   const linearDF = linearCount - (hasExplicitIntercept ? 0 : 1);
-  const interactionCount = terms.filter((term) => term.factorCodes.length === 2).length;
-  const quadraticCount = terms.filter((term) => term.power.some((power) => power === 2)).length;
+  const interactionCount = modelBlocks.interactions;
+  const quadraticCount = modelBlocks.quadratic;
 
   const vifs = calculateVIFs(X, hasExplicitIntercept ? 1 : 0);
 
@@ -371,7 +277,10 @@ export function fitModel(
     },
   ];
 
-  const interceptX = X.map((row) => [row[0]]);
+  // Mixture bases omit an explicit intercept, but their components sum to one.
+  // Use a constant-only baseline for sequential sums of squares rather than
+  // treating the first mixture component as an intercept.
+  const interceptX = hasExplicitIntercept ? X.map((row) => [row[0]]) : X.map(() => [1]);
   const linearEnd = (hasExplicitIntercept ? 1 : 0) + linearCount;
   const linearX = X.map((row) => row.slice(0, linearEnd));
   const interactionEnd = linearEnd + interactionCount;
