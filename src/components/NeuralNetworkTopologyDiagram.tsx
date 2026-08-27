@@ -27,6 +27,12 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
   const currentCQA = cqas.find((c) => c.code === selectedCQA) || cqas[0];
   const outputCQAs = isShared ? cqas : currentCQA ? [currentCQA] : [];
 
+  // Helper to safely truncate text if it exceeds max length
+  const truncateText = (str: string, maxLen: number) => {
+    if (!str) return '';
+    return str.length > maxLen ? str.slice(0, maxLen - 1) + '…' : str;
+  };
+
   const numInputs = activeFactors.length;
   const numH1 = config.hiddenNodes1 || 3;
   const numH2 = config.hiddenNodes2 || 0;
@@ -35,18 +41,18 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
   const hasH2 = numH2 > 0;
   const maxNodesInLayer = Math.max(numInputs, numH1, numH2, numOutputs, 3);
 
-  // SVG Canvas dimensions
-  const svgWidth = 920;
-  const svgHeight = Math.max(290, maxNodesInLayer * 46 + 70);
-  const topPadding = 45;
-  const bottomPadding = 30;
+  // SVG Canvas dimensions with generous width to prevent text clipping on left/right
+  const svgWidth = 1180;
+  const svgHeight = Math.max(300, maxNodesInLayer * 52 + 80);
+  const topPadding = 52;
+  const bottomPadding = 32;
   const usableHeight = svgHeight - topPadding - bottomPadding;
 
-  // Column X positions
-  const xInput = 160;
-  const xH1 = hasH2 ? 380 : 470;
-  const xH2 = hasH2 ? 560 : 0;
-  const xOutput = 750;
+  // Column X positions (255px left margin for input labels, 320px right margin for output labels)
+  const xInput = 255;
+  const xH1 = hasH2 ? 500 : 580;
+  const xH2 = hasH2 ? 675 : 0;
+  const xOutput = 855;
 
   // Helper to calculate Y coordinates for N nodes centered vertically
   const getNodeYs = (count: number) => {
@@ -202,16 +208,16 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
           {/* Layer Background Column Panels */}
           {/* Input Layer Column Header */}
           <g>
-            <rect x="20" y="8" width={xInput + 20} height="26" rx="4" fill="#f1f5f9" stroke="#cbd5e1" strokeWidth="1" />
-            <text x={(20 + xInput + 20) / 2} y="25" textAnchor="middle" fill="#334155" fontSize="11" fontWeight="700">
+            <rect x="15" y="8" width={xInput - 10} height="28" rx="5" fill="#f1f5f9" stroke="#cbd5e1" strokeWidth="1" />
+            <text x={(15 + xInput - 10) / 2} y="26" textAnchor="middle" fill="#334155" fontSize="11" fontWeight="700">
               LỚP ĐẦU VÀO ({numInputs} Biến X)
             </text>
           </g>
 
           {/* Hidden Layer 1 Header */}
           <g>
-            <rect x={xH1 - 55} y="8" width="110" height="26" rx="4" fill="#ede9fe" stroke="#c4b5fd" strokeWidth="1" />
-            <text x={xH1} y="25" textAnchor="middle" fill="#6b21a8" fontSize="11" fontWeight="700">
+            <rect x={xH1 - 65} y="8" width="130" height="28" rx="5" fill="#ede9fe" stroke="#c4b5fd" strokeWidth="1" />
+            <text x={xH1} y="26" textAnchor="middle" fill="#6b21a8" fontSize="11" fontWeight="700">
               LỚP ẨN 1 ({numH1} Nơ-ron)
             </text>
           </g>
@@ -219,8 +225,8 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
           {/* Hidden Layer 2 Header (if present) */}
           {hasH2 && (
             <g>
-              <rect x={xH2 - 55} y="8" width="110" height="26" rx="4" fill="#fae8ff" stroke="#e879f9" strokeWidth="1" />
-              <text x={xH2} y="25" textAnchor="middle" fill="#86198f" fontSize="11" fontWeight="700">
+              <rect x={xH2 - 65} y="8" width="130" height="28" rx="5" fill="#fae8ff" stroke="#e879f9" strokeWidth="1" />
+              <text x={xH2} y="26" textAnchor="middle" fill="#86198f" fontSize="11" fontWeight="700">
                 LỚP ẨN 2 ({numH2} Nơ-ron)
               </text>
             </g>
@@ -228,8 +234,8 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
 
           {/* Output Layer Header */}
           <g>
-            <rect x={xOutput - 40} y="8" width={svgWidth - xOutput + 20} height="26" rx="4" fill="#ccfbf1" stroke="#99f6e4" strokeWidth="1" />
-            <text x={xOutput + 65} y="25" textAnchor="middle" fill="#0f766e" fontSize="11" fontWeight="700">
+            <rect x={xOutput - 30} y="8" width={svgWidth - xOutput + 15} height="28" rx="5" fill="#ccfbf1" stroke="#99f6e4" strokeWidth="1" />
+            <text x={(xOutput - 30 + svgWidth - 15) / 2} y="26" textAnchor="middle" fill="#0f766e" fontSize="11" fontWeight="700">
               LỚP ĐẦU RA ({isShared ? `${numOutputs} CQAs Hợp nhất` : `${numOutputs} CQA Độc lập`})
             </text>
           </g>
@@ -318,7 +324,7 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
                   fontSize="11"
                   fontWeight="700"
                 >
-                  {factor.code}: {factor.name}
+                  {factor.code}: {truncateText(factor.name, 30)}
                 </text>
                 <text
                   x={xInput - 22}
@@ -442,18 +448,18 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
 
                 {/* Node Label on Right */}
                 <text
-                  x={xOutput + 22}
+                  x={xOutput + 24}
                   y={y - 4}
                   textAnchor="start"
                   fill="#0f172a"
                   fontSize="11"
                   fontWeight="700"
                 >
-                  {cqa.code}: {cqa.name}
+                  {cqa.code}: {truncateText(cqa.name, 32)}
                   {isTarget && isShared && <tspan fill="#0284c7" fontWeight="600"> (Active)</tspan>}
                 </text>
                 <text
-                  x={xOutput + 22}
+                  x={xOutput + 24}
                   y={y + 10}
                   textAnchor="start"
                   fill="#0f766e"
