@@ -85,6 +85,7 @@ export type DoEDesignType =
   | 'SimplexCentroid'
   | 'Combined_Mixture_Factorial'
   | 'Combined_Mixture_RSM'
+  | 'Combined_Mixture_DOptimal'
   | 'DOptimal';
 
 export interface DoEDesignConfig {

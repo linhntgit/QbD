@@ -7,7 +7,7 @@
 ## Chức năng
 
 - Xây dựng **QTPP**, CQA, CMA và CPP; quản lý đánh giá rủi ro FMEA.
-- Tạo ma trận DoE: full/fractional factorial, Box–Behnken, CCD, D-optimal, mixture và combined mixture–process.
+- Tạo ma trận DoE: full/fractional factorial, Box–Behnken, CCD, D-optimal, mixture và combined mixture–process; thiết kế mixture–process có tùy chọn D-optimal 14/24/30 run theo mức độ mô hình.
 - Nhập/xuất bảng DoE qua Excel hoặc CSV; tạo dữ liệu thử nghiệm mô phỏng có giới hạn vật lý phù hợp theo loại đáp ứng.
 - Phân tích hồi quy đa thức và ANOVA, bao gồm kiểm tra thiếu bậc tự do, đa cộng tuyến và tính khả định của mô hình.
 - Huấn luyện mô hình mạng nơ-ron theo từng CQA hoặc đa đầu ra.

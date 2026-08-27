@@ -625,8 +625,10 @@ export const CASE_STUDIES: QBDProject[] = [
     ],
     doeConfig: {
       category: 'Combined_Mixture_Process',
-      designType: 'Combined_Mixture_Factorial',
-      centerPoints: 3,
+      designType: 'Combined_Mixture_DOptimal',
+      dOptimalModel: '2FI',
+      numRuns: 24,
+      centerPoints: 0,
       replicates: 1,
       randomized: true,
     },

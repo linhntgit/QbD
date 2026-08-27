@@ -655,10 +655,25 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
     onUpdateProject({ runs: updatedRuns });
     showToast(`✓ Đã xóa dữ liệu ${clearedCount} ô trong vùng chọn!`);
   };
+  const hasMixtureProcessFactors = useMemo(() => {
+    const hasMixture = activeFactors.some((factor) => factor.role === 'mixture_component' || factor.type === 'Mixture');
+    const hasProcess = activeFactors.some((factor) => factor.role !== 'mixture_component' && factor.type !== 'Mixture');
+    return hasMixture && hasProcess;
+  }, [activeFactors]);
+  const isOptimalDesign = designConfig.designType === 'DOptimal' || designConfig.designType === 'Combined_Mixture_DOptimal';
+  const selectedOptimalModel = designConfig.dOptimalModel || (hasMixtureProcessFactors ? '2FI' : 'Quadratic');
   const minRequiredTerms = useMemo(
-    () => calculateNumModelTerms(activeFactors.length, designConfig.dOptimalModel || 'Quadratic', activeFactors),
-    [activeFactors, designConfig.dOptimalModel]
+    () => calculateNumModelTerms(activeFactors.length, selectedOptimalModel, activeFactors),
+    [activeFactors, selectedOptimalModel]
   );
+  const recommendedOptimalRuns = useMemo(() => {
+    if (hasMixtureProcessFactors) {
+      if (selectedOptimalModel === 'Linear') return Math.max(14, minRequiredTerms + 5);
+      if (selectedOptimalModel === '2FI') return Math.max(24, minRequiredTerms + 6);
+      return Math.max(30, minRequiredTerms + 8);
+    }
+    return Math.max(minRequiredTerms + 4, 15);
+  }, [hasMixtureProcessFactors, minRequiredTerms, selectedOptimalModel]);
 
   // Calculate D-Efficiency and Matrix Metrics dynamically
   const designMetrics = useMemo(() => {
@@ -897,7 +912,20 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
             <select
               className="input-field"
               value={designConfig.designType}
-              onChange={(e) => setDesignConfig({ ...designConfig, designType: e.target.value as DoEDesignType })}
+              onChange={(e) => {
+                const nextType = e.target.value as DoEDesignType;
+                const isCombinedOptimal = nextType === 'Combined_Mixture_DOptimal';
+                setDesignConfig({
+                  ...designConfig,
+                  designType: nextType,
+                  ...(isCombinedOptimal
+                    ? {
+                        dOptimalModel: designConfig.dOptimalModel || '2FI',
+                        numRuns: designConfig.numRuns || 24,
+                      }
+                    : {}),
+                });
+              }}
             >
               {designConfig.category === 'Custom_Optimal' && (
                 <option value="DOptimal">D-Optimal Design (Tối đa hóa định thức |X^T X|)</option>
@@ -906,6 +934,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                 <>
                   <option value="Combined_Mixture_Factorial">Combined Simplex x Factorial 2^p (Tích Hỗn hợp - Yếu tố)</option>
                   <option value="Combined_Mixture_RSM">Combined Simplex x Box-Behnken RSM (Tích Hỗn hợp - Bề mặt đáp ứng)</option>
+                  <option value="Combined_Mixture_DOptimal">D-Optimal Mixture–Process (Giảm số run, chọn theo mô hình)</option>
                 </>
               )}
               {designConfig.category === 'RSM' && (
@@ -934,7 +963,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
           </div>
 
           {/* D-Optimal Target Model & Run Count */}
-          {designConfig.designType === 'DOptimal' ? (
+          {isOptimalDesign ? (
             <>
               <div>
                 <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: '#0369a1', marginBottom: '0.3rem' }}>
@@ -942,28 +971,36 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                 </label>
                 <select
                   className="input-field"
-                  value={designConfig.dOptimalModel || 'Quadratic'}
-                  onChange={(e) => setDesignConfig({ ...designConfig, dOptimalModel: e.target.value as any })}
+                  value={selectedOptimalModel}
+                  onChange={(e) => setDesignConfig({ ...designConfig, dOptimalModel: e.target.value as 'Linear' | '2FI' | 'Quadratic' })}
                 >
                   <option value="Quadratic">Bậc 2 Toàn phần (Quadratic: Linear + 2FI + Quadratic)</option>
                   <option value="2FI">Tương tác 2 nhân tố (2FI: Linear + Interactions)</option>
-                  <option value="Linear">Tuyến tính bậc 1 (Linear: Chỉ các hiệu ứng chính)</option>
+                  <option value="Linear">Tuyến tính bậc 1 (mixture–process: gồm xᵢ·zⱼ)</option>
                 </select>
               </div>
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: '#0369a1', marginBottom: '0.3rem' }}>
-                  Tổng Số Lần Chạy N (Tối thiểu {minRequiredTerms})
+                  Tổng Số Lần Chạy N (tối thiểu {minRequiredTerms + 1}; khuyến nghị {recommendedOptimalRuns})
                 </label>
                 <input
                   type="number"
-                  min={minRequiredTerms}
+                  min={minRequiredTerms + 1}
                   max={60}
                   className="input-field"
-                  value={designConfig.numRuns || Math.max(minRequiredTerms + 4, 15)}
-                  onChange={(e) => setDesignConfig({ ...designConfig, numRuns: Math.max(minRequiredTerms, Number(e.target.value)) })}
+                  value={designConfig.numRuns || recommendedOptimalRuns}
+                  onChange={(e) => setDesignConfig({ ...designConfig, numRuns: Math.max(minRequiredTerms + 1, Number(e.target.value)) })}
                 />
               </div>
+              {designConfig.designType === 'Combined_Mixture_DOptimal' && hasMixtureProcessFactors && (
+                <div style={{ gridColumn: '1 / -1', fontSize: '0.76rem', color: '#0f766e', background: '#f0fdfa', border: '1px solid #99f6e4', borderRadius: '0.4rem', padding: '0.6rem 0.7rem' }}>
+                  Chọn nhanh: <button type="button" className="btn btn-teal" style={{ fontSize: '0.72rem', padding: '0.2rem 0.45rem', marginLeft: '0.4rem' }} onClick={() => setDesignConfig({ ...designConfig, dOptimalModel: 'Linear', numRuns: 14 })}>Sàng lọc 14</button>
+                  <button type="button" className="btn btn-teal" style={{ fontSize: '0.72rem', padding: '0.2rem 0.45rem', marginLeft: '0.35rem' }} onClick={() => setDesignConfig({ ...designConfig, dOptimalModel: '2FI', numRuns: 24 })}>Cân bằng 24</button>
+                  <button type="button" className="btn btn-teal" style={{ fontSize: '0.72rem', padding: '0.2rem 0.45rem', marginLeft: '0.35rem' }} onClick={() => setDesignConfig({ ...designConfig, dOptimalModel: 'Quadratic', numRuns: 30 })}>RSM 30</button>
+                  <span style={{ marginLeft: '0.55rem' }}>N phải lớn hơn số hệ số p để còn bậc tự do ước lượng sai số.</span>
+                </div>
+              )}
             </>
           ) : (
             <div>

@@ -89,8 +89,11 @@ function buildTerms(factors: Factor[], modelType: ModelType): TermDef[] {
     });
   }
 
-  // 2. Linear terms (X1, X2, ...)
+  // 2. Linear terms. In a mixture-process model, a standalone process term is
+  // collinear with the sum of its mixture × process terms. Keep only mixture
+  // components here; process effects are represented by those interactions.
   factors.forEach((f, idx) => {
+    if (hasMixture && !mixtureIndexes.includes(idx)) return;
     const p = new Array(k).fill(0);
     p[idx] = 1;
     terms.push({
@@ -100,6 +103,27 @@ function buildTerms(factors: Factor[], modelType: ModelType): TermDef[] {
       evaluator: (coded) => coded[f.code] ?? 0,
     });
   });
+
+  // A first-order mixture-process model represents process effects through
+  // x_i·z_j rather than collinear standalone z_j terms.
+  if (hasMixture && modelType === 'Linear') {
+    for (const mixtureIndex of mixtureIndexes) {
+      for (let processIndex = 0; processIndex < k; processIndex++) {
+        if (mixtureIndexes.includes(processIndex)) continue;
+        const p = new Array(k).fill(0);
+        p[mixtureIndex] = 1;
+        p[processIndex] = 1;
+        const mixtureCode = factors[mixtureIndex].code;
+        const processCode = factors[processIndex].code;
+        terms.push({
+          name: `${mixtureCode}*${processCode}`,
+          factorCodes: [mixtureCode, processCode],
+          power: p,
+          evaluator: (coded) => (coded[mixtureCode] ?? 0) * (coded[processCode] ?? 0),
+        });
+      }
+    }
+  }
 
   // 3. Two-factor interaction (2FI) terms (X1*X2, X1*X3, ...)
   if (modelType === '2FI' || modelType === 'Quadratic' || modelType === 'Reduced') {
@@ -255,13 +279,10 @@ export function fitModel(
 
   // Sequential (Type I) ANOVA blocks.  These are fitted nested models, rather
   // than distributing the model SS in proportion to the number of terms.
-  const k = activeFactors.length;
-  const linearCount = k;
+  const linearCount = terms.filter((term) => term.power.reduce((sum, power) => sum + power, 0) === 1).length;
   const linearDF = linearCount - (hasExplicitIntercept ? 0 : 1);
-  const interactionCount = (modelType === '2FI' || modelType === 'Quadratic' || modelType === 'Reduced') ? (k * (k - 1)) / 2 : 0;
-  const quadraticCount = (modelType === 'Quadratic' || modelType === 'Reduced')
-    ? activeFactors.filter((factor) => factor.role !== 'mixture_component' && factor.type !== 'Mixture').length
-    : 0;
+  const interactionCount = terms.filter((term) => term.factorCodes.length === 2).length;
+  const quadraticCount = terms.filter((term) => term.power.some((power) => power === 2)).length;
 
   const vifs = calculateVIFs(X, hasExplicitIntercept ? 1 : 0);
 

@@ -517,10 +517,11 @@ export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { r
   const mixtureFactors = factors.filter((f) => f.role === 'mixture_component' || f.type === 'Mixture');
   const processFactors = factors.filter((f) => f.role !== 'mixture_component' && f.type !== 'Mixture');
 
-  if (
-    config.category === 'Combined_Mixture_Process' ||
-    (mixtureFactors.length >= 2 && processFactors.length >= 1)
-  ) {
+  const useCrossedCombinedDesign =
+    config.category === 'Combined_Mixture_Process' &&
+    config.designType !== 'Combined_Mixture_DOptimal';
+
+  if (useCrossedCombinedDesign) {
     const combinedType =
       config.designType === 'Combined_Mixture_RSM' ? 'Combined_Mixture_RSM' : 'Combined_Mixture_Factorial';
     codedMatrix = generateCombinedMixtureProcessMatrix(
@@ -587,11 +588,21 @@ export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { r
         break;
       }
 
+      case 'Combined_Mixture_DOptimal':
       case 'DOptimal': {
-        const dModel = config.dOptimalModel || (k <= 3 ? 'Quadratic' : '2FI');
+        // For mixture-process studies, an optimal design selects a small,
+        // model-dependent subset from the constrained mixture × process pool.
+        // It must not fall back to the complete crossed design.
+        const dModel = config.dOptimalModel || (mixtureFactors.length > 0 ? '2FI' : k <= 3 ? 'Quadratic' : '2FI');
         const numTerms = calculateNumModelTermsForFactors(factors, dModel);
-        const defaultRuns = Math.max(numTerms + 4, k <= 2 ? 10 : k === 3 ? 15 : 20);
-        const nRuns = config.numRuns && config.numRuns >= numTerms ? config.numRuns : defaultRuns;
+        // N must exceed p to retain residual degrees of freedom for model fitting.
+        const minimumFittableRuns = numTerms + 1;
+        const defaultRuns = mixtureFactors.length > 0 && processFactors.length > 0
+          ? dModel === 'Linear' ? 14 : dModel === '2FI' ? 24 : 30
+          : Math.max(numTerms + 4, k <= 2 ? 10 : k === 3 ? 15 : 20);
+        const nRuns = config.numRuns
+          ? Math.max(minimumFittableRuns, config.numRuns)
+          : Math.max(minimumFittableRuns, defaultRuns);
         codedMatrix = generateDOptimalMatrix(factors, dModel, nRuns);
         break;
       }
@@ -601,14 +612,19 @@ export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { r
         break;
     }
 
-    // Add Center Points for standard designs
-    const centerCount = config.centerPoints > 0 ? config.centerPoints : (config.category === 'RSM' ? 3 : 0);
-    for (let c = 0; c < centerCount; c++) {
-      if (config.category === 'Mixture' || mixtureFactors.length === k) {
-        const centroidRow = codedMatrix.length > 0 ? codedMatrix[codedMatrix.length - 1] : new Array(k).fill(Number((1 / k).toFixed(4)));
-        codedMatrix.push([...centroidRow]);
-      } else {
-        codedMatrix.push(new Array(k).fill(0));
+    // D-optimal N already includes every selected run. Appending center points
+    // would both violate the requested run count and create an invalid all-zero
+    // mixture row for a combined mixture-process design.
+    const isOptimalDesign = config.designType === 'DOptimal' || config.designType === 'Combined_Mixture_DOptimal';
+    if (!isOptimalDesign) {
+      const centerCount = config.centerPoints > 0 ? config.centerPoints : (config.category === 'RSM' ? 3 : 0);
+      for (let c = 0; c < centerCount; c++) {
+        if (config.category === 'Mixture' || mixtureFactors.length === k) {
+          const centroidRow = codedMatrix.length > 0 ? codedMatrix[codedMatrix.length - 1] : new Array(k).fill(Number((1 / k).toFixed(4)));
+          codedMatrix.push([...centroidRow]);
+        } else {
+          codedMatrix.push(new Array(k).fill(0));
+        }
       }
     }
   }
@@ -621,7 +637,20 @@ export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { r
   }
 
   // Build standard runs
-  const runs: DoERun[] = allCodedRows.map((row, index) => {
+  const mixtureMatrixIndexes = matrixFactors
+    .map((factor, index) => (factor.role === 'mixture_component' || factor.type === 'Mixture' ? index : -1))
+    .filter((index) => index >= 0);
+  const runs: DoERun[] = allCodedRows.map((rawRow, index) => {
+    const row = [...rawRow];
+    // The candidate set is rounded to four decimals. Put the rounding residue
+    // into one component so displayed mixture proportions sum to exactly 100%.
+    if (mixtureMatrixIndexes.length >= 2) {
+      const total = mixtureMatrixIndexes.reduce((sum, matrixIndex) => sum + row[matrixIndex], 0);
+      if (Math.abs(total - 1) > 1e-10) {
+        const lastIndex = mixtureMatrixIndexes[mixtureMatrixIndexes.length - 1];
+        row[lastIndex] += 1 - total;
+      }
+    }
     const factorCoded: Record<string, number> = {};
     const factorActual: Record<string, number | string> = {};
 
@@ -732,7 +761,19 @@ function expandModelVectorForFactors(
     .filter((index) => index >= 0);
   const hasMixture = mixtureIndexes.length > 0;
   const row: number[] = hasMixture ? [] : [1];
-  row.push(...coded);
+  // In a mixture-process model, z_j = Σx_i·z_j. Standalone process main
+  // effects are therefore collinear with mixture × process terms and are not
+  // included in the Scheffé-style basis.
+  row.push(...(hasMixture ? mixtureIndexes.map((index) => coded[index]) : coded));
+  // A first-order mixture-process model still needs x_i·z_j terms to estimate
+  // the effect of each process variable across the mixture region.
+  if (hasMixture && model === 'Linear') {
+    for (const mixtureIndex of mixtureIndexes) {
+      for (let processIndex = 0; processIndex < coded.length; processIndex++) {
+        if (!mixtureIndexes.includes(processIndex)) row.push(coded[mixtureIndex] * coded[processIndex]);
+      }
+    }
+  }
   if (model === '2FI' || model === 'Quadratic') {
     for (let i = 0; i < coded.length; i++) {
       for (let j = i + 1; j < coded.length; j++) row.push(coded[i] * coded[j]);
@@ -785,8 +826,11 @@ function generateCandidatePool(factors: Factor[]): number[][] {
     }
 
     const combinedCandidates: number[][] = [];
-    for (const m of mixCandidates) {
-      for (const p of procPool) {
+    // Group by process setting so the deterministic D-optimal initialization
+    // samples all process levels instead of repeatedly selecting the first
+    // (-1, -1, ...) combination for every mixture point.
+    for (const p of procPool) {
+      for (const m of mixCandidates) {
         combinedCandidates.push(
           factors.map((factor) => {
             const mixIndex = mixtureFactors.indexOf(factor);
