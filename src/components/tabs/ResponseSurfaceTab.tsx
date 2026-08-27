@@ -21,7 +21,7 @@ import type {
 } from '../../types/qbd';
 import { PlotlyChart } from '../PlotlyChart';
 import { codedToActual, actualToCoded } from '../../services/doeGenerator';
-import { formatAxisTitle, extract2DContourSegments } from '../../services/mathUtils';
+import { formatAxisTitle, extract2DContourSegments, calculateCQAMargin } from '../../services/mathUtils';
 import { optimizeDesirability } from '../../services/statistics';
 import { generateTernaryContour, buildTernaryPlotlyData } from '../../services/ternaryContour';
 
@@ -187,19 +187,48 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
     }
 
     const zGrid: number[][] = [];
+    const hoverX: number[] = [];
+    const hoverY: number[] = [];
+    const hoverText: string[] = [];
 
     for (let j = 0; j < N; j++) {
       const row: number[] = [];
       const yCoded = yCodedArr[j];
+      const yAct = yActualArr[j];
 
       for (let i = 0; i < N; i++) {
         const xCoded = xCodedArr[i];
+        const xAct = xActualArr[i];
         const pointCoded: Record<string, number> = { ...fixedFactorCoded };
         pointCoded[factorX.code] = xCoded;
         pointCoded[factorY.code] = yCoded;
 
         const pred = model.predict(pointCoded);
         row.push(Number(pred.toFixed(3)));
+
+        const cqaMargin = calculateCQAMargin(
+          pred,
+          currentCQA.objective,
+          currentCQA.lowerLimit,
+          currentCQA.upperLimit,
+          currentCQA.target
+        );
+        const isPass = cqaMargin >= 0;
+
+        hoverX.push(xAct);
+        hoverY.push(yAct);
+
+        const statusBadge = isPass
+          ? `<span style="color:#16a34a;font-weight:700">✓ ĐẠT TIÊU CHUẨN (${currentCQA.lowerLimit !== undefined ? `>= ${currentCQA.lowerLimit}` : ''}${currentCQA.lowerLimit !== undefined && currentCQA.upperLimit !== undefined ? ', ' : ''}${currentCQA.upperLimit !== undefined ? `<= ${currentCQA.upperLimit}` : ''} ${currentCQA.unit || ''})</span>`
+          : `<span style="color:#dc2626;font-weight:700">⚠ NGOÀI TIÊU CHUẨN (Không đạt tiêu chuẩn ${currentCQA.code})</span>`;
+
+        hoverText.push(
+          `<b>${factorX.name} (${factorX.code})</b>: ${typeof xAct === 'number' ? xAct.toFixed(2) : xAct} ${factorX.unit || ''}<br>` +
+          `<b>${factorY.name} (${factorY.code})</b>: ${typeof yAct === 'number' ? yAct.toFixed(2) : yAct} ${factorY.unit || ''}<br>` +
+          `-------------------------<br>` +
+          `${statusBadge}<br>` +
+          `<span style="color:#0f766e;font-weight:700">Dự đoán ${currentCQA.name} (${currentCQA.code}): ${pred.toFixed(3)} ${currentCQA.unit || ''}</span>`
+        );
       }
       zGrid.push(row);
     }
@@ -208,8 +237,11 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
       xActualArr,
       yActualArr,
       zGrid,
+      hoverX,
+      hoverY,
+      hoverText,
     };
-  }, [model, factorX, factorY, fixedFactorCoded]);
+  }, [model, factorX, factorY, fixedFactorCoded, currentCQA]);
 
   // Ternary Mesh & Contour Calculation
   const ternaryResult = useMemo(() => {
@@ -444,8 +476,27 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
           showlabels: true,
           labelfont: { family: 'Inter', size: 12, color: 'white' },
         },
-        hoverinfo: 'x+y+z',
+        hoverinfo: 'none',
       });
+
+      // 2D Fine Hover Probing Layer
+      if (surfaceGrid.hoverX && surfaceGrid.hoverX.length > 0) {
+        traces.push({
+          type: 'scatter',
+          mode: 'markers',
+          name: 'Hover Probe',
+          x: surfaceGrid.hoverX,
+          y: surfaceGrid.hoverY,
+          text: surfaceGrid.hoverText,
+          hoverinfo: 'text',
+          marker: {
+            size: 10,
+            opacity: 0.001,
+            color: '#000000',
+          },
+          showlegend: false,
+        });
+      }
 
       // 2D Spec Limit Isolines
       if (showSpecLimits) {

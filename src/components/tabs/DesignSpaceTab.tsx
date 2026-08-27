@@ -248,14 +248,19 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
     }
 
     const zScoreGrid: number[][] = [];
+    const hoverX: number[] = [];
+    const hoverY: number[] = [];
+    const hoverText: string[] = [];
     const validCQAs = cqas.filter((c) => models[c.code]);
 
     for (let j = 0; j < N; j++) {
       const row: number[] = [];
       const yCoded = yCodedArr[j];
+      const yAct = yActualArr[j];
 
       for (let i = 0; i < N; i++) {
         const xCoded = xCodedArr[i];
+        const xAct = xActualArr[i];
         const pointCoded: Record<string, number> = {};
         factors.forEach((f) => {
           pointCoded[f.code] = sliceFactorsCoded[f.code] ?? 0;
@@ -264,6 +269,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
         pointCoded[factorY.code] = yCoded;
 
         let minMargin = 999999;
+        const cqaHoverLines: string[] = [];
         for (const cqa of validCQAs) {
           const model = models[cqa.code];
           const yPred = model.predict(pointCoded);
@@ -272,9 +278,30 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
           if (cqaMargin < minMargin) {
             minMargin = cqaMargin;
           }
+
+          const isPass = cqaMargin >= 0;
+          cqaHoverLines.push(
+            `<span style="color:${isPass ? '#16a34a' : '#dc2626'};font-weight:600">${isPass ? '✓' : '✗'} ${cqa.code}: ${yPred.toFixed(3)} ${cqa.unit || ''}</span>`
+          );
         }
 
         row.push(Number(minMargin.toFixed(5)));
+
+        hoverX.push(xAct);
+        hoverY.push(yAct);
+
+        const statusText =
+          minMargin >= 0
+            ? `<span style="color:#16a34a;font-weight:700">✓ ĐẠT DESIGN SPACE (+${(minMargin * 100).toFixed(1)}% Margin)</span>`
+            : `<span style="color:#dc2626;font-weight:700">⚠ NGOÀI TIÊU CHUẨN (${(minMargin * 100).toFixed(1)}% Margin)</span>`;
+
+        hoverText.push(
+          `<b>${factorX.name} (${factorX.code})</b>: ${typeof xAct === 'number' ? xAct.toFixed(2) : xAct} ${factorX.unit || ''}<br>` +
+          `<b>${factorY.name} (${factorY.code})</b>: ${typeof yAct === 'number' ? yAct.toFixed(2) : yAct} ${factorY.unit || ''}<br>` +
+          `-------------------------<br>` +
+          `${statusText}<br>` +
+          cqaHoverLines.join('<br>')
+        );
       }
       zScoreGrid.push(row);
     }
@@ -283,6 +310,9 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
       xActualArr,
       yActualArr,
       zScoreGrid,
+      hoverX,
+      hoverY,
+      hoverText,
     };
   }, [overlayMode, factorX, factorY, models, cqas, factors, sliceFactorsCoded, resolution]);
 
@@ -349,8 +379,24 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
           size: 0,
           showlines: showBoundaryLines,
         },
-        hoverinfo: 'x+y',
+        hoverinfo: 'none',
         name: 'Design Space',
+      },
+      // 2D Fine Hover Probing Layer
+      {
+        type: 'scatter',
+        mode: 'markers',
+        name: 'Hover Probe',
+        x: sweetSpotGrid.hoverX,
+        y: sweetSpotGrid.hoverY,
+        text: sweetSpotGrid.hoverText,
+        hoverinfo: 'text',
+        marker: {
+          size: 10,
+          opacity: 0.001,
+          color: '#000000',
+        },
+        showlegend: false,
       },
     ];
 
