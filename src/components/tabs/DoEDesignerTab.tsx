@@ -21,9 +21,14 @@ import {
   Copy,
   ArrowUpDown,
   Trash2,
+  Plus,
+  PlusCircle,
+  CopyPlus,
+  ListPlus,
 } from 'lucide-react';
 import type {
   QBDProject,
+  DoERun,
   DoEDesignConfig,
   DoEDesignType,
   DoECategory,
@@ -73,6 +78,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
   const [isProcessingFile, setIsProcessingFile] = useState<boolean>(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [showExportMenu, setShowExportMenu] = useState<boolean>(false);
+  const [showAddRowMenu, setShowAddRowMenu] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- Excel Spreadsheet Selection & Bi-directional Clipboard Sync ---
@@ -339,8 +345,174 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
     });
   };
 
+  // Helper to create a fully-initialized default DoERun with correct factors and coded values
+  const createDefaultRun = (order: number): DoERun => {
+    const newId = `run-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+    const factorActual: Record<string, number | string> = {};
+    const factorCoded: Record<string, number> = {};
+
+    const mixtureCount = mixtureFactors.length;
+    project.factors.forEach((f) => {
+      if (f.dataType === 'qualitative') {
+        const defaultCat = f.categories?.[0] || 'Mức 1';
+        factorActual[f.code] = defaultCat;
+        factorCoded[f.code] = actualToCoded(defaultCat, f);
+      } else if (f.role === 'mixture_component' || f.type === 'Mixture') {
+        const defaultVal = mixtureCount > 0 ? Number((100 / mixtureCount).toFixed(2)) : (f.center ?? f.low);
+        factorActual[f.code] = defaultVal;
+        factorCoded[f.code] = actualToCoded(defaultVal, f);
+      } else {
+        const defaultVal = f.center !== undefined ? f.center : Number(((f.low + f.high) / 2).toFixed(2));
+        factorActual[f.code] = defaultVal;
+        factorCoded[f.code] = actualToCoded(defaultVal, f);
+      }
+    });
+
+    const responses: Record<string, number | string | null> = {};
+    project.cqas.forEach((cqa) => {
+      responses[cqa.code] = '';
+    });
+
+    return {
+      id: newId,
+      stdOrder: order,
+      runOrder: order,
+      block: 1,
+      factorCoded,
+      factorActual,
+      responses,
+    };
+  };
+
+  // Add a single new row (optionally at specified index)
+  const handleAddRow = (insertAtIndex?: number) => {
+    const targetIdx =
+      insertAtIndex !== undefined && insertAtIndex >= 0 && insertAtIndex <= project.runs.length
+        ? insertAtIndex
+        : activeCell !== null
+        ? activeCell.r + 1
+        : project.runs.length;
+
+    const newRun = createDefaultRun(targetIdx + 1);
+    const nextRuns = [...project.runs];
+    nextRuns.splice(targetIdx, 0, newRun);
+
+    const updatedRuns = nextRuns.map((r, idx) => ({
+      ...r,
+      stdOrder: idx + 1,
+      runOrder: r.runOrder ?? idx + 1,
+    }));
+
+    onUpdateProject({ runs: updatedRuns });
+    setActiveCell({ r: targetIdx, c: 1 });
+    setSelection({ start: { r: targetIdx, c: 0 }, end: { r: targetIdx, c: spreadsheetCols.length - 1 } });
+    showToast(`✓ Đã thêm 1 dòng thí nghiệm mới (Hàng ${targetIdx + 1})`);
+  };
+
+  // Add multiple rows
+  const handleAddMultipleRows = (count: number) => {
+    if (count <= 0) return;
+    const currentLen = project.runs.length;
+    const newRuns: DoERun[] = [];
+    for (let i = 0; i < count; i++) {
+      newRuns.push(createDefaultRun(currentLen + i + 1));
+    }
+    const updatedRuns = [...project.runs, ...newRuns].map((r, idx) => ({
+      ...r,
+      stdOrder: idx + 1,
+      runOrder: r.runOrder ?? idx + 1,
+    }));
+    onUpdateProject({ runs: updatedRuns });
+    const newFirstIdx = currentLen;
+    setActiveCell({ r: newFirstIdx, c: 1 });
+    setSelection({ start: { r: newFirstIdx, c: 0 }, end: { r: updatedRuns.length - 1, c: spreadsheetCols.length - 1 } });
+    showToast(`✓ Đã thêm ${count} dòng thí nghiệm mới vào bảng!`);
+  };
+
+  // Duplicate a specific row
+  const handleDuplicateRow = (runIndex: number) => {
+    if (runIndex < 0 || runIndex >= project.runs.length) return;
+    const sourceRun = project.runs[runIndex];
+    const newId = `run-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+    const clonedRun: DoERun = {
+      ...sourceRun,
+      id: newId,
+      stdOrder: runIndex + 2,
+      runOrder: runIndex + 2,
+      factorActual: { ...sourceRun.factorActual },
+      factorCoded: { ...sourceRun.factorCoded },
+      responses: { ...sourceRun.responses },
+    };
+
+    const nextRuns = [...project.runs];
+    nextRuns.splice(runIndex + 1, 0, clonedRun);
+
+    const updatedRuns = nextRuns.map((r, idx) => ({
+      ...r,
+      stdOrder: idx + 1,
+      runOrder: r.runOrder ?? idx + 1,
+    }));
+
+    onUpdateProject({ runs: updatedRuns });
+    setActiveCell({ r: runIndex + 1, c: 1 });
+    setSelection({ start: { r: runIndex + 1, c: 0 }, end: { r: runIndex + 1, c: spreadsheetCols.length - 1 } });
+    showToast(`✓ Đã nhân bản Hàng ${runIndex + 1} thành Hàng ${runIndex + 2}!`);
+  };
+
+  // Delete a specific row
+  const handleDeleteRow = (runIndex: number) => {
+    if (runIndex < 0 || runIndex >= project.runs.length) return;
+    const updatedRuns = project.runs
+      .filter((_, idx) => idx !== runIndex)
+      .map((r, idx) => ({
+        ...r,
+        stdOrder: idx + 1,
+        runOrder: r.runOrder ?? idx + 1,
+      }));
+
+    onUpdateProject({ runs: updatedRuns });
+
+    if (updatedRuns.length === 0) {
+      setActiveCell(null);
+      setSelection(null);
+    } else {
+      const nextR = Math.min(runIndex, updatedRuns.length - 1);
+      setActiveCell({ r: nextR, c: 0 });
+      setSelection({ start: { r: nextR, c: 0 }, end: { r: nextR, c: spreadsheetCols.length - 1 } });
+    }
+    showToast(`✓ Đã xóa dòng thí nghiệm (Hàng ${runIndex + 1})`);
+  };
+
+  // Delete selected rows
+  const handleDeleteSelectedRows = () => {
+    if (!normalizedRange || project.runs.length === 0) return;
+    const minR = normalizedRange.minR;
+    const maxR = normalizedRange.maxR;
+    const countToDelete = maxR - minR + 1;
+
+    const updatedRuns = project.runs
+      .filter((_, idx) => idx < minR || idx > maxR)
+      .map((r, idx) => ({
+        ...r,
+        stdOrder: idx + 1,
+        runOrder: r.runOrder ?? idx + 1,
+      }));
+
+    onUpdateProject({ runs: updatedRuns });
+
+    if (updatedRuns.length === 0) {
+      setActiveCell(null);
+      setSelection(null);
+    } else {
+      const nextR = Math.min(minR, updatedRuns.length - 1);
+      setActiveCell({ r: nextR, c: 0 });
+      setSelection({ start: { r: nextR, c: 0 }, end: { r: nextR, c: spreadsheetCols.length - 1 } });
+    }
+    showToast(`✓ Đã xóa ${countToDelete} dòng thí nghiệm đã chọn!`);
+  };
+
   const handlePasteMatrix = (clipboardText: string, anchorRow?: number, anchorCol?: number) => {
-    if (!clipboardText || project.runs.length === 0) return;
+    if (!clipboardText) return;
     const startR = anchorRow !== undefined ? anchorRow : (normalizedRange ? normalizedRange.minR : (activeCell ? activeCell.r : 0));
     const startC = anchorCol !== undefined ? anchorCol : (normalizedRange ? normalizedRange.minC : (activeCell ? activeCell.c : 0));
 
@@ -356,7 +528,10 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
 
     lines.forEach((line, rOffset) => {
       const targetR = startR + rOffset;
-      if (targetR >= updatedRuns.length) return;
+      // Auto-expand runs if targetR is beyond current length
+      while (targetR >= updatedRuns.length) {
+        updatedRuns.push(createDefaultRun(updatedRuns.length + 1));
+      }
 
       const run = { ...updatedRuns[targetR] };
       const factorActual = { ...run.factorActual };
@@ -961,6 +1136,217 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               onChange={handleFileUpload}
             />
 
+            {/* Add Row Dropdown Menu */}
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowAddRowMenu(!showAddRowMenu)}
+                className="btn btn-primary"
+                style={{
+                  fontSize: '0.8rem',
+                  padding: '0.35rem 0.65rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.3rem',
+                  backgroundColor: '#16a34a',
+                  borderColor: '#15803d',
+                }}
+                title="Thêm các dòng thí nghiệm mới vào ma trận"
+              >
+                <Plus size={14} />
+                <span>Thêm Dòng</span>
+                <ChevronDown size={12} />
+              </button>
+
+              {showAddRowMenu && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    marginTop: '0.25rem',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '0.5rem',
+                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                    zIndex: 50,
+                    minWidth: '230px',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <button
+                    onClick={() => {
+                      handleAddRow();
+                      setShowAddRowMenu(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.55rem 0.8rem',
+                      textAlign: 'left',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      borderBottom: '1px solid #f1f5f9',
+                      fontSize: '0.78rem',
+                      color: '#0f172a',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f0fdf4')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
+                    <Plus size={14} color="#16a34a" />
+                    <div>
+                      <div style={{ fontWeight: '600' }}>+ Thêm 1 dòng ở cuối</div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b' }}>Thêm 1 thí nghiệm mới vào cuối bảng</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      handleAddRow(activeCell ? activeCell.r + 1 : undefined);
+                      setShowAddRowMenu(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.55rem 0.8rem',
+                      textAlign: 'left',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      borderBottom: '1px solid #f1f5f9',
+                      fontSize: '0.78rem',
+                      color: '#0f172a',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f0fdf4')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
+                    <ListPlus size={14} color="#0d9488" />
+                    <div>
+                      <div style={{ fontWeight: '600' }}>+ Chèn 1 dòng tại vị trí chọn</div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b' }}>Chèn ngay dưới hàng đang kích hoạt</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      handleDuplicateRow(activeCell ? activeCell.r : project.runs.length - 1);
+                      setShowAddRowMenu(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.55rem 0.8rem',
+                      textAlign: 'left',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      borderBottom: '1px solid #f1f5f9',
+                      fontSize: '0.78rem',
+                      color: '#0f172a',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#eff6ff')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
+                    <CopyPlus size={14} color="#2563eb" />
+                    <div>
+                      <div style={{ fontWeight: '600' }}>📑 Nhân bản dòng đang chọn</div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b' }}>Nhân bản giá trị biến để làm điểm lặp</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      handleAddMultipleRows(5);
+                      setShowAddRowMenu(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.55rem 0.8rem',
+                      textAlign: 'left',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      borderBottom: '1px solid #f1f5f9',
+                      fontSize: '0.78rem',
+                      color: '#0f172a',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
+                    <PlusCircle size={14} color="#0284c7" />
+                    <div>
+                      <div style={{ fontWeight: '600' }}>+ Thêm 5 dòng thí nghiệm</div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b' }}>Thêm hàng loạt 5 dòng mới</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      handleAddMultipleRows(10);
+                      setShowAddRowMenu(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.55rem 0.8rem',
+                      textAlign: 'left',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      fontSize: '0.78rem',
+                      color: '#0f172a',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
+                    <PlusCircle size={14} color="#0284c7" />
+                    <div>
+                      <div style={{ fontWeight: '600' }}>+ Thêm 10 dòng thí nghiệm</div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b' }}>Thêm hàng loạt 10 dòng mới</div>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Delete Selected Row(s) Button */}
+            {normalizedRange && (
+              <button
+                onClick={handleDeleteSelectedRows}
+                className="btn btn-secondary"
+                style={{
+                  fontSize: '0.8rem',
+                  padding: '0.35rem 0.65rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  backgroundColor: '#fee2e2',
+                  borderColor: '#fca5a5',
+                  color: '#b91c1c',
+                  fontWeight: '600',
+                }}
+                title="Xóa toàn bộ các dòng thí nghiệm đang được chọn"
+              >
+                <Trash2 size={14} />
+                <span>
+                  Xóa {normalizedRange.maxR - normalizedRange.minR + 1 > 1
+                    ? `${normalizedRange.maxR - normalizedRange.minR + 1} Dòng`
+                    : `Hàng ${normalizedRange.minR + 1}`}
+                </span>
+              </button>
+            )}
+
             {/* Copy Selected Range / Entire Table */}
             <button
               onClick={handleCopySelection}
@@ -1396,6 +1782,23 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                       {col.letter}
                     </th>
                   ))}
+
+                  <th
+                    style={{
+                      backgroundColor: '#f1f5f9',
+                      color: '#475569',
+                      fontWeight: '700',
+                      fontSize: '0.72rem',
+                      textAlign: 'center',
+                      padding: '0.2rem 0.4rem',
+                      borderRight: '1px solid #cbd5e1',
+                      borderBottom: '1px solid #cbd5e1',
+                      width: '96px',
+                      minWidth: '96px',
+                    }}
+                  >
+                    Thao Tác
+                  </th>
                 </tr>
 
                 {/* Header Row 2: Variable & CQA Titles */}
@@ -1446,6 +1849,22 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                       </div>
                     </th>
                   ))}
+
+                  <th
+                    style={{
+                      backgroundColor: '#f8fafc',
+                      color: '#64748b',
+                      padding: '0.45rem 0.5rem',
+                      textAlign: 'center',
+                      fontWeight: '700',
+                      fontSize: '0.76rem',
+                      borderRight: '1px solid #cbd5e1',
+                      width: '96px',
+                      minWidth: '96px',
+                    }}
+                  >
+                    Hành động
+                  </th>
                 </tr>
               </thead>
 
@@ -1764,11 +2183,174 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                           </td>
                         );
                       })}
+
+                      {/* Row Operations Actions */}
+                      <td
+                        style={{
+                          textAlign: 'center',
+                          padding: '0.15rem 0.35rem',
+                          borderBottom: '1px solid #cbd5e1',
+                          borderRight: '1px solid #cbd5e1',
+                          backgroundColor: '#f8fafc',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAddRow(runIdx + 1);
+                            }}
+                            style={{
+                              border: '1px solid #bbf7d0',
+                              backgroundColor: '#f0fdf4',
+                              cursor: 'pointer',
+                              padding: '0.2rem 0.35rem',
+                              borderRadius: '3px',
+                              color: '#16a34a',
+                              display: 'flex',
+                              alignItems: 'center',
+                            }}
+                            title={`Chèn thêm 1 dòng mới bên dưới Hàng ${runIdx + 1}`}
+                          >
+                            <Plus size={13} />
+                          </button>
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDuplicateRow(runIdx);
+                            }}
+                            style={{
+                              border: '1px solid #bfdbfe',
+                              backgroundColor: '#eff6ff',
+                              cursor: 'pointer',
+                              padding: '0.2rem 0.35rem',
+                              borderRadius: '3px',
+                              color: '#2563eb',
+                              display: 'flex',
+                              alignItems: 'center',
+                            }}
+                            title={`Nhân bản Hàng ${runIdx + 1} (Duplicate Run)`}
+                          >
+                            <CopyPlus size={13} />
+                          </button>
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteRow(runIdx);
+                            }}
+                            style={{
+                              border: '1px solid #fecaca',
+                              backgroundColor: '#fef2f2',
+                              cursor: 'pointer',
+                              padding: '0.2rem 0.35rem',
+                              borderRadius: '3px',
+                              color: '#dc2626',
+                              display: 'flex',
+                              alignItems: 'center',
+                            }}
+                            title={`Xóa Hàng ${runIdx + 1}`}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
+
+            {/* Interactive Bottom Bar: Quick Add Row & Stats */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0.5rem 0.75rem',
+                backgroundColor: '#f8fafc',
+                borderTop: '1px solid #cbd5e1',
+                fontSize: '0.78rem',
+                flexWrap: 'wrap',
+                gap: '0.5rem',
+                position: 'sticky',
+                bottom: 0,
+                zIndex: 5,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => handleAddRow()}
+                  className="btn btn-primary"
+                  style={{
+                    fontSize: '0.76rem',
+                    padding: '0.3rem 0.75rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    backgroundColor: '#16a34a',
+                    borderColor: '#15803d',
+                  }}
+                  title="Thêm 1 dòng thí nghiệm mới vào cuối bảng"
+                >
+                  <Plus size={14} />
+                  <span>+ Thêm 1 Dòng Mới (Add Run)</span>
+                </button>
+
+                <button
+                  onClick={() => handleAddMultipleRows(5)}
+                  className="btn btn-secondary"
+                  style={{ fontSize: '0.76rem', padding: '0.3rem 0.6rem', backgroundColor: '#ffffff', borderColor: '#cbd5e1' }}
+                  title="Thêm 5 dòng thí nghiệm cùng lúc"
+                >
+                  +5 Dòng
+                </button>
+
+                <button
+                  onClick={() => handleAddMultipleRows(10)}
+                  className="btn btn-secondary"
+                  style={{ fontSize: '0.76rem', padding: '0.3rem 0.6rem', backgroundColor: '#ffffff', borderColor: '#cbd5e1' }}
+                  title="Thêm 10 dòng thí nghiệm cùng lúc"
+                >
+                  +10 Dòng
+                </button>
+
+                {normalizedRange && (
+                  <button
+                    onClick={handleDeleteSelectedRows}
+                    className="btn btn-secondary"
+                    style={{
+                      fontSize: '0.76rem',
+                      padding: '0.3rem 0.7rem',
+                      backgroundColor: '#fee2e2',
+                      color: '#b91c1c',
+                      borderColor: '#fca5a5',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                    }}
+                    title="Xóa toàn bộ các dòng đang được chọn"
+                  >
+                    <Trash2 size={13} />
+                    <span>
+                      Xóa {normalizedRange.maxR - normalizedRange.minR + 1 > 1
+                        ? `${normalizedRange.maxR - normalizedRange.minR + 1} Dòng Đã Chọn`
+                        : `Dòng ${normalizedRange.minR + 1}`}
+                    </span>
+                  </button>
+                )}
+              </div>
+
+              <div style={{ color: '#475569', fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span>Tổng cộng: <strong style={{ color: '#0f172a' }}>{project.runs.length}</strong> lần chạy thí nghiệm</span>
+                <span style={{ color: '#94a3b8' }}>|</span>
+                <span style={{ color: '#16a34a', fontWeight: '600' }}>
+                  ✓ Tự động đồng bộ sang ANOVA &amp; Mạng Nơ-ron AI
+                </span>
+              </div>
+            </div>
           </div>
         )}
       </div>
