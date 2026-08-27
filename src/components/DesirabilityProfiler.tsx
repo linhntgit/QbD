@@ -234,6 +234,214 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
     onUpdateCQAs(updated);
   };
 
+  // Helper to generate Plotly trace and layout for a single CQA Desirability curve d_i(Y)
+  const getDesirabilityCurveData = (cqa: CQA) => {
+    const L = cqa.lowerLimit;
+    const U = cqa.upperLimit;
+    const T = cqa.target;
+    const s = cqa.sShape || 1.0;
+    const t = cqa.tShape || 1.0;
+
+    const currentY = currentEvaluation?.predictions[cqa.code]?.value ?? NaN;
+    const currentDi = currentEvaluation?.individualD[cqa.code] ?? 0;
+
+    let minVal = 0;
+    let maxVal = 100;
+
+    if (cqa.objective === 'maximize') {
+      const low = L !== undefined ? L : T !== undefined ? T * 0.8 : 0;
+      const target = T !== undefined ? T : U !== undefined ? U : low + 10;
+      const span = Math.max(1, target - low);
+      minVal = low - 0.25 * span;
+      maxVal = target + 0.35 * span;
+    } else if (cqa.objective === 'minimize') {
+      const target = T !== undefined ? T : L !== undefined ? L : 0;
+      const up = U !== undefined ? U : target + 10;
+      const span = Math.max(1, up - target);
+      minVal = Math.max(0, target - 0.35 * span);
+      maxVal = up + 0.25 * span;
+    } else if (cqa.objective === 'target') {
+      const low = L !== undefined ? L : T !== undefined ? T * 0.8 : 0;
+      const up = U !== undefined ? U : T !== undefined ? T * 1.2 : low + 20;
+      const span = Math.max(1, up - low);
+      minVal = low - 0.2 * span;
+      maxVal = up + 0.2 * span;
+    } else {
+      const low = L !== undefined ? L : 0;
+      const up = U !== undefined ? U : 100;
+      const span = Math.max(1, up - low);
+      minVal = low - 0.2 * span;
+      maxVal = up + 0.2 * span;
+    }
+
+    if (!isNaN(currentY)) {
+      minVal = Math.min(minVal, currentY - 0.05 * Math.abs(currentY || 1));
+      maxVal = Math.max(maxVal, currentY + 0.05 * Math.abs(currentY || 1));
+    }
+
+    const N = 100;
+    const xVals: number[] = [];
+    const yVals: number[] = [];
+
+    for (let i = 0; i < N; i++) {
+      const yVal = minVal + (i / (N - 1)) * (maxVal - minVal);
+      const dVal = calculateIndividualDesirability(yVal, cqa.objective, L, U, T, s, t);
+      xVals.push(Number(yVal.toFixed(3)));
+      yVals.push(Number(dVal.toFixed(4)));
+    }
+
+    const traces: any[] = [
+      // Baseline 1.0 (100% Satisfaction)
+      {
+        type: 'scatter',
+        mode: 'lines',
+        name: 'Thỏa mãn 100% (d = 1.0)',
+        x: [minVal, maxVal],
+        y: [1.0, 1.0],
+        line: { color: 'rgba(22, 163, 74, 0.45)', width: 1.5, dash: 'dash' },
+        hoverinfo: 'name',
+      },
+      // Baseline 0.0 (0% Satisfaction)
+      {
+        type: 'scatter',
+        mode: 'lines',
+        name: 'Không thỏa mãn (d = 0.0)',
+        x: [minVal, maxVal],
+        y: [0.0, 0.0],
+        line: { color: 'rgba(220, 38, 38, 0.45)', width: 1.5, dash: 'dash' },
+        hoverinfo: 'name',
+      },
+      // Main Curve d_i(Y)
+      {
+        type: 'scatter',
+        mode: 'lines',
+        name: `Hàm thỏa dụng d_${cqa.code}(Y)`,
+        x: xVals,
+        y: yVals,
+        line: { color: '#2563eb', width: 2.8 },
+        fill: 'tozeroy',
+        fillcolor: 'rgba(37, 99, 235, 0.08)',
+        hoverinfo: 'x+y',
+      },
+    ];
+
+    // Current point marker
+    if (!isNaN(currentY)) {
+      traces.push({
+        type: 'scatter',
+        mode: 'markers+text',
+        name: `Hiện tại (${currentY})`,
+        x: [currentY],
+        y: [currentDi],
+        marker: {
+          size: 11,
+          color: currentDi >= 0.8 ? '#16a34a' : currentDi > 0 ? '#d97706' : '#dc2626',
+          line: { color: '#ffffff', width: 2 },
+        },
+        text: [`d=${currentDi.toFixed(3)}`],
+        textposition: 'top center',
+        textfont: { size: 10, color: '#0f172a', weight: 700 },
+        hoverinfo: 'text',
+        hovertext: [
+          `<b>${cqa.name} (${cqa.code})</b><br>` +
+          `Dự đoán hiện tại: <b>${currentY} ${cqa.unit || ''}</b><br>` +
+          `Độ thỏa dụng: <b>d = ${currentDi.toFixed(4)} (${(currentDi * 100).toFixed(1)}%)</b>`
+        ],
+      });
+    }
+
+    const shapes: any[] = [];
+    const annotations: any[] = [];
+
+    if (L !== undefined) {
+      shapes.push({
+        type: 'line',
+        x0: L,
+        x1: L,
+        y0: 0,
+        y1: 1.05,
+        line: { color: '#dc2626', width: 1.8, dash: 'dot' },
+      });
+      annotations.push({
+        x: L,
+        y: 0.12,
+        text: `L=${L}`,
+        showarrow: false,
+        font: { size: 9.5, color: '#dc2626', weight: 700 },
+        bgcolor: '#ffffff',
+        borderpad: 2,
+      });
+    }
+
+    if (T !== undefined) {
+      shapes.push({
+        type: 'line',
+        x0: T,
+        x1: T,
+        y0: 0,
+        y1: 1.05,
+        line: { color: '#16a34a', width: 1.8, dash: 'dot' },
+      });
+      annotations.push({
+        x: T,
+        y: 0.88,
+        text: `Target=${T}`,
+        showarrow: false,
+        font: { size: 9.5, color: '#16a34a', weight: 700 },
+        bgcolor: '#ffffff',
+        borderpad: 2,
+      });
+    }
+
+    if (U !== undefined && (cqa.objective !== 'target' || U !== T)) {
+      shapes.push({
+        type: 'line',
+        x0: U,
+        x1: U,
+        y0: 0,
+        y1: 1.05,
+        line: { color: '#dc2626', width: 1.8, dash: 'dot' },
+      });
+      annotations.push({
+        x: U,
+        y: 0.12,
+        text: `U=${U}`,
+        showarrow: false,
+        font: { size: 9.5, color: '#dc2626', weight: 700 },
+        bgcolor: '#ffffff',
+        borderpad: 2,
+      });
+    }
+
+    const layout = {
+      title: {
+        text: `<b>${cqa.code}: ${cqa.name}</b> (${cqa.objective === 'maximize' ? '📈 Maximize (Lớn nhất)' : cqa.objective === 'minimize' ? '📉 Minimize (Nhỏ nhất)' : cqa.objective === 'target' ? '🎯 Match Target (Đạt đích)' : '📏 In Range (Trong khoảng)'})`,
+        font: { size: 11, color: '#1e3a8a', family: 'Inter, sans-serif' },
+      },
+      xaxis: {
+        title: { text: `${cqa.name}${cqa.unit ? ` [${cqa.unit}]` : ''}`, font: { size: 10, color: '#334155' } },
+        range: [minVal, maxVal],
+        tickfont: { size: 9 },
+        zeroline: false,
+      },
+      yaxis: {
+        title: { text: `d_${cqa.code}`, font: { size: 10, color: '#334155' } },
+        range: [-0.05, 1.15],
+        tickvals: [0, 0.25, 0.5, 0.75, 1.0],
+        ticktext: ['0 (0%)', '0.25', '0.5', '0.75', '1.0 (100%)'],
+        tickfont: { size: 9 },
+        zeroline: true,
+      },
+      margin: { l: 45, r: 20, t: 35, b: 40, pad: 2 },
+      shapes,
+      annotations,
+      showlegend: false,
+      height: 220,
+    };
+
+    return { traces, layout };
+  };
+
   // Generate interactive 2D Trace curves for the Profiler Grid
   const profilerGridData = useMemo(() => {
     if (validCQAs.length === 0 || factors.length === 0) return null;
@@ -747,6 +955,108 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                 })}
               </tbody>
             </table>
+          </div>
+
+          {/* Desirability Curves Visualization Grid (Slide 25–27) */}
+          <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <TrendingUp size={17} color="#2563eb" />
+                <h5 style={{ fontSize: '0.9rem', fontWeight: '700', color: '#1e3a8a', margin: 0 }}>
+                  Đồ Thị Minh Họa Hàm Thỏa Dụng Riêng Từng Chỉ Tiêu ($d_i(Y)$ vs $Y$ - Slide 25–27)
+                </h5>
+              </div>
+              <span className="badge badge-primary" style={{ fontSize: '0.72rem', backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
+                Derringer &amp; Suich (1980) Standard
+              </span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1rem' }}>
+              {validCQAs.map((cqa) => {
+                const curve = getDesirabilityCurveData(cqa);
+                const currentY = currentEvaluation?.predictions[cqa.code]?.value ?? NaN;
+                const currentDi = currentEvaluation?.individualD[cqa.code] ?? 0;
+                const L = cqa.lowerLimit;
+                const U = cqa.upperLimit;
+                const T = cqa.target;
+                const s = cqa.sShape || 1.0;
+                const t = cqa.tShape || 1.0;
+
+                return (
+                  <div
+                    key={cqa.id}
+                    style={{
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '0.5rem',
+                      backgroundColor: '#f8fafc',
+                      padding: '0.75rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.5rem',
+                    }}
+                  >
+                    {/* Plotly Chart of d_i(Y) */}
+                    <div style={{ height: '220px', width: '100%' }}>
+                      <PlotlyChart
+                        data={curve.traces}
+                        layout={curve.layout}
+                        config={{ responsive: true, displayModeBar: false }}
+                        style={{ width: '100%', height: '100%' }}
+                      />
+                    </div>
+
+                    {/* Explanatory Spec Breakdown */}
+                    <div
+                      style={{
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '0.375rem',
+                        padding: '0.6rem 0.75rem',
+                        fontSize: '0.75rem',
+                        lineHeight: '1.45',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.3rem',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: '700' }}>
+                        <span style={{ color: '#1e3a8a' }}>{cqa.code}: {cqa.name}</span>
+                        <span className={`badge ${currentDi >= 0.8 ? 'badge-success' : currentDi > 0 ? 'badge-warning' : 'badge-danger'}`} style={{ fontSize: '0.7rem' }}>
+                          Hiện tại: Y={isNaN(currentY) ? '-' : currentY} (d={currentDi.toFixed(3)})
+                        </span>
+                      </div>
+
+                      {/* 100% Satisfaction Region */}
+                      <div style={{ color: '#15803d' }}>
+                        <strong>🟢 Thỏa mãn 100% ($d_{cqa.code} = 1.0$): </strong>
+                        {cqa.objective === 'maximize' && `Khi ${cqa.code} ≥ ${T ?? U ?? 0} ${cqa.unit || ''} (Càng lớn càng tốt)`}
+                        {cqa.objective === 'minimize' && `Khi ${cqa.code} ≤ ${T ?? L ?? 0} ${cqa.unit || ''} (Càng nhỏ càng tốt)`}
+                        {cqa.objective === 'target' && `Khi ${cqa.code} = ${T ?? ((L ?? 0) + (U ?? 100)) / 2} ${cqa.unit || ''} (Đạt chính xác Đích)`}
+                        {cqa.objective === 'range' && `Khi ${L ?? 0} ≤ ${cqa.code} ≤ ${U ?? 100} ${cqa.unit || ''}`}
+                      </div>
+
+                      {/* 0% Satisfaction (Unacceptable) Region */}
+                      <div style={{ color: '#b91c1c' }}>
+                        <strong>🔴 Thỏa mãn 0% ($d_{cqa.code} = 0.0$): </strong>
+                        {cqa.objective === 'maximize' && `Khi ${cqa.code} ≤ ${L ?? 0} ${cqa.unit || ''} (Dưới ngưỡng chấp nhận)`}
+                        {cqa.objective === 'minimize' && `Khi ${cqa.code} ≥ ${U ?? 100} ${cqa.unit || ''} (Vượt ngưỡng chấp nhận)`}
+                        {cqa.objective === 'target' && `Khi ${cqa.code} ≤ ${L ?? 0} hoặc ${cqa.code} ≥ ${U ?? 100} ${cqa.unit || ''} (Ngoài dải [L, U])`}
+                        {cqa.objective === 'range' && `Khi ${cqa.code} < ${L ?? 0} hoặc ${cqa.code} > ${U ?? 100} ${cqa.unit || ''}`}
+                      </div>
+
+                      {/* Shape Parameter Formula */}
+                      <div style={{ color: '#475569', fontSize: '0.72rem', backgroundColor: '#f1f5f9', padding: '0.3rem 0.5rem', borderRadius: '0.25rem' }}>
+                        <strong>Hệ số hình dạng: </strong>
+                        {cqa.objective === 'maximize' && `s = ${s} (${s === 1 ? 'Tuyến tính' : s > 1 ? 'Khắt khe dốc' : 'Khoan dung lồi'})`}
+                        {cqa.objective === 'minimize' && `t = ${t} (${t === 1 ? 'Tuyến tính' : t > 1 ? 'Khắt khe dốc' : 'Khoan dung lồi'})`}
+                        {cqa.objective === 'target' && `s = ${s} (nhánh dưới), t = ${t} (nhánh trên)`}
+                        {cqa.objective === 'range' && `Hàm bước (Step function)`}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

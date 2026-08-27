@@ -258,7 +258,7 @@ export function normalInverseCDF(p: number): number {
 }
 
 /**
- * Derringer and Suich Individual Desirability Calculation d_i
+ * Derringer and Suich Individual Desirability Calculation d_i (Slide 24-27)
  */
 export function calculateIndividualDesirability(
   y: number,
@@ -279,7 +279,7 @@ export function calculateIndividualDesirability(
       return Math.max(0, Math.min(1.0, y / 100.0));
     }
     case 'maximize': {
-      // Ramp Up (Larger is better): d=0 below L, d=1 at/above T
+      // Ramp Up (Slide 24, 25): d=0 when y <= L (0% satisfaction), d=1 when y >= T (100% satisfaction)
       const L = lowLimit !== undefined ? lowLimit : target !== undefined ? target * 0.8 : 0;
       const T = target !== undefined ? target : highLimit !== undefined ? highLimit : L !== 0 ? L * 1.5 : 100;
       if (T <= L) return y >= L ? 1.0 : 0.0;
@@ -290,28 +290,42 @@ export function calculateIndividualDesirability(
     }
 
     case 'minimize': {
-      // Ramp Down (Smaller is better): d=1 at/below T, d=0 at/above U
+      // Ramp Down (Slide 25, 26): d=1 when y <= T (100% satisfaction), d=0 when y >= U (0% satisfaction)
       const T = target !== undefined ? target : lowLimit !== undefined ? lowLimit : 0;
       const U = highLimit !== undefined ? highLimit : T !== 0 ? T * 1.5 : 100;
+      const power = t !== undefined && t !== 1.0 ? t : s;
       if (U <= T) return y <= U ? 1.0 : 0.0;
       if (y <= T) return 1.0;
       if (y >= U) return 0.0;
       const frac = (U - y) / (U - T);
-      return Math.pow(Math.max(0, Math.min(1.0, frac)), Math.max(0.01, s));
+      return Math.pow(Math.max(0, Math.min(1.0, frac)), Math.max(0.01, power));
     }
 
     case 'target': {
-      // Tent Shape (Nominal is best): d=0 outside [L, U], d=1 at Target T
+      // Tent / Trapezoid Shape (Slide 26, 27): d=0 outside [L, U], d=1 at Target T
       const L = lowLimit !== undefined ? lowLimit : target !== undefined ? target * 0.9 : 0;
       const U = highLimit !== undefined ? highLimit : target !== undefined ? target * 1.1 : 100;
       const T = target !== undefined ? target : (L + U) / 2;
       if (y < L || y > U) return 0.0;
-      if (y <= T) {
+      if (T <= L && U <= T) return y === T ? 1.0 : 0.0;
+      if (T <= L) {
+        // Lower limit equals Target (e.g. L = T = 78, U = 85)
+        if (y < T) return 0.0;
+        if (U <= T) return 1.0;
+        const frac = (U - y) / (U - T);
+        return Math.pow(Math.max(0, Math.min(1.0, frac)), Math.max(0.01, t));
+      }
+      if (U <= T) {
+        // Upper limit equals Target
+        if (y > T) return 0.0;
         if (T <= L) return 1.0;
         const frac = (y - L) / (T - L);
         return Math.pow(Math.max(0, Math.min(1.0, frac)), Math.max(0.01, s));
+      }
+      if (y <= T) {
+        const frac = (y - L) / (T - L);
+        return Math.pow(Math.max(0, Math.min(1.0, frac)), Math.max(0.01, s));
       } else {
-        if (U <= T) return 1.0;
         const frac = (U - y) / (U - T);
         return Math.pow(Math.max(0, Math.min(1.0, frac)), Math.max(0.01, t));
       }
