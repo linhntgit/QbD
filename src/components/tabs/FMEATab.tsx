@@ -5,6 +5,7 @@ import {
   Trash2,
   GitBranch,
   ArrowRight,
+  HelpCircle,
 } from 'lucide-react';
 import type { QBDProject, FMEARiskItem } from '../../types/qbd';
 
@@ -291,6 +292,159 @@ export const FMEATab: React.FC<FMEATabProps> = ({
                 })}
               </tbody>
             </table>
+          </div>
+
+          {/* Detailed RPN Scoring and Risk Classification Guide (ICH Q9 / FMEA Guidance) */}
+          <div
+            style={{
+              marginTop: '1.25rem',
+              backgroundColor: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '0.625rem',
+              padding: '1rem 1.25rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <HelpCircle size={18} color="#0f766e" />
+                <h4 style={{ fontSize: '0.92rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
+                  💡 Ghi Chú Phân Loại Mức Rủi Ro &amp; Cách Đánh Giá Chỉ Số RPN (ICH Q9)
+                </h4>
+              </div>
+              <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#0f766e', backgroundColor: '#ccfbf1', padding: '0.2rem 0.6rem', borderRadius: '4px', border: '1px solid #99f6e4' }}>
+                Công thức: RPN = S (Nghiêm trọng) × P (Xác suất) × D (Khó phát hiện)
+              </span>
+            </div>
+
+            {/* 3 Risk Level Threshold Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.85rem', marginBottom: '1rem' }}>
+              {/* High Risk Card */}
+              <div
+                style={{
+                  backgroundColor: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '0.5rem',
+                  padding: '0.85rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.35rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <span style={{ fontSize: '1.1rem' }}>🔴</span>
+                    <span style={{ fontWeight: '700', color: '#991b1b', fontSize: '0.85rem' }}>
+                      RỦI RO CAO (HIGH RISK)
+                    </span>
+                  </div>
+                  <span style={{ fontWeight: '800', fontSize: '0.85rem', color: '#b91c1c', backgroundColor: '#fee2e2', padding: '0.1rem 0.45rem', borderRadius: '4px', border: '1px solid #fca5a5' }}>
+                    RPN ≥ 100
+                  </span>
+                </div>
+                <p style={{ fontSize: '0.78rem', color: '#7f1d1d', margin: 0, lineHeight: 1.4 }}>
+                  <strong>Khi nào là High:</strong> Nhân tố có khả năng gây sai lệch nghiêm trọng lên CQA, tần suất xuất hiện cao hoặc khó phát hiện qua kiểm tra thông thường (hoặc khi điểm nghiêm trọng <code>S ≥ 8</code>).
+                </p>
+                <div style={{ fontSize: '0.75rem', color: '#991b1b', backgroundColor: '#ffffff', padding: '0.35rem 0.5rem', borderRadius: '4px', border: '1px solid #fecaca', marginTop: '0.2rem' }}>
+                  ⚡ <strong>Hành động:</strong> <strong>BẮT BUỘC</strong> đưa vào ma trận thực nghiệm DoE để xác định Design Space &amp; kiểm soát chặt.
+                </div>
+              </div>
+
+              {/* Medium Risk Card */}
+              <div
+                style={{
+                  backgroundColor: '#fffbeb',
+                  border: '1px solid #fde68a',
+                  borderRadius: '0.5rem',
+                  padding: '0.85rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.35rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <span style={{ fontSize: '1.1rem' }}>🟡</span>
+                    <span style={{ fontWeight: '700', color: '#92400e', fontSize: '0.85rem' }}>
+                      RỦI RO TRUNG BÌNH (MEDIUM)
+                    </span>
+                  </div>
+                  <span style={{ fontWeight: '800', fontSize: '0.85rem', color: '#b45309', backgroundColor: '#fef3c7', padding: '0.1rem 0.45rem', borderRadius: '4px', border: '1px solid #fcd34d' }}>
+                    50 ≤ RPN &lt; 100
+                  </span>
+                </div>
+                <p style={{ fontSize: '0.78rem', color: '#78350f', margin: 0, lineHeight: 1.4 }}>
+                  <strong>Khi nào là Medium:</strong> Nguy cơ tiềm ẩn có thể ảnh hưởng CQA nếu thông số dao động rộng, nhưng có thể bù trừ hoặc phát hiện ở mức độ vừa phải.
+                </p>
+                <div style={{ fontSize: '0.75rem', color: '#92400e', backgroundColor: '#ffffff', padding: '0.35rem 0.5rem', borderRadius: '4px', border: '1px solid #fde68a', marginTop: '0.2rem' }}>
+                  🔍 <strong>Hành động:</strong> Đánh giá dựa trên dữ liệu tiền định / tài liệu, cân nhắc đưa vào sàng lọc sơ bộ (Screening DoE).
+                </div>
+              </div>
+
+              {/* Low Risk Card */}
+              <div
+                style={{
+                  backgroundColor: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '0.5rem',
+                  padding: '0.85rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.35rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <span style={{ fontSize: '1.1rem' }}>🟢</span>
+                    <span style={{ fontWeight: '700', color: '#166534', fontSize: '0.85rem' }}>
+                      RỦI RO THẤP (LOW RISK)
+                    </span>
+                  </div>
+                  <span style={{ fontWeight: '800', fontSize: '0.85rem', color: '#15803d', backgroundColor: '#dcfce7', padding: '0.1rem 0.45rem', borderRadius: '4px', border: '1px solid #86efac' }}>
+                    RPN &lt; 50
+                  </span>
+                </div>
+                <p style={{ fontSize: '0.78rem', color: '#14532d', margin: 0, lineHeight: 1.4 }}>
+                  <strong>Khi nào là Low:</strong> Tác động không đáng kể lên CQA, xác suất phát sinh lỗi rất thấp hoặc hệ thống kiểm soát tại chỗ phát hiện tức thì 100%.
+                </p>
+                <div style={{ fontSize: '0.75rem', color: '#166534', backgroundColor: '#ffffff', padding: '0.35rem 0.5rem', borderRadius: '4px', border: '1px solid #bbf7d0', marginTop: '0.2rem' }}>
+                  📋 <strong>Hành động:</strong> Kiểm soát thường quy qua quy trình thao tác chuẩn (SOP), không cần thiết khảo sát DoE.
+                </div>
+              </div>
+            </div>
+
+            {/* Explanation of S, P, D parameters */}
+            <div
+              style={{
+                backgroundColor: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '0.5rem',
+                padding: '0.75rem 1rem',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                gap: '1rem',
+                fontSize: '0.76rem',
+                color: '#334155',
+              }}
+            >
+              <div>
+                <strong style={{ color: '#0f172a' }}>1. S (Severity - Mức độ nghiêm trọng, 1-10):</strong>
+                <div style={{ marginTop: '0.2rem', color: '#64748b' }}>
+                  Đánh giá hậu quả nếu lỗi xảy ra. <strong>1-3</strong>: Nhẹ, không ảnh hưởng CQA; <strong>4-6</strong>: Vừa phải; <strong>7-10</strong>: Rất nghiêm trọng, vi phạm Dược điển hoặc ảnh hưởng tính mạng/an toàn.
+                </div>
+              </div>
+              <div>
+                <strong style={{ color: '#0f172a' }}>2. P (Probability - Xác suất xảy ra, 1-10):</strong>
+                <div style={{ marginTop: '0.2rem', color: '#64748b' }}>
+                  Tần suất phát sinh nguyên nhân gây lỗi. <strong>1-3</strong>: Cực hiếm khi xảy ra; <strong>4-6</strong>: Thỉnh thoảng xuất hiện; <strong>7-10</strong>: Thường xuyên xảy ra liên tục nếu không kiểm soát.
+                </div>
+              </div>
+              <div>
+                <strong style={{ color: '#0f172a' }}>3. D (Detectability - Khó phát hiện, 1-10):</strong>
+                <div style={{ marginTop: '0.2rem', color: '#64748b' }}>
+                  Khả năng hệ thống kiểm soát phát hiện lỗi. <strong>1-3</strong>: Chắc chắn phát hiện (IPC Online 100%); <strong>4-6</strong>: Kiểm nghiệm mẫu QC; <strong>7-10</strong>: Rất khó/Không thể phát hiện.
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       ) : (
