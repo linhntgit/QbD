@@ -349,7 +349,7 @@ export async function exportQBDWordReport(
           children: [
             createDataCell(f.code, idx % 2 === 1, 10),
             createDataCell(f.name, idx % 2 === 1, 25),
-            createDataCell(`${f.type} (${f.role === 'mixture_component' ? 'Hỗn hợp' : 'Độc lập'})`, idx % 2 === 1, 18),
+            createDataCell(`${f.type} (${f.role === 'mixture_component' ? 'Hỗn hợp' : f.role === 'formulation_other' ? 'Công thức khác' : 'Quy trình'})`, idx % 2 === 1, 18),
             createDataCell(f.unit || '-', idx % 2 === 1, 10),
             createDataCell(String(f.low), idx % 2 === 1, 12),
             createDataCell(f.center !== undefined ? String(f.center) : String((f.low + f.high) / 2), idx % 2 === 1, 12),
