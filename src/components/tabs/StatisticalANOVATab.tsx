@@ -49,15 +49,18 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
 
   const currentCQA = project.cqas.find((c) => c.code === selectedCQA) || project.cqas[0];
   const model = currentCQA ? models[currentCQA.code] : null;
+  const appliedModelType: ModelType = currentCQA
+    ? (modelTypes[currentCQA.code] || model?.modelType || 'Quadratic')
+    : 'Quadratic';
   const analysisWizard = useMemo(
     () => currentCQA ? assessModelCandidates(currentCQA, project.factors, project.runs) : null,
     [currentCQA, project.factors, project.runs],
   );
   const confirmationPlan = useMemo(
-    () => currentCQA && analysisWizard?.recommended?.model
-      ? buildConfirmationPlan(currentCQA, analysisWizard.recommended.model, project.runs)
+    () => currentCQA && model
+      ? buildConfirmationPlan(currentCQA, model, project.runs)
       : null,
-    [analysisWizard, currentCQA, project.runs],
+    [currentCQA, model, project.runs],
   );
 
   if (!currentCQA) {
@@ -416,7 +419,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
               <thead><tr><th>Mô hình</th><th>Phân cấp</th><th>AICc</th><th>Q²</th><th>LOF p</th><th>df dư</th><th>Đánh giá</th><th /></tr></thead>
               <tbody>
                 {analysisWizard.candidates.map((candidate) => {
-                  const chosen = candidate.modelType === analysisWizard.recommended?.modelType;
+                  const chosen = candidate.modelType === appliedModelType;
                   return <tr key={candidate.modelType} style={{ background: chosen ? '#ecfdf5' : undefined }}>
                     <td style={{ fontWeight: '700' }}>{candidate.modelType}</td>
                     <td>✓ Đầy đủ</td>
@@ -787,7 +790,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <BrainCircuit size={20} color="#7c3aed" />
                 <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a' }}>
-                  Bảng So Sánh Đối Chiếu Hiệu Năng: Mô Hình Đa Thức vs Mạng Nơ-ron (Slide 36)
+                  Bảng So Sánh Đối Chiếu Hiệu Năng: Mô Hình Đa Thức vs Mạng Nơ-ron
                 </h3>
               </div>
               <span className="badge badge-purple" style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}>

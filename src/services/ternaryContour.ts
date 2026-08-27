@@ -407,7 +407,9 @@ export function generateTernaryContour(
         pointCoded[factorB.code] = factorB.role === 'mixture_component' ? bProp : actualToCoded(bPct, factorB);
         pointCoded[factorC.code] = factorC.role === 'mixture_component' ? cProp : actualToCoded(cPct, factorC);
 
-        const zVal = Number(model.predict(pointCoded).toFixed(3));
+        // Keep the response surface continuous.  Precision is applied only when
+        // rendering labels/hover text, not to the contour data itself.
+        const zVal = model.predict(pointCoded);
         zGrid[j][i] = zVal;
 
         if (zVal < zMin) zMin = zVal;
@@ -794,7 +796,6 @@ export function buildTernaryPlotlyData(
   if (showDoERuns && doeRuns.length > 0) {
     const runX: number[] = [];
     const runY: number[] = [];
-    const runTexts: string[] = [];
     const runHovers: string[] = [];
 
     doeRuns.forEach((run, idx) => {
@@ -819,8 +820,6 @@ export function buildTernaryPlotlyData(
         const cart = ternaryToCartesian(aNorm, bNorm, cNorm);
         runX.push(cart.x);
         runY.push(cart.y);
-        runTexts.push(`R${run.runOrder || idx + 1}`);
-
         const yVal = run.responses[cqa.code];
         runHovers.push(
           `<b>Thí nghiệm ${run.runOrder || idx + 1} (DoE Run)</b><br>` +
@@ -835,13 +834,12 @@ export function buildTernaryPlotlyData(
     if (runX.length > 0) {
       traces.push({
         type: 'scatter',
-        mode: 'markers+text',
+        // Keep the simplex readable when several DoE runs occupy nearby compositions.
+        // Run identifiers remain available in the hover card rather than overlapping the markers.
+        mode: 'markers',
         name: 'Điểm Thực Nghiệm DoE (◆)',
         x: runX,
         y: runY,
-        text: runTexts,
-        textposition: 'top center',
-        textfont: { family: 'Inter, sans-serif', size: 9.5, color: '#0f172a', weight: 600 },
         hoverinfo: 'text',
         hovertext: runHovers,
         marker: {
@@ -879,13 +877,10 @@ export function buildTernaryPlotlyData(
 
     traces.push({
       type: 'scatter',
-      mode: 'markers+text',
+      mode: 'markers',
       name: '★ Điểm Tối Ưu (Optimum)',
       x: [cart.x],
       y: [cart.y],
-      text: ['★ TỐI ƯU'],
-      textposition: 'bottom center',
-      textfont: { family: 'Inter, sans-serif', size: 10.5, color: '#9a3412', weight: 700 },
       hoverinfo: 'text',
       hovertext: [
         `<b>★ ĐIỂM TỐI ƯU DESIRABILITY (D = ${(optimum.overallDesirability * 100).toFixed(1)}%)</b><br>` +
@@ -911,7 +906,7 @@ export function buildTernaryPlotlyData(
       font: { size: 13, color: '#0f172a', family: 'Inter, sans-serif' },
     },
     autosize: true,
-    margin: { l: 35, r: 35, b: 45, t: 40, pad: 2 },
+    margin: { l: 35, r: 35, b: 55, t: 78, pad: 2 },
     xaxis: {
       range: [-6, 106],
       fixedrange: true,
@@ -956,14 +951,9 @@ export function buildTernaryPlotlyData(
         font: { size: 12, color: '#0f172a', family: 'Inter, sans-serif' },
       },
     ],
-    showlegend: true,
-    legend: {
-      orientation: 'h',
-      x: 0.5,
-      xanchor: 'center',
-      y: -0.14,
-      font: { size: 10.5 },
-    },
+    // The app presents the semantic legend outside the chart. Hiding the long
+    // technical trace legend prevents it from colliding with the title.
+    showlegend: false,
   };
 
   return { traces, layout };
@@ -1344,7 +1334,6 @@ export function generateTernaryDesignSpace(
   if (showDoERuns && doeRuns && doeRuns.length > 0) {
     const runX: number[] = [];
     const runY: number[] = [];
-    const runTexts: string[] = [];
     const runHovers: string[] = [];
 
     doeRuns.forEach((run, idx) => {
@@ -1369,8 +1358,6 @@ export function generateTernaryDesignSpace(
         const cart = ternaryToCartesian(aNorm, bNorm, cNorm);
         runX.push(cart.x);
         runY.push(cart.y);
-        runTexts.push(`R${run.runOrder || idx + 1}`);
-
         runHovers.push(
           `<b>Thí nghiệm ${run.runOrder || idx + 1} (DoE Run)</b><br>` +
           `${formatFactorApexName(factorA)}: ${aPct.toFixed(1)}%<br>` +
@@ -1383,13 +1370,12 @@ export function generateTernaryDesignSpace(
     if (runX.length > 0) {
       sweetSpotTraces.push({
         type: 'scatter',
-        mode: 'markers+text',
+        // IDs are intentionally available on hover only; this avoids collisions
+        // between close experimental compositions.
+        mode: 'markers',
         name: 'Điểm Thực Nghiệm DoE (◆)',
         x: runX,
         y: runY,
-        text: runTexts,
-        textposition: 'top center',
-        textfont: { family: 'Inter, sans-serif', size: 9.5, color: '#0f172a', weight: 600 },
         hoverinfo: 'text',
         hovertext: runHovers,
         marker: {
@@ -1436,13 +1422,10 @@ export function generateTernaryDesignSpace(
 
     sweetSpotTraces.push({
       type: 'scatter',
-      mode: 'markers+text',
+      mode: 'markers',
       name: '★ Target Setpoint (Optimum)',
       x: [cart.x],
       y: [cart.y],
-      text: ['★ ĐIỂM TỐI ƯU'],
-      textposition: 'bottom center',
-      textfont: { family: 'Inter, sans-serif', size: 10.5, color: '#1e3a8a', weight: 700 },
       hoverinfo: 'text',
       hovertext: [
         `<b>★ ĐIỂM TỐI ƯU DESIRABILITY (D = ${(optimum.overallDesirability * 100).toFixed(1)}%)</b><br>` +
@@ -1487,7 +1470,7 @@ export function generateTernaryDesignSpace(
       font: { size: 13, color: '#0f172a', family: 'Inter, sans-serif' },
     },
     autosize: true,
-    margin: { l: 35, r: 35, b: 50, t: 40, pad: 2 },
+    margin: { l: 35, r: 35, b: 55, t: 78, pad: 2 },
     xaxis: {
       range: [-6, 106],
       fixedrange: true,
@@ -1532,14 +1515,7 @@ export function generateTernaryDesignSpace(
         font: { size: 12, color: '#0f172a', family: 'Inter, sans-serif' },
       },
     ],
-    showlegend: true,
-    legend: {
-      orientation: 'h',
-      x: 0.5,
-      xanchor: 'center',
-      y: -0.16,
-      font: { size: 10 },
-    },
+    showlegend: false,
   };
 
   return { traces: sweetSpotTraces, sweetSpotTraces, layout, constraints, sweetSpotFraction };

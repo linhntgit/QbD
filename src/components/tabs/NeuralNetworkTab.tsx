@@ -251,7 +251,9 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
         pointCoded[factorY.code] = yCoded;
 
         const pred = neuralModel.predict(pointCoded);
-        row.push(Number(pred.toFixed(3)));
+        // Preserve raw neural-network predictions in the surface grid.  Rounding
+        // here produces artificial steps for responses such as PDI.
+        row.push(pred);
 
         const cqaMargin = calculateCQAMargin(
           pred,
@@ -2189,7 +2191,12 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                     </div>
 
                     <div style={{ height: '160px' }}>
-                      <PlotlyChart data={tracePlotData} layout={traceLayout} style={{ width: '100%', height: '100%' }} />
+                      <PlotlyChart
+                        data={tracePlotData}
+                        layout={traceLayout}
+                        config={{ responsive: true, displayModeBar: false, compact: true }}
+                        style={{ width: '100%', height: '100%' }}
+                      />
                     </div>
 
                     <div style={{ marginTop: '0.5rem' }}>

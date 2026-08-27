@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   QBDProject,
   ModelType,
@@ -12,6 +12,7 @@ import { CASE_STUDIES } from './data/caseStudies';
 import { fitModel, optimizeDesirability, runMonteCarloSimulation } from './services/statistics';
 import { fitNeuralNetModel, fitMultiOutputNeuralNet, DEFAULT_NEURAL_CONFIG } from './services/neuralNetwork';
 import { exportQBDWordReport } from './services/reportGenerator';
+import { loadPersistedProject, persistProject, recordProjectVersion, validateProjectTemplate } from './services/projectGovernance';
 import { Navbar } from './components/Navbar';
 import { TabNavigation, type TabKey } from './components/TabNavigation';
 import { QTPPTab } from './components/tabs/QTPPTab';
@@ -25,14 +26,22 @@ import { ReportTab } from './components/tabs/ReportTab';
 
 export function App() {
   // Default project: Case Study 1 (Metoprolol Tablet BBD)
-  const [project, setProject] = useState<QBDProject>(CASE_STUDIES[0]);
+  const [project, setProject] = useState<QBDProject>(() => loadPersistedProject() || CASE_STUDIES[0]);
   const [activeTab, setActiveTab] = useState<TabKey>('qtpp');
-  const [selectedCQA, setSelectedCQA] = useState<string>(CASE_STUDIES[0].cqas[0]?.code || 'Y1');
+  const [selectedCQA, setSelectedCQA] = useState<string>(() => (loadPersistedProject() || CASE_STUDIES[0]).cqas[0]?.code || 'Y1');
   const [modelTypes, setModelTypes] = useState<Record<string, ModelType>>({});
   const [neuralTrainingMode, setNeuralTrainingMode] = useState<NeuralTrainingMode>('independent');
   const [sharedNeuralConfig, setSharedNeuralConfig] = useState<NeuralNetConfig>({ ...DEFAULT_NEURAL_CONFIG });
   const [neuralConfigs, setNeuralConfigs] = useState<Record<string, NeuralNetConfig>>({});
   const [modelingEngine, setModelingEngine] = useState<ModelingEngine>('polynomial');
+  const hasPersistedInitialProject = useRef(false);
+  const pendingAuditAction = useRef('Khởi tạo project');
+
+  useEffect(() => {
+    persistProject(project);
+    if (hasPersistedInitialProject.current) recordProjectVersion(project, pendingAuditAction.current);
+    hasPersistedInitialProject.current = true;
+  }, [project]);
 
   // Calculate ANOVA Models dynamically for all CQAs
   const models = useMemo<Record<string, StatisticalModelResult>>(() => {
@@ -130,6 +139,7 @@ export function App() {
 
   // Update Project Handler
   const handleUpdateProject = (updated: Partial<QBDProject>) => {
+    pendingAuditAction.current = `Cập nhật: ${Object.keys(updated).join(', ')}`;
     setProject((prev) => ({
       ...prev,
       ...updated,
@@ -139,6 +149,12 @@ export function App() {
 
   // Load Case Study / Project
   const handleLoadProject = (newProj: QBDProject) => {
+    const validation = validateProjectTemplate(newProj);
+    if (!validation.valid) {
+      window.alert(`Không thể tải project vì template không hợp lệ:\n${validation.errors.join('\n')}`);
+      return;
+    }
+    pendingAuditAction.current = 'Tải project/case study';
     setProject(newProj);
     if (newProj.cqas.length > 0) {
       setSelectedCQA(newProj.cqas[0].code);
@@ -216,9 +232,16 @@ export function App() {
       designSpace: [],
     };
 
+    pendingAuditAction.current = 'Tạo project mới';
     setProject(blankProject);
     setSelectedCQA('Y1');
     setActiveTab('qtpp');
+  };
+
+  const handleRestoreProject = (snapshot: QBDProject) => {
+    pendingAuditAction.current = 'Khôi phục snapshot lịch sử';
+    setProject(snapshot);
+    setSelectedCQA(snapshot.cqas[0]?.code || 'Y1');
   };
 
   // Save Project JSON
@@ -348,6 +371,7 @@ export function App() {
             neuralModels={neuralModels}
             modelingEngine={modelingEngine}
             onToggleEngine={setModelingEngine}
+            onRestoreSnapshot={handleRestoreProject}
           />
         )}
       </main>

@@ -22,6 +22,7 @@ import type {
 } from '../types/qbd';
 import { calculateDesignEfficiency } from './doeGenerator';
 import { generateUpdatedRiskAssessment, generateControlStrategy } from './statistics';
+import { getTraceabilitySummary } from './projectGovernance';
 
 const PRIMARY_COLOR = '1E3A8A'; // Deep Navy Blue
 const ACCENT_COLOR = '0D9488'; // Teal
@@ -152,6 +153,22 @@ export async function exportQBDWordReport(
       rows: metaRows,
     }),
     new Paragraph({ text: '', spacing: { after: 300 } })
+  );
+
+  const traceability = getTraceabilitySummary(project);
+  sections.push(
+    new Paragraph({ text: '0. Protocol Trước Chạy & Traceability Sau Chạy', heading: HeadingLevel.HEADING_1, spacing: { before: 150, after: 120 } }),
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({ children: [createHeaderCell('Hạng mục', 30), createHeaderCell('Nội dung', 70)] }),
+        new TableRow({ children: [createDataCell('Protocol ID', false, 30), createDataCell(traceability.protocolId, false, 70)] }),
+        new TableRow({ children: [createDataCell('Thiết kế trước chạy', true, 30), createDataCell(`${project.doeConfig.designType}; ${project.runs.length} run; ${project.doeConfig.blocks ?? 1} block; randomize=${project.doeConfig.randomized ? 'Có' : 'Không'}.`, true, 70)] }),
+        new TableRow({ children: [createDataCell('Trace sau chạy', false, 30), createDataCell(traceability.runStatus, false, 70)] }),
+        new TableRow({ children: [createDataCell('Kiểm tra template', true, 30), createDataCell(traceability.validation.valid ? 'Đạt kiểm tra cấu trúc cục bộ.' : `Không đạt: ${traceability.validation.errors.join(' ')}`, true, 70)] }),
+      ],
+    }),
+    new Paragraph({ text: 'Lưu ý: protocol cần được phê duyệt trước khi thực nghiệm. Traceability cục bộ của ứng dụng không thay thế audit trail, phân quyền, chữ ký điện tử hay validation package GxP/21 CFR Part 11.', spacing: { before: 120, after: 240 } }),
   );
 
   // SECTION 1.1: Executive Summary & Chronological Studies (FDA Table 1 format)

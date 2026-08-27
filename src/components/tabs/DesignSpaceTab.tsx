@@ -36,6 +36,7 @@ import {
 import { codedToActual, actualToCoded } from '../../services/doeGenerator';
 import { formatAxisTitle, calculateCQAMargin } from '../../services/mathUtils';
 import { generateTernaryDesignSpace } from '../../services/ternaryContour';
+import { assessDesignSpaceRobustness } from '../../services/designSpaceRobustness';
 
 interface DesignSpaceTabProps {
   project: QBDProject;
@@ -136,6 +137,11 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
       10000
     );
   });
+
+  const robustness = useMemo(
+    () => optimum ? assessDesignSpaceRobustness(optimum.actualFactors, factors, cqas, models, mcResult) : null,
+    [optimum, factors, cqas, models, mcResult],
+  );
 
   // Sync optimum, slice factors, and Monte Carlo when models, engine or project changes
   useEffect(() => {
@@ -285,7 +291,9 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
           );
         }
 
-        row.push(Number(minMargin.toFixed(5)));
+        // Keep the margin field continuous for the design-space contour; use
+        // rounding only in the hover text and report-facing display.
+        row.push(minMargin);
 
         hoverX.push(xAct);
         hoverY.push(yAct);
@@ -1018,6 +1026,47 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
 
         </div>
       </div>
+
+      {robustness && (
+        <div className="qbd-card" style={{ borderLeft: '4px solid #0284c7' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: '0.8rem' }}>
+            <div>
+              <h3 style={{ fontSize: '1rem', margin: 0, color: '#0c4a6e' }}>Robust setpoint, acceptance region & PAR</h3>
+              <p style={{ fontSize: '0.75rem', color: '#475569', margin: '0.2rem 0 0' }}>Kết hợp probability-of-failure từ Monte Carlo với sensitivity cục bộ và PAR sàng lọc quanh setpoint tối ưu.</p>
+            </div>
+            <span className={`badge ${robustness.probabilityOfFailurePercent !== null && robustness.probabilityOfFailurePercent <= 1 ? 'badge-success' : 'badge-warning'}`}>
+              P(failure) {robustness.probabilityOfFailurePercent === null ? '—' : `${robustness.probabilityOfFailurePercent}%`}
+            </span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.7rem', marginBottom: '0.75rem' }}>
+            <div style={{ background: '#f0f9ff', borderRadius: '0.45rem', padding: '0.65rem', fontSize: '0.75rem', color: '#334155' }}>
+              <strong>Acceptance region tại setpoint</strong><br />
+              {robustness.acceptance.map((item) => <div key={item.code} style={{ color: item.accepted ? '#15803d' : '#b91c1c' }}>{item.accepted ? '✓' : '⚠'} {item.code}: dự đoán {item.predicted.toFixed(3)} · margin {(item.normalizedMargin * 100).toFixed(1)}%</div>)}
+            </div>
+            <div style={{ background: '#f0fdfa', borderRadius: '0.45rem', padding: '0.65rem', fontSize: '0.75rem', color: '#334155' }}>
+              <strong>Uncertainty của risk estimate</strong><br />
+              {robustness.probabilityInterval95 ? `95% MC interval: ${robustness.probabilityInterval95.low}%–${robustness.probabilityInterval95.high}%` : 'Chạy Monte Carlo để ước lượng xác suất thất bại.'}<br />
+              RSD hiện chọn: ±{mcVariability}% · {mcResult?.simulations.toLocaleString() ?? 0} lô ảo.
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 0.9fr) minmax(340px, 1.1fr)', gap: '0.85rem' }}>
+            <div style={{ minHeight: '250px' }}>
+              <PlotlyChart
+                data={[{ type: 'bar', orientation: 'h', y: robustness.sensitivities.map((item) => item.factorCode).reverse(), x: robustness.sensitivities.map((item) => item.relativeImpact).reverse(), marker: { color: '#0284c7' }, hovertemplate: '%{y}: %{x:.2f}%<extra></extra>' }]}
+                layout={{ title: 'Sensitivity / tornado (±5% factor span)', xaxis: { title: 'Thay đổi chuẩn hóa lớn nhất (%)' }, margin: { l: 65, r: 20, t: 45, b: 45 }, height: 250 }}
+                style={{ height: '250px' }}
+              />
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="data-table" style={{ fontSize: '0.74rem', minWidth: '430px' }}>
+                <thead><tr><th>Factor</th><th>Rủi ro nhạy hơn</th><th>PAR screening</th><th>Ghi chú</th></tr></thead>
+                <tbody>{robustness.sensitivities.map((item) => <tr key={item.factorCode}><td><strong>{item.factorCode}</strong> · {item.factorName}</td><td>{item.direction === 'higher-risk-at-low' ? 'Phía thấp' : item.direction === 'higher-risk-at-high' ? 'Phía cao' : 'Cân bằng'}</td><td>{item.parLow !== undefined ? `${item.parLow} – ${item.parHigh}` : 'Xem mixture overlay'}</td><td>{item.note ?? 'OAT, giữ các factor khác tại setpoint'}</td></tr>)}</tbody>
+              </table>
+            </div>
+          </div>
+          <div style={{ marginTop: '0.6rem', color: '#64748b', fontSize: '0.7rem' }}>{robustness.note}</div>
+        </div>
+      )}
 
       {/* Monte Carlo Risk & Reliability Assessment (ICH Q9) */}
       <div className="qbd-card">

@@ -28,6 +28,17 @@ import { codedToActual, actualToCoded } from '../services/doeGenerator';
 import { optimizeDesirability } from '../services/statistics';
 import { calculateIndividualDesirability, tDistributionCritical } from '../services/mathUtils';
 
+/**
+ * Display-only scientific formatting for plot labels and hover text.  Plot data
+ * must retain its full floating-point precision so small CQA effects remain
+ * continuous (notably PDI values around 0.2).
+ */
+const formatPlotValue = (value: number, significantDigits = 5): string => {
+  if (!Number.isFinite(value)) return '—';
+  if (value === 0) return '0';
+  return Number(value.toPrecision(significantDigits)).toString();
+};
+
 interface DesirabilityProfilerProps {
   factors: Factor[];
   cqas: CQA[];
@@ -290,8 +301,11 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
     for (let i = 0; i < N; i++) {
       const yVal = minVal + (i / (N - 1)) * (maxVal - minVal);
       const dVal = calculateIndividualDesirability(yVal, cqa.objective, L, U, T, s, t);
-      xVals.push(Number(yVal.toFixed(3)));
-      yVals.push(Number(dVal.toFixed(4)));
+      // Keep the numerical grid unrounded.  Rounding a low-range response such
+      // as PDI before Plotly receives it turns a continuous desirability curve
+      // into visible plateaus.
+      xVals.push(yVal);
+      yVals.push(dVal);
     }
 
     const traces: any[] = [
@@ -496,7 +510,9 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
       const dOverallArr: number[] = [];
 
       xRange.forEach((xc) => {
-        const xAct = isMix ? Number((xc * 100).toFixed(2)) : codedToActual(xc, f);
+        // Chart coordinates remain raw; number formatting belongs to labels and
+        // hover text, never to the data passed into a trace.
+        const xAct = isMix ? xc * 100 : codedToActual(xc, f);
         xActualArr.push(typeof xAct === 'number' ? xAct : Number(xAct) || xc);
 
         // Build point holding other factors at current settings
@@ -524,7 +540,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
         dOverallArr.push(zero ? 0 : Math.exp(logSum / totalWeight));
       });
 
-      const currXAct = isMix ? Number(((currentCoded[f.code] ?? 0) * 100).toFixed(2)) : codedToActual(currentCoded[f.code] ?? 0, f);
+      const currXAct = isMix ? (currentCoded[f.code] ?? 0) * 100 : codedToActual(currentCoded[f.code] ?? 0, f);
       dTraces[f.code] = {
         xActual: xActualArr,
         dOverall: dOverallArr,
@@ -551,9 +567,11 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
           const yp = model.predict(testPoint);
           const se = statisticalModel?.predictStandardError?.(testPoint) ?? 0;
           const halfWidth = statisticalModel && Number.isFinite(critical) ? critical * se : Number.NaN;
-          yPredArr.push(Number(yp.toFixed(3)));
-          ciUpArr.push(Number.isFinite(halfWidth) ? Number((yp + halfWidth).toFixed(3)) : Number.NaN);
-          ciLowArr.push(Number.isFinite(halfWidth) ? Number((yp - halfWidth).toFixed(3)) : Number.NaN);
+          // Do not quantise predictions or confidence limits before plotting.
+          // PDI commonly changes by less than 0.001 across adjacent grid points.
+          yPredArr.push(yp);
+          ciUpArr.push(Number.isFinite(halfWidth) ? yp + halfWidth : Number.NaN);
+          ciLowArr.push(Number.isFinite(halfWidth) ? yp - halfWidth : Number.NaN);
         });
 
         const currY = model.predict(currentCoded);
@@ -564,7 +582,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
           ciUpper: ciUpArr,
           ciLower: ciLowArr,
           currentXActual: typeof currXAct === 'number' ? currXAct : Number(currXAct) || 0,
-          currentYPred: Number(currY.toFixed(3)),
+          currentYPred: currY,
         };
       });
     });
@@ -1271,7 +1289,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                   </div>
 
                   {/* Factor Columns: Plotly mini trace */}
-                  {factors.map((f) => {
+                  {factors.map((f, factorIndex) => {
                     const traceData = profilerGridData.responseTraces[cqa.code]?.[f.code];
                     if (!traceData) return <div key={f.code} />;
 
@@ -1308,7 +1326,8 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                         name: `${cqa.name} (${cqa.code}) vs ${f.name} (${f.code})`,
                         text: traceData.xActual.map(
                           (x, i) =>
-                            `${f.name} (${f.code}): ${x} ${f.unit || ''}<br>${cqa.name} (${cqa.code}): ${traceData.yPred[i]} ${cqa.unit || ''}`
+                            `${f.name} (${f.code}): ${formatPlotValue(x)} ${f.unit || ''}<br>` +
+                            `${cqa.name} (${cqa.code}): ${formatPlotValue(traceData.yPred[i])} ${cqa.unit || ''}`
                         ),
                         hoverinfo: 'text',
                         showlegend: false,
@@ -1320,23 +1339,29 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                         type: 'scatter',
                         mode: 'markers',
                         marker: { size: 7, color: '#dc2626' },
-                        name: `Hiện tại: ${traceData.currentXActual} ${f.unit || ''} → ${traceData.currentYPred} ${cqa.unit || ''}`,
+                        name: `Hiện tại: ${formatPlotValue(traceData.currentXActual)} ${f.unit || ''} → ${formatPlotValue(traceData.currentYPred)} ${cqa.unit || ''}`,
                         showlegend: false,
                         hoverinfo: 'name',
                       },
                     ];
 
                     const layout: any = {
-                      margin: { l: 32, r: 15, t: 10, b: 24 },
-                      height: 125,
+                      // A matrix uses shared outer axes: the left column carries Y,
+                      // and the bottom row carries X. This preserves names/units
+                      // without repeating them in every cell.
+                      margin: { l: factorIndex === 0 ? 62 : 42, r: 12, t: 8, b: 28, pad: 1 },
+                      height: 145,
                       showlegend: false,
                       xaxis: {
+                        showticklabels: false,
                         showgrid: true,
                         gridcolor: '#f1f5f9',
                         zeroline: false,
                         tickfont: { size: 9 },
                       },
                       yaxis: {
+                        title: factorIndex === 0 ? { text: `${cqa.code} [${cqa.unit || '—'}]`, font: { size: 10, color: '#334155' }, standoff: 4 } : undefined,
+                        showticklabels: factorIndex === 0,
                         showgrid: true,
                         gridcolor: '#f1f5f9',
                         zeroline: false,
@@ -1360,14 +1385,19 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                       <div
                         key={f.code}
                         style={{
-                          height: '130px',
+                          height: '145px',
                           border: '1px solid #e2e8f0',
                           borderRadius: '0.375rem',
                           backgroundColor: '#fafafa',
                           overflow: 'hidden',
                         }}
                       >
-                        <PlotlyChart data={plotData} layout={layout} style={{ width: '100%', height: '100%' }} />
+                        <PlotlyChart
+                          data={plotData}
+                          layout={layout}
+                          config={{ responsive: true, displayModeBar: false, compact: true }}
+                          style={{ width: '100%', height: '100%' }}
+                        />
                       </div>
                     );
                   })}
@@ -1402,7 +1432,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
               </div>
 
               {/* Factor Columns: Plotly Overall D Traces */}
-              {factors.map((f) => {
+              {factors.map((f, factorIndex) => {
                 const dData = profilerGridData.dTraces[f.code];
                 if (!dData) return <div key={f.code} />;
 
@@ -1434,16 +1464,19 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                 ];
 
                 const layout: any = {
-                  margin: { l: 32, r: 15, t: 10, b: 24 },
-                  height: 125,
+                  margin: { l: factorIndex === 0 ? 62 : 42, r: 12, t: 8, b: 42, pad: 1 },
+                  height: 145,
                   showlegend: false,
                   xaxis: {
+                    title: { text: `${f.code} [${f.unit || '—'}]`, font: { size: 10, color: '#334155' }, standoff: 4 },
                     showgrid: true,
                     gridcolor: '#e2e8f0',
                     zeroline: false,
                     tickfont: { size: 9 },
                   },
                   yaxis: {
+                    title: factorIndex === 0 ? { text: 'D [—]', font: { size: 10, color: '#334155' }, standoff: 4 } : undefined,
+                    showticklabels: factorIndex === 0,
                     range: [0, 1.05],
                     showgrid: true,
                     gridcolor: '#e2e8f0',
@@ -1467,14 +1500,19 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                   <div
                     key={f.code}
                     style={{
-                      height: '130px',
+                      height: '145px',
                       border: '1px solid #a7f3d0',
                       borderRadius: '0.375rem',
                       backgroundColor: '#ffffff',
                       overflow: 'hidden',
                     }}
                   >
-                    <PlotlyChart data={plotData} layout={layout} style={{ width: '100%', height: '100%' }} />
+                    <PlotlyChart
+                      data={plotData}
+                      layout={layout}
+                      config={{ responsive: true, displayModeBar: false, compact: true }}
+                      style={{ width: '100%', height: '100%' }}
+                    />
                   </div>
                 );
               })}

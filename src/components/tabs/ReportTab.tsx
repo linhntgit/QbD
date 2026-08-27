@@ -18,6 +18,8 @@ import { exportQBDWordReport } from '../../services/reportGenerator';
 import { calculateDesignEfficiency } from '../../services/doeGenerator';
 import { generateUpdatedRiskAssessment, generateControlStrategy } from '../../services/statistics';
 import { NeuralNetworkTopologyDiagram } from '../NeuralNetworkTopologyDiagram';
+import { ProjectGovernancePanel } from '../ProjectGovernancePanel';
+import { getTraceabilitySummary } from '../../services/projectGovernance';
 
 interface ReportTabProps {
   project: QBDProject;
@@ -27,6 +29,7 @@ interface ReportTabProps {
   neuralModels?: Record<string, NeuralNetModelResult>;
   modelingEngine?: ModelingEngine;
   onToggleEngine?: (engine: ModelingEngine) => void;
+  onRestoreSnapshot: (project: QBDProject) => void;
 }
 
 export const ReportTab: React.FC<ReportTabProps> = ({
@@ -37,7 +40,9 @@ export const ReportTab: React.FC<ReportTabProps> = ({
   neuralModels,
   modelingEngine = 'polynomial',
   onToggleEngine,
+  onRestoreSnapshot,
 }) => {
+  const traceability = getTraceabilitySummary(project);
   const handleDownloadWord = () => {
     exportQBDWordReport(project, models, optimum, monteCarlo, neuralModels, modelingEngine);
   };
@@ -172,6 +177,18 @@ export const ReportTab: React.FC<ReportTabProps> = ({
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <div style={{ marginBottom: '2rem' }}>
+          <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
+            0. Protocol trước chạy & traceability sau chạy
+          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.65rem', fontSize: '0.78rem' }}>
+            <div style={{ background: '#f8fafc', padding: '0.7rem', borderRadius: '0.4rem' }}><strong>Protocol ID</strong><br /><span className="font-mono">{traceability.protocolId}</span></div>
+            <div style={{ background: '#f8fafc', padding: '0.7rem', borderRadius: '0.4rem' }}><strong>Thiết kế đã phê duyệt</strong><br />{project.doeConfig.designType} · {project.runs.length} run · {project.doeConfig.blocks ?? 1} block</div>
+            <div style={{ background: '#f8fafc', padding: '0.7rem', borderRadius: '0.4rem' }}><strong>Trace sau chạy</strong><br />{traceability.runStatus}</div>
+          </div>
+          <p style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.55rem' }}>Protocol phải được chuyên gia phê duyệt trước chạy; báo cáo hiện tại chỉ tổng hợp dữ liệu có trong project tại thời điểm xuất.</p>
         </div>
 
         {/* 1. QTPP */}
@@ -713,6 +730,10 @@ export const ReportTab: React.FC<ReportTabProps> = ({
               <div style={{ fontWeight: '600', color: '#0f172a', marginTop: '0.25rem' }}>..........................................</div>
             </div>
           </div>
+        </div>
+
+        <div style={{ marginTop: '2rem' }}>
+          <ProjectGovernancePanel project={project} onRestoreSnapshot={onRestoreSnapshot} />
         </div>
 
       </div>

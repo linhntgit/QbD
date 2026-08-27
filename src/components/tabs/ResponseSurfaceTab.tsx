@@ -204,7 +204,9 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
         pointCoded[factorY.code] = yCoded;
 
         const pred = model.predict(pointCoded);
-        row.push(Number(pred.toFixed(3)));
+        // Preserve raw predictions in the surface grid.  Formatting is applied
+        // only in hover text so low-range CQAs are not rendered as terraces.
+        row.push(pred);
 
         const cqaMargin = calculateCQAMargin(
           pred,
