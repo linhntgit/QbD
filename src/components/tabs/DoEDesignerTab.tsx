@@ -39,6 +39,7 @@ import {
   calculateNumModelTerms,
   actualToCoded,
 } from '../../services/doeGenerator';
+import { simulateDemoResponses } from '../../services/demoDataSimulator';
 import {
   exportToExcel,
   exportToCSV,
@@ -767,46 +768,14 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
     onUpdateProject({ runs: updatedRuns });
   };
 
-  // Smart Auto-Fill simulated pharma response data based on factor interactions
+  // Simulate plausible measurements with scientific response-specific constraints.
   const handleAutoSimulateData = () => {
     if (project.runs.length === 0) return;
 
-    const simulatedRuns = project.runs.map((run) => {
-      const resp: Record<string, number | string> = {};
-
-      project.cqas.forEach((cqa) => {
-        if (cqa.dataType === 'qualitative_binary') {
-          const pass = Math.random() > 0.15;
-          resp[cqa.code] = pass ? 'Đạt' : 'Không đạt';
-          return;
-        }
-
-        const base = cqa.target ?? (cqa.lowerLimit ? (cqa.lowerLimit + (cqa.upperLimit || 100)) / 2 : 50);
-        let effect = 0;
-
-        project.factors.forEach((f, idx) => {
-          if (f.controllability === 'constant') return;
-          const coded = run.factorCoded[f.code] ?? 0;
-          const weight = ((idx % 3) + 1) * 3.5;
-          effect += coded * weight - 0.5 * coded * coded * weight;
-        });
-
-        if (project.factors.length >= 2) {
-          const x1 = run.factorCoded[project.factors[0]?.code] ?? 0;
-          const x2 = run.factorCoded[project.factors[1]?.code] ?? 0;
-          effect += x1 * x2 * 4.2;
-        }
-
-        const noise = (Math.random() - 0.5) * (base * 0.03);
-        const val = Number((base + effect + noise).toFixed(2));
-        resp[cqa.code] = val;
-      });
-
-      return {
-        ...run,
-        responses: resp,
-      };
-    });
+    const simulatedRuns = project.runs.map((run) => ({
+      ...run,
+      responses: simulateDemoResponses(project, run),
+    }));
 
     onUpdateProject({ runs: simulatedRuns });
   };

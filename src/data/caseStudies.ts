@@ -28,7 +28,7 @@ export const CASE_STUDIES: QBDProject[] = [
       {
         id: 'qtpp-3',
         element: 'Độ cứng & Độ mài mòn',
-        target: 'Độ cứng 8-14 kP, Độ mài mòn < 0.8%',
+        target: 'Độ cứng 8-16 kP, Độ mài mòn < 0.8%',
         justification: 'Đảm bảo viên chịu được quá trình bao phim, đóng vỉ và vận chuyển.',
       },
       {
@@ -76,7 +76,7 @@ export const CASE_STUDIES: QBDProject[] = [
         target: 12.0,
         lowerLimit: 8.0,
         upperLimit: 16.0,
-        objective: 'maximize',
+        objective: 'target',
         weight: 3,
         sShape: 1,
         tShape: 1,
@@ -1148,4 +1148,3 @@ export const CASE_STUDIES: QBDProject[] = [
     ],
   },
 ];
-
