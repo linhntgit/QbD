@@ -344,18 +344,26 @@ export async function exportQBDWordReport(
       ],
     }),
     ...project.factors.map(
-      (f, idx) =>
-        new TableRow({
+      (f, idx) => {
+        const roleLabel =
+          f.role === 'mixture_component'
+            ? 'Thành phần hỗn hợp (Σ=100%)'
+            : f.role === 'formulation_other'
+            ? 'Biến công thức khác'
+            : 'Biến quy trình';
+
+        return new TableRow({
           children: [
             createDataCell(f.code, idx % 2 === 1, 10),
             createDataCell(f.name, idx % 2 === 1, 25),
-            createDataCell(`${f.type} (${f.role === 'mixture_component' ? 'Hỗn hợp' : f.role === 'formulation_other' ? 'Công thức khác' : 'Quy trình'})`, idx % 2 === 1, 18),
-            createDataCell(f.unit || '-', idx % 2 === 1, 10),
-            createDataCell(String(f.low), idx % 2 === 1, 12),
+            createDataCell(`${f.type} • ${roleLabel}`, idx % 2 === 1, 22),
+            createDataCell(f.unit || '-', idx % 2 === 1, 8),
+            createDataCell(String(f.low), idx % 2 === 1, 11),
             createDataCell(f.center !== undefined ? String(f.center) : String((f.low + f.high) / 2), idx % 2 === 1, 12),
-            createDataCell(String(f.high), idx % 2 === 1, 13),
+            createDataCell(String(f.high), idx % 2 === 1, 12),
           ],
-        })
+        });
+      }
     ),
   ];
 
@@ -369,6 +377,9 @@ export async function exportQBDWordReport(
 
   // SECTION 2.2: DoE Experimental Matrix & Efficiency
   const eff = calculateDesignEfficiency(project.runs, project.factors);
+  const mixtureFactors = project.factors.filter((f) => f.role === 'mixture_component' || f.type === 'Mixture');
+  const hasMixture = mixtureFactors.length > 0;
+
   sections.push(
     new Paragraph({
       text: '2.2 Kế Hoạch Thiết Kế Thực Nghiệm (DoE Matrix) & Đánh Giá Hiệu Quả',
@@ -383,38 +394,59 @@ export async function exportQBDWordReport(
           color: PRIMARY_COLOR,
         }),
       ],
+      spacing: { after: 100 },
+    }),
+    new Paragraph({
+      text: 'Ma trận thí nghiệm được chuẩn hóa dưới dạng bảng tính 2 chiều, hỗ trợ số thứ tự thực hiện ngẫu nhiên (Randomized Run Order) để triệt tiêu sai số hệ thống:',
       spacing: { after: 150 },
     })
   );
 
   const runHeaderCells = [
-    createHeaderCell('Std', 6),
-    createHeaderCell('Run', 6),
-    ...project.factors.map((f) => createHeaderCell(f.code, 12)),
-    ...project.cqas.map((c) => createHeaderCell(c.code, 14)),
+    createHeaderCell('Std', 5),
+    createHeaderCell('Run', 5),
+    ...project.factors.map((f) => createHeaderCell(f.code, 10)),
+    ...(hasMixture ? [createHeaderCell('Σ Hỗn Hợp', 10)] : []),
+    ...project.cqas.map((c) => createHeaderCell(c.code, 12)),
   ];
 
   const runDataRows = project.runs.map((r, idx) => {
+    const sumMix = hasMixture
+      ? mixtureFactors.reduce((acc, f) => {
+          const v = Number(r.factorActual[f.code]);
+          return acc + (isNaN(v) ? 0 : v);
+        }, 0)
+      : 0;
+
     return new TableRow({
       children: [
-        createDataCell(String(r.stdOrder), idx % 2 === 1, 6),
-        createDataCell(String(r.runOrder), idx % 2 === 1, 6),
+        createDataCell(String(r.stdOrder), idx % 2 === 1, 5),
+        createDataCell(String(r.runOrder), idx % 2 === 1, 5),
         ...project.factors.map((f) =>
           createDataCell(
             typeof r.factorActual[f.code] === 'number'
               ? (r.factorActual[f.code] as number).toFixed(1)
               : String(r.factorActual[f.code] ?? '-'),
             idx % 2 === 1,
-            12
+            10
           )
         ),
+        ...(hasMixture
+          ? [
+              createDataCell(
+                Math.abs(sumMix - 100) < 0.1 ? '100% (✓)' : `${sumMix.toFixed(1)}% (⚠)`,
+                idx % 2 === 1,
+                10
+              ),
+            ]
+          : []),
         ...project.cqas.map((c) =>
           createDataCell(
             r.responses[c.code] !== null && r.responses[c.code] !== undefined
               ? String(r.responses[c.code])
               : '-',
             idx % 2 === 1,
-            14
+            12
           )
         ),
       ],
@@ -432,9 +464,13 @@ export async function exportQBDWordReport(
   // SECTION 2.3: Statistical Modeling, ANOVA & Curvature Test
   sections.push(
     new Paragraph({
-      text: '2.3 Mô Hình Hóa Thống Kê, Phân Tích Phương Sai (ANOVA) & Kiểm Định Độ Cong',
+      text: '2.3 Mô Hình Hóa Thống Kê, Phân Tích Phương Sai (ANOVA) & Kiểm Định Độ Tương Thích (Lack of Fit)',
       heading: HeadingLevel.HEADING_1,
       spacing: { before: 300, after: 150 },
+    }),
+    new Paragraph({
+      text: 'Phân tích phương sai (ANOVA) nhằm đánh giá mức độ ý nghĩa của toàn bộ mô hình (Model p < 0.05) và kiểm định độ tương thích Lack of Fit (p > 0.05 là đạt chuẩn không bị thiếu phù hợp theo ICH Q8 & US FDA):',
+      spacing: { after: 150 },
     })
   );
 
@@ -494,25 +530,33 @@ export async function exportQBDWordReport(
           createHeaderCell('Bậc Tự Do (df)', 12),
           createHeaderCell('Trung Bình Bình Phương (MS)', 22),
           createHeaderCell('F-value', 14),
-          createHeaderCell('p-value', 14),
+          createHeaderCell('p-value', 20),
         ],
       }),
       ...model.anova.map(
-        (row, idx) =>
-          new TableRow({
+        (row, idx) => {
+          const isLOF = row.source === 'Lack of Fit';
+          let pValStr = '-';
+          if (row.pValue !== undefined) {
+            pValStr = row.pValue < 0.001 ? '< 0.001' : row.pValue.toFixed(4);
+            if (isLOF) {
+              pValStr += row.pValue > 0.05 ? ' (✓ Đạt > 0.05)' : ' (⚠ Thiếu phù hợp)';
+            }
+          } else if (isLOF && row.df === 0) {
+            pValStr = 'df = 0 (Bão hòa)';
+          }
+
+          return new TableRow({
             children: [
               createDataCell(row.source, idx % 2 === 1, 30),
               createDataCell(row.ss.toFixed(3), idx % 2 === 1, 22),
               createDataCell(String(row.df), idx % 2 === 1, 12),
               createDataCell(row.ms.toFixed(3), idx % 2 === 1, 22),
               createDataCell(row.fValue !== undefined ? row.fValue.toFixed(2) : '-', idx % 2 === 1, 14),
-              createDataCell(
-                row.pValue !== undefined ? (row.pValue < 0.001 ? '< 0.001' : row.pValue.toFixed(4)) : '-',
-                idx % 2 === 1,
-                14
-              ),
+              createDataCell(pValStr, idx % 2 === 1, 20),
             ],
-          })
+          });
+        }
       ),
     ];
 

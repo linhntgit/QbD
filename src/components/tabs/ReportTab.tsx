@@ -299,7 +299,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                 <tr style={{ backgroundColor: '#f1f5f9' }}>
                   <th>Mã</th>
                   <th>Tên Biến Đầu Vào</th>
-                  <th>Phân Loại</th>
+                  <th>Vai Trò (QbD Role)</th>
                   <th>Bản Chất Dữ Liệu</th>
                   <th>Khả Năng Kiểm Soát</th>
                   <th>Đơn Vị</th>
@@ -311,7 +311,15 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                   <tr key={f.code}>
                     <td className="font-mono font-bold" style={{ color: '#b45309' }}>{f.code}</td>
                     <td style={{ fontWeight: '600' }}>{f.name}</td>
-                    <td>{f.type}</td>
+                    <td>
+                      <span className={`badge ${f.role === 'mixture_component' ? 'badge-teal' : f.role === 'process_parameter' ? 'badge-primary' : 'badge-secondary'}`}>
+                        {f.role === 'mixture_component'
+                          ? '🧪 Thành phần hỗn hợp (Σ=100%)'
+                          : f.role === 'formulation_other'
+                          ? '📦 Biến công thức khác'
+                          : '⚙️ Biến quy trình'}
+                      </span>
+                    </td>
                     <td>{f.dataType === 'qualitative' ? 'Định tính' : f.dataType === 'quantitative_multilevel' ? 'ĐL nhiều mức' : 'ĐL liên tục'}</td>
                     <td>
                       <span className={`badge ${f.controllability === 'constant' ? 'badge-primary' : f.controllability === 'uncontrollable_noise' ? 'badge-warning' : 'badge-success'}`}>
@@ -348,56 +356,139 @@ export const ReportTab: React.FC<ReportTabProps> = ({
             );
           })()}
 
-          <div className="table-container" style={{ maxHeight: '350px' }}>
-            <table className="qbd-table">
-              <thead>
-                <tr style={{ backgroundColor: '#f1f5f9' }}>
-                  <th>Std</th>
-                  <th>Run</th>
-                  {project.factors.map((f) => (
-                    <th key={f.code}>{f.name} ({f.code}){f.unit ? ` [${f.unit}]` : ''}</th>
-                  ))}
-                  {project.cqas.map((c) => (
-                    <th key={c.code}>{c.name} ({c.code}){c.unit ? ` [${c.unit}]` : ''}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {project.runs.map((r) => (
-                  <tr key={r.id}>
-                    <td>{r.stdOrder}</td>
-                    <td style={{ fontWeight: '700' }}>{r.runOrder}</td>
-                    {project.factors.map((f) => (
-                      <td key={f.code}>{r.factorActual[f.code]}</td>
-                    ))}
-                    {project.cqas.map((c) => (
-                      <td key={c.code} style={{ fontWeight: '600', color: '#0f766e' }}>{r.responses[c.code] ?? '-'}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {/* DoE Matrix Table */}
+          {(() => {
+            const mixtureFactors = project.factors.filter((f) => f.role === 'mixture_component' || f.type === 'Mixture');
+            const hasMixture = mixtureFactors.length > 0;
+
+            return (
+              <div className="table-container" style={{ maxHeight: '350px' }}>
+                <table className="qbd-table">
+                  <thead>
+                    <tr style={{ backgroundColor: '#f1f5f9' }}>
+                      <th>Std</th>
+                      <th>Run</th>
+                      {project.factors.map((f) => (
+                        <th key={f.code}>{f.name} ({f.code}){f.unit ? ` [${f.unit}]` : ''}</th>
+                      ))}
+                      {hasMixture && (
+                        <th style={{ backgroundColor: '#ecfdf5', color: '#065f46', textAlign: 'center' }}>Σ Hỗn Hợp (%)</th>
+                      )}
+                      {project.cqas.map((c) => (
+                        <th key={c.code} style={{ backgroundColor: '#ccfbf1', color: '#0f766e' }}>{c.name} ({c.code}){c.unit ? ` [${c.unit}]` : ''}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {project.runs.map((r) => {
+                      const sumMix = hasMixture
+                        ? mixtureFactors.reduce((acc, f) => {
+                            const v = Number(r.factorActual[f.code]);
+                            return acc + (isNaN(v) ? 0 : v);
+                          }, 0)
+                        : 0;
+                      const is100 = Math.abs(sumMix - 100) < 0.1;
+
+                      return (
+                        <tr key={r.id}>
+                          <td style={{ textAlign: 'center' }}>{r.stdOrder}</td>
+                          <td style={{ fontWeight: '700', textAlign: 'center' }}>{r.runOrder}</td>
+                          {project.factors.map((f) => (
+                            <td key={f.code}>{r.factorActual[f.code]}</td>
+                          ))}
+                          {hasMixture && (
+                            <td style={{ textAlign: 'center' }}>
+                              <span className={`badge ${is100 ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '0.7rem' }}>
+                                {is100 ? '✓ 100%' : `⚠ ${sumMix.toFixed(1)}%`}
+                              </span>
+                            </td>
+                          )}
+                          {project.cqas.map((c) => (
+                            <td key={c.code} style={{ fontWeight: '600', color: '#0f766e' }}>{r.responses[c.code] ?? '-'}</td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
         </div>
 
         {/* 5. Statistical Models & ANOVA */}
         <div style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
-            5. Phương Trình Hồi Quy & Kết Quả Thống Kê ANOVA
+            5. Phương Trình Hồi Quy & Kết Quả Phân Tích Phương Sai (ANOVA - Lack of Fit)
           </h2>
           {Object.values(models).map((m) => {
             const cqa = project.cqas.find((c) => c.code === m.cqaCode);
             return (
-              <div key={m.cqaCode} style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '0.5rem', marginBottom: '1rem', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontWeight: '700', color: '#1e3a8a', marginBottom: '0.3rem' }}>
+              <div key={m.cqaCode} style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '0.5rem', marginBottom: '1.25rem', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontWeight: '700', color: '#1e3a8a', marginBottom: '0.3rem', fontSize: '0.95rem' }}>
                   {cqa?.name} ({m.cqaCode}) - Mô hình {m.modelType}
                 </div>
                 <div className="font-mono" style={{ fontSize: '0.85rem', color: '#0f766e', marginBottom: '0.5rem' }}>
                   {m.equationString}
                 </div>
-                <div style={{ fontSize: '0.8rem', color: '#475569' }}>
-                  R² = <strong>{m.diagnostics.rSquared.toFixed(4)}</strong> | R² Adj = <strong>{m.diagnostics.adjRSquared.toFixed(4)}</strong> | R² Pred = <strong>{m.diagnostics.predRSquared.toFixed(4)}</strong> | Adeq Precision = <strong>{m.diagnostics.adeqPrecision.toFixed(2)}</strong> | Std Dev = <strong>{m.diagnostics.stdDev.toFixed(3)}</strong>
+                <div style={{ fontSize: '0.8rem', color: '#475569', marginBottom: '0.75rem' }}>
+                  R² = <strong>{m.diagnostics.rSquared.toFixed(4)}</strong> | R² Adj = <strong>{m.diagnostics.adjRSquared.toFixed(4)}</strong> | R² Pred = <strong>{m.diagnostics.predRSquared.toFixed(4)}</strong> | Adeq Precision = <strong>{m.diagnostics.adeqPrecision.toFixed(2)}</strong> | Std Dev = <strong>{m.diagnostics.stdDev.toFixed(3)}</strong> (CV = {m.diagnostics.cvPercent.toFixed(2)}%)
                 </div>
+
+                {/* Complete ANOVA Table */}
+                <div className="table-container">
+                  <table className="qbd-table">
+                    <thead>
+                      <tr style={{ backgroundColor: '#f1f5f9' }}>
+                        <th>Nguồn (Source)</th>
+                        <th>Tổng BP (SS)</th>
+                        <th style={{ textAlign: 'center' }}>df</th>
+                        <th>TB BP (MS)</th>
+                        <th style={{ textAlign: 'center' }}>F-value</th>
+                        <th style={{ textAlign: 'center' }}>p-value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {m.anova.map((row, rIdx) => {
+                        const isLOF = row.source === 'Lack of Fit';
+                        const isPass = isLOF
+                          ? (row.pValue !== undefined && row.pValue > 0.05)
+                          : (row.pValue !== undefined && row.pValue < 0.05);
+
+                        return (
+                          <tr key={rIdx} style={{ fontWeight: row.source === 'Model' || row.source === 'Residual' ? '600' : 'normal' }}>
+                            <td>
+                              {row.source}
+                              {isLOF && <span style={{ fontSize: '0.68rem', color: '#64748b', marginLeft: '0.35rem' }}>(Độ tương thích)</span>}
+                            </td>
+                            <td>{row.ss.toFixed(3)}</td>
+                            <td style={{ textAlign: 'center' }}>{row.df}</td>
+                            <td>{row.ms.toFixed(3)}</td>
+                            <td style={{ textAlign: 'center' }}>{row.fValue !== undefined ? row.fValue.toFixed(2) : '-'}</td>
+                            <td style={{ textAlign: 'center' }}>
+                              {row.pValue !== undefined ? (
+                                <span className={`badge ${isPass ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '0.72rem' }}>
+                                  {row.pValue < 0.001 ? '< 0.001' : row.pValue.toFixed(4)}
+                                  {isLOF && (isPass ? ' (✓ Đạt > 0.05)' : ' (⚠ Thiếu phù hợp)')}
+                                </span>
+                              ) : isLOF && row.df === 0 ? (
+                                <span className="badge badge-warning" style={{ fontSize: '0.7rem' }}>df = 0 (Bão hòa)</span>
+                              ) : (
+                                '-'
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {m.curvatureTest && (
+                  <div style={{ marginTop: '0.5rem', fontSize: '0.76rem', color: m.curvatureTest.significant ? '#b45309' : '#15803d' }}>
+                    <strong>Kiểm định độ cong (Curvature Test):</strong> F = {m.curvatureTest.fValue?.toFixed(2)}, p = {m.curvatureTest.pValue !== undefined ? (m.curvatureTest.pValue < 0.001 ? '< 0.001' : m.curvatureTest.pValue.toFixed(4)) : '-'} ({m.curvatureTest.note})
+                  </div>
+                )}
               </div>
             );
           })}
