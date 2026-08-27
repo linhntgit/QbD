@@ -124,6 +124,7 @@ export function generateFractionalFactorial(k: number): number[][] {
  * Generate Plackett-Burman Design matrix (N=8, 12, 16)
  */
 export function generatePlackettBurman(k: number): number[][] {
+  if (k < 1 || k > 15) return [];
   let baseRow: number[] = [];
   let nRuns = 12;
 
@@ -202,59 +203,19 @@ export function generateTaguchi(k: number, arrayType?: string): number[][] {
  */
 export function generateBoxBehnken(k: number): number[][] {
   const matrix: number[][] = [];
-
-  if (k === 3) {
-    // 12 factorial edge points
-    const edges = [
-      [-1, -1, 0], [1, -1, 0], [-1, 1, 0], [1, 1, 0],
-      [-1, 0, -1], [1, 0, -1], [-1, 0, 1], [1, 0, 1],
-      [0, -1, -1], [0, 1, -1], [0, -1, 1], [0, 1, 1]
-    ];
-    return edges;
-  }
-
-  if (k === 4) {
-    // 24 edge points for k=4
-    const pairs = [
-      [0, 1], [0, 2], [0, 3],
-      [1, 2], [1, 3],
-      [2, 3]
-    ];
-    const signs = [
-      [-1, -1], [1, -1], [-1, 1], [1, 1]
-    ];
-    for (const [p1, p2] of pairs) {
+  if (k < 3) return matrix;
+  const signs = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
+  for (let p1 = 0; p1 < k; p1++) {
+    for (let p2 = p1 + 1; p2 < k; p2++) {
       for (const [s1, s2] of signs) {
-        const row = [0, 0, 0, 0];
+        const row = new Array(k).fill(0);
         row[p1] = s1;
         row[p2] = s2;
         matrix.push(row);
       }
     }
-    return matrix;
   }
-
-  if (k === 5) {
-    // Standard fractional BBD for k=5
-    const pairs = [
-      [0, 1], [1, 2], [2, 3], [3, 4], [4, 0]
-    ];
-    const signs = [
-      [-1, -1], [1, -1], [-1, 1], [1, 1]
-    ];
-    for (const [p1, p2] of pairs) {
-      for (const [s1, s2] of signs) {
-        const row = [0, 0, 0, 0, 0];
-        row[p1] = s1;
-        row[p2] = s2;
-        matrix.push(row);
-      }
-    }
-    return matrix;
-  }
-
-  // Fallback for k=2 or general
-  return generateFullFactorial(k);
+  return matrix;
 }
 
 /**
@@ -311,32 +272,28 @@ function generatePureSimplexDesign(q: number, type: 'Lattice' | 'Centroid' | 'Ex
     }
   }
 
-  // Ternary blends if q >= 3
-  if (q >= 3) {
-    for (let i = 0; i < q; i++) {
-      for (let j = i + 1; j < q; j++) {
-        for (let m = j + 1; m < q; m++) {
+  // Simplex-centroid contains centroids of every non-empty subset.  A
+  // degree-2 simplex lattice stops after pure and binary blends.
+  if (type !== 'Lattice' && q >= 3) {
+    for (let subsetSize = 3; subsetSize < q; subsetSize++) {
+      const addSubsetCentroids = (start: number, selected: number[]) => {
+        if (selected.length === subsetSize) {
           const row = new Array(q).fill(0);
-          row[i] = Number((1 / 3).toFixed(4));
-          row[j] = Number((1 / 3).toFixed(4));
-          row[m] = Number((1 / 3).toFixed(4));
+          selected.forEach((index) => { row[index] = Number((1 / subsetSize).toFixed(10)); });
           matrix.push(row);
+          return;
         }
-      }
+        for (let index = start; index <= q - (subsetSize - selected.length); index++) {
+          addSubsetCentroids(index + 1, [...selected, index]);
+        }
+      };
+      addSubsetCentroids(0, []);
     }
   }
 
-  // Overall centroid
-  const center = new Array(q).fill(Number((1 / q).toFixed(4)));
-  matrix.push(center);
-
-  // Axial check blends (between centroid and vertices for Centroid design)
-  if (type === 'Centroid' && q >= 2) {
-    for (let i = 0; i < q; i++) {
-      const axial = new Array(q).fill(Number(((1 - 0.6) / (q - 1)).toFixed(4)));
-      axial[i] = 0.6;
-      matrix.push(axial);
-    }
+  if (type !== 'Lattice') {
+    const center = new Array(q).fill(Number((1 / q).toFixed(10)));
+    matrix.push(center);
   }
 
   return matrix;
@@ -356,17 +313,18 @@ export function generateConstrainedMixtureDesign(
   if (q === 1) return [[1.0]];
 
   // 1. Extract bounds in normalized proportions [0, 1]
-  const isPercent = factors.some((f) => f.high > 1.0 || f.unit === '%');
   const L = factors.map((f) => {
-    const raw = f.low !== undefined ? (isPercent || f.high > 1.0 ? f.low / 100 : f.low) : 0;
+    const raw = f.low !== undefined ? (f.high > 1.0 || f.unit === '%' ? f.low / 100 : f.low) : 0;
     return Math.max(0, Math.min(1, raw));
   });
   const U = factors.map((f, idx) => {
-    const raw = f.high !== undefined ? (isPercent || f.high > 1.0 ? f.high / 100 : f.high) : 1;
+    const raw = f.high !== undefined ? (f.high > 1.0 || f.unit === '%' ? f.high / 100 : f.high) : 1;
     return Math.max(L[idx], Math.min(1, raw));
   });
 
   const sumL = L.reduce((a, b) => a + b, 0);
+  const sumU = U.reduce((a, b) => a + b, 0);
+  if (sumL > 1 + 1e-10 || sumU < 1 - 1e-10) return [];
   const isUnconstrained = L.every((l) => Math.abs(l) < 1e-6) && U.every((u) => Math.abs(u - 1) < 1e-6);
 
   if (isUnconstrained) {
@@ -427,12 +385,9 @@ export function generateConstrainedMixtureDesign(
     }
   }
 
-  // Fallback if degenerate
-  if (vertices.length === 0) {
-    const mid = L.map((l, i) => (l + U[i]) / 2);
-    const sumMid = mid.reduce((a, b) => a + b, 0) || 1;
-    vertices.push(mid.map((v) => Number((v / sumMid).toFixed(4))));
-  }
+  if (vertices.length === 0) return [];
+
+  if (type === 'ExtremeVertices') return vertices;
 
   const allPoints: number[][] = [...vertices];
 
@@ -536,7 +491,9 @@ export function generateCombinedMixtureProcessMatrix(
   }
 
   // 4. Center blend at center process conditions
-  const centerBlend = mixMatrix[mixMatrix.length - 1] || new Array(mixtureCount).fill(Number((1 / mixtureCount).toFixed(4)));
+  const centerBlend = mixMatrix.length > 0
+    ? mixMatrix[0].map((_, index) => mixMatrix.reduce((sum, row) => sum + row[index], 0) / mixMatrix.length)
+    : new Array(mixtureCount).fill(Number((1 / mixtureCount).toFixed(4)));
   const centerProc = new Array(processCount).fill(0);
   combined.push([...centerBlend, ...centerProc]);
   combined.push([...centerBlend, ...centerProc]);
@@ -554,6 +511,7 @@ export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { r
 
   let codedMatrix: number[][] = [];
   let calculatedAlpha: number | undefined = undefined;
+  let matrixFactors = factors;
 
   // Separate Mixture components and Independent Process factors
   const mixtureFactors = factors.filter((f) => f.role === 'mixture_component' || f.type === 'Mixture');
@@ -570,6 +528,7 @@ export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { r
       processFactors,
       combinedType
     );
+    matrixFactors = [...mixtureFactors, ...processFactors];
   } else {
     switch (config.designType) {
       case 'FullFactorial2k':
@@ -624,12 +583,13 @@ export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { r
           procFactors,
           config.designType
         );
+        matrixFactors = [...mixFactors, ...procFactors];
         break;
       }
 
       case 'DOptimal': {
         const dModel = config.dOptimalModel || (k <= 3 ? 'Quadratic' : '2FI');
-        const numTerms = calculateNumModelTerms(k, dModel);
+        const numTerms = calculateNumModelTermsForFactors(factors, dModel);
         const defaultRuns = Math.max(numTerms + 4, k <= 2 ? 10 : k === 3 ? 15 : 20);
         const nRuns = config.numRuns && config.numRuns >= numTerms ? config.numRuns : defaultRuns;
         codedMatrix = generateDOptimalMatrix(factors, dModel, nRuns);
@@ -665,8 +625,9 @@ export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { r
     const factorCoded: Record<string, number> = {};
     const factorActual: Record<string, number | string> = {};
 
-    factors.forEach((f, idx) => {
-      const codedVal = row[idx] !== undefined ? row[idx] : 0;
+    factors.forEach((f) => {
+      const matrixIndex = matrixFactors.indexOf(f);
+      const codedVal = row[matrixIndex] !== undefined ? row[matrixIndex] : 0;
       factorCoded[f.code] = codedVal;
       if (f.role === 'mixture_component' || f.type === 'Mixture' || config.category === 'Mixture') {
         if (f.high <= 1.0 && f.unit !== '%') {
@@ -709,7 +670,12 @@ export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { r
 /**
  * Calculate the number of terms in a polynomial regression model
  */
-export function calculateNumModelTerms(k: number, model: 'Linear' | '2FI' | 'Quadratic'): number {
+export function calculateNumModelTerms(
+  k: number,
+  model: 'Linear' | '2FI' | 'Quadratic',
+  factors?: Factor[]
+): number {
+  if (factors) return calculateNumModelTermsForFactors(factors, model);
   if (k <= 0) return 1;
   const linear = k;
   const interaction = (k * (k - 1)) / 2;
@@ -752,6 +718,39 @@ export function expandModelVector(coded: number[], model: 'Linear' | '2FI' | 'Qu
 }
 
 /**
+ * Model basis used by optimal-design diagnostics.  Mixture components sum to
+ * one, therefore their basis is Scheffé-style (no explicit intercept and no
+ * redundant component squares).
+ */
+function expandModelVectorForFactors(
+  coded: number[],
+  factors: Factor[],
+  model: 'Linear' | '2FI' | 'Quadratic'
+): number[] {
+  const mixtureIndexes = factors
+    .map((factor, index) => (factor.role === 'mixture_component' || factor.type === 'Mixture' ? index : -1))
+    .filter((index) => index >= 0);
+  const hasMixture = mixtureIndexes.length > 0;
+  const row: number[] = hasMixture ? [] : [1];
+  row.push(...coded);
+  if (model === '2FI' || model === 'Quadratic') {
+    for (let i = 0; i < coded.length; i++) {
+      for (let j = i + 1; j < coded.length; j++) row.push(coded[i] * coded[j]);
+    }
+  }
+  if (model === 'Quadratic') {
+    for (let i = 0; i < coded.length; i++) {
+      if (!mixtureIndexes.includes(i)) row.push(coded[i] * coded[i]);
+    }
+  }
+  return row;
+}
+
+function calculateNumModelTermsForFactors(factors: Factor[], model: 'Linear' | '2FI' | 'Quadratic'): number {
+  return expandModelVectorForFactors(new Array(factors.length).fill(0), factors, model).length;
+}
+
+/**
  * Generate candidate pool for D-Optimal search
  */
 function generateCandidatePool(factors: Factor[]): number[][] {
@@ -788,7 +787,12 @@ function generateCandidatePool(factors: Factor[]): number[][] {
     const combinedCandidates: number[][] = [];
     for (const m of mixCandidates) {
       for (const p of procPool) {
-        combinedCandidates.push([...m, ...p]);
+        combinedCandidates.push(
+          factors.map((factor) => {
+            const mixIndex = mixtureFactors.indexOf(factor);
+            return mixIndex >= 0 ? m[mixIndex] : p[processFactors.indexOf(factor)];
+          })
+        );
       }
     }
     return combinedCandidates;
@@ -830,7 +834,7 @@ export function generateDOptimalMatrix(
   const k = factors.length;
   if (k === 0) return [];
 
-  const numTerms = calculateNumModelTerms(k, modelOrder);
+  const numTerms = calculateNumModelTermsForFactors(factors, modelOrder);
   const N = Math.max(numTerms, targetRuns);
 
   // 1. Generate candidate points
@@ -840,7 +844,7 @@ export function generateDOptimalMatrix(
   }
 
   // 2. Expand candidate pool into model matrix rows
-  const candidateRows = candidatePool.map((pt) => expandModelVector(pt, modelOrder));
+  const candidateRows = candidatePool.map((pt) => expandModelVectorForFactors(pt, factors, modelOrder));
 
   // 3. Greedy Initial Selection: Select N points to maximize initial det(X^T X)
   const selectedIndices: number[] = [];
@@ -885,7 +889,7 @@ export function generateDOptimalMatrix(
 
       // Try replacing point i with a candidate from pool
       for (let c = 0; c < candidatePool.length; c++) {
-        if (c === origIdx) continue;
+        if (c === origIdx || selectedIndices.some((selected, index) => index !== i && selected === c)) continue;
 
         selectedIndices[i] = c;
         const newLogDet = computeLogDet(selectedIndices);
@@ -918,7 +922,7 @@ export function calculateDesignEfficiency(
   const activeFactors = factors.filter((f) => f.controllability !== 'constant');
   const k = activeFactors.length;
   const N = runs.length;
-  const p = calculateNumModelTerms(k, modelOrder);
+  const p = calculateNumModelTermsForFactors(activeFactors, modelOrder);
 
   if (N < p || k === 0) {
     return {
@@ -939,7 +943,7 @@ export function calculateDesignEfficiency(
   // Build X matrix
   const X: number[][] = runs.map((r) => {
     const codedPt = activeFactors.map((f) => r.factorCoded[f.code] ?? 0);
-    return expandModelVector(codedPt, modelOrder);
+    return expandModelVectorForFactors(codedPt, activeFactors, modelOrder);
   });
 
   const XT = matTranspose(X);
@@ -988,11 +992,12 @@ export function calculateDesignEfficiency(
   // G-Efficiency: 100 * p / (N * max(h_ii))
   const gEff = maxH > 0 ? Number(Math.min(100, Math.max(0, (100 * p) / (N * maxH))).toFixed(2)) : 0;
 
-  // Condition Number estimation
-  const diagElements: number[] = XTX.map((row: number[], i: number) => Math.abs(row[i]));
-  const maxDiag = Math.max(...diagElements);
-  const minDiag = Math.min(...diagElements.filter((v: number) => v > 0));
-  const condNum = minDiag > 0 ? Number((maxDiag / minDiag).toFixed(2)) : 1.0;
+  // A genuine matrix condition number (1-norm), rather than a ratio of only
+  // diagonal entries.  It detects non-orthogonality and near singularity.
+  const oneNorm = (matrix: number[][]) => Math.max(...matrix[0].map((_, col) => matrix.reduce((sum, row) => sum + Math.abs(row[col]), 0)));
+  const condNum = invXTX.length > 0
+    ? Number((oneNorm(XTX) * oneNorm(invXTX)).toFixed(2))
+    : Number.POSITIVE_INFINITY;
 
   // Rating
   let rating: 'Xuất sắc (>85%)' | 'Tốt (70-85%)' | 'Chấp nhận được (50-70%)' | 'Kém (<50%)' = 'Kém (<50%)';
@@ -1014,4 +1019,3 @@ export function calculateDesignEfficiency(
     rating,
   };
 }
-

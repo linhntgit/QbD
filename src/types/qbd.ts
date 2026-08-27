@@ -192,6 +192,9 @@ export interface StatisticalModelResult {
   diagnostics: ModelDiagnostics;
   equationString: string;
   predict: (codedFactors: Record<string, number>) => number;
+  /** Standard error of the estimated mean response at a coded factor point. */
+  predictStandardError?: (codedFactors: Record<string, number>) => number;
+  residualDegreesOfFreedom?: number;
 }
 
 export interface UpdatedRiskItem {
@@ -283,4 +286,3 @@ export interface QBDProject {
 }
 
 export * from './neuralNetwork';
-

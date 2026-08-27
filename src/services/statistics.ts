@@ -19,6 +19,7 @@ import {
   matInverse,
   fDistributionPValue,
   tDistributionPValue,
+  tDistributionCritical,
   calculateIndividualDesirability,
   calculateInformationCriteria,
 } from './mathUtils';
@@ -30,20 +31,63 @@ interface TermDef {
   evaluator: (coded: Record<string, number>) => number;
 }
 
+function calculateSSE(X: number[][], Y: number[][]): number {
+  const beta = matMul(matMul(matInverse(matMul(matTranspose(X), X)), matTranspose(X)), Y);
+  const predicted = matMul(X, beta);
+  return Y.reduce((sum, row, i) => sum + Math.pow(row[0] - predicted[i][0], 2), 0);
+}
+
+/** Variance inflation factors for non-intercept columns. */
+function calculateVIFs(X: number[][], firstPredictorIndex: number = 1): number[] {
+  const p = X[0].length;
+  const n = X.length;
+  const vifs = new Array(p).fill(1);
+
+  for (let target = firstPredictorIndex; target < p; target++) {
+    const y = X.map((row) => row[target]);
+    const mean = y.reduce((sum, value) => sum + value, 0) / n;
+    const sst = y.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0);
+    if (sst <= 1e-12) {
+      vifs[target] = Infinity;
+      continue;
+    }
+    const others = X.map((row) => row.filter((_, index) => index !== target));
+    try {
+      const beta = matMul(matMul(matInverse(matMul(matTranspose(others), others)), matTranspose(others)), y.map((value) => [value]));
+      const sse = others.reduce((sum, row, index) => {
+        const predicted = row.reduce((acc, value, col) => acc + value * beta[col][0], 0);
+        return sum + Math.pow(y[index] - predicted, 2);
+      }, 0);
+      const r2 = Math.min(1, Math.max(0, 1 - sse / sst));
+      vifs[target] = r2 >= 1 - 1e-10 ? Infinity : 1 / (1 - r2);
+    } catch {
+      vifs[target] = Infinity;
+    }
+  }
+  return vifs;
+}
+
 /**
  * Build term definitions based on factors and model type
  */
 function buildTerms(factors: Factor[], modelType: ModelType): TermDef[] {
   const terms: TermDef[] = [];
   const k = factors.length;
+  const mixtureIndexes = factors
+    .map((factor, index) => (factor.role === 'mixture_component' || factor.type === 'Mixture' ? index : -1))
+    .filter((index) => index >= 0);
+  const hasMixture = mixtureIndexes.length > 0;
 
-  // 1. Intercept
-  terms.push({
-    name: 'Intercept',
-    factorCodes: [],
-    power: [],
-    evaluator: () => 1.0,
-  });
+  // Mixture components sum to one, so an explicit intercept is exactly
+  // collinear with their linear terms.  A Scheffé-style basis omits it.
+  if (!hasMixture) {
+    terms.push({
+      name: 'Intercept',
+      factorCodes: [],
+      power: [],
+      evaluator: () => 1.0,
+    });
+  }
 
   // 2. Linear terms (X1, X2, ...)
   factors.forEach((f, idx) => {
@@ -76,9 +120,12 @@ function buildTerms(factors: Factor[], modelType: ModelType): TermDef[] {
     }
   }
 
-  // 4. Quadratic / Squared terms (X1^2, X2^2, ...)
+  // 4. Quadratic / Squared terms.  In a mixture basis, x_i² is redundant
+  // with x_i and x_i*x_j because sum(x_i)=1, therefore retain squared terms
+  // only for independent process factors.
   if (modelType === 'Quadratic' || modelType === 'Reduced') {
     for (let i = 0; i < k; i++) {
+      if (mixtureIndexes.includes(i)) continue;
       const p = new Array(k).fill(0);
       p[i] = 2;
       const code = factors[i].code;
@@ -103,6 +150,9 @@ export function fitModel(
   runs: DoERun[],
   modelType: ModelType = 'Quadratic'
 ): StatisticalModelResult | null {
+  // A 0/100 surrogate is not a binomial model.  Fail closed until a logistic
+  // modelling engine is supplied rather than reporting invalid OLS p-values.
+  if (cqa.dataType === 'qualitative_binary' || cqa.objective === 'pass_category') return null;
   // Only vary factors that are not constant
   const activeFactors = factors.filter((f) => f.controllability !== 'constant');
 
@@ -126,12 +176,13 @@ export function fitModel(
     .filter((item) => item.parsedY !== null);
 
   const n = validRuns.length;
-  if (n < activeFactors.length + 2) {
-    return null; // Not enough degrees of freedom
-  }
-
-  let terms = buildTerms(activeFactors, modelType);
+  const terms = buildTerms(activeFactors, modelType);
   const p = terms.length;
+  const hasExplicitIntercept = terms[0]?.name === 'Intercept';
+
+  // A valid OLS ANOVA needs a full-rank model and at least one residual degree
+  // of freedom.  Do not manufacture a residual df for a saturated model.
+  if (n <= p) return null;
 
   // Build X matrix (n x p) and Y vector (n x 1)
   const X: number[][] = validRuns.map(({ run }) => terms.map((t) => t.evaluator(run.factorCoded)));
@@ -139,7 +190,12 @@ export function fitModel(
 
   const XT = matTranspose(X);
   const XTX = matMul(XT, X);
-  const invXTX = matInverse(XTX);
+  let invXTX: number[][];
+  try {
+    invXTX = matInverse(XTX);
+  } catch {
+    return null;
+  }
   const XTY = matMul(XT, Y);
   const Beta = matMul(invXTX, XTY); // (p x 1)
 
@@ -157,7 +213,7 @@ export function fitModel(
 
   const dfTotal = n - 1;
   const dfModel = p - 1;
-  const dfResidual = Math.max(1, n - p);
+  const dfResidual = n - p;
 
   const msModel = dfModel > 0 ? ssModel / dfModel : 0;
   const msResidual = dfResidual > 0 ? ssResidual / dfResidual : 0;
@@ -197,11 +253,17 @@ export function fitModel(
   const pLackOfFit =
     fLackOfFit !== undefined ? fDistributionPValue(fLackOfFit, dfLackOfFit, dfPureError) : undefined;
 
-  // Breakdown of Sum of Squares: Linear, 2FI, Quadratic
+  // Sequential (Type I) ANOVA blocks.  These are fitted nested models, rather
+  // than distributing the model SS in proportion to the number of terms.
   const k = activeFactors.length;
   const linearCount = k;
+  const linearDF = linearCount - (hasExplicitIntercept ? 0 : 1);
   const interactionCount = (modelType === '2FI' || modelType === 'Quadratic' || modelType === 'Reduced') ? (k * (k - 1)) / 2 : 0;
-  const quadraticCount = (modelType === 'Quadratic' || modelType === 'Reduced') ? k : 0;
+  const quadraticCount = (modelType === 'Quadratic' || modelType === 'Reduced')
+    ? activeFactors.filter((factor) => factor.role !== 'mixture_component' && factor.type !== 'Mixture').length
+    : 0;
+
+  const vifs = calculateVIFs(X, hasExplicitIntercept ? 1 : 0);
 
   // Compute Term Statistics (SE, t-value, p-value)
   const regressionTerms: RegressionTerm[] = terms.map((t, idx) => {
@@ -219,7 +281,7 @@ export function fitModel(
       stdError: se,
       tValue: tVal,
       pValue: pVal,
-      vif: 1.0, // Orthogonal designs have VIF=1
+      vif: hasExplicitIntercept && idx === 0 ? 1 : vifs[idx],
       significant: pVal < 0.05,
     };
   });
@@ -259,16 +321,19 @@ export function fitModel(
   const rSquared = ssTotal > 0 ? Math.max(0, Math.min(1, 1 - ssResidual / ssTotal)) : 0;
   const adjRSquared =
     dfTotal > 0 && dfResidual > 0
-      ? Math.max(0, Math.min(1, 1 - (ssResidual / dfResidual) / (ssTotal / dfTotal)))
-      : 0;
-  const predRSquared = ssTotal > 0 ? Math.max(0, Math.min(1, 1 - press / ssTotal)) : 0;
+      ? 1 - (ssResidual / dfResidual) / (ssTotal / dfTotal)
+      : Number.NaN;
+  const predRSquared = ssTotal > 0 ? 1 - press / ssTotal : Number.NaN;
   const qSquared = predRSquared; // Slide 12 Q^2 (PRESS-based Leave-One-Out R^2)
 
   const infoCrit = calculateInformationCriteria(n, p, ssResidual);
 
   const yRange = Math.max(...yPred) - Math.min(...yPred);
-  const adeqPrecision =
-    n > 0 && msResidual > 0 ? yRange / Math.sqrt((p * msResidual) / n) : 0;
+  const averagePredictionError = leverages.reduce(
+    (sum, leverage) => sum + Math.sqrt(Math.max(0, msResidual * leverage)),
+    0
+  ) / n;
+  const adeqPrecision = averagePredictionError > 0 ? yRange / averagePredictionError : 0;
 
   const stdDev = Math.sqrt(msResidual);
   const cvPercent = yMean !== 0 ? (stdDev / yMean) * 100 : 0;
@@ -285,28 +350,37 @@ export function fitModel(
     },
   ];
 
-  if (linearCount > 0) {
-    const ssLinear = ssModel * (linearCount / dfModel);
-    const msLinear = ssLinear / linearCount;
+  const interceptX = X.map((row) => [row[0]]);
+  const linearEnd = (hasExplicitIntercept ? 1 : 0) + linearCount;
+  const linearX = X.map((row) => row.slice(0, linearEnd));
+  const interactionEnd = linearEnd + interactionCount;
+  const interactionX = X.map((row) => row.slice(0, interactionEnd));
+  const sseIntercept = calculateSSE(interceptX, Y);
+  const sseLinear = calculateSSE(linearX, Y);
+  const sse2FI = interactionCount > 0 ? calculateSSE(interactionX, Y) : sseLinear;
+
+  if (linearDF > 0) {
+    const ssLinear = Math.max(0, sseIntercept - sseLinear);
+    const msLinear = ssLinear / linearDF;
     const fLinear = msResidual > 0 ? msLinear / msResidual : undefined;
-    const pLinear = fLinear !== undefined && dfResidual > 0 ? fDistributionPValue(fLinear, linearCount, dfResidual) : undefined;
+    const pLinear = fLinear !== undefined && dfResidual > 0 ? fDistributionPValue(fLinear, linearDF, dfResidual) : undefined;
     anova.push({
-      source: 'Linear',
+      source: 'Linear (Sequential)',
       ss: ssLinear,
-      df: linearCount,
+      df: linearDF,
       ms: msLinear,
       fValue: fLinear,
       pValue: pLinear,
     });
   }
   if (interactionCount > 0) {
-    const ss2FI = ssModel * (interactionCount / dfModel);
-    const ms2FI = ss2FI / interactionCount;
+    const ss2FIBlock = Math.max(0, sseLinear - sse2FI);
+    const ms2FI = ss2FIBlock / interactionCount;
     const f2FI = msResidual > 0 ? ms2FI / msResidual : undefined;
     const p2FI = f2FI !== undefined && dfResidual > 0 ? fDistributionPValue(f2FI, interactionCount, dfResidual) : undefined;
     anova.push({
-      source: '2-Factor Interaction (2FI)',
-      ss: ss2FI,
+      source: '2-Factor Interaction (Sequential)',
+      ss: ss2FIBlock,
       df: interactionCount,
       ms: ms2FI,
       fValue: f2FI,
@@ -314,12 +388,12 @@ export function fitModel(
     });
   }
   if (quadraticCount > 0) {
-    const ssQuad = ssModel * (quadraticCount / dfModel);
+    const ssQuad = Math.max(0, sse2FI - ssResidual);
     const msQuad = ssQuad / quadraticCount;
     const fQuad = msResidual > 0 ? msQuad / msResidual : undefined;
     const pQuad = fQuad !== undefined && dfResidual > 0 ? fDistributionPValue(fQuad, quadraticCount, dfResidual) : undefined;
     anova.push({
-      source: 'Quadratic',
+      source: 'Quadratic (Sequential)',
       ss: ssQuad,
       df: quadraticCount,
       ms: msQuad,
@@ -426,6 +500,15 @@ export function fitModel(
     return result;
   };
 
+  const predictStandardError = (coded: Record<string, number>): number => {
+    const x0 = terms.map((term) => term.evaluator(coded));
+    const varianceMultiplier = x0.reduce(
+      (sum, value, i) => sum + value * x0.reduce((inner, other, j) => inner + invXTX[i][j] * other, 0),
+      0
+    );
+    return Math.sqrt(Math.max(0, msResidual * varianceMultiplier));
+  };
+
   return {
     cqaCode: cqa.code,
     modelType,
@@ -458,6 +541,8 @@ export function fitModel(
     },
     equationString,
     predict,
+    predictStandardError,
+    residualDegreesOfFreedom: dfResidual,
   };
 }
 
@@ -472,6 +557,8 @@ export function projectToBoundedMixture(
   total: number = 1.0
 ): number[] {
   const n = p.length;
+  if (l.length !== n || u.length !== n) return [];
+  if (!isFeasibleBoundedMixture(l, u, total)) return [];
   if (n === 0) return [];
   if (n === 1) return [Math.max(l[0], Math.min(u[0], total))];
 
@@ -479,7 +566,7 @@ export function projectToBoundedMixture(
   let current = p.map((val, i) => Math.max(l[i], Math.min(u[i], val)));
 
   // Iterative projection onto simplex hyperplane sum(p_i) = total
-  for (let iter = 0; iter < 20; iter++) {
+  for (let iter = 0; iter < n + 5; iter++) {
     const curSum = current.reduce((a, b) => a + b, 0);
     const diff = total - curSum;
     if (Math.abs(diff) < 1e-6) break;
@@ -497,7 +584,15 @@ export function projectToBoundedMixture(
     });
   }
 
-  return current.map((v) => Number(v.toFixed(6)));
+  return current.map((v) => Number(v.toFixed(10)));
+}
+
+export function isFeasibleBoundedMixture(l: number[], u: number[], total: number = 1): boolean {
+  if (l.length === 0 || l.length !== u.length || !Number.isFinite(total)) return false;
+  if (l.some((value, index) => !Number.isFinite(value) || !Number.isFinite(u[index]) || value > u[index])) return false;
+  const sumL = l.reduce((sum, value) => sum + value, 0);
+  const sumU = u.reduce((sum, value) => sum + value, 0);
+  return sumL <= total + 1e-10 && sumU >= total - 1e-10;
 }
 
 /**
@@ -507,6 +602,8 @@ export function isWithinSurveyBounds(
   coded: Record<string, number>,
   factors: Factor[]
 ): boolean {
+  let mixtureTotal = 0;
+  let mixtureCount = 0;
   for (const f of factors) {
     if (f.controllability === 'constant') continue;
     const isMixture = f.role === 'mixture_component' || f.type === 'Mixture';
@@ -519,6 +616,8 @@ export function isWithinSurveyBounds(
       if (valPct < lowPct - 0.05 || valPct > highPct + 0.05) {
         return false;
       }
+      mixtureTotal += valProp;
+      mixtureCount++;
     } else {
       const c = coded[f.code] ?? 0;
       if (c < -1.05 || c > 1.05) {
@@ -526,7 +625,7 @@ export function isWithinSurveyBounds(
       }
     }
   }
-  return true;
+  return mixtureCount < 2 || Math.abs(mixtureTotal - 1) <= 1e-6;
 }
 
 /**
@@ -539,8 +638,8 @@ export function optimizeDesirability(
   models: Record<string, StatisticalModelResult | NeuralNetModelResult>,
   lockedFactors?: Record<string, number>
 ): DesirabilitySolution | null {
-  const validCQAs = cqas.filter((c) => models[c.code]);
-  if (validCQAs.length === 0) return null;
+  if (cqas.some((c) => !models[c.code])) return null;
+  const validCQAs = cqas;
 
   const totalWeight = validCQAs.reduce((sum, c) => sum + (c.weight || 1), 0);
   const k = factors.length;
@@ -577,11 +676,14 @@ export function optimizeDesirability(
 
   // Identify mixture and process factors and their survey bounds
   const mixFactors = factors.filter((f) => f.role === 'mixture_component' || f.type === 'Mixture');
-  const procFactors = factors.filter((f) => f.role !== 'mixture_component' && f.type !== 'Mixture');
+  const procFactors = factors.filter(
+    (f) => f.role !== 'mixture_component' && f.type !== 'Mixture' && f.controllability === 'controllable'
+  );
   const hasMixture = mixFactors.length >= 2;
 
   const mixLowProps = mixFactors.map((f) => (f.high <= 1.0 && f.unit !== '%' ? f.low : f.low / 100));
   const mixHighProps = mixFactors.map((f) => (f.high <= 1.0 && f.unit !== '%' ? f.high : f.high / 100));
+  if (hasMixture && !isFeasibleBoundedMixture(mixLowProps, mixHighProps)) return null;
 
   let bestD = -1;
   let bestCoded: Record<string, number> = {};
@@ -589,6 +691,9 @@ export function optimizeDesirability(
 
   // 1. Seed candidate with Feasible Polytope Centroid
   const initialCandidate: Record<string, number> = {};
+  factors
+    .filter((f) => f.controllability === 'uncontrollable_noise')
+    .forEach((f) => { initialCandidate[f.code] = 0; });
   procFactors.forEach((f) => {
     initialCandidate[f.code] = lockedFactors && lockedFactors[f.code] !== undefined ? lockedFactors[f.code] : 0.0;
   });
@@ -635,6 +740,9 @@ export function optimizeDesirability(
     const factor = factors[factorIdx];
     if (lockedFactors && lockedFactors[factor.code] !== undefined) {
       currentCoded[factor.code] = lockedFactors[factor.code];
+      exploreGrid(factorIdx + 1, currentCoded);
+    } else if (factor.controllability !== 'controllable') {
+      currentCoded[factor.code] = 0;
       exploreGrid(factorIdx + 1, currentCoded);
     } else {
       const isMix = factor.role === 'mixture_component' || factor.type === 'Mixture';
@@ -695,9 +803,11 @@ export function optimizeDesirability(
   factors.forEach((f) => {
     if (f.controllability === 'constant') {
       actualFactors[f.code] = f.constantValue ?? f.low;
-    } else if (f.role === 'mixture_component') {
+    } else if (f.role === 'mixture_component' || f.type === 'Mixture') {
       const frac = bestCoded[f.code] ?? (1 / mixFactors.length);
-      actualFactors[f.code] = Number((frac * 100).toFixed(2));
+      actualFactors[f.code] = f.high <= 1.0 && f.unit !== '%'
+        ? Number(frac.toFixed(4))
+        : Number((frac * 100).toFixed(2));
     } else {
       const c = bestCoded[f.code] ?? 0;
       if (f.dataType === 'qualitative' && f.categories && f.categories.length > 0) {
@@ -716,12 +826,18 @@ export function optimizeDesirability(
   validCQAs.forEach((cqa) => {
     const model = models[cqa.code];
     const val = model.predict(bestCoded);
-    const se = (model.diagnostics as any).stdDev ?? (model.diagnostics as any).rmseTrain ?? 0.1;
+    const statisticalModel = 'predictStandardError' in model ? model : undefined;
+    const se = statisticalModel?.predictStandardError?.(bestCoded) ?? (model.diagnostics as any).rmseVal ?? (model.diagnostics as any).rmseOverall;
+    const df = statisticalModel?.residualDegreesOfFreedom;
+    const critical = df && df > 0 ? tDistributionCritical(0.05, df) : Number.NaN;
+    // Neural-network residual RMSE is not a parameter-estimation CI.  Preserve
+    // the field for UI compatibility but do not label its interval as a CI.
+    const ciHalfWidth = Number.isFinite(critical) && statisticalModel?.predictStandardError ? critical * se : Number.NaN;
     predictedResponses[cqa.code] = {
       value: Number(val.toFixed(3)),
       se: Number(se.toFixed(3)),
-      ciLow: Number((val - 1.96 * se).toFixed(3)),
-      ciHigh: Number((val + 1.96 * se).toFixed(3)),
+      ciLow: Number.isFinite(ciHalfWidth) ? Number((val - ciHalfWidth).toFixed(3)) : Number.NaN,
+      ciHigh: Number.isFinite(ciHalfWidth) ? Number((val + ciHalfWidth).toFixed(3)) : Number.NaN,
       desirability: Number((bestDMap[cqa.code] ?? 0).toFixed(4)),
     };
   });
@@ -758,6 +874,49 @@ export function runMonteCarloSimulation(
 
   const mixFactors = factors.filter((f) => f.role === 'mixture_component' || f.type === 'Mixture');
   const hasMixture = mixFactors.length >= 2;
+  const mixLowProps = mixFactors.map((f) => (f.high <= 1 && f.unit !== '%' ? f.low : f.low / 100));
+  const mixHighProps = mixFactors.map((f) => (f.high <= 1 && f.unit !== '%' ? f.high : f.high / 100));
+  if (hasMixture && !isFeasibleBoundedMixture(mixLowProps, mixHighProps)) {
+    throw new Error('Mixture bounds are infeasible: require Σlower ≤ 100% ≤ Σupper.');
+  }
+
+  const standardNormal = () => {
+    const u1 = Math.max(1e-12, Math.random());
+    return Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * Math.random());
+  };
+  const valueToProportion = (factor: Factor, value: number) =>
+    factor.high <= 1 && factor.unit !== '%' ? value : value / 100;
+
+  // Preserve observed residual co-movement between CQAs when enough paired
+  // residuals exist; otherwise the conservative fallback is independence.
+  const residualMaps = validCQAs.map((cqa) => {
+    const map = new Map<number, number>();
+    ((models[cqa.code].diagnostics as any).residuals ?? []).forEach((residual: any) => {
+      if (Number.isFinite(residual.residual)) map.set(residual.runOrder, residual.residual);
+    });
+    return map;
+  });
+  const correlation = validCQAs.map((_, i) => validCQAs.map((_, j) => {
+    if (i === j) return 1;
+    const paired = [...residualMaps[i]].flatMap(([runOrder, left]) => {
+      const right = residualMaps[j].get(runOrder);
+      return right === undefined ? [] : [[left, right] as [number, number]];
+    });
+    if (paired.length < 3) return 0;
+    const meanLeft = paired.reduce((sum, pair) => sum + pair[0], 0) / paired.length;
+    const meanRight = paired.reduce((sum, pair) => sum + pair[1], 0) / paired.length;
+    const numerator = paired.reduce((sum, pair) => sum + (pair[0] - meanLeft) * (pair[1] - meanRight), 0);
+    const denomLeft = Math.sqrt(paired.reduce((sum, pair) => sum + Math.pow(pair[0] - meanLeft, 2), 0));
+    const denomRight = Math.sqrt(paired.reduce((sum, pair) => sum + Math.pow(pair[1] - meanRight, 2), 0));
+    return denomLeft > 0 && denomRight > 0 ? Math.max(-0.95, Math.min(0.95, numerator / (denomLeft * denomRight))) : 0;
+  }));
+  const cholesky = correlation.map((row) => new Array(row.length).fill(0));
+  for (let i = 0; i < cholesky.length; i++) {
+    for (let j = 0; j <= i; j++) {
+      const value = correlation[i][j] - Array.from({ length: j }, (_, k) => cholesky[i][k] * cholesky[j][k]).reduce((sum, item) => sum + item, 0);
+      cholesky[i][j] = i === j ? Math.sqrt(Math.max(1e-8, value)) : value / cholesky[j][j];
+    }
+  }
 
   for (let s = 0; s < simulations; s++) {
     // Generate randomized factor actuals and convert to coded/proportion
@@ -781,10 +940,14 @@ export function runMonteCarloSimulation(
       const sd = Math.max(1e-5, Math.abs(mean) * (variabilityPercent / 100.0));
 
       // Box-Muller standard normal transform
-      const u1 = Math.max(1e-9, Math.random());
-      const u2 = Math.random();
-      const z = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
-      const actualVal = mean + z * sd;
+      // Truncated normal sampling prevents extrapolation outside the proven
+      // operating range while retaining stochastic process variation.
+      let actualVal = mean;
+      for (let attempt = 0; attempt < 100; attempt++) {
+        actualVal = mean + standardNormal() * sd;
+        if (actualVal >= f.low && actualVal <= f.high) break;
+      }
+      actualVal = Math.max(f.low, Math.min(f.high, actualVal));
 
       const center = f.center !== undefined ? f.center : (f.low + f.high) / 2;
       const half = (f.high - f.low) / 2;
@@ -797,24 +960,21 @@ export function runMonteCarloSimulation(
       mixFactors.forEach((f) => {
         if (f.controllability === 'constant') {
           const constNum = typeof f.constantValue === 'number' ? f.constantValue : Number(f.constantValue) || f.low;
-          sampledProps.push(constNum / 100);
+          sampledProps.push(valueToProportion(f, constNum));
           return;
         }
         const rawMean = setpointActual[f.code];
         const mean: number = typeof rawMean === 'number' ? rawMean : Number(rawMean) || (f.low + f.high) / 2; // mean in %
         const sd = Math.max(1e-5, mean * (variabilityPercent / 100.0));
 
-        const u1 = Math.max(1e-9, Math.random());
-        const u2 = Math.random();
-        const z = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
-        const actualValPct = Math.max(0.01, mean + z * sd);
-        sampledProps.push(actualValPct / 100);
+        const actualVal = Math.max(0, mean + standardNormal() * sd);
+        sampledProps.push(valueToProportion(f, actualVal));
       });
 
       if (hasMixture) {
-        const sumProps = sampledProps.reduce((a, b) => a + b, 0);
+        const boundedProps = projectToBoundedMixture(sampledProps, mixLowProps, mixHighProps, 1.0);
         mixFactors.forEach((f, idx) => {
-          sampleCoded[f.code] = sumProps > 0 ? sampledProps[idx] / sumProps : 1 / mixFactors.length;
+          sampleCoded[f.code] = boundedProps[idx];
         });
       } else {
         mixFactors.forEach((f, idx) => {
@@ -825,15 +985,18 @@ export function runMonteCarloSimulation(
 
     // 3. Evaluate each CQA with True Gaussian Model Residual Noise
     let batchPass = true;
-    for (const cqa of validCQAs) {
+    const correlatedZ = new Array(validCQAs.length).fill(0);
+    const independentZ = validCQAs.map(() => standardNormal());
+    for (let i = 0; i < cholesky.length; i++) {
+      correlatedZ[i] = cholesky[i].reduce((sum, coefficient, j) => sum + coefficient * independentZ[j], 0);
+    }
+    for (let cqaIndex = 0; cqaIndex < validCQAs.length; cqaIndex++) {
+      const cqa = validCQAs[cqaIndex];
       const model = models[cqa.code];
       const noiseStd = (model.diagnostics as any).stdDev ?? (model.diagnostics as any).rmseTrain ?? (model.diagnostics as any).rmseOverall ?? 0.1;
 
       // Exact Box-Muller Gaussian Noise for model residual variance
-      const uNoise1 = Math.max(1e-9, Math.random());
-      const uNoise2 = Math.random();
-      const zNoise = Math.sqrt(-2.0 * Math.log(uNoise1)) * Math.cos(2.0 * Math.PI * uNoise2);
-      const resError = noiseStd * zNoise;
+      const resError = noiseStd * correlatedZ[cqaIndex];
 
       const yPred = model.predict(sampleCoded) + resError;
       cqaValues[cqa.code].push(yPred);
@@ -844,6 +1007,7 @@ export function runMonteCarloSimulation(
       if (cqa.upperLimit !== undefined && yPred > cqa.upperLimit) {
         batchPass = false;
       }
+      if (cqa.objective === 'pass_category' && yPred < 90) batchPass = false;
     }
 
     if (batchPass) passCount++;
@@ -857,7 +1021,7 @@ export function runMonteCarloSimulation(
   validCQAs.forEach((cqa) => {
     const vals = cqaValues[cqa.code];
     const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
-    const sd = Math.sqrt(vals.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / vals.length);
+    const sd = Math.sqrt(vals.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / Math.max(1, vals.length - 1));
     const min = Math.min(...vals);
     const max = Math.max(...vals);
 
@@ -1081,4 +1245,3 @@ export function generateControlStrategy(
 
   return items;
 }
-

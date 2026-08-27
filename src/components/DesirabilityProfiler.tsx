@@ -26,7 +26,7 @@ import type {
 import { PlotlyChart } from './PlotlyChart';
 import { codedToActual, actualToCoded } from '../services/doeGenerator';
 import { optimizeDesirability } from '../services/statistics';
-import { calculateIndividualDesirability } from '../services/mathUtils';
+import { calculateIndividualDesirability, tDistributionCritical } from '../services/mathUtils';
 
 interface DesirabilityProfilerProps {
   factors: Factor[];
@@ -103,7 +103,11 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
     validCQAs.forEach((cqa) => {
       const model = models[cqa.code];
       const val = model.predict(currentCoded);
-      const se = (model.diagnostics as any)?.stdDev ?? (model.diagnostics as any)?.rmseTrain ?? 0.1;
+      const statisticalModel = 'predictStandardError' in model ? model : undefined;
+      const se = statisticalModel?.predictStandardError?.(currentCoded) ?? (model.diagnostics as any)?.rmseOverall ?? (model.diagnostics as any)?.rmseVal ?? 0;
+      const df = statisticalModel?.residualDegreesOfFreedom;
+      const critical = df ? tDistributionCritical(0.05, df) : Number.NaN;
+      const halfWidth = statisticalModel && Number.isFinite(critical) ? critical * se : Number.NaN;
       const di = calculateIndividualDesirability(
         val,
         cqa.objective,
@@ -117,8 +121,8 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
       predictions[cqa.code] = {
         value: Number(val.toFixed(3)),
         se: Number(se.toFixed(3)),
-        ciLow: Number((val - 1.96 * se).toFixed(3)),
-        ciHigh: Number((val + 1.96 * se).toFixed(3)),
+        ciLow: Number.isFinite(halfWidth) ? Number((val - halfWidth).toFixed(3)) : Number.NaN,
+        ciHigh: Number.isFinite(halfWidth) ? Number((val + halfWidth).toFixed(3)) : Number.NaN,
         desirability: Number(di.toFixed(4)),
       };
 
@@ -535,7 +539,9 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
         }
 
         const model = models[cqa.code];
-        const se = (model.diagnostics as any)?.stdDev ?? (model.diagnostics as any)?.rmseTrain ?? 0.1;
+        const statisticalModel = 'predictStandardError' in model ? model : undefined;
+        const df = statisticalModel?.residualDegreesOfFreedom;
+        const critical = df ? tDistributionCritical(0.05, df) : Number.NaN;
         const yPredArr: number[] = [];
         const ciUpArr: number[] = [];
         const ciLowArr: number[] = [];
@@ -543,9 +549,11 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
         xRange.forEach((xc) => {
           const testPoint: Record<string, number> = { ...currentCoded, [f.code]: xc };
           const yp = model.predict(testPoint);
+          const se = statisticalModel?.predictStandardError?.(testPoint) ?? 0;
+          const halfWidth = statisticalModel && Number.isFinite(critical) ? critical * se : Number.NaN;
           yPredArr.push(Number(yp.toFixed(3)));
-          ciUpArr.push(Number((yp + 1.96 * se).toFixed(3)));
-          ciLowArr.push(Number((yp - 1.96 * se).toFixed(3)));
+          ciUpArr.push(Number.isFinite(halfWidth) ? Number((yp + halfWidth).toFixed(3)) : Number.NaN);
+          ciLowArr.push(Number.isFinite(halfWidth) ? Number((yp - halfWidth).toFixed(3)) : Number.NaN);
         });
 
         const currY = model.predict(currentCoded);
@@ -1247,7 +1255,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                       {predInfo?.value ?? '-'} {cqa.unit}
                     </div>
                     <div style={{ fontSize: '0.68rem', color: '#64748b' }}>
-                      95% CI: [{predInfo?.ciLow} - {predInfo?.ciHigh}]
+                      {Number.isFinite(predInfo?.ciLow) ? `95% CI: [${predInfo?.ciLow} - ${predInfo?.ciHigh}]` : '95% CI: chưa khả dụng cho ANN'}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.1rem' }}>
                       <span style={{ fontSize: '0.68rem', color: '#64748b' }}>d:</span>

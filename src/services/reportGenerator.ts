@@ -726,7 +726,7 @@ export async function exportQBDWordReport(
             createDataCell(`${cqa.name} (${cqa.code})`, idx % 2 === 1, 25),
             createDataCell(cqa.objective.toUpperCase(), idx % 2 === 1, 15),
             createDataCell(pred ? `${pred.value} ${cqa.unit}` : '-', idx % 2 === 1, 22),
-            createDataCell(pred ? `[${pred.ciLow} - ${pred.ciHigh}]` : '-', idx % 2 === 1, 23),
+            createDataCell(pred && Number.isFinite(pred.ciLow) ? `[${pred.ciLow} - ${pred.ciHigh}]` : 'N/A (không có CI đã hiệu chuẩn)', idx % 2 === 1, 23),
             createDataCell(pred ? `${pred.desirability}` : '-', idx % 2 === 1, 15),
           ],
         });

@@ -655,8 +655,8 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
     showToast(`✓ Đã xóa dữ liệu ${clearedCount} ô trong vùng chọn!`);
   };
   const minRequiredTerms = useMemo(
-    () => calculateNumModelTerms(activeFactors.length, designConfig.dOptimalModel || 'Quadratic'),
-    [activeFactors.length, designConfig.dOptimalModel]
+    () => calculateNumModelTerms(activeFactors.length, designConfig.dOptimalModel || 'Quadratic', activeFactors),
+    [activeFactors, designConfig.dOptimalModel]
   );
 
   // Calculate D-Efficiency and Matrix Metrics dynamically
@@ -2651,4 +2651,3 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
     </div>
   );
 };
-

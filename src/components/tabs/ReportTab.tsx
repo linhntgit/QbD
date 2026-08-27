@@ -578,7 +578,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                           {pred ? `${pred.value} ${cqa.unit}` : '-'}
                         </strong>
                         <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                          {pred ? `[${pred.ciLow} - ${pred.ciHigh}] (d=${pred.desirability})` : ''}
+                          {pred ? (Number.isFinite(pred.ciLow) ? `[${pred.ciLow} - ${pred.ciHigh}]` : 'CI chưa khả dụng') + ` (d=${pred.desirability})` : ''}
                         </span>
                       </span>
                     </div>

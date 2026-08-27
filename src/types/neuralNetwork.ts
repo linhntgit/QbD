@@ -1,5 +1,5 @@
 export type NeuralActivation = 'tanh' | 'linear' | 'gaussian' | 'sigmoid' | 'relu';
-export type NeuralValidationMethod = 'holdout' | 'kfold' | 'none';
+export type NeuralValidationMethod = 'holdout' | 'none';
 export type NeuralTrainingMode = 'shared' | 'independent';
 
 export interface NeuralArchitectureMetrics {

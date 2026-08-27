@@ -38,9 +38,14 @@ export function matTranspose(A: number[][]): number[][] {
 /**
  * Matrix inverse using Gauss-Jordan elimination with partial pivoting and ridge regularization if ill-conditioned
  */
-export function matInverse(A: number[][], ridgeLambda: number = 1e-9): number[][] {
+export function matInverse(A: number[][], ridgeLambda: number = 0): number[][] {
   const n = A.length;
-  // Deep clone and optionally add tiny ridge to diagonal for numerical stability
+  if (n === 0 || A.some((row) => row.length !== n)) {
+    throw new Error('Matrix inverse requires a non-empty square matrix.');
+  }
+
+  // Ridge is available only to callers that explicitly request penalised inversion.
+  // Statistical OLS inference must never silently regularise a singular design.
   const M: number[][] = A.map((row, i) =>
     row.map((val, j) => (i === j ? val + ridgeLambda : val))
   );
@@ -60,9 +65,8 @@ export function matInverse(A: number[][], ridgeLambda: number = 1e-9): number[][
       }
     }
 
-    if (maxVal < 1e-15) {
-      // Near singular matrix: augment diagonal and continue
-      M[i][i] += 1e-6;
+    if (maxVal < 1e-12) {
+      throw new Error('Matrix is singular or numerically rank deficient.');
     }
 
     // Swap rows in M and I
@@ -254,7 +258,27 @@ export function normalInverseCDF(p: number): number {
       ((((d[0] * v + d[1]) * v + d[2]) * v + d[3]) * v + 1);
   }
 
-  return p < 0.5 ? -r : r;
+  // The lower-tail rational approximation is already negative.  The previous
+  // sign reversal mirrored Q-Q plots about the origin.
+  return p < 0.5 ? r : -r;
+}
+
+/**
+ * Positive two-sided Student-t critical value, solved from the existing
+ * accurate survival-probability routine.  It avoids a second approximation
+ * family and is sufficient for confidence-interval calculations.
+ */
+export function tDistributionCritical(alpha: number, df: number): number {
+  if (!(alpha > 0 && alpha < 1) || df <= 0) return Number.NaN;
+  let low = 0;
+  let high = 1;
+  while (tDistributionPValue(high, df) > alpha && high < 1e6) high *= 2;
+  for (let i = 0; i < 80; i++) {
+    const mid = (low + high) / 2;
+    if (tDistributionPValue(mid, df) > alpha) low = mid;
+    else high = mid;
+  }
+  return (low + high) / 2;
 }
 
 /**
@@ -700,5 +724,4 @@ export function calculateCarpenterArchitecture(
     recommendation,
   };
 }
-
 

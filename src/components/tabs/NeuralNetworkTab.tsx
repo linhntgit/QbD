@@ -2089,7 +2089,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                     <div style={{ fontSize: '1.3rem', fontWeight: '800', color: '#1e3a8a' }}>
                       {currentPred.toFixed(3)} {currentCQA.unit}
                       <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b', marginLeft: '0.4rem' }}>
-                        [{(currentPred - 1.96 * rmse).toFixed(2)} - {(currentPred + 1.96 * rmse).toFixed(2)}]
+                        RMSE huấn luyện: {rmse.toFixed(2)} (không phải 95% CI)
                       </span>
                     </div>
                   </div>
