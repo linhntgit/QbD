@@ -825,7 +825,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                     {/* ANN subheaders */}
                     <th style={{ textAlign: 'center' }}>R² Train</th>
                     <th style={{ textAlign: 'center' }}>R² Val</th>
-                    <th style={{ textAlign: 'center' }}>Q² (Val)</th>
+                    <th style={{ textAlign: 'center' }}>Validation R² (hold-out)</th>
                     <th style={{ textAlign: 'center' }}>RMSE</th>
                     <th style={{ textAlign: 'center' }}>AICc</th>
                   </tr>
@@ -836,7 +836,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                     const ann = neuralModels[cqa.code];
 
                     const olsQ2 = ols?.diagnostics.qSquared ?? ols?.diagnostics.predRSquared ?? 0;
-                    const annQ2 = ann?.diagnostics.qSquared ?? ann?.diagnostics.rSquaredVal ?? 0;
+                    const annValidationR2 = ann?.diagnostics.rSquaredVal ?? 0;
                     const olsAIC = ols?.diagnostics.aicc ?? 9999;
                     const annAIC = ann?.diagnostics.aicc ?? 9999;
 
@@ -844,7 +844,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                     let recBadge = 'badge-secondary';
 
                     if (ols && ann) {
-                      if (annQ2 > olsQ2 + 0.05 || (annAIC < olsAIC - 2 && annQ2 >= olsQ2)) {
+                      if (annValidationR2 > olsQ2 + 0.05 || (annAIC < olsAIC - 2 && annValidationR2 >= olsQ2)) {
                         recommendation = '🧠 Ưu tiên Mạng Nơ-ron (ANN)';
                         recBadge = 'badge-purple';
                       } else {
@@ -887,8 +887,8 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                         <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
                           {ann ? ann.diagnostics.rSquaredVal.toFixed(3) : '-'}
                         </td>
-                        <td style={{ textAlign: 'center', fontFamily: 'monospace', fontWeight: '700', color: annQ2 > 0.7 ? '#15803d' : '#475569' }}>
-                          {ann ? annQ2.toFixed(3) : '-'}
+                        <td style={{ textAlign: 'center', fontFamily: 'monospace', fontWeight: '700', color: annValidationR2 > 0.7 ? '#15803d' : '#475569' }}>
+                          {ann ? annValidationR2.toFixed(3) : '-'}
                         </td>
                         <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
                           {ann ? ann.diagnostics.rmseOverall.toFixed(3) : '-'}

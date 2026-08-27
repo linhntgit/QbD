@@ -69,12 +69,13 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
     hasMixture ? 'ternary' : '2d'
   );
 
-  // Sync mode if project changes
+  // A Cartesian overlay independently varies two axes and is therefore invalid
+  // when the factors are constrained to a mixture simplex.
   useEffect(() => {
-    if (hasMixture) {
+    if (hasMixture && overlayMode !== 'ternary') {
       setOverlayMode('ternary');
     }
-  }, [project.id, hasMixture]);
+  }, [project.id, hasMixture, overlayMode]);
 
   // Selected Axis Factors for 2D Overlay Plot
   const [xAxisFactor, setXAxisFactor] = useState<string>(factors[0]?.code || 'X1');
@@ -159,7 +160,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
       );
       setMcResult(mc);
     }
-  }, [project.id, models, modelingEngine]);
+  }, [project.id, models, modelingEngine, factors, cqas, mcVariability, mcSimulations]);
 
   // Execute Monte Carlo with non-blocking realistic simulation feedback
   const executeSimulation = (
@@ -235,7 +236,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
 
   // Sweet Spot / Design Space Overlay Grid Computation (2D Cartesian)
   const sweetSpotGrid = useMemo(() => {
-    if (overlayMode !== '2d' || !factorX || !factorY || Object.keys(models).length === 0) return null;
+    if (hasMixture || overlayMode !== '2d' || !factorX || !factorY || Object.keys(models).length === 0) return null;
 
     const N = Math.max(40, Math.min(300, resolution));
     const xActualArr: number[] = [];
@@ -322,7 +323,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
       hoverY,
       hoverText,
     };
-  }, [overlayMode, factorX, factorY, models, cqas, factors, sliceFactorsCoded, resolution]);
+  }, [hasMixture, overlayMode, factorX, factorY, models, cqas, factors, sliceFactorsCoded, resolution]);
 
   // Ternary Design Space Mesh Computation
   const ternaryDS = useMemo(() => {
@@ -453,7 +454,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
     }
 
     return data;
-  }, [overlayMode, ternaryDS, factorA, factorB, factorC, sweetSpotGrid, factorX, factorY, optimum, smoothness, showBoundaryLines]);
+  }, [overlayMode, ternaryDS, factorA, factorB, factorC, sweetSpotGrid, factorX, factorY, optimum, smoothness, showBoundaryLines, cqas]);
 
   const overlayLayout = useMemo(() => {
     if (overlayMode === 'ternary' && ternaryDS) {
@@ -486,7 +487,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
       annotations: [],
       margin: { l: 85, r: 40, t: 50, b: 75, pad: 4 },
     };
-  }, [overlayMode, factorA, factorB, factorC, factorX, factorY]);
+  }, [overlayMode, ternaryDS, factorX, factorY]);
 
   // Determine fixed factors list based on active overlay mode
   const activeAxisCodes =
@@ -599,13 +600,6 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
               {/* Overlay Mode Toggle: 2D vs Ternary */}
               {hasMixture && (
                 <div style={{ display: 'flex', backgroundColor: '#f1f5f9', borderRadius: '0.375rem', padding: '0.15rem', gap: '0.15rem' }}>
-                  <button
-                    onClick={() => setOverlayMode('2d')}
-                    className={`btn ${overlayMode === '2d' ? 'btn-primary' : 'btn-secondary'}`}
-                    style={{ fontSize: '0.72rem', padding: '0.25rem 0.5rem' }}
-                  >
-                    2D Cartesian
-                  </button>
                   <button
                     onClick={() => setOverlayMode('ternary')}
                     className={`btn ${overlayMode === 'ternary' ? 'btn-teal' : 'btn-secondary'}`}

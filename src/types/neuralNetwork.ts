@@ -49,7 +49,8 @@ export interface NeuralNetDiagnostics {
   rSquaredVal: number;
   rSquaredOverall: number;
   adjRSquared?: number;
-  qSquared?: number; // Q^2 (1 - PRESS/SSTotal or Validation R^2)
+  /** Deprecated. ANN results use rSquaredVal (a hold-out validation R²), not PRESS Q². */
+  qSquared?: number;
   rmseTrain: number;
   rmseVal: number;
   rmseOverall: number;

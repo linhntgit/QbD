@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   LayoutGrid,
   Sparkles,
@@ -45,6 +45,7 @@ import {
   validateDesignSetup,
 } from '../../services/doeGenerator';
 import { simulateDemoResponses } from '../../services/demoDataSimulator';
+import { createSeededRandom, stableSeedFromText } from '../../services/random';
 import {
   exportToExcel,
   exportToCSV,
@@ -243,7 +244,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
     return cols;
   }, [project.factors, project.cqas, mixtureFactors]);
 
-  const getCellValue = (run: typeof project.runs[0], col: typeof spreadsheetCols[0]): string | number => {
+  const getCellValue = useCallback((run: typeof project.runs[0], col: typeof spreadsheetCols[0]): string | number => {
     switch (col.type) {
       case 'std':
         return run.stdOrder;
@@ -269,7 +270,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
       case 'cqa':
         return run.responses[col.code] ?? '';
     }
-  };
+  }, [mixtureFactors]);
 
   const normalizedRange = useMemo(() => {
     if (!selection) return null;
@@ -321,7 +322,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
       min: numericCount > 0 ? min : 0,
       max: numericCount > 0 ? max : 0,
     };
-  }, [normalizedRange, project.runs, spreadsheetCols]);
+  }, [normalizedRange, project.runs, spreadsheetCols, getCellValue]);
 
   const handleCopySelection = () => {
     if (project.runs.length === 0) return;
@@ -852,10 +853,11 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
   // Simulate plausible measurements with scientific response-specific constraints.
   const handleAutoSimulateData = () => {
     if (project.runs.length === 0) return;
-
+    const seed = project.analysisProvenance?.demoDataSeed ?? stableSeedFromText(project.id, 'demo-data');
+    const random = createSeededRandom(seed);
     const simulatedRuns = project.runs.map((run) => ({
       ...run,
-      responses: simulateDemoResponses(project, run),
+      responses: simulateDemoResponses(project, run, random),
     }));
 
     onUpdateProject({ runs: simulatedRuns });
@@ -885,7 +887,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
       setShowImportModal(true);
       setImportTab('file');
     } catch (err: any) {
-      setFileError(err.message || 'Lỗi khi đọc file Excel/CSV.');
+      setFileError(err.message || 'Lỗi khi đọc file CSV.');
       setShowImportModal(true);
       setImportTab('file');
     } finally {
@@ -899,6 +901,10 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
   // Apply parsed data into project runs
   const handleApplyImportedData = () => {
     if (!parsedData || parsedData.runs.length === 0) return;
+    if (!parsedData.isValid) {
+      showToast('Không thể nhập dữ liệu: hãy sửa các lỗi validation trước.', 'info');
+      return;
+    }
     onUpdateProject({ runs: parsedData.runs });
     setShowImportModal(false);
     setParsedData(null);
@@ -1289,12 +1295,12 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
-            {/* Hidden File Input for Excel/CSV */}
+            {/* CSV-only import avoids parsing untrusted binary Excel workbooks. */}
             <input
               type="file"
               ref={fileInputRef}
               style={{ display: 'none' }}
-              accept=".xlsx,.xls,.csv"
+              accept=".csv,text/csv"
               onChange={handleFileUpload}
             />
 
@@ -1567,12 +1573,12 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               <span>Xóa Ô (Del)</span>
             </button>
 
-            {/* Upload Excel / CSV */}
+            {/* Upload CSV */}
             <button
               onClick={() => fileInputRef.current?.click()}
               className="btn btn-primary"
               style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem', backgroundColor: '#0284c7' }}
-              title="Tải lên file dữ liệu MS Excel (.xlsx) hoặc CSV (.csv)"
+              title="Tải lên file CSV UTF-8 (xuất từ Excel nếu cần)"
               disabled={isProcessingFile}
             >
               <Upload size={14} />
@@ -1665,7 +1671,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                   >
                     <FileSpreadsheet size={15} color="#16a34a" />
                     <div>
-                      <div style={{ fontWeight: '600' }}>Xuất File Excel (.xlsx)</div>
+                      <div style={{ fontWeight: '600' }}>Xuất CSV tương thích Excel</div>
                       <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Đầy đủ biến X, mã hóa, đáp ứng Y</div>
                     </div>
                   </button>
@@ -2585,7 +2591,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                 style={{ fontSize: '0.82rem', padding: '0.4rem 0.9rem', borderRadius: '0.375rem 0.375rem 0 0' }}
               >
                 <Upload size={14} />
-                <span>2. Tải Lên File (.xlsx / .csv)</span>
+                <span>2. Tải Lên File CSV</span>
               </button>
             </div>
 
@@ -2625,10 +2631,10 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                 >
                   <Upload size={32} color="#2563eb" style={{ margin: '0 auto 0.5rem' }} />
                   <div style={{ fontWeight: '600', color: '#1e40af', fontSize: '0.9rem' }}>
-                    Click để chọn file hoặc kéo thả file Excel / CSV vào đây
+                    Click để chọn file hoặc kéo thả CSV vào đây
                   </div>
                   <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
-                    Hỗ trợ định dạng: .xlsx, .xls, .csv
+                    Hỗ trợ CSV UTF-8; với Excel, chọn <strong>Save As → CSV UTF-8</strong> trước khi tải lên.
                   </div>
                 </div>
 

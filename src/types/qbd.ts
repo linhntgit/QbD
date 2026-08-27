@@ -256,6 +256,8 @@ export interface DesignSpaceRanges {
 
 export interface MonteCarloResult {
   simulations: number;
+  seed?: number;
+  variabilityPercent?: number;
   passCount: number;
   failCount: number;
   defectRatePPM: number;
@@ -269,6 +271,15 @@ export interface MonteCarloResult {
     cpk?: number;
     outOfSpecPercent: number;
   }>;
+}
+
+/** Persisted analysis settings make optimization/simulation reproducible. */
+export interface AnalysisProvenance {
+  optimizerSeed: number;
+  monteCarloSeed: number;
+  demoDataSeed: number;
+  monteCarloVariabilityPercent: number;
+  monteCarloSimulations: number;
 }
 
 export interface QBDProject {
@@ -289,6 +300,7 @@ export interface QBDProject {
   runs: DoERun[];
   designSpace: DesignSpaceRanges[];
   modelingEngine?: ModelingEngine;
+  analysisProvenance?: AnalysisProvenance;
 }
 
 export * from './neuralNetwork';

@@ -17,6 +17,69 @@ import {
 } from './mathUtils';
 import { projectToBoundedMixture, isWithinSurveyBounds, isFeasibleBoundedMixture } from './statistics';
 
+/** Draw and perturb points only inside the physically feasible mixture simplex.
+ * Non-mixture inputs retain their coded [-1, 1] survey range. */
+function sampleFeasibleSensitivityPoint(factors: Factor[], rng: () => number): number[] {
+  const point = factors.map((factor) =>
+    factor.role === 'mixture_component' || factor.type === 'Mixture' ? 0 : rng() * 2 - 1,
+  );
+  const mixtureIndexes = factors
+    .map((factor, index) => (factor.role === 'mixture_component' || factor.type === 'Mixture' ? index : -1))
+    .filter((index) => index >= 0);
+  if (mixtureIndexes.length < 2) return point;
+
+  const lower = mixtureIndexes.map((index) => {
+    const factor = factors[index];
+    return factor.high <= 1 && factor.unit !== '%' ? factor.low : factor.low / 100;
+  });
+  const upper = mixtureIndexes.map((index) => {
+    const factor = factors[index];
+    return factor.high <= 1 && factor.unit !== '%' ? factor.high : factor.high / 100;
+  });
+  const composition = projectToBoundedMixture(mixtureIndexes.map(() => rng()), lower, upper, 1);
+  mixtureIndexes.forEach((index, mixtureIndex) => {
+    point[index] = composition[mixtureIndex] ?? lower[mixtureIndex];
+  });
+  return point;
+}
+
+function perturbFeasibleSensitivityPoint(
+  point: number[],
+  index: number,
+  factors: Factor[],
+  delta: number,
+): number[] {
+  const perturbed = [...point];
+  const factor = factors[index];
+  const isMixture = factor.role === 'mixture_component' || factor.type === 'Mixture';
+  if (!isMixture) {
+    perturbed[index] = Math.max(-1, Math.min(1, perturbed[index] + delta));
+    return perturbed;
+  }
+
+  const mixtureIndexes = factors
+    .map((candidate, candidateIndex) => (candidate.role === 'mixture_component' || candidate.type === 'Mixture' ? candidateIndex : -1))
+    .filter((candidateIndex) => candidateIndex >= 0);
+  const lower = mixtureIndexes.map((mixtureIndex) => {
+    const candidate = factors[mixtureIndex];
+    return candidate.high <= 1 && candidate.unit !== '%' ? candidate.low : candidate.low / 100;
+  });
+  const upper = mixtureIndexes.map((mixtureIndex) => {
+    const candidate = factors[mixtureIndex];
+    return candidate.high <= 1 && candidate.unit !== '%' ? candidate.high : candidate.high / 100;
+  });
+  const composition = projectToBoundedMixture(
+    mixtureIndexes.map((mixtureIndex) => point[mixtureIndex] + (mixtureIndex === index ? delta : 0)),
+    lower,
+    upper,
+    1,
+  );
+  mixtureIndexes.forEach((mixtureIndex, compositionIndex) => {
+    perturbed[mixtureIndex] = composition[compositionIndex] ?? point[mixtureIndex];
+  });
+  return perturbed;
+}
+
 /**
  * Seedable pseudo-random number generator (Mulberry32)
  */
@@ -672,13 +735,12 @@ export function fitNeuralNetModel(
   const rngSens = createRNG(12345);
 
   for (let s = 0; s < numGrid; s++) {
-    const baseCoded = activeFactors.map(() => rngSens() * 2 - 1);
+    const baseCoded = sampleFeasibleSensitivityPoint(activeFactors, rngSens);
     const basePred = predictNorm(baseCoded);
     const delta = 0.01;
 
     for (let j = 0; j < numInputs; j++) {
-      const perturbed = [...baseCoded];
-      perturbed[j] = Math.min(1.0, perturbed[j] + delta);
+      const perturbed = perturbFeasibleSensitivityPoint(baseCoded, j, activeFactors, delta);
       const perturbedPred = predictNorm(perturbed);
       const grad = Math.abs((perturbedPred - basePred) / delta);
       rawSensitivities[j] += grad;
@@ -763,7 +825,6 @@ export function fitNeuralNetModel(
 
   const pCount = parameterCount;
   const adjRSquared = N > pCount && N > 1 ? Math.max(0, Math.min(1, 1 - ((1 - r2Overall) * (N - 1)) / (N - pCount))) : r2Overall;
-  const qSquared = nVal > 0 ? r2Val : r2Overall;
   const infoCrit = calculateInformationCriteria(N, pCount, overallSSE);
 
   return {
@@ -782,7 +843,6 @@ export function fitNeuralNetModel(
       rSquaredVal: Number(r2Val.toFixed(4)),
       rSquaredOverall: Number(r2Overall.toFixed(4)),
       adjRSquared: Number(adjRSquared.toFixed(4)),
-      qSquared: Number(qSquared.toFixed(4)),
       rmseTrain: Number(rmseTrain.toFixed(4)),
       rmseVal: Number(rmseVal.toFixed(4)),
       rmseOverall: Number(rmseOverall.toFixed(4)),
@@ -1380,12 +1440,11 @@ export function fitMultiOutputNeuralNet(
     const rngSens = createRNG(12345 + cIdx * 77);
 
     for (let s = 0; s < numGrid; s++) {
-      const baseCoded = activeFactors.map(() => rngSens() * 2 - 1);
+      const baseCoded = sampleFeasibleSensitivityPoint(activeFactors, rngSens);
       const basePred = predictNorm(baseCoded);
       const delta = 0.01;
       for (let k = 0; k < numInputs; k++) {
-        const perturbed = [...baseCoded];
-        perturbed[k] = Math.max(-1.0, Math.min(1.0, perturbed[k] + delta));
+        const perturbed = perturbFeasibleSensitivityPoint(baseCoded, k, activeFactors, delta);
         const diff = Math.abs(predictNorm(perturbed) - basePred) / delta;
         rawSensitivities[k] += diff;
       }
@@ -1481,7 +1540,6 @@ export function fitMultiOutputNeuralNet(
         rSquaredVal: Number(r2Val.toFixed(4)),
         rSquaredOverall: Number(r2Overall.toFixed(4)),
         adjRSquared: Number((nCqaTotal > numInputs && nCqaTotal > 1 ? Math.max(0, Math.min(1, 1 - ((1 - r2Overall) * (nCqaTotal - 1)) / (nCqaTotal - numInputs))) : r2Overall).toFixed(4)),
-        qSquared: Number((nCqaVal > 0 ? r2Val : r2Overall).toFixed(4)),
         rmseTrain: Number(rmseTrain.toFixed(4)),
         rmseVal: Number(rmseVal.toFixed(4)),
         rmseOverall: Number(rmseOverall.toFixed(4)),
@@ -1520,7 +1578,8 @@ export function fitMultiOutputNeuralNet(
 export function optimizeNeuralDesirability(
   factors: Factor[],
   cqas: CQA[],
-  neuralModels: Record<string, NeuralNetModelResult>
+  neuralModels: Record<string, NeuralNetModelResult>,
+  seed: number = 20260827,
 ): DesirabilitySolution | null {
   if (cqas.some((c) => !neuralModels[c.code])) return null;
   const validCQAs = cqas;
@@ -1640,11 +1699,12 @@ export function optimizeNeuralDesirability(
 
   // 3. Multi-Start Local Fine-Tuning strictly inside Bounded Simplex
   const numStarts = 400;
+  const random = createRNG(seed);
   for (let iter = 0; iter < numStarts; iter++) {
     const candidateCoded: Record<string, number> = {};
     procFactors.forEach((f) => {
       const current = bestCoded[f.code] ?? 0;
-      const jitter = (Math.random() - 0.5) * 0.25;
+      const jitter = (random() - 0.5) * 0.25;
       candidateCoded[f.code] = Math.max(-1.0, Math.min(1.0, Number((current + jitter).toFixed(4))));
     });
 
@@ -1652,7 +1712,7 @@ export function optimizeNeuralDesirability(
       const rawJittered = mixFactors.map((f, i) => {
         const current = bestCoded[f.code] ?? (mixLowProps[i] + mixHighProps[i]) / 2;
         const range = mixHighProps[i] - mixLowProps[i];
-        const jitter = (Math.random() - 0.5) * range * 0.4;
+        const jitter = (random() - 0.5) * range * 0.4;
         return current + jitter;
       });
 

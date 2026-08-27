@@ -19,7 +19,7 @@ import { calculateDesignEfficiency } from '../../services/doeGenerator';
 import { generateUpdatedRiskAssessment, generateControlStrategy } from '../../services/statistics';
 import { NeuralNetworkTopologyDiagram } from '../NeuralNetworkTopologyDiagram';
 import { ProjectGovernancePanel } from '../ProjectGovernancePanel';
-import { getTraceabilitySummary } from '../../services/projectGovernance';
+import { getReportReadiness, getTraceabilitySummary } from '../../services/projectGovernance';
 
 interface ReportTabProps {
   project: QBDProject;
@@ -43,7 +43,12 @@ export const ReportTab: React.FC<ReportTabProps> = ({
   onRestoreSnapshot,
 }) => {
   const traceability = getTraceabilitySummary(project);
+  const reportReadiness = getReportReadiness(project);
   const handleDownloadWord = () => {
+    if (!reportReadiness.readyForScientificReport) {
+      window.alert(`Chưa thể xuất báo cáo khoa học cuối cùng.\n${[...reportReadiness.errors, ...reportReadiness.warnings].slice(0, 8).join('\n')}`);
+      return;
+    }
     exportQBDWordReport(project, models, optimum, monteCarlo, neuralModels, modelingEngine);
   };
 
@@ -109,14 +114,22 @@ export const ReportTab: React.FC<ReportTabProps> = ({
 
           <button
             onClick={handleDownloadWord}
-            className="btn btn-teal"
+            className={`btn ${reportReadiness.readyForScientificReport ? 'btn-teal' : 'btn-secondary'}`}
+            disabled={!reportReadiness.readyForScientificReport}
             style={{ fontSize: '0.82rem', padding: '0.4rem 1rem' }}
+            title={reportReadiness.readyForScientificReport ? 'Xuất báo cáo khoa học cuối cùng' : 'Cần hoàn tất và kiểm tra dữ liệu trước khi xuất'}
           >
             <Download size={16} />
             <span>Tải Báo Cáo Word (.docx)</span>
           </button>
         </div>
       </div>
+
+      {!reportReadiness.readyForScientificReport && (
+        <div className="qbd-card" style={{ borderLeft: '4px solid #d97706', color: '#92400e', fontSize: '0.82rem' }}>
+          <strong>Báo cáo khoa học cuối cùng đang bị khóa.</strong> Hoàn tất dữ liệu và sửa các lỗi kiểm tra trước khi xuất Word.
+        </div>
+      )}
 
       {/* Live Scientific Report Document View */}
       <div

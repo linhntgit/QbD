@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   Sparkles,
   Lock,
@@ -25,7 +25,12 @@ import type {
 } from '../types/qbd';
 import { PlotlyChart } from './PlotlyChart';
 import { codedToActual, actualToCoded } from '../services/doeGenerator';
-import { optimizeDesirability } from '../services/statistics';
+import {
+  getFeasibleMixtureComponentRange,
+  normalizeMixtureCoded,
+  optimizeDesirability,
+  setBoundedMixtureComponent,
+} from '../services/statistics';
 import { calculateIndividualDesirability, tDistributionCritical } from '../services/mathUtils';
 
 /**
@@ -37,6 +42,20 @@ const formatPlotValue = (value: number, significantDigits = 5): string => {
   if (!Number.isFinite(value)) return '—';
   if (value === 0) return '0';
   return Number(value.toPrecision(significantDigits)).toString();
+};
+
+const createInitialCoded = (factors: Factor[]): Record<string, number> => {
+  const initial: Record<string, number> = {};
+  factors.forEach((factor) => {
+    if (factor.role === 'mixture_component' || factor.type === 'Mixture') {
+      const low = factor.high <= 1 && factor.unit !== '%' ? factor.low : factor.low / 100;
+      const high = factor.high <= 1 && factor.unit !== '%' ? factor.high : factor.high / 100;
+      initial[factor.code] = (low + high) / 2;
+    } else {
+      initial[factor.code] = 0;
+    }
+  });
+  return normalizeMixtureCoded(initial, factors);
 };
 
 interface DesirabilityProfilerProps {
@@ -57,28 +76,12 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
   const validCQAs = useMemo(() => cqas.filter((c) => models[c.code]), [cqas, models]);
 
   // Current interactive factor settings (coded values [-1, +1] or proportions [0, 1])
-  const [currentCoded, setCurrentCoded] = useState<Record<string, number>>(() => {
-    const init: Record<string, number> = {};
-    const mixFactors = factors.filter((f) => f.role === 'mixture_component' || f.type === 'Mixture');
-    factors.forEach((f) => {
-      if (f.role === 'mixture_component' || f.type === 'Mixture') {
-        const lowProp = f.high <= 1.0 && f.unit !== '%' ? f.low : f.low / 100;
-        const highProp = f.high <= 1.0 && f.unit !== '%' ? f.high : f.high / 100;
-        init[f.code] = Number(((lowProp + highProp) / 2).toFixed(4));
-      } else {
-        init[f.code] = 0;
-      }
-    });
-    if (mixFactors.length > 0) {
-      const sum = mixFactors.reduce((s, f) => s + (init[f.code] ?? 0), 0);
-      if (sum > 0) {
-        mixFactors.forEach((f) => {
-          init[f.code] = Number((init[f.code] / sum).toFixed(4));
-        });
-      }
-    }
-    return init;
-  });
+  const [currentCoded, setCurrentCoded] = useState<Record<string, number>>(() => createInitialCoded(factors));
+
+  // Project settings back onto the simplex after changing project/factor bounds.
+  useEffect(() => {
+    setCurrentCoded((previous) => normalizeMixtureCoded({ ...createInitialCoded(factors), ...previous }, factors));
+  }, [factors]);
 
   // Locked factors state (factors held constant during optimization)
   const [lockedFactors, setLockedFactors] = useState<Record<string, boolean>>({});
@@ -195,26 +198,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
 
   // Reset all factors to Center (0 for process, mid-proportion for mixture)
   const handleResetToCenter = () => {
-    const centerCoded: Record<string, number> = {};
-    const mixFactors = factors.filter((f) => f.role === 'mixture_component' || f.type === 'Mixture');
-    factors.forEach((f) => {
-      if (f.role === 'mixture_component' || f.type === 'Mixture') {
-        const lowProp = f.high <= 1.0 && f.unit !== '%' ? f.low : f.low / 100;
-        const highProp = f.high <= 1.0 && f.unit !== '%' ? f.high : f.high / 100;
-        centerCoded[f.code] = Number(((lowProp + highProp) / 2).toFixed(4));
-      } else {
-        centerCoded[f.code] = 0;
-      }
-    });
-    if (mixFactors.length > 0) {
-      const sum = mixFactors.reduce((s, f) => s + (centerCoded[f.code] ?? 0), 0);
-      if (sum > 0) {
-        mixFactors.forEach((f) => {
-          centerCoded[f.code] = Number((centerCoded[f.code] / sum).toFixed(4));
-        });
-      }
-    }
-    setCurrentCoded(centerCoded);
+    setCurrentCoded(createInitialCoded(factors));
   };
 
   // Remember current setting (Saved Candidate)
@@ -234,7 +218,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
 
   // Restore saved setting
   const handleRestoreSetting = (saved: SavedDesirabilitySetting) => {
-    setCurrentCoded({ ...saved.codedFactors });
+    setCurrentCoded(normalizeMixtureCoded(saved.codedFactors, factors));
   };
 
   // Delete saved setting
@@ -498,8 +482,13 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
     // Compute for each factor column
     factors.forEach((f) => {
       const isMix = f.role === 'mixture_component' || f.type === 'Mixture';
-      const lowVal = isMix ? (f.high <= 1.0 && f.unit !== '%' ? f.low : f.low / 100) : -1.0;
-      const highVal = isMix ? (f.high <= 1.0 && f.unit !== '%' ? f.high : f.high / 100) : 1.0;
+      const feasibleMixtureRange = isMix ? getFeasibleMixtureComponentRange(factors, f.code) : null;
+      const lowVal = isMix
+        ? (feasibleMixtureRange?.low ?? (f.high <= 1.0 && f.unit !== '%' ? f.low : f.low / 100))
+        : -1.0;
+      const highVal = isMix
+        ? (feasibleMixtureRange?.high ?? (f.high <= 1.0 && f.unit !== '%' ? f.high : f.high / 100))
+        : 1.0;
 
       const xRange: number[] = [];
       for (let i = 0; i < N_POINTS; i++) {
@@ -516,7 +505,9 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
         xActualArr.push(typeof xAct === 'number' ? xAct : Number(xAct) || xc);
 
         // Build point holding other factors at current settings
-        const testPoint: Record<string, number> = { ...currentCoded, [f.code]: xc };
+        const testPoint = isMix
+          ? setBoundedMixtureComponent(currentCoded, factors, f.code, xc)
+          : { ...currentCoded, [f.code]: xc };
 
         // Evaluate overall D at this test point
         let logSum = 0;
@@ -563,7 +554,9 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
         const ciLowArr: number[] = [];
 
         xRange.forEach((xc) => {
-          const testPoint: Record<string, number> = { ...currentCoded, [f.code]: xc };
+          const testPoint = isMix
+            ? setBoundedMixtureComponent(currentCoded, factors, f.code, xc)
+            : { ...currentCoded, [f.code]: xc };
           const yp = model.predict(testPoint);
           const se = statisticalModel?.predictStandardError?.(testPoint) ?? 0;
           const halfWidth = statisticalModel && Number.isFinite(critical) ? critical * se : Number.NaN;
@@ -1176,10 +1169,9 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                           if (!isNaN(val)) {
                             const isMix = f.role === 'mixture_component' || f.type === 'Mixture';
                             const newCoded = isMix ? val / 100 : actualToCoded(val, f);
-                            setCurrentCoded((prev) => ({
-                              ...prev,
-                              [f.code]: Number(newCoded.toFixed(4)),
-                            }));
+                            setCurrentCoded((prev) => isMix
+                              ? setBoundedMixtureComponent(prev, factors, f.code, newCoded)
+                              : { ...prev, [f.code]: Number(newCoded.toFixed(4)) });
                           }
                         }}
                       />
@@ -1200,10 +1192,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                           value={typeof actual === 'number' ? actual : Number(actual) || 0}
                           onChange={(e) => {
                             const valPct = Number(e.target.value);
-                            setCurrentCoded((prev) => ({
-                              ...prev,
-                              [f.code]: Number((valPct / 100).toFixed(4)),
-                            }));
+                            setCurrentCoded((prev) => setBoundedMixtureComponent(prev, factors, f.code, valPct / 100));
                           }}
                           style={{ width: '100%', cursor: 'pointer' }}
                         />

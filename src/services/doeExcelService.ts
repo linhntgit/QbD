@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 import type { QBDProject, Factor, CQA, DoERun } from '../types/qbd';
 import { actualToCoded } from './doeGenerator';
 
@@ -25,6 +24,71 @@ export interface ParsedDoEData {
   errors: ParseValidationError[];
   isValid: boolean;
   numRuns: number;
+}
+
+const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
+
+/** Small RFC-4180-compatible parser used for the deliberately CSV-only import path. */
+function parseDelimitedRows(text: string, delimiter: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = '';
+  let quoted = false;
+  for (let index = 0; index < text.length; index++) {
+    const character = text[index];
+    if (quoted && character === '"' && text[index + 1] === '"') {
+      cell += '"';
+      index++;
+    } else if (character === '"') {
+      quoted = !quoted;
+    } else if (!quoted && character === delimiter) {
+      row.push(cell.trim());
+      cell = '';
+    } else if (!quoted && (character === '\n' || character === '\r')) {
+      if (character === '\r' && text[index + 1] === '\n') index++;
+      row.push(cell.trim());
+      if (row.some((value) => value !== '')) rows.push(row);
+      row = [];
+      cell = '';
+    } else {
+      cell += character;
+    }
+  }
+  row.push(cell.trim());
+  if (row.some((value) => value !== '')) rows.push(row);
+  return rows;
+}
+
+function validateImportedRuns(runs: DoERun[], factors: Factor[]): ParseValidationError[] {
+  const errors: ParseValidationError[] = [];
+  const runOrders = new Set<number>();
+  const stdOrders = new Set<number>();
+  const mixture = factors.filter((factor) => factor.role === 'mixture_component' || factor.type === 'Mixture');
+  const asProportion = (value: unknown, factor: Factor): number => {
+    const numeric = Number(value);
+    return factor.high <= 1 && factor.unit !== '%' ? numeric : numeric / 100;
+  };
+  runs.forEach((run, index) => {
+    const row = index + 2;
+    if (runOrders.has(run.runOrder)) errors.push({ row, column: 'RunOrder', message: `RunOrder ${run.runOrder} bị trùng.`, severity: 'error' });
+    runOrders.add(run.runOrder);
+    if (stdOrders.has(run.stdOrder)) errors.push({ row, column: 'StdOrder', message: `StdOrder ${run.stdOrder} bị trùng.`, severity: 'error' });
+    stdOrders.add(run.stdOrder);
+    factors.forEach((factor) => {
+      if (factor.controllability === 'constant' || factor.dataType === 'qualitative') return;
+      const actual = run.factorActual[factor.code];
+      if (typeof actual !== 'number' || !Number.isFinite(actual) || actual < factor.low - 1e-8 || actual > factor.high + 1e-8) {
+        errors.push({ row, column: factor.code, message: `${factor.code} nằm ngoài giới hạn khảo sát hoặc không hợp lệ.`, severity: 'error' });
+      }
+    });
+    if (mixture.length >= 2) {
+      const codedTotal = mixture.reduce((sum, factor) => sum + Number(run.factorCoded[factor.code]), 0);
+      const actualTotal = mixture.reduce((sum, factor) => sum + asProportion(run.factorActual[factor.code], factor), 0);
+      if (!Number.isFinite(codedTotal) || Math.abs(codedTotal - 1) > 1e-6) errors.push({ row, column: 'Mixture coded', message: 'Các thành phần mixture ở coded scale phải có tổng bằng 1.', severity: 'error' });
+      if (!Number.isFinite(actualTotal) || Math.abs(actualTotal - 1) > 1e-6) errors.push({ row, column: 'Mixture actual', message: 'Các thành phần mixture ở actual scale phải có tổng bằng 100%.', severity: 'error' });
+    }
+  });
+  return errors;
 }
 
 /**
@@ -213,6 +277,7 @@ export function processRawTableData(
     });
   });
 
+  errors.push(...validateImportedRuns(parsedRuns, factors));
   const hasCriticalErrors = errors.some((e) => e.severity === 'error');
 
   return {
@@ -248,10 +313,7 @@ export function parseClipboardExcel(
   }
 
   // Split lines
-  const lines = clipboardText
-    .trim()
-    .split(/\r?\n/)
-    .map((l) => l.split('\t').map((c) => c.trim()));
+  const lines = parseDelimitedRows(clipboardText.trim(), '\t');
 
   if (lines.length === 0) {
     return {
@@ -298,7 +360,8 @@ export function parseClipboardExcel(
 }
 
 /**
- * Parse Excel (.xlsx, .xls) or CSV File
+ * Parse a CSV file. Binary Excel import is intentionally disabled: the prior
+ * parser depended on a package with unresolved high-severity advisories.
  */
 export async function parseExcelFile(
   file: File,
@@ -306,49 +369,30 @@ export async function parseExcelFile(
   cqas: CQA[],
   existingRuns: DoERun[] = []
 ): Promise<ParsedDoEData> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
+  if (!file.name.toLowerCase().endsWith('.csv')) {
+    throw new Error('Chỉ nhận CSV UTF-8. Hãy mở file Excel bằng Excel và Save As CSV trước khi nhập.');
+  }
+  if (file.size > MAX_IMPORT_BYTES) throw new Error('File CSV vượt quá giới hạn 10 MB.');
+  const text = await file.text();
+  const delimiter = text.split(/\r?\n/, 1)[0].includes(';') ? ';' : ',';
+  const rows = parseDelimitedRows(text.replace(/^\uFEFF/, ''), delimiter);
+  if (rows.length === 0) throw new Error('File CSV rỗng.');
+  return processRawTableData(rows[0], rows.slice(1), factors, cqas, existingRuns);
+}
 
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
-
-        // Get first worksheet
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-
-        if (!worksheet) {
-          throw new Error('File Excel không có trang tính (Sheet) nào hợp lệ.');
-        }
-
-        // Convert to 2D array of strings
-        const jsonSheet = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1, defval: '' });
-
-        if (!jsonSheet || jsonSheet.length === 0) {
-          throw new Error('Trang tính rỗng.');
-        }
-
-        const headers = (jsonSheet[0] || []).map((h) => String(h || '').trim());
-        const dataRows = jsonSheet.slice(1);
-
-        const result = processRawTableData(headers, dataRows, factors, cqas, existingRuns);
-        resolve(result);
-      } catch (err: any) {
-        reject(err);
-      }
-    };
-
-    reader.onerror = () => {
-      reject(new Error('Không thể đọc file. Vui lòng thử lại.'));
-    };
-
-    reader.readAsArrayBuffer(file);
-  });
+function downloadCSV(headers: string[], rows: Array<Array<string | number | null | undefined>>, filename: string): void {
+  const escape = (value: string | number | null | undefined) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+  const contents = `\uFEFF${[headers, ...rows].map((row) => row.map(escape).join(',')).join('\n')}`;
+  const url = URL.createObjectURL(new Blob([contents], { type: 'text/csv;charset=utf-8' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 /**
- * Export DoE matrix to Excel file (.xlsx)
+ * Export DoE matrix as an Excel-compatible CSV without a binary workbook parser.
  */
 export function exportToExcel(project: QBDProject, filename?: string) {
   if (project.runs.length === 0) return;
@@ -371,21 +415,12 @@ export function exportToExcel(project: QBDProject, filename?: string) {
     ...project.cqas.map((c) => r.responses[c.code] ?? ''),
   ]);
 
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows]);
-
-  // Set column widths
-  const colWidths = headers.map((h) => ({ wch: Math.max(h.length + 4, 12) }));
-  ws['!cols'] = colWidths;
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'DoE_Matrix');
-
   const cleanName = (filename || `${project.name || 'QbD_Project'}_DoE_Runs`).replace(/\s+/g, '_');
-  XLSX.writeFile(wb, `${cleanName}.xlsx`);
+  downloadCSV(headers, dataRows, `${cleanName}.csv`);
 }
 
 /**
- * Export Excel Template for laboratory entry
+ * Export a laboratory-entry template as Excel-compatible CSV.
  */
 export function exportTemplateExcel(project: QBDProject) {
   if (project.runs.length === 0) return;
@@ -404,15 +439,8 @@ export function exportTemplateExcel(project: QBDProject) {
     ...project.cqas.map((c) => r.responses[c.code] ?? ''),
   ]);
 
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows]);
-  const colWidths = headers.map((h) => ({ wch: Math.max(h.length + 4, 14) }));
-  ws['!cols'] = colWidths;
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Mau_Nhap_Ket_Qua');
-
   const cleanName = `${(project.name || 'QbD').replace(/\s+/g, '_')}_Mau_Nhap_Lab`;
-  XLSX.writeFile(wb, `${cleanName}.xlsx`);
+  downloadCSV(headers, dataRows, `${cleanName}.csv`);
 }
 
 /**
@@ -435,18 +463,6 @@ export function exportToCSV(project: QBDProject, filename?: string) {
     ...project.cqas.map((c) => r.responses[c.code] ?? ''),
   ]);
 
-  const csvContent =
-    'data:text/csv;charset=utf-8,\uFEFF' +
-    [headers.join(','), ...rows.map((e) => e.map((val) => `"${String(val).replace(/"/g, '""')}"`).join(','))].join(
-      '\n'
-    );
-
-  const encodedUri = encodeURI(csvContent);
-  const link = document.createElement('a');
-  link.setAttribute('href', encodedUri);
   const cleanName = (filename || `${project.name || 'QbD_Project'}_DoE_Matrix`).replace(/\s+/g, '_');
-  link.setAttribute('download', `${cleanName}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  downloadCSV(headers, rows, `${cleanName}.csv`);
 }

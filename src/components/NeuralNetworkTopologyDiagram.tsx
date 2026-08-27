@@ -10,6 +10,19 @@ interface NeuralNetworkTopologyDiagramProps {
   archMetrics?: NeuralArchitectureMetrics;
 }
 
+function getNodeYs(count: number, topPadding: number, usableHeight: number): number[] {
+  if (count <= 0) return [];
+  if (count === 1) return [topPadding + usableHeight / 2];
+  const spacing = usableHeight / (count - 1);
+  const maxSpacing = 52;
+  if (spacing > maxSpacing) {
+    const totalSpan = (count - 1) * maxSpacing;
+    const startY = topPadding + (usableHeight - totalSpan) / 2;
+    return Array.from({ length: count }, (_, index) => startY + index * maxSpacing);
+  }
+  return Array.from({ length: count }, (_, index) => topPadding + index * spacing);
+}
+
 export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagramProps> = ({
   factors,
   cqas,
@@ -54,25 +67,10 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
   const xH2 = hasH2 ? 675 : 0;
   const xOutput = 855;
 
-  // Helper to calculate Y coordinates for N nodes centered vertically
-  const getNodeYs = (count: number) => {
-    if (count <= 0) return [];
-    if (count === 1) return [topPadding + usableHeight / 2];
-    const spacing = usableHeight / (count - 1);
-    // If spacing is too large, compact it
-    const maxSpacing = 52;
-    if (spacing > maxSpacing) {
-      const totalSpan = (count - 1) * maxSpacing;
-      const startY = topPadding + (usableHeight - totalSpan) / 2;
-      return Array.from({ length: count }, (_, i) => startY + i * maxSpacing);
-    }
-    return Array.from({ length: count }, (_, i) => topPadding + i * spacing);
-  };
-
-  const inputYs = useMemo(() => getNodeYs(numInputs), [numInputs, usableHeight]);
-  const h1Ys = useMemo(() => getNodeYs(numH1), [numH1, usableHeight]);
-  const h2Ys = useMemo(() => getNodeYs(numH2), [numH2, usableHeight]);
-  const outputYs = useMemo(() => getNodeYs(numOutputs), [numOutputs, usableHeight]);
+  const inputYs = useMemo(() => getNodeYs(numInputs, topPadding, usableHeight), [numInputs, topPadding, usableHeight]);
+  const h1Ys = useMemo(() => getNodeYs(numH1, topPadding, usableHeight), [numH1, topPadding, usableHeight]);
+  const h2Ys = useMemo(() => getNodeYs(numH2, topPadding, usableHeight), [numH2, topPadding, usableHeight]);
+  const outputYs = useMemo(() => getNodeYs(numOutputs, topPadding, usableHeight), [numOutputs, topPadding, usableHeight]);
 
   const getFactorColor = (f: Factor) => {
     if (f.role === 'mixture_component' || f.type === 'Mixture') return '#0d9488'; // Teal

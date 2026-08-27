@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
+  AnalysisProvenance,
   QBDProject,
   ModelType,
   StatisticalModelResult,
@@ -12,7 +13,8 @@ import { CASE_STUDIES } from './data/caseStudies';
 import { fitModel, optimizeDesirability, runMonteCarloSimulation } from './services/statistics';
 import { fitNeuralNetModel, fitMultiOutputNeuralNet, DEFAULT_NEURAL_CONFIG } from './services/neuralNetwork';
 import { exportQBDWordReport } from './services/reportGenerator';
-import { loadPersistedProject, persistProject, recordProjectVersion, validateProjectTemplate } from './services/projectGovernance';
+import { getReportReadiness, loadPersistedProject, persistProject, recordProjectVersion, validateProjectTemplate } from './services/projectGovernance';
+import { stableSeedFromText } from './services/random';
 import { Navbar } from './components/Navbar';
 import { TabNavigation, type TabKey } from './components/TabNavigation';
 import { QTPPTab } from './components/tabs/QTPPTab';
@@ -23,6 +25,14 @@ import { NeuralNetworkTab } from './components/tabs/NeuralNetworkTab';
 import { ResponseSurfaceTab } from './components/tabs/ResponseSurfaceTab';
 import { DesignSpaceTab } from './components/tabs/DesignSpaceTab';
 import { ReportTab } from './components/tabs/ReportTab';
+
+const createAnalysisProvenance = (projectId: string): AnalysisProvenance => ({
+  optimizerSeed: stableSeedFromText(projectId, 'optimizer'),
+  monteCarloSeed: stableSeedFromText(projectId, 'monte-carlo'),
+  demoDataSeed: stableSeedFromText(projectId, 'demo-data'),
+  monteCarloVariabilityPercent: 2,
+  monteCarloSimulations: 10_000,
+});
 
 export function App() {
   // Default project: Case Study 1 (Metoprolol Tablet BBD)
@@ -36,6 +46,14 @@ export function App() {
   const [modelingEngine, setModelingEngine] = useState<ModelingEngine>('polynomial');
   const hasPersistedInitialProject = useRef(false);
   const pendingAuditAction = useRef('Khởi tạo project');
+
+  useEffect(() => {
+    if (!project.analysisProvenance) {
+      setProject((previous) => ({ ...previous, analysisProvenance: createAnalysisProvenance(previous.id) }));
+    }
+  }, [project.analysisProvenance, project.id]);
+
+  const analysisProvenance = project.analysisProvenance ?? createAnalysisProvenance(project.id);
 
   useEffect(() => {
     persistProject(project);
@@ -84,7 +102,7 @@ export function App() {
   const handleTrainSharedNeuralModel = (config: NeuralNetConfig) => {
     setSharedNeuralConfig({
       ...config,
-      seed: Math.floor(Math.random() * 100000),
+      seed: config.seed,
     });
   };
 
@@ -92,7 +110,7 @@ export function App() {
   const handleTrainIndependentNeuralModel = (cqaCode: string, config: NeuralNetConfig) => {
     setNeuralConfigs((prev) => ({
       ...prev,
-      [cqaCode]: { ...config, seed: Math.floor(Math.random() * 100000) },
+      [cqaCode]: { ...config, seed: config.seed },
     }));
   };
 
@@ -102,7 +120,7 @@ export function App() {
       const next: Record<string, NeuralNetConfig> = {};
       project.cqas.forEach((cqa) => {
         const existing = prev[cqa.code] || DEFAULT_NEURAL_CONFIG;
-        next[cqa.code] = { ...existing, seed: Math.floor(Math.random() * 100000) };
+        next[cqa.code] = { ...existing, seed: existing.seed };
       });
       return next;
     });
@@ -113,7 +131,7 @@ export function App() {
     setNeuralConfigs(() => {
       const next: Record<string, NeuralNetConfig> = {};
       project.cqas.forEach((cqa) => {
-        next[cqa.code] = { ...sourceConfig, seed: Math.floor(Math.random() * 100000) };
+        next[cqa.code] = { ...sourceConfig, seed: sourceConfig.seed };
       });
       return next;
     });
@@ -121,8 +139,8 @@ export function App() {
 
   // Calculate Desirability Optimum dynamically from active modeling engine
   const optimum = useMemo(() => {
-    return optimizeDesirability(project.factors, project.cqas, activeModels);
-  }, [project.factors, project.cqas, activeModels]);
+    return optimizeDesirability(project.factors, project.cqas, activeModels, undefined, analysisProvenance.optimizerSeed);
+  }, [project.factors, project.cqas, activeModels, analysisProvenance.optimizerSeed]);
 
   // Calculate Monte Carlo Simulation from active modeling engine
   const monteCarlo = useMemo(() => {
@@ -132,10 +150,11 @@ export function App() {
       project.factors,
       project.cqas,
       activeModels,
-      2.0,
-      10000
+      analysisProvenance.monteCarloVariabilityPercent,
+      analysisProvenance.monteCarloSimulations,
+      analysisProvenance.monteCarloSeed,
     );
-  }, [optimum, project.factors, project.cqas, activeModels]);
+  }, [optimum, project.factors, project.cqas, activeModels, analysisProvenance]);
 
   // Update Project Handler
   const handleUpdateProject = (updated: Partial<QBDProject>) => {
@@ -258,6 +277,11 @@ export function App() {
 
   // Export Word Report
   const handleExportWord = () => {
+    const readiness = getReportReadiness(project);
+    if (!readiness.readyForScientificReport) {
+      window.alert(`Chưa thể xuất báo cáo khoa học cuối cùng.\n${[...readiness.errors, ...readiness.warnings].slice(0, 8).join('\n')}`);
+      return;
+    }
     exportQBDWordReport(project, models, optimum, monteCarlo, neuralModels, modelingEngine);
   };
 

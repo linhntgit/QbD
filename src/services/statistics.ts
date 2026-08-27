@@ -24,6 +24,7 @@ import {
   calculateInformationCriteria,
 } from './mathUtils';
 import { buildModelTerms, getModelBlockCounts, type ModelTermDefinition } from './modelTerms';
+import { createSeededRandom } from './random';
 
 type TermDef = ModelTermDefinition;
 
@@ -661,6 +662,101 @@ export function projectToBoundedMixture(
   return current.map((v) => Number(v.toFixed(10)));
 }
 
+/** Return the mixture factors in their project order. */
+export function getMixtureFactors(factors: Factor[]): Factor[] {
+  return factors.filter((factor) => factor.role === 'mixture_component' || factor.type === 'Mixture');
+}
+
+function mixtureBoundsAsProportions(factors: Factor[]): { low: number[]; high: number[] } {
+  return {
+    low: factors.map((factor) => (factor.high <= 1 && factor.unit !== '%' ? factor.low : factor.low / 100)),
+    high: factors.map((factor) => (factor.high <= 1 && factor.unit !== '%' ? factor.high : factor.high / 100)),
+  };
+}
+
+/**
+ * Projects all mixture fields in a coded point to the bounded simplex.  Use this
+ * at UI boundaries as well as in numerical routines: a response surface may
+ * never evaluate a composition whose components do not sum to 100%.
+ */
+export function normalizeMixtureCoded(
+  coded: Record<string, number>,
+  factors: Factor[],
+): Record<string, number> {
+  const mixture = getMixtureFactors(factors);
+  if (mixture.length < 2) return { ...coded };
+  const { low, high } = mixtureBoundsAsProportions(mixture);
+  const candidate = mixture.map((factor, index) => {
+    const fallback = (low[index] + high[index]) / 2;
+    return Number.isFinite(coded[factor.code]) ? coded[factor.code] : fallback;
+  });
+  const projected = projectToBoundedMixture(candidate, low, high, 1);
+  if (projected.length !== mixture.length) return { ...coded };
+  const normalized = { ...coded };
+  mixture.forEach((factor, index) => {
+    normalized[factor.code] = projected[index];
+  });
+  return normalized;
+}
+
+/**
+ * Set one mixture component while preserving the simplex and all component
+ * bounds.  The selected component is retained whenever it is feasible; the
+ * remaining components are projected only over the residual total.
+ */
+export function setBoundedMixtureComponent(
+  coded: Record<string, number>,
+  factors: Factor[],
+  factorCode: string,
+  requestedValue: number,
+): Record<string, number> {
+  const mixture = getMixtureFactors(factors);
+  const selectedIndex = mixture.findIndex((factor) => factor.code === factorCode);
+  if (mixture.length < 2 || selectedIndex < 0) return { ...coded, [factorCode]: requestedValue };
+
+  const { low, high } = mixtureBoundsAsProportions(mixture);
+  if (!isFeasibleBoundedMixture(low, high)) return normalizeMixtureCoded(coded, factors);
+  const otherIndices = mixture.map((_, index) => index).filter((index) => index !== selectedIndex);
+  const otherLow = otherIndices.reduce((sum, index) => sum + low[index], 0);
+  const otherHigh = otherIndices.reduce((sum, index) => sum + high[index], 0);
+  const selected = Math.max(
+    low[selectedIndex],
+    Math.min(high[selectedIndex], Math.max(1 - otherHigh, Math.min(1 - otherLow, requestedValue))),
+  );
+  const remaining = otherIndices.map((index) => {
+    const fallback = (low[index] + high[index]) / 2;
+    return Number.isFinite(coded[mixture[index].code]) ? coded[mixture[index].code] : fallback;
+  });
+  const projectedOthers = projectToBoundedMixture(
+    remaining,
+    otherIndices.map((index) => low[index]),
+    otherIndices.map((index) => high[index]),
+    1 - selected,
+  );
+  const next = { ...coded, [factorCode]: Number(selected.toFixed(10)) };
+  otherIndices.forEach((index, otherIndex) => {
+    next[mixture[index].code] = Number((projectedOthers[otherIndex] ?? low[index]).toFixed(10));
+  });
+  return next;
+}
+
+/** Feasible range for a component after accounting for all other bounds. */
+export function getFeasibleMixtureComponentRange(
+  factors: Factor[],
+  factorCode: string,
+): { low: number; high: number } | null {
+  const mixture = getMixtureFactors(factors);
+  const selectedIndex = mixture.findIndex((factor) => factor.code === factorCode);
+  if (mixture.length < 2 || selectedIndex < 0) return null;
+  const { low, high } = mixtureBoundsAsProportions(mixture);
+  const otherLow = low.reduce((sum, value, index) => index === selectedIndex ? sum : sum + value, 0);
+  const otherHigh = high.reduce((sum, value, index) => index === selectedIndex ? sum : sum + value, 0);
+  return {
+    low: Math.max(low[selectedIndex], 1 - otherHigh),
+    high: Math.min(high[selectedIndex], 1 - otherLow),
+  };
+}
+
 export function isFeasibleBoundedMixture(l: number[], u: number[], total: number = 1): boolean {
   if (l.length === 0 || l.length !== u.length || !Number.isFinite(total)) return false;
   if (l.some((value, index) => !Number.isFinite(value) || !Number.isFinite(u[index]) || value > u[index])) return false;
@@ -710,12 +806,14 @@ export function optimizeDesirability(
   factors: Factor[],
   cqas: CQA[],
   models: Record<string, StatisticalModelResult | NeuralNetModelResult>,
-  lockedFactors?: Record<string, number>
+  lockedFactors?: Record<string, number>,
+  seed: number = 20260827,
 ): DesirabilitySolution | null {
   if (cqas.some((c) => !models[c.code])) return null;
   const validCQAs = cqas;
 
   const totalWeight = validCQAs.reduce((sum, c) => sum + (c.weight || 1), 0);
+  const random = createSeededRandom(seed);
   const k = factors.length;
 
   const evaluateOverallDesirability = (coded: Record<string, number>): { dOverall: number; dMap: Record<string, number> } => {
@@ -842,7 +940,7 @@ export function optimizeDesirability(
         candidateCoded[f.code] = lockedFactors[f.code];
       } else {
         const current = bestCoded[f.code] ?? 0;
-        const jitter = (Math.random() - 0.5) * 0.25;
+        const jitter = (random() - 0.5) * 0.25;
         candidateCoded[f.code] = Math.max(-1.0, Math.min(1.0, Number((current + jitter).toFixed(4))));
       }
     });
@@ -854,7 +952,7 @@ export function optimizeDesirability(
         }
         const current = bestCoded[f.code] ?? (mixLowProps[i] + mixHighProps[i]) / 2;
         const range = mixHighProps[i] - mixLowProps[i];
-        const jitter = (Math.random() - 0.5) * range * 0.4;
+        const jitter = (random() - 0.5) * range * 0.4;
         return current + jitter;
       });
 
@@ -934,7 +1032,8 @@ export function runMonteCarloSimulation(
   cqas: CQA[],
   models: Record<string, StatisticalModelResult | NeuralNetModelResult>,
   variabilityPercent: number = 2.0, // % RSD of process parameters
-  simulations: number = 10000
+  simulations: number = 10000,
+  seed: number = 20260827,
 ): MonteCarloResult {
   const startTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
   const validCQAs = cqas.filter((c) => models[c.code]);
@@ -954,9 +1053,10 @@ export function runMonteCarloSimulation(
     throw new Error('Mixture bounds are infeasible: require Σlower ≤ 100% ≤ Σupper.');
   }
 
+  const random = createSeededRandom(seed);
   const standardNormal = () => {
-    const u1 = Math.max(1e-12, Math.random());
-    return Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * Math.random());
+    const u1 = Math.max(1e-12, random());
+    return Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * random());
   };
   const valueToProportion = (factor: Factor, value: number) =>
     factor.high <= 1 && factor.unit !== '%' ? value : value / 100;
@@ -1134,6 +1234,8 @@ export function runMonteCarloSimulation(
 
   return {
     simulations,
+    seed,
+    variabilityPercent,
     passCount,
     failCount,
     defectRatePPM,
@@ -1158,7 +1260,6 @@ export function generateUpdatedRiskAssessment(
     project.cqas.forEach((c) => {
       const model = models[c.code];
       let isSig = false;
-      let modelQuality = 0;
 
       if (model) {
         if ('terms' in model) {
@@ -1167,37 +1268,36 @@ export function generateUpdatedRiskAssessment(
           if (term && term.significant) {
             isSig = true;
           }
-          modelQuality = model.diagnostics.rSquared;
         } else if ('diagnostics' in model) {
           // Neural Net Model
           const diag = (model as any).diagnostics;
-          modelQuality = diag.rSquaredOverall ?? diag.rSquaredVal ?? diag.rSquaredTrain ?? 0.85;
           const varImp = diag.variableImportance?.find((v: any) => v.factorCode === f.code);
-          isSig = varImp ? varImp.relativeImportance >= 10 : true;
+          // ANN importance is a sensitivity screen, never a p-value.
+          isSig = varImp ? varImp.relativeImportance >= 10 : false;
         }
       }
 
       // Initial Risk Determination (from prior risk matrix or factor criticality)
       const isCriticalRole = f.role === 'mixture_component' || f.controllability === 'controllable';
       const isHighCriticalCQA = c.weight >= 4 || c.objective === 'target';
-      const initialRisk: 'High' | 'Medium' | 'Low' =
-        isCriticalRole && isHighCriticalCQA ? 'High' : isCriticalRole || isHighCriticalCQA ? 'Medium' : 'Low';
-
-      let updatedRisk: 'Low' | 'Medium' = 'Low';
-      let justification = '';
-
-      if (isSig) {
-        if (modelQuality >= 0.75) {
-          updatedRisk = 'Low';
-          justification = `Đã khảo sát qua DoE và chứng minh có ảnh hưởng có ý nghĩa thống kê (p < 0.05, R² = ${(modelQuality * 100).toFixed(1)}%). Đã thiết lập dải vận hành an toàn PAR [${f.low} - ${f.high} ${f.unit || ''}] trong Design Space để kiểm soát chất lượng, do đó rủi ro giảm xuống Mức Thấp (Low).`;
-        } else {
-          updatedRisk = 'Medium';
-          justification = `Yếu tố có ảnh hưởng đến chỉ tiêu nhưng mô hình có phương sai còn dư. Cần kiểm soát chặt chẽ tại điểm tối ưu và tăng cường kiểm tra trong quá trình (IPC).`;
-        }
-      } else {
-        updatedRisk = 'Low';
-        justification = `Kết quả DoE và ANOVA khẳng định yếu tố không gây ảnh hưởng bất lợi có ý nghĩa thống kê (p ≥ 0.05) trong toàn bộ dải khảo sát [${f.low} - ${f.high} ${f.unit || ''}]. Rủi ro được giảm xuống Mức Thấp (Low).`;
-      }
+      const linkedFmea = project.fmeaRisks.filter((risk) => risk.factorId === f.id && risk.cqaId === c.id);
+      const initialRisk: 'High' | 'Medium' | 'Low' = linkedFmea.length > 0
+        ? linkedFmea.some((risk) => risk.riskLevel === 'High') ? 'High' : linkedFmea.some((risk) => risk.riskLevel === 'Medium') ? 'Medium' : 'Low'
+        : isCriticalRole && isHighCriticalCQA ? 'High' : isCriticalRole || isHighCriticalCQA ? 'Medium' : 'Low';
+      const isPolynomial = Boolean(model && 'predictStandardError' in model);
+      const diagnostics = model?.diagnostics as any;
+      const q2 = diagnostics?.qSquared ?? diagnostics?.predRSquared;
+      const lof = diagnostics?.pLOF;
+      const modelAdequate = isPolynomial
+        ? ((model as StatisticalModelResult | undefined)?.residualDegreesOfFreedom ?? 0) >= 4 && Number.isFinite(q2) && q2 >= 0 && (lof === undefined || lof === null || lof >= 0.05)
+        : Number.isFinite(diagnostics?.rSquaredVal) && diagnostics.rSquaredVal >= 0.5;
+      // A model alone never authorizes a risk downgrade.  Confirmation data and
+      // approved controls are required; retain medium risk when any evidence is missing.
+      const updatedRisk: 'Low' | 'Medium' = initialRisk === 'Low' && modelAdequate ? 'Low' : 'Medium';
+      const evidence = isPolynomial
+        ? `OLS: df dư ${(model as StatisticalModelResult | undefined)?.residualDegreesOfFreedom ?? 0}, Q² ${Number.isFinite(q2) ? q2.toFixed(3) : 'không có'}, LOF ${lof === undefined || lof === null ? 'không ước lượng được' : `p=${lof.toFixed(3)}`}`
+        : `ANN: validation R² ${Number.isFinite(diagnostics?.rSquaredVal) ? diagnostics.rSquaredVal.toFixed(3) : 'không có'} (không phải p-value/Q²)`;
+      const justification = `${isSig ? 'Mô hình sàng lọc ghi nhận ảnh hưởng cần kiểm soát.' : 'Chưa có bằng chứng đủ mạnh để kết luận không có ảnh hưởng bất lợi.'} ${evidence}. Kết quả chỉ dùng cho sàng lọc; cần rà soát FMEA, confirmation run và phê duyệt chiến lược kiểm soát trước khi hạ mức rủi ro.`;
 
       items.push({
         factorCode: f.code,
@@ -1238,9 +1338,9 @@ export function generateControlStrategy(
     const norLow = typeof targetVal === 'number' ? Number((targetVal - norDelta).toFixed(1)) : f.low;
     const norHigh = typeof targetVal === 'number' ? Number((targetVal + norDelta).toFixed(1)) : f.high;
 
-    const norStr = `${norLow} - ${norHigh} ${f.unit || ''}`.trim();
-    const parStr = `${f.low} - ${f.high} ${f.unit || ''}`.trim();
-    const dsStr = `Nằm trong vùng chấp nhận đa biến (Multivariate Design Space)`;
+    const norStr = `${norLow} - ${norHigh} ${f.unit || ''} (screening)` .trim();
+    const parStr = `${f.low} - ${f.high} ${f.unit || ''} (dải khảo sát; chưa phải PAR)` .trim();
+    const dsStr = 'Chưa xác nhận: cần acceptance grid/Monte Carlo có seed và confirmation run';
 
     const method = isMaterial
       ? 'Tiêu chuẩn kiểm nghiệm nguyên liệu đầu vào (Vendor CoA & Kiểm nghiệm định tính/định lượng trước pha chế)'

@@ -44,6 +44,11 @@ import {
 } from '../../services/neuralNetwork';
 import { formatAxisTitle, extract2DContourSegments, calculateCQAMargin } from '../../services/mathUtils';
 import {
+  getFeasibleMixtureComponentRange,
+  normalizeMixtureCoded,
+  setBoundedMixtureComponent,
+} from '../../services/statistics';
+import {
   generateTernaryContour,
   buildTernaryPlotlyTraces,
 } from '../../services/ternaryContour';
@@ -137,19 +142,19 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
     totalTours: number;
     epoch: number;
     maxEpochs: number;
-    loss: number;
-    bestR2: number;
+    loss?: number;
+    bestR2?: number;
     phase: string;
   } | null>(null);
   const [lastTrainedNotice, setLastTrainedNotice] = useState<string | null>(null);
 
-  // Profiler interactive slider values (in coded scale [-1, 1])
+  // Profiler values always remain on the bounded mixture simplex.
   const [profilerCoded, setProfilerCoded] = useState<Record<string, number>>(() => {
     const init: Record<string, number> = {};
     project.factors.forEach((f) => {
       init[f.code] = 0;
     });
-    return init;
+    return normalizeMixtureCoded(init, project.factors);
   });
 
   // Mixture factors filter
@@ -157,6 +162,10 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
     return project.factors.filter((f) => f.role === 'mixture_component' || f.type === 'Mixture');
   }, [project.factors]);
   const hasMixture = mixtureFactors.length >= 3;
+
+  useEffect(() => {
+    setProfilerCoded((previous) => normalizeMixtureCoded(previous, project.factors));
+  }, [project.factors]);
 
   // 3D/2D Surface Profiler factor axes
   const [xAxisFactor, setXAxisFactor] = useState<string>(project.factors[0]?.code || 'X1');
@@ -168,10 +177,10 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
 
   // If project changes and has mixture, sync default plot type
   useEffect(() => {
-    if (hasMixture && plotType === '3d') {
+    if (hasMixture && plotType !== 'ternary') {
       setPlotType('ternary');
     }
-  }, [project.id, hasMixture]);
+  }, [project.id, hasMixture, plotType]);
 
   // Selected Vertices for 3-Component Mixture Triangle
   const [ternaryA, setTernaryA] = useState<string>(() => mixtureFactors[0]?.code || project.factors[0]?.code || 'X1');
@@ -215,7 +224,9 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
   const factorY = project.factors.find((f) => f.code === yAxisFactor) || project.factors[1];
 
   const surfaceGrid = useMemo(() => {
-    if (!neuralModel || !factorX || !factorY) return null;
+    // Cartesian grids vary axes independently and are not valid for mixture
+    // compositions.  Mixture projects are rendered only on the simplex.
+    if (hasMixture || !neuralModel || !factorX || !factorY) return null;
 
     const N = 35;
     const xActualArr: number[] = [];
@@ -283,7 +294,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
     }
 
     return { xActualArr, yActualArr, zGrid, hoverX, hoverY, hoverText };
-  }, [neuralModel, factorX, factorY, profilerCoded, currentCQA]);
+  }, [hasMixture, neuralModel, factorX, factorY, profilerCoded, currentCQA]);
 
   // Ternary Mesh & Contour Calculation for Neural Model
   const ternaryResult = useMemo(() => {
@@ -612,6 +623,8 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
     surfaceGrid,
     factorX,
     factorY,
+    ternaryLevels,
+    ternarySmoothness,
   ]);
 
   const surfaceLayout = useMemo(() => {
@@ -735,16 +748,11 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
       const numDisplaySteps = Math.min(totalTours, 8);
 
       for (let t = 1; t <= numDisplaySteps; t++) {
-        const tourLoss = 0.04 / Math.sqrt(t) + Math.random() * 0.008;
-        const estR2 = Math.min(0.998, 0.86 + 0.13 * (1 - Math.exp(-t / 2.2)) + (Math.random() * 0.01 - 0.005));
-
         setTrainingProgress({
           tour: t,
           totalTours,
           epoch: Math.floor((maxEpochs * t) / numDisplaySteps),
           maxEpochs,
-          loss: tourLoss,
-          bestR2: Number(estR2.toFixed(4)),
           phase: `Đang huấn luyện mạng Multi-Output Tour #${t}/${totalTours} • Fit đồng thời ${project.cqas.length} biến Y (${localConfig.activation.toUpperCase()} [${localConfig.hiddenNodes1}${localConfig.hiddenNodes2 > 0 ? `, ${localConfig.hiddenNodes2}` : ''}])...`,
         });
 
@@ -762,8 +770,6 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
         totalTours,
         epoch: maxEpochs,
         maxEpochs,
-        loss: 0.0018,
-        bestR2: 0.9935,
         phase: `✓ Hoàn tất huấn luyện mạng nơ-ron hợp nhất cho toàn bộ ${project.cqas.length} biến Y!`,
       });
 
@@ -785,16 +791,11 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
       const numDisplaySteps = Math.min(totalTours, 8);
 
       for (let t = 1; t <= numDisplaySteps; t++) {
-        const tourLoss = 0.04 / Math.sqrt(t) + Math.random() * 0.008;
-        const estR2 = Math.min(0.998, 0.86 + 0.13 * (1 - Math.exp(-t / 2.2)) + (Math.random() * 0.01 - 0.005));
-
         setTrainingProgress({
           tour: t,
           totalTours,
           epoch: Math.floor((maxEpochs * t) / numDisplaySteps),
           maxEpochs,
-          loss: tourLoss,
-          bestR2: Number(estR2.toFixed(4)),
           phase: `Đang tối ưu hóa Tour #${t}/${totalTours} cho ${currentCQA.code} • Hàm kích hoạt ${localConfig.activation.toUpperCase()} (Lớp ẩn: [${localConfig.hiddenNodes1}${localConfig.hiddenNodes2 > 0 ? `, ${localConfig.hiddenNodes2}` : ''}])...`,
         });
 
@@ -812,8 +813,6 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
         totalTours,
         epoch: maxEpochs,
         maxEpochs,
-        loss: 0.0018,
-        bestR2: 0.9935,
         phase: `✓ Hoàn tất huấn luyện mạng nơ-ron cho ${currentCQA.name}!`,
       });
 
@@ -840,8 +839,6 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
         totalTours: totalCQAs,
         epoch: 1000,
         maxEpochs: 1000,
-        loss: 0.002,
-        bestR2: 0.985,
         phase: `Đang huấn luyện mạng độc lập cho CQA #${i + 1}/${totalCQAs}: ${cqa.name} (${cqa.code})...`,
       });
       await new Promise((resolve) => setTimeout(resolve, 120));
@@ -869,7 +866,12 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
   };
 
   const handleSolveNeuralOptimum = () => {
-    const opt = optimizeNeuralDesirability(project.factors, project.cqas, neuralModels);
+    const opt = optimizeNeuralDesirability(
+      project.factors,
+      project.cqas,
+      neuralModels,
+      project.analysisProvenance?.optimizerSeed,
+    );
     if (opt) {
       setNeuralOptimum(opt);
       try {
@@ -1714,14 +1716,14 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             <div style={{ backgroundColor: '#1e293b', borderRadius: '0.375rem', padding: '0.5rem 0.75rem', border: '1px solid #334155' }}>
               <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: '700' }}>HÀM MẤT MÁT (MSE LOSS)</div>
               <div className="font-mono" style={{ fontSize: '0.9rem', fontWeight: '800', color: '#f43f5e' }}>
-                {trainingProgress.loss.toFixed(5)}
+                {trainingProgress.loss === undefined ? 'Sẽ hiển thị sau khi fit' : trainingProgress.loss.toFixed(5)}
               </div>
             </div>
 
             <div style={{ backgroundColor: '#1e293b', borderRadius: '0.375rem', padding: '0.5rem 0.75rem', border: '1px solid #334155' }}>
               <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: '700' }}>BEST TRAIN R²</div>
               <div className="font-mono" style={{ fontSize: '0.9rem', fontWeight: '800', color: '#38bdf8' }}>
-                {trainingProgress.bestR2.toFixed(4)}
+                {trainingProgress.bestR2 === undefined ? 'Sẽ hiển thị sau khi fit' : trainingProgress.bestR2.toFixed(4)}
               </div>
             </div>
 
@@ -1793,14 +1795,14 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               </div>
             </div>
 
-            {/* Validation R-Squared / Q^2 */}
+            {/* Hold-out validation R²; it is not comparable to OLS PRESS Q². */}
             <div className="qbd-card" style={{ padding: '0.85rem', borderLeft: '4px solid #dc2626' }}>
-              <div style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b' }}>HỆ SỐ DỰ BÁO Q² (VAL R²)</div>
+              <div style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b' }}>VALIDATION R² (HOLD-OUT)</div>
               <div style={{ fontSize: '1.45rem', fontWeight: '800', color: '#dc2626', margin: '0.15rem 0' }}>
-                {(neuralModel.diagnostics.qSquared ?? neuralModel.diagnostics.rSquaredVal).toFixed(4)}
+                {neuralModel.diagnostics.rSquaredVal.toFixed(4)}
               </div>
-              <div style={{ fontSize: '0.7rem', color: (neuralModel.diagnostics.qSquared ?? neuralModel.diagnostics.rSquaredVal) > 0.7 ? '#15803d' : '#64748b' }}>
-                {(neuralModel.diagnostics.qSquared ?? neuralModel.diagnostics.rSquaredVal) > 0.7 ? '✓ Dự báo tốt (> 0.7)' : `RMSE = ${neuralModel.diagnostics.rmseVal.toFixed(3)}`}
+              <div style={{ fontSize: '0.7rem', color: neuralModel.diagnostics.rSquaredVal > 0.7 ? '#15803d' : '#64748b' }}>
+                {neuralModel.diagnostics.rSquaredVal > 0.7 ? '✓ Hold-out validation tốt (> 0.7)' : `RMSE validation = ${neuralModel.diagnostics.rmseVal.toFixed(3)}`}
               </div>
             </div>
 
@@ -1854,7 +1856,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                     <th>Dạng Kiến Trúc</th>
                     <th style={{ textAlign: 'center' }}>R² Train</th>
                     <th style={{ textAlign: 'center' }}>R²adj</th>
-                    <th style={{ textAlign: 'center' }}>Hệ Số Q² (PRESS/Val)</th>
+                    <th style={{ textAlign: 'center' }}>Dự báo (Q² OLS / Validation R² ANN)</th>
                     <th style={{ textAlign: 'center' }}>Sai Số RMSE</th>
                     <th style={{ textAlign: 'center' }}>AICc</th>
                     <th>Đánh Giá Chuyên Môn Bào Chế</th>
@@ -1897,8 +1899,8 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                     <td style={{ textAlign: 'center' }}>
                       {neuralModel.diagnostics.adjRSquared?.toFixed(4) ?? neuralModel.diagnostics.rSquaredOverall.toFixed(4)}
                     </td>
-                    <td style={{ textAlign: 'center', fontWeight: '700', color: (neuralModel.diagnostics.qSquared ?? neuralModel.diagnostics.rSquaredVal) > 0.7 ? '#15803d' : '#7c3aed' }}>
-                      {(neuralModel.diagnostics.qSquared ?? neuralModel.diagnostics.rSquaredVal).toFixed(4)}
+                    <td style={{ textAlign: 'center', fontWeight: '700', color: neuralModel.diagnostics.rSquaredVal > 0.7 ? '#15803d' : '#7c3aed' }}>
+                      {neuralModel.diagnostics.rSquaredVal.toFixed(4)}
                     </td>
                     <td style={{ textAlign: 'center', fontWeight: '700' }}>
                       {neuralModel.diagnostics.rmseOverall.toFixed(3)}
@@ -2104,6 +2106,10 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               {project.factors.map((f) => {
                 const coded = profilerCoded[f.code] ?? 0;
                 const actual = codedToActual(coded, f);
+                const isMixtureFactor = f.role === 'mixture_component' || f.type === 'Mixture';
+                const mixtureRange = isMixtureFactor ? getFeasibleMixtureComponentRange(project.factors, f.code) : null;
+                const traceLow = isMixtureFactor ? (mixtureRange?.low ?? 0) : -1;
+                const traceHigh = isMixtureFactor ? (mixtureRange?.high ?? 1) : 1;
 
                 // Compute 1D sensitivity trace curve for this factor
                 const traceSteps = 21;
@@ -2111,11 +2117,13 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                 const yTracePred: number[] = [];
 
                 for (let step = 0; step < traceSteps; step++) {
-                  const c = -1.0 + (2.0 * step) / (traceSteps - 1);
+                  const c = traceLow + ((traceHigh - traceLow) * step) / (traceSteps - 1);
                   const actVal = codedToActual(c, f);
                   xTraceActual.push(typeof actVal === 'number' ? actVal : Number(actVal) || c);
 
-                  const tempCoded = { ...profilerCoded, [f.code]: c };
+                  const tempCoded = isMixtureFactor
+                    ? setBoundedMixtureComponent(profilerCoded, project.factors, f.code, c)
+                    : { ...profilerCoded, [f.code]: c };
                   yTracePred.push(neuralModel.predict(tempCoded));
                 }
 
@@ -2209,22 +2217,22 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
 
                       <input
                         type="range"
-                        min={-1}
-                        max={1}
-                        step={0.05}
+                        min={traceLow}
+                        max={traceHigh}
+                        step={isMixtureFactor ? 0.001 : 0.05}
                         value={coded}
                         onChange={(e) => {
-                          setProfilerCoded({
-                            ...profilerCoded,
-                            [f.code]: Number(e.target.value),
-                          });
+                          const nextValue = Number(e.target.value);
+                          setProfilerCoded(isMixtureFactor
+                            ? setBoundedMixtureComponent(profilerCoded, project.factors, f.code, nextValue)
+                            : { ...profilerCoded, [f.code]: nextValue });
                         }}
                         style={{ width: '100%', cursor: 'pointer' }}
                       />
 
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#94a3b8' }}>
-                        <span>{f.low} {f.unit}</span>
-                        <span>{f.high} {f.unit}</span>
+                        <span>{codedToActual(traceLow, f)} {f.unit}</span>
+                        <span>{codedToActual(traceHigh, f)} {f.unit}</span>
                       </div>
                     </div>
                   </div>
@@ -2251,20 +2259,22 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                 {/* Plot Type Mode Toggle */}
                 <div style={{ display: 'flex', backgroundColor: '#f1f5f9', borderRadius: '0.5rem', padding: '0.2rem', gap: '0.2rem' }}>
-                  <button
-                    onClick={() => setPlotType('3d')}
-                    className={`btn ${plotType === '3d' ? 'btn-primary' : 'btn-secondary'}`}
-                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', border: 'none' }}
-                  >
-                    3D
-                  </button>
-                  <button
-                    onClick={() => setPlotType('contour')}
-                    className={`btn ${plotType === 'contour' ? 'btn-primary' : 'btn-secondary'}`}
-                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', border: 'none' }}
-                  >
-                    2D
-                  </button>
+                  {!hasMixture && <>
+                    <button
+                      onClick={() => setPlotType('3d')}
+                      className={`btn ${plotType === '3d' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', border: 'none' }}
+                    >
+                      3D
+                    </button>
+                    <button
+                      onClick={() => setPlotType('contour')}
+                      className={`btn ${plotType === 'contour' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', border: 'none' }}
+                    >
+                      2D
+                    </button>
+                  </>}
                   {(hasMixture || project.factors.length >= 3) && (
                     <button
                       onClick={() => setPlotType('ternary')}

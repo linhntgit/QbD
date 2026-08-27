@@ -60,12 +60,13 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
     hasMixture ? 'ternary' : '3d'
   );
 
-  // If project changes and has mixture, sync default plot type
+  // Cartesian grids vary their axes independently.  For mixture projects this
+  // leaves the simplex, so only the ternary representation is permitted.
   useEffect(() => {
-    if (hasMixture && plotType === '3d') {
+    if (hasMixture && plotType !== 'ternary') {
       setPlotType('ternary');
     }
-  }, [project.id, hasMixture]);
+  }, [project.id, hasMixture, plotType]);
 
   // Selected Axis Factors for 2D / 3D Cartesian
   const [xAxisFactor, setXAxisFactor] = useState<string>(factors[0]?.code || 'X1');
@@ -168,7 +169,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
 
   // Grid calculation for 3D Surface & 2D Cartesian Contour
   const surfaceGrid = useMemo(() => {
-    if (!model || !factorX || !factorY) return null;
+    if (hasMixture || !model || !factorX || !factorY) return null;
 
     const N = 35; // 35x35 resolution
     const xCodedArr: number[] = [];
@@ -243,7 +244,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
       hoverY,
       hoverText,
     };
-  }, [model, factorX, factorY, fixedFactorCoded, currentCQA]);
+  }, [hasMixture, model, factorX, factorY, fixedFactorCoded, currentCQA]);
 
   // Ternary Mesh & Contour Calculation
   const ternaryResult = useMemo(() => {
@@ -703,22 +704,24 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
 
             {/* Plot Type Selector: 3D / 2D / Ternary */}
             <div style={{ display: 'flex', backgroundColor: '#f1f5f9', borderRadius: '0.5rem', padding: '0.25rem', gap: '0.2rem' }}>
-              <button
-                onClick={() => setPlotType('3d')}
-                className={`btn ${plotType === '3d' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', border: 'none' }}
-                title="Bề mặt đáp ứng 3 chiều trong không gian"
-              >
-                3D Surface
-              </button>
-              <button
-                onClick={() => setPlotType('contour')}
-                className={`btn ${plotType === 'contour' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', border: 'none' }}
-                title="Đường đồng mức 2D trên hệ tọa độ Descartes"
-              >
-                2D Contour
-              </button>
+              {!hasMixture && <>
+                <button
+                  onClick={() => setPlotType('3d')}
+                  className={`btn ${plotType === '3d' ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', border: 'none' }}
+                  title="Bề mặt đáp ứng 3 chiều trong không gian"
+                >
+                  3D Surface
+                </button>
+                <button
+                  onClick={() => setPlotType('contour')}
+                  className={`btn ${plotType === 'contour' ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', border: 'none' }}
+                  title="Đường đồng mức 2D trên hệ tọa độ Descartes"
+                >
+                  2D Contour
+                </button>
+              </>}
               <button
                 onClick={() => setPlotType('ternary')}
                 className={`btn ${plotType === 'ternary' ? 'btn-teal' : 'btn-secondary'}`}
