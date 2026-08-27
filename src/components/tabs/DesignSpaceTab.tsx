@@ -762,7 +762,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
           </div>
 
           {/* Plotly Canvas */}
-          <div style={{ height: '540px', width: '100%' }}>
+          <div style={{ height: overlayMode === 'ternary' ? '680px' : '560px', width: '100%' }}>
             <PlotlyChart data={overlayPlotData} layout={overlayLayout} style={{ width: '100%', height: '100%' }} />
           </div>
         </div>

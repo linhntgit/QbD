@@ -104,6 +104,14 @@ export function cartesianToTernary(x: number, y: number): { a: number; b: number
 }
 
 /**
+ * Format factor apex title without duplicating the factor code e.g. "Capryol 90 (X1)"
+ */
+export function formatFactorApexName(f: { name: string; code: string }): string {
+  const cleanName = f.name.replace(new RegExp(`\\s*\\(${f.code}\\)`, 'gi'), '').trim();
+  return `${cleanName} (${f.code})`;
+}
+
+/**
  * Calculate constraint boundary lines and experimental polygon for 3 mixture components (L_i <= X_i <= U_i)
  */
 export function calculateMixtureConstraints(
@@ -569,8 +577,8 @@ export function buildTernaryPlotlyData(
     },
     line: {
       smoothing: smoothness,
-      width: displayMode === 'lines_only' ? 2.0 : 1.1,
-      color: displayMode === 'lines_only' ? '#0f172a' : 'rgba(255, 255, 255, 0.45)',
+      width: displayMode === 'lines_only' ? 1.2 : 0.75,
+      color: displayMode === 'lines_only' ? '#334155' : 'rgba(255, 255, 255, 0.4)',
     },
     colorbar: {
       title: {
@@ -592,7 +600,7 @@ export function buildTernaryPlotlyData(
     name: 'Biên Tam Giác Simplex',
     x: [0, 100, 50, 0],
     y: [0, 0, H, 0],
-    line: { color: '#0f172a', width: 2.8 },
+    line: { color: '#0f172a', width: 2.0 },
     hoverinfo: 'none',
     showlegend: false,
   });
@@ -620,7 +628,7 @@ export function buildTernaryPlotlyData(
     name: 'Lưới Tam Giác (%)',
     x: gridX,
     y: gridY,
-    line: { color: 'rgba(148, 163, 184, 0.45)', width: 0.9, dash: 'dot' },
+    line: { color: 'rgba(148, 163, 184, 0.35)', width: 0.6, dash: 'dot' },
     hoverinfo: 'none',
     showlegend: false,
   });
@@ -633,18 +641,18 @@ export function buildTernaryPlotlyData(
   // Base BC (Axis C: 0 to 100%)
   for (let c = 20; c <= 80; c += 20) {
     tickX.push(c);
-    tickY.push(-3.2);
+    tickY.push(-2.5);
     tickTexts.push(`${c}%`);
   }
   // Right Edge CA (Axis A: 0 to 100%)
   for (let a = 20; a <= 80; a += 20) {
-    tickX.push(100 - a / 2 + 4.2);
+    tickX.push(100 - a / 2 + 3.2);
     tickY.push(a * (H / 100));
     tickTexts.push(`${a}%`);
   }
   // Left Edge AB (Axis B: 0 to 100%)
   for (let b = 20; b <= 80; b += 20) {
-    tickX.push((100 - b) / 2 - 4.2);
+    tickX.push((100 - b) / 2 - 3.2);
     tickY.push((100 - b) * (H / 100));
     tickTexts.push(`${b}%`);
   }
@@ -657,7 +665,7 @@ export function buildTernaryPlotlyData(
     y: tickY,
     text: tickTexts,
     textposition: 'middle center',
-    textfont: { family: 'Inter, sans-serif', size: 9.5, color: '#64748b', weight: 600 },
+    textfont: { family: 'Inter, sans-serif', size: 9, color: '#64748b', weight: 600 },
     hoverinfo: 'none',
     showlegend: false,
   });
@@ -674,7 +682,7 @@ export function buildTernaryPlotlyData(
           y: [cl.p1.y, cl.p2.y],
           line: {
             color: cl.color,
-            width: 2.4,
+            width: 1.4,
             dash: cl.dash,
           },
           hoverinfo: 'name',
@@ -699,7 +707,7 @@ export function buildTernaryPlotlyData(
       y: polyY,
       line: {
         color: '#ea580c',
-        width: 3.0,
+        width: 1.8,
       },
       hoverinfo: 'name',
       showlegend: true,
@@ -738,7 +746,7 @@ export function buildTernaryPlotlyData(
           y: segY,
           line: {
             color: lineColor,
-            width: 3.4,
+            width: 1.8,
             dash: lineDash,
           },
           hoverinfo: 'name',
@@ -757,9 +765,9 @@ export function buildTernaryPlotlyData(
       : `<span style="color:#dc2626;font-weight:700">⚠ Ngoài giới hạn khảo sát</span>`;
 
     return (
-      `<b>${factorA.name} (${factorA.code})</b>: ${p.aPct}%<br>` +
-      `<b>${factorB.name} (${factorB.code})</b>: ${p.bPct}%<br>` +
-      `<b>${factorC.name} (${factorC.code})</b>: ${p.cPct}%<br>` +
+      `<b>${formatFactorApexName(factorA)}</b>: ${p.aPct}%<br>` +
+      `<b>${formatFactorApexName(factorB)}</b>: ${p.bPct}%<br>` +
+      `<b>${formatFactorApexName(factorC)}</b>: ${p.cPct}%<br>` +
       `-------------------------<br>` +
       `${constraintBadge}<br>` +
       `<span style="color:#0f766e;font-weight:700">Dự đoán ${cqa.name} (${cqa.code}): ${p.z} ${cqa.unit}</span>`
@@ -816,9 +824,9 @@ export function buildTernaryPlotlyData(
         const yVal = run.responses[cqa.code];
         runHovers.push(
           `<b>Thí nghiệm ${run.runOrder || idx + 1} (DoE Run)</b><br>` +
-          `${factorA.name}: ${aPct.toFixed(1)}%<br>` +
-          `${factorB.name}: ${bPct.toFixed(1)}%<br>` +
-          `${factorC.name}: ${cPct.toFixed(1)}%<br>` +
+          `${formatFactorApexName(factorA)}: ${aPct.toFixed(1)}%<br>` +
+          `${formatFactorApexName(factorB)}: ${bPct.toFixed(1)}%<br>` +
+          `${formatFactorApexName(factorC)}: ${cPct.toFixed(1)}%<br>` +
           `<b>Thực nghiệm ${cqa.code}: ${yVal !== undefined ? yVal : 'N/A'} ${cqa.unit || ''}</b>`
         );
       }
@@ -833,14 +841,14 @@ export function buildTernaryPlotlyData(
         y: runY,
         text: runTexts,
         textposition: 'top center',
-        textfont: { family: 'Inter, sans-serif', size: 10, color: '#0f172a', weight: 700 },
+        textfont: { family: 'Inter, sans-serif', size: 9.5, color: '#0f172a', weight: 600 },
         hoverinfo: 'text',
         hovertext: runHovers,
         marker: {
           symbol: 'diamond',
           color: '#fbbf24',
-          line: { color: '#0f172a', width: 2 },
-          size: 11,
+          line: { color: '#0f172a', width: 1.2 },
+          size: 9.5,
         },
         showlegend: true,
       });
@@ -877,35 +885,35 @@ export function buildTernaryPlotlyData(
       y: [cart.y],
       text: ['★ TỐI ƯU'],
       textposition: 'bottom center',
-      textfont: { family: 'Inter, sans-serif', size: 11, color: '#b45309', weight: 700 },
+      textfont: { family: 'Inter, sans-serif', size: 10.5, color: '#9a3412', weight: 700 },
       hoverinfo: 'text',
       hovertext: [
         `<b>★ ĐIỂM TỐI ƯU DESIRABILITY (D = ${(optimum.overallDesirability * 100).toFixed(1)}%)</b><br>` +
-        `${factorA.name}: ${aPct.toFixed(1)}%<br>` +
-        `${factorB.name}: ${bPct.toFixed(1)}%<br>` +
-        `${factorC.name}: ${cPct.toFixed(1)}%<br>` +
+        `${formatFactorApexName(factorA)}: ${aPct.toFixed(1)}%<br>` +
+        `${formatFactorApexName(factorB)}: ${bPct.toFixed(1)}%<br>` +
+        `${formatFactorApexName(factorC)}: ${cPct.toFixed(1)}%<br>` +
         `<b>Dự đoán ${cqa.code}: ${optPred ? optPred.value.toFixed(2) : 'N/A'} ${cqa.unit}</b>`
       ],
       marker: {
         symbol: 'star',
         color: '#e11d48',
-        line: { color: '#ffffff', width: 2 },
-        size: 15,
+        line: { color: '#ffffff', width: 1.5 },
+        size: 14,
       },
       showlegend: true,
     });
   }
 
-  // Layout with 1:1 Aspect Ratio and Apex Annotations
+  // Layout with 1:1 Aspect Ratio, Max Viewable Triangle Size and Apex Annotations
   const layout = {
     title: {
       text: `Biểu Đồ Contour Tam Giác Hỗn Hợp: ${cqa.name} (${cqa.code})${cqa.unit ? ` [${cqa.unit}]` : ''}`,
       font: { size: 13, color: '#0f172a', family: 'Inter, sans-serif' },
     },
     autosize: true,
-    margin: { l: 65, r: 65, b: 65, t: 55, pad: 4 },
+    margin: { l: 35, r: 35, b: 45, t: 40, pad: 2 },
     xaxis: {
-      range: [-15, 115],
+      range: [-6, 106],
       fixedrange: true,
       zeroline: false,
       showgrid: false,
@@ -913,7 +921,7 @@ export function buildTernaryPlotlyData(
       showticklabels: false,
     },
     yaxis: {
-      range: [-10, 98],
+      range: [-7, 94],
       fixedrange: true,
       zeroline: false,
       showgrid: false,
@@ -926,26 +934,26 @@ export function buildTernaryPlotlyData(
       // Apex A (Top)
       {
         x: 50,
-        y: H + 5.5,
-        text: `<b>▲ ${factorA.name} (${factorA.code})</b>`,
+        y: H + 4.2,
+        text: `<b>▲ ${formatFactorApexName(factorA)}</b>`,
         showarrow: false,
-        font: { size: 12.5, color: '#0f172a', family: 'Inter, sans-serif' },
+        font: { size: 12, color: '#0f172a', family: 'Inter, sans-serif' },
       },
       // Apex B (Bottom-Left)
       {
-        x: -4,
-        y: -6.5,
-        text: `<b>◀ ${factorB.name} (${factorB.code})</b>`,
+        x: -2,
+        y: -4.8,
+        text: `<b>◀ ${formatFactorApexName(factorB)}</b>`,
         showarrow: false,
-        font: { size: 12.5, color: '#0f172a', family: 'Inter, sans-serif' },
+        font: { size: 12, color: '#0f172a', family: 'Inter, sans-serif' },
       },
       // Apex C (Bottom-Right)
       {
-        x: 104,
-        y: -6.5,
-        text: `<b>▶ ${factorC.name} (${factorC.code})</b>`,
+        x: 102,
+        y: -4.8,
+        text: `<b>▶ ${formatFactorApexName(factorC)}</b>`,
         showarrow: false,
-        font: { size: 12.5, color: '#0f172a', family: 'Inter, sans-serif' },
+        font: { size: 12, color: '#0f172a', family: 'Inter, sans-serif' },
       },
     ],
     showlegend: true,
@@ -1145,8 +1153,8 @@ export function generateTernaryDesignSpace(
     },
     line: {
       smoothing: smoothness,
-      width: 0.8,
-      color: 'rgba(255, 255, 255, 0.35)',
+      width: 0.5,
+      color: 'rgba(255, 255, 255, 0.25)',
     },
     colorbar: {
       title: {
@@ -1168,7 +1176,7 @@ export function generateTernaryDesignSpace(
     name: 'Biên Tam Giác',
     x: [0, 100, 50, 0],
     y: [0, 0, H, 0],
-    line: { color: '#0f172a', width: 2.8 },
+    line: { color: '#0f172a', width: 2.0 },
     hoverinfo: 'none',
     showlegend: false,
   });
@@ -1197,7 +1205,7 @@ export function generateTernaryDesignSpace(
     name: 'Lưới Tam Giác (%)',
     x: gridX,
     y: gridY,
-    line: { color: 'rgba(148, 163, 184, 0.45)', width: 0.9, dash: 'dot' },
+    line: { color: 'rgba(148, 163, 184, 0.35)', width: 0.6, dash: 'dot' },
     hoverinfo: 'none',
     showlegend: false,
   });
@@ -1210,18 +1218,18 @@ export function generateTernaryDesignSpace(
   // Base BC (Axis C: 0 to 100%)
   for (let c = 20; c <= 80; c += 20) {
     tickX.push(c);
-    tickY.push(-3.2);
+    tickY.push(-2.5);
     tickTexts.push(`${c}%`);
   }
   // Right Edge CA (Axis A: 0 to 100%)
   for (let a = 20; a <= 80; a += 20) {
-    tickX.push(100 - a / 2 + 4.2);
+    tickX.push(100 - a / 2 + 3.2);
     tickY.push(a * (H / 100));
     tickTexts.push(`${a}%`);
   }
   // Left Edge AB (Axis B: 0 to 100%)
   for (let b = 20; b <= 80; b += 20) {
-    tickX.push((100 - b) / 2 - 4.2);
+    tickX.push((100 - b) / 2 - 3.2);
     tickY.push((100 - b) * (H / 100));
     tickTexts.push(`${b}%`);
   }
@@ -1234,7 +1242,7 @@ export function generateTernaryDesignSpace(
     y: tickY,
     text: tickTexts,
     textposition: 'middle center',
-    textfont: { family: 'Inter, sans-serif', size: 9.5, color: '#64748b', weight: 600 },
+    textfont: { family: 'Inter, sans-serif', size: 9, color: '#64748b', weight: 600 },
     hoverinfo: 'none',
     showlegend: false,
   });
@@ -1260,7 +1268,7 @@ export function generateTernaryDesignSpace(
       y: boundY,
       line: {
         color: '#15803d',
-        width: 3.4,
+        width: 2.0,
       },
       hoverinfo: 'name',
       showlegend: true,
@@ -1279,7 +1287,7 @@ export function generateTernaryDesignSpace(
           y: [cl.p1.y, cl.p2.y],
           line: {
             color: cl.color,
-            width: 2.4,
+            width: 1.4,
             dash: cl.dash,
           },
           hoverinfo: 'name',
@@ -1304,7 +1312,7 @@ export function generateTernaryDesignSpace(
       y: polyY,
       line: {
         color: '#c2410c',
-        width: 3.0,
+        width: 1.8,
       },
       hoverinfo: 'name',
       showlegend: true,
@@ -1318,7 +1326,7 @@ export function generateTernaryDesignSpace(
     name: `Vùng Đạt Chuẩn 100% CQAs (${(sweetSpotFraction * 100).toFixed(1)}% Simplex)`,
     x: [null],
     y: [null],
-    line: { color: '#22c55e', width: 4 },
+    line: { color: '#22c55e', width: 2.5 },
     showlegend: true,
   });
 
@@ -1328,7 +1336,7 @@ export function generateTernaryDesignSpace(
     name: 'Vùng Ngoài Tiêu Chuẩn (OOS)',
     x: [null],
     y: [null],
-    line: { color: '#f87171', width: 4 },
+    line: { color: '#f87171', width: 2.5 },
     showlegend: true,
   });
 
@@ -1365,9 +1373,9 @@ export function generateTernaryDesignSpace(
 
         runHovers.push(
           `<b>Thí nghiệm ${run.runOrder || idx + 1} (DoE Run)</b><br>` +
-          `${factorA.name}: ${aPct.toFixed(1)}%<br>` +
-          `${factorB.name}: ${bPct.toFixed(1)}%<br>` +
-          `${factorC.name}: ${cPct.toFixed(1)}%`
+          `${formatFactorApexName(factorA)}: ${aPct.toFixed(1)}%<br>` +
+          `${formatFactorApexName(factorB)}: ${bPct.toFixed(1)}%<br>` +
+          `${formatFactorApexName(factorC)}: ${cPct.toFixed(1)}%`
         );
       }
     });
@@ -1381,14 +1389,14 @@ export function generateTernaryDesignSpace(
         y: runY,
         text: runTexts,
         textposition: 'top center',
-        textfont: { family: 'Inter, sans-serif', size: 10, color: '#0f172a', weight: 700 },
+        textfont: { family: 'Inter, sans-serif', size: 9.5, color: '#0f172a', weight: 600 },
         hoverinfo: 'text',
         hovertext: runHovers,
         marker: {
           symbol: 'diamond',
           color: '#fbbf24',
-          line: { color: '#0f172a', width: 2 },
-          size: 11,
+          line: { color: '#0f172a', width: 1.2 },
+          size: 9.5,
         },
         showlegend: true,
       });
@@ -1434,13 +1442,13 @@ export function generateTernaryDesignSpace(
       y: [cart.y],
       text: ['★ ĐIỂM TỐI ƯU'],
       textposition: 'bottom center',
-      textfont: { family: 'Inter, sans-serif', size: 11, color: '#1e3a8a', weight: 700 },
+      textfont: { family: 'Inter, sans-serif', size: 10.5, color: '#1e3a8a', weight: 700 },
       hoverinfo: 'text',
       hovertext: [
         `<b>★ ĐIỂM TỐI ƯU DESIRABILITY (D = ${(optimum.overallDesirability * 100).toFixed(1)}%)</b><br>` +
-        `${factorA.name}: ${aPct.toFixed(1)}%<br>` +
-        `${factorB.name}: ${bPct.toFixed(1)}%<br>` +
-        `${factorC.name}: ${cPct.toFixed(1)}%<br>` +
+        `${formatFactorApexName(factorA)}: ${aPct.toFixed(1)}%<br>` +
+        `${formatFactorApexName(factorB)}: ${bPct.toFixed(1)}%<br>` +
+        `${formatFactorApexName(factorC)}: ${cPct.toFixed(1)}%<br>` +
         `-------------------------<br>` +
         `<b>Dự đoán đáp ứng tại điểm tối ưu:</b><br>` +
         optPredLines.join('<br>')
@@ -1448,8 +1456,8 @@ export function generateTernaryDesignSpace(
       marker: {
         symbol: 'star',
         color: '#1e3a8a',
-        line: { color: '#ffffff', width: 2 },
-        size: 16,
+        line: { color: '#ffffff', width: 1.5 },
+        size: 14,
       },
       showlegend: true,
     });
@@ -1479,9 +1487,9 @@ export function generateTernaryDesignSpace(
       font: { size: 13, color: '#0f172a', family: 'Inter, sans-serif' },
     },
     autosize: true,
-    margin: { l: 65, r: 65, b: 75, t: 55, pad: 4 },
+    margin: { l: 35, r: 35, b: 50, t: 40, pad: 2 },
     xaxis: {
-      range: [-15, 115],
+      range: [-6, 106],
       fixedrange: true,
       zeroline: false,
       showgrid: false,
@@ -1489,7 +1497,7 @@ export function generateTernaryDesignSpace(
       showticklabels: false,
     },
     yaxis: {
-      range: [-10, 98],
+      range: [-7, 94],
       fixedrange: true,
       zeroline: false,
       showgrid: false,
@@ -1502,24 +1510,24 @@ export function generateTernaryDesignSpace(
       // Apex A (Top)
       {
         x: 50,
-        y: H + 5.5,
-        text: `<b>▲ ${factorA.name} (${factorA.code})</b>`,
+        y: H + 4.2,
+        text: `<b>▲ ${formatFactorApexName(factorA)}</b>`,
         showarrow: false,
         font: { size: 12, color: '#0f172a', family: 'Inter, sans-serif' },
       },
       // Apex B (Bottom-Left)
       {
-        x: -4,
-        y: -6.5,
-        text: `<b>◀ ${factorB.name} (${factorB.code})</b>`,
+        x: -2,
+        y: -4.8,
+        text: `<b>◀ ${formatFactorApexName(factorB)}</b>`,
         showarrow: false,
         font: { size: 12, color: '#0f172a', family: 'Inter, sans-serif' },
       },
       // Apex C (Bottom-Right)
       {
-        x: 104,
-        y: -6.5,
-        text: `<b>▶ ${factorC.name} (${factorC.code})</b>`,
+        x: 102,
+        y: -4.8,
+        text: `<b>▶ ${formatFactorApexName(factorC)}</b>`,
         showarrow: false,
         font: { size: 12, color: '#0f172a', family: 'Inter, sans-serif' },
       },

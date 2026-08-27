@@ -2515,7 +2515,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               </div>
             )}
 
-            <div style={{ height: plotType === 'ternary' ? '540px' : '480px' }}>
+            <div style={{ height: plotType === 'ternary' ? '680px' : '520px' }}>
               <PlotlyChart data={surfacePlotData} layout={surfaceLayout} style={{ width: '100%', height: '100%' }} />
             </div>
           </div>

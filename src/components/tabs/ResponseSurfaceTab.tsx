@@ -1271,7 +1271,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
         </div>
 
         {/* Right 3D Surface / Contour WebGL Viewer */}
-        <div className="qbd-card" style={{ height: '660px', padding: '0.5rem', display: 'flex', flexDirection: 'column' }}>
+        <div className="qbd-card" style={{ height: plotType === 'ternary' ? '700px' : '660px', padding: '0.5rem', display: 'flex', flexDirection: 'column' }}>
           <PlotlyChart data={plotlyData} layout={plotlyLayout} style={{ width: '100%', height: '100%' }} />
         </div>
 

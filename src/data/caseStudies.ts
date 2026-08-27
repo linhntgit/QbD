@@ -531,7 +531,7 @@ export const CASE_STUDIES: QBDProject[] = [
     factors: [
       {
         id: 'factor-sedds-1',
-        name: 'Pha dầu Capryol 90 (X1)',
+        name: 'Pha dầu Capryol 90',
         code: 'X1',
         type: 'Mixture',
         dataType: 'quantitative',
@@ -544,7 +544,7 @@ export const CASE_STUDIES: QBDProject[] = [
       },
       {
         id: 'factor-sedds-2',
-        name: 'Diện hoạt Cremophor EL (X2)',
+        name: 'Diện hoạt Cremophor EL',
         code: 'X2',
         type: 'Mixture',
         dataType: 'quantitative',
@@ -557,7 +557,7 @@ export const CASE_STUDIES: QBDProject[] = [
       },
       {
         id: 'factor-sedds-3',
-        name: 'Đồng diện hoạt Transcutol P (X3)',
+        name: 'Đồng diện hoạt Transcutol P',
         code: 'X3',
         type: 'Mixture',
         dataType: 'quantitative',
@@ -810,7 +810,7 @@ export const CASE_STUDIES: QBDProject[] = [
     factors: [
       {
         id: 'f-fda-1',
-        name: 'Tỷ lệ bao màng Kollicoat SR 30D (X1)',
+        name: 'Tỷ lệ bao màng Kollicoat SR 30D',
         code: 'X1',
         unit: '%',
         low: 20.0,
@@ -823,7 +823,7 @@ export const CASE_STUDIES: QBDProject[] = [
       },
       {
         id: 'f-fda-2',
-        name: 'Tỷ lệ chất hóa dẻo Triethyl Citrate TEC (X2)',
+        name: 'Tỷ lệ chất hóa dẻo Triethyl Citrate TEC',
         code: 'X2',
         unit: '%',
         low: 5.0,
@@ -836,7 +836,7 @@ export const CASE_STUDIES: QBDProject[] = [
       },
       {
         id: 'f-fda-3',
-        name: 'Lực nén dập viên Main Compression (X3)',
+        name: 'Lực nén dập viên Main Compression',
         code: 'X3',
         unit: 'kN',
         low: 4.0,
@@ -849,7 +849,7 @@ export const CASE_STUDIES: QBDProject[] = [
       },
       {
         id: 'f-fda-4',
-        name: 'Tốc độ máy dập viên Press Speed (X4)',
+        name: 'Tốc độ máy dập viên Press Speed',
         code: 'X4',
         unit: 'rpm',
         low: 20.0,
