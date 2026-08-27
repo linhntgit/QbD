@@ -289,34 +289,34 @@ export function generateCCD(k: number, type: 'Full' | 'FaceCentered' | 'Rotatabl
 }
 
 /**
- * Generate Simplex Lattice / Centroid Mixture Design
+ * Generate Pure Simplex Lattice / Centroid Mixture Design on unconstrained simplex [0, 1]^q with sum(x) = 1
  */
-export function generateMixtureDesign(k: number, _type: 'Lattice' | 'Centroid' = 'Centroid'): number[][] {
+function generatePureSimplexDesign(q: number, type: 'Lattice' | 'Centroid' | 'ExtremeVertices' = 'Centroid'): number[][] {
   const matrix: number[][] = [];
 
   // Pure components (1, 0, 0...)
-  for (let i = 0; i < k; i++) {
-    const row = new Array(k).fill(0);
-    row[i] = 1;
+  for (let i = 0; i < q; i++) {
+    const row = new Array(q).fill(0);
+    row[i] = 1.0;
     matrix.push(row);
   }
 
   // Binary blends (0.5, 0.5, 0...)
-  for (let i = 0; i < k; i++) {
-    for (let j = i + 1; j < k; j++) {
-      const row = new Array(k).fill(0);
+  for (let i = 0; i < q; i++) {
+    for (let j = i + 1; j < q; j++) {
+      const row = new Array(q).fill(0);
       row[i] = 0.5;
       row[j] = 0.5;
       matrix.push(row);
     }
   }
 
-  // Ternary blends if k >= 3
-  if (k >= 3) {
-    for (let i = 0; i < k; i++) {
-      for (let j = i + 1; j < k; j++) {
-        for (let m = j + 1; m < k; m++) {
-          const row = new Array(k).fill(0);
+  // Ternary blends if q >= 3
+  if (q >= 3) {
+    for (let i = 0; i < q; i++) {
+      for (let j = i + 1; j < q; j++) {
+        for (let m = j + 1; m < q; m++) {
+          const row = new Array(q).fill(0);
           row[i] = Number((1 / 3).toFixed(4));
           row[j] = Number((1 / 3).toFixed(4));
           row[m] = Number((1 / 3).toFixed(4));
@@ -327,10 +327,177 @@ export function generateMixtureDesign(k: number, _type: 'Lattice' | 'Centroid' =
   }
 
   // Overall centroid
-  const center = new Array(k).fill(Number((1 / k).toFixed(4)));
+  const center = new Array(q).fill(Number((1 / q).toFixed(4)));
   matrix.push(center);
 
+  // Axial check blends (between centroid and vertices for Centroid design)
+  if (type === 'Centroid' && q >= 2) {
+    for (let i = 0; i < q; i++) {
+      const axial = new Array(q).fill(Number(((1 - 0.6) / (q - 1)).toFixed(4)));
+      axial[i] = 0.6;
+      matrix.push(axial);
+    }
+  }
+
   return matrix;
+}
+
+/**
+ * Generate Constrained Mixture Design using McLean-Anderson / Extreme Vertices & Pseudocomponents
+ * Handles lower bounds L_i and upper bounds U_i so that ALL runs strictly satisfy:
+ * L_i <= X_i <= U_i and sum(X_i) = 1 (or 100%).
+ */
+export function generateConstrainedMixtureDesign(
+  factors: Factor[],
+  type: 'Lattice' | 'Centroid' | 'ExtremeVertices' = 'Centroid'
+): number[][] {
+  const q = factors.length;
+  if (q === 0) return [];
+  if (q === 1) return [[1.0]];
+
+  // 1. Extract bounds in normalized proportions [0, 1]
+  const isPercent = factors.some((f) => f.high > 1.0 || f.unit === '%');
+  const L = factors.map((f) => {
+    const raw = f.low !== undefined ? (isPercent || f.high > 1.0 ? f.low / 100 : f.low) : 0;
+    return Math.max(0, Math.min(1, raw));
+  });
+  const U = factors.map((f, idx) => {
+    const raw = f.high !== undefined ? (isPercent || f.high > 1.0 ? f.high / 100 : f.high) : 1;
+    return Math.max(L[idx], Math.min(1, raw));
+  });
+
+  const sumL = L.reduce((a, b) => a + b, 0);
+  const isUnconstrained = L.every((l) => Math.abs(l) < 1e-6) && U.every((u) => Math.abs(u - 1) < 1e-6);
+
+  if (isUnconstrained) {
+    return generatePureSimplexDesign(q, type);
+  }
+
+  // Check if pure L-pseudocomponents can be used without upper bound truncation
+  const canUsePureLPseudocomponents =
+    sumL < 1.0 && factors.every((_, i) => L[i] + (1 - sumL) <= U[i] + 1e-5);
+
+  if (canUsePureLPseudocomponents) {
+    const zMatrix = generatePureSimplexDesign(q, type);
+    const rem = 1.0 - sumL;
+    return zMatrix.map((zRow) =>
+      zRow.map((zi, i) => Number((L[i] + zi * rem).toFixed(4)))
+    );
+  }
+
+  // 2. McLean-Anderson / XVERT Extreme Vertices Algorithm for general bounds [L_i, U_i]
+  const vertices: number[][] = [];
+
+  for (let k = 0; k < q; k++) {
+    const indepIndices: number[] = [];
+    for (let j = 0; j < q; j++) {
+      if (j !== k) indepIndices.push(j);
+    }
+
+    const nIndep = indepIndices.length;
+    const numCombos = Math.pow(2, nIndep);
+
+    for (let mask = 0; mask < numCombos; mask++) {
+      const pt = new Array(q).fill(0);
+      let sumIndep = 0;
+
+      for (let bit = 0; bit < nIndep; bit++) {
+        const factorIdx = indepIndices[bit];
+        const useUpper = ((mask >> bit) & 1) === 1;
+        const val = useUpper ? U[factorIdx] : L[factorIdx];
+        pt[factorIdx] = val;
+        sumIndep += val;
+      }
+
+      const xk = 1.0 - sumIndep;
+      if (xk >= L[k] - 1e-5 && xk <= U[k] + 1e-5) {
+        pt[k] = Math.max(L[k], Math.min(U[k], xk));
+
+        // Normalize sum to 1.0
+        const total = pt.reduce((a, b) => a + b, 0);
+        const normalized = pt.map((v) => Number((v / total).toFixed(4)));
+
+        const exists = vertices.some((v) =>
+          v.every((val, idx) => Math.abs(val - normalized[idx]) < 1e-3)
+        );
+        if (!exists) {
+          vertices.push(normalized);
+        }
+      }
+    }
+  }
+
+  // Fallback if degenerate
+  if (vertices.length === 0) {
+    const mid = L.map((l, i) => (l + U[i]) / 2);
+    const sumMid = mid.reduce((a, b) => a + b, 0) || 1;
+    vertices.push(mid.map((v) => Number((v / sumMid).toFixed(4))));
+  }
+
+  const allPoints: number[][] = [...vertices];
+
+  // 3. Edge Centroids (Midpoints between adjacent vertices)
+  for (let i = 0; i < vertices.length; i++) {
+    for (let j = i + 1; j < vertices.length; j++) {
+      const v1 = vertices[i];
+      const v2 = vertices[j];
+
+      let sharedConstraints = 0;
+      for (let f = 0; f < q; f++) {
+        const atLower = Math.abs(v1[f] - L[f]) < 1e-3 && Math.abs(v2[f] - L[f]) < 1e-3;
+        const atUpper = Math.abs(v1[f] - U[f]) < 1e-3 && Math.abs(v2[f] - U[f]) < 1e-3;
+        if (atLower || atUpper) sharedConstraints++;
+      }
+
+      if (sharedConstraints >= Math.max(1, q - 2) || q <= 3) {
+        const edgeMid = v1.map((val, idx) => Number(((val + v2[idx]) / 2).toFixed(4)));
+        const exists = allPoints.some((p) =>
+          p.every((val, idx) => Math.abs(val - edgeMid[idx]) < 1e-3)
+        );
+        if (!exists) {
+          allPoints.push(edgeMid);
+        }
+      }
+    }
+  }
+
+  // 4. Overall Centroid (Trọng tâm đa diện)
+  const centroid = new Array(q).fill(0);
+  vertices.forEach((v) => {
+    v.forEach((val, idx) => {
+      centroid[idx] += val / vertices.length;
+    });
+  });
+  const normalizedCentroid = centroid.map((v) => Number(v.toFixed(4)));
+  const centroidExists = allPoints.some((p) =>
+    p.every((val, idx) => Math.abs(val - normalizedCentroid[idx]) < 1e-3)
+  );
+  if (!centroidExists) {
+    allPoints.push(normalizedCentroid);
+  }
+
+  // 5. Axial / Interior Blends (Midpoints between Overall Centroid and each Vertex)
+  vertices.forEach((v) => {
+    const axial = v.map((val, idx) => Number(((val + normalizedCentroid[idx]) / 2).toFixed(4)));
+    const exists = allPoints.some((p) =>
+      p.every((val, idx) => Math.abs(val - axial[idx]) < 1e-3)
+    );
+    if (!exists) {
+      allPoints.push(axial);
+    }
+  });
+
+  return allPoints;
+}
+
+/**
+ * Backward compatibility wrapper for generateMixtureDesign
+ */
+export function generateMixtureDesign(kOrFactors: number | Factor[], type: 'Lattice' | 'Centroid' = 'Centroid'): number[][] {
+  if (typeof kOrFactors === 'number') {
+    return generatePureSimplexDesign(kOrFactors, type);
+  }
+  return generateConstrainedMixtureDesign(kOrFactors, type);
 }
 
 /**
@@ -338,12 +505,15 @@ export function generateMixtureDesign(k: number, _type: 'Lattice' | 'Centroid' =
  * (Ma trận tích hợp Hỗn hợp & Thông số Quy trình)
  */
 export function generateCombinedMixtureProcessMatrix(
-  mixtureCount: number,
-  processCount: number,
+  mixtureFactors: Factor[],
+  processFactors: Factor[],
   type: 'Combined_Mixture_Factorial' | 'Combined_Mixture_RSM' = 'Combined_Mixture_Factorial'
 ): number[][] {
-  // 1. Mixture matrix (Simplex Centroid)
-  const mixMatrix = generateMixtureDesign(mixtureCount, 'Centroid');
+  const mixtureCount = mixtureFactors.length;
+  const processCount = processFactors.length;
+
+  // 1. Constrained Mixture matrix
+  const mixMatrix = generateConstrainedMixtureDesign(mixtureFactors, 'Centroid');
 
   // 2. Process variables matrix
   let procMatrix: number[][] = [];
@@ -366,7 +536,7 @@ export function generateCombinedMixtureProcessMatrix(
   }
 
   // 4. Center blend at center process conditions
-  const centerBlend = new Array(mixtureCount).fill(Number((1 / mixtureCount).toFixed(4)));
+  const centerBlend = mixMatrix[mixMatrix.length - 1] || new Array(mixtureCount).fill(Number((1 / mixtureCount).toFixed(4)));
   const centerProc = new Array(processCount).fill(0);
   combined.push([...centerBlend, ...centerProc]);
   combined.push([...centerBlend, ...centerProc]);
@@ -386,8 +556,8 @@ export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { r
   let calculatedAlpha: number | undefined = undefined;
 
   // Separate Mixture components and Independent Process factors
-  const mixtureFactors = factors.filter((f) => f.role === 'mixture_component');
-  const processFactors = factors.filter((f) => f.role !== 'mixture_component');
+  const mixtureFactors = factors.filter((f) => f.role === 'mixture_component' || f.type === 'Mixture');
+  const processFactors = factors.filter((f) => f.role !== 'mixture_component' && f.type !== 'Mixture');
 
   if (
     config.category === 'Combined_Mixture_Process' ||
@@ -396,8 +566,8 @@ export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { r
     const combinedType =
       config.designType === 'Combined_Mixture_RSM' ? 'Combined_Mixture_RSM' : 'Combined_Mixture_Factorial';
     codedMatrix = generateCombinedMixtureProcessMatrix(
-      mixtureFactors.length,
-      processFactors.length,
+      mixtureFactors,
+      processFactors,
       combinedType
     );
   } else {
@@ -439,16 +609,19 @@ export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { r
 
       case 'SimplexLattice':
       case 'SimplexCentroid':
-        codedMatrix = generateMixtureDesign(k, config.designType === 'SimplexLattice' ? 'Lattice' : 'Centroid');
+        codedMatrix = generateConstrainedMixtureDesign(
+          factors,
+          config.designType === 'SimplexLattice' ? 'Lattice' : 'Centroid'
+        );
         break;
 
       case 'Combined_Mixture_Factorial':
       case 'Combined_Mixture_RSM': {
-        const mixCount = mixtureFactors.length > 0 ? mixtureFactors.length : Math.min(3, k);
-        const procCount = k - mixCount;
+        const mixFactors = mixtureFactors.length > 0 ? mixtureFactors : factors.slice(0, Math.min(3, k));
+        const procFactors = processFactors.length > 0 ? processFactors : factors.slice(mixFactors.length);
         codedMatrix = generateCombinedMixtureProcessMatrix(
-          mixCount,
-          procCount,
+          mixFactors,
+          procFactors,
           config.designType
         );
         break;
@@ -471,8 +644,9 @@ export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { r
     // Add Center Points for standard designs
     const centerCount = config.centerPoints > 0 ? config.centerPoints : (config.category === 'RSM' ? 3 : 0);
     for (let c = 0; c < centerCount; c++) {
-      if (config.category === 'Mixture') {
-        codedMatrix.push(new Array(k).fill(Number((1 / k).toFixed(4))));
+      if (config.category === 'Mixture' || mixtureFactors.length === k) {
+        const centroidRow = codedMatrix.length > 0 ? codedMatrix[codedMatrix.length - 1] : new Array(k).fill(Number((1 / k).toFixed(4)));
+        codedMatrix.push([...centroidRow]);
       } else {
         codedMatrix.push(new Array(k).fill(0));
       }
@@ -494,8 +668,12 @@ export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { r
     factors.forEach((f, idx) => {
       const codedVal = row[idx] !== undefined ? row[idx] : 0;
       factorCoded[f.code] = codedVal;
-      if (f.role === 'mixture_component' || config.category === 'Mixture') {
-        factorActual[f.code] = Number((codedVal * 100).toFixed(2));
+      if (f.role === 'mixture_component' || f.type === 'Mixture' || config.category === 'Mixture') {
+        if (f.high <= 1.0 && f.unit !== '%') {
+          factorActual[f.code] = Number(codedVal.toFixed(4));
+        } else {
+          factorActual[f.code] = Number((codedVal * 100).toFixed(2));
+        }
       } else {
         factorActual[f.code] = codedToActual(codedVal, f);
       }
@@ -580,7 +758,43 @@ function generateCandidatePool(factors: Factor[]): number[][] {
   const k = factors.length;
   if (k === 0) return [];
 
-  // Generate multi-level grid per factor
+  const mixtureFactors = factors.filter((f) => f.role === 'mixture_component' || f.type === 'Mixture');
+  const processFactors = factors.filter((f) => f.role !== 'mixture_component' && f.type !== 'Mixture');
+
+  if (mixtureFactors.length > 0) {
+    const mixCandidates = generateConstrainedMixtureDesign(mixtureFactors, 'Centroid');
+    if (processFactors.length === 0) {
+      return mixCandidates;
+    }
+
+    const procLevels: number[][] = processFactors.map((f) => {
+      if (f.controllability === 'constant') return [0];
+      if (f.dataType === 'qualitative') return [-1, 1];
+      if (f.dataType === 'quantitative_multilevel') return [-1, 0, 1];
+      return [-1, 0, 1];
+    });
+
+    let procPool: number[][] = [[]];
+    for (let i = 0; i < processFactors.length; i++) {
+      const next: number[][] = [];
+      for (const p of procPool) {
+        for (const lvl of procLevels[i]) {
+          next.push([...p, lvl]);
+        }
+      }
+      procPool = next;
+    }
+
+    const combinedCandidates: number[][] = [];
+    for (const m of mixCandidates) {
+      for (const p of procPool) {
+        combinedCandidates.push([...m, ...p]);
+      }
+    }
+    return combinedCandidates;
+  }
+
+  // Standard process factors grid
   const gridPerFactor: number[][] = factors.map((f) => {
     if (f.controllability === 'constant') return [0];
     if (f.dataType === 'qualitative') return [-1, 1];
