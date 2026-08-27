@@ -286,27 +286,45 @@ export function fitModel(
   ];
 
   if (linearCount > 0) {
+    const ssLinear = ssModel * (linearCount / dfModel);
+    const msLinear = ssLinear / linearCount;
+    const fLinear = msResidual > 0 ? msLinear / msResidual : undefined;
+    const pLinear = fLinear !== undefined && dfResidual > 0 ? fDistributionPValue(fLinear, linearCount, dfResidual) : undefined;
     anova.push({
       source: 'Linear',
-      ss: ssModel * (linearCount / dfModel), // Proportional partition approximation
+      ss: ssLinear,
       df: linearCount,
-      ms: (ssModel * (linearCount / dfModel)) / linearCount,
+      ms: msLinear,
+      fValue: fLinear,
+      pValue: pLinear,
     });
   }
   if (interactionCount > 0) {
+    const ss2FI = ssModel * (interactionCount / dfModel);
+    const ms2FI = ss2FI / interactionCount;
+    const f2FI = msResidual > 0 ? ms2FI / msResidual : undefined;
+    const p2FI = f2FI !== undefined && dfResidual > 0 ? fDistributionPValue(f2FI, interactionCount, dfResidual) : undefined;
     anova.push({
       source: '2-Factor Interaction (2FI)',
-      ss: ssModel * (interactionCount / dfModel),
+      ss: ss2FI,
       df: interactionCount,
-      ms: (ssModel * (interactionCount / dfModel)) / interactionCount,
+      ms: ms2FI,
+      fValue: f2FI,
+      pValue: p2FI,
     });
   }
   if (quadraticCount > 0) {
+    const ssQuad = ssModel * (quadraticCount / dfModel);
+    const msQuad = ssQuad / quadraticCount;
+    const fQuad = msResidual > 0 ? msQuad / msResidual : undefined;
+    const pQuad = fQuad !== undefined && dfResidual > 0 ? fDistributionPValue(fQuad, quadraticCount, dfResidual) : undefined;
     anova.push({
       source: 'Quadratic',
-      ss: ssModel * (quadraticCount / dfModel),
+      ss: ssQuad,
       df: quadraticCount,
-      ms: (ssModel * (quadraticCount / dfModel)) / quadraticCount,
+      ms: msQuad,
+      fValue: fQuad,
+      pValue: pQuad,
     });
   }
 

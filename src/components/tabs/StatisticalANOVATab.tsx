@@ -546,6 +546,21 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                                 {row.pValue < 0.001 ? '< 0.001' : row.pValue.toFixed(4)}
                                 {isLOF && (isPass ? ' (✓ Đạt > 0.05)' : ' (⚠ Thiếu phù hợp)')}
                               </span>
+                            ) : isLOF && row.df === 0 ? (
+                              <span
+                                style={{
+                                  fontSize: '0.72rem',
+                                  color: '#b45309',
+                                  backgroundColor: '#fef3c7',
+                                  padding: '0.15rem 0.4rem',
+                                  borderRadius: '4px',
+                                  border: '1px solid #fde68a',
+                                  display: 'inline-block',
+                                }}
+                                title="Mô hình bão hòa (df = 0 vì số tham số p bằng tổng số mẫu N). Hãy chọn dạng mô hình Linear hoặc 2FI, hoặc thêm số lần chạy thực nghiệm để tính p-value của Lack of Fit"
+                              >
+                                df = 0 (Mô hình bão hòa)
+                              </span>
                             ) : (
                               '-'
                             )}
@@ -556,6 +571,30 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                   </tbody>
                 </table>
               </div>
+
+              {/* Guidance for Saturated Model Lack of Fit df=0 */}
+              {model.anova.some((r) => r.source === 'Lack of Fit' && r.df === 0) && (
+                <div
+                  style={{
+                    marginTop: '0.65rem',
+                    padding: '0.55rem 0.75rem',
+                    backgroundColor: '#eff6ff',
+                    border: '1px solid #bfdbfe',
+                    borderRadius: '0.375rem',
+                    fontSize: '0.75rem',
+                    color: '#1e40af',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '0.45rem',
+                  }}
+                >
+                  <span style={{ fontSize: '0.95rem' }}>💡</span>
+                  <div>
+                    <strong>Lưu ý về Kiểm định Lack of Fit:</strong> Mô hình hiện tại có số tham số bằng đúng số mẫu thực nghiệm (mô hình bão hòa, $df_{'{'}Residual{'}'} \le df_{'{'}PureError{'}'}$ nên $df_{'{'}LOF{'}'} = 0$).
+                    Để tính được <strong>p-value Lack of Fit</strong>, bạn có thể chuyển <strong>"Dạng mô hình"</strong> ở trên sang <em>Tuyến tính (Linear)</em> hoặc <em>Tương tác (2FI)</em>, hoặc thêm các lần chạy thí nghiệm mới ở Tab 3.
+                  </div>
+                </div>
+              )}
 
               {/* Curvature Test (Kiểm định độ cong với Center Points) */}
               {model.curvatureTest && (
