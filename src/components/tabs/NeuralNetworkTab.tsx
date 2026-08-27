@@ -35,6 +35,7 @@ import type {
   ModelingEngine,
 } from '../../types/qbd';
 import { PlotlyChart } from '../PlotlyChart';
+import { NeuralNetworkTopologyDiagram } from '../NeuralNetworkTopologyDiagram';
 import { codedToActual } from '../../services/doeGenerator';
 import {
   optimizeNeuralDesirability,
@@ -1546,6 +1547,18 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               </button>
             </div>
           )}
+
+          {/* SVG Neural Network Topology Diagram (Lớp vào, Lớp ẩn 1, Lớp ẩn 2, Lớp ra Hợp nhất / Độc lập) */}
+          <div style={{ marginTop: '0.85rem' }}>
+            <NeuralNetworkTopologyDiagram
+              factors={project.factors}
+              cqas={project.cqas}
+              selectedCQA={selectedCQA}
+              config={localConfig}
+              trainingMode={neuralTrainingMode}
+              archMetrics={archMetrics}
+            />
+          </div>
         </div>
 
         {/* 4. Action Buttons Toolbar (Các Nút Fit, Áp Dụng...) */}

@@ -17,6 +17,7 @@ import type {
 import { exportQBDWordReport } from '../../services/reportGenerator';
 import { calculateDesignEfficiency } from '../../services/doeGenerator';
 import { generateUpdatedRiskAssessment, generateControlStrategy } from '../../services/statistics';
+import { NeuralNetworkTopologyDiagram } from '../NeuralNetworkTopologyDiagram';
 
 interface ReportTabProps {
   project: QBDProject;
@@ -500,6 +501,24 @@ export const ReportTab: React.FC<ReportTabProps> = ({
             <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#7c3aed', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
               5b. Mô hình Mạng Nơ-ron AI (Neural Network Platform)
             </h2>
+
+            {/* Neural Network Architecture Diagram */}
+            {(() => {
+              const firstNM = Object.values(neuralModels)[0];
+              if (!firstNM) return null;
+              return (
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <NeuralNetworkTopologyDiagram
+                    factors={project.factors}
+                    cqas={project.cqas}
+                    selectedCQA={firstNM.cqaCode}
+                    config={firstNM.config}
+                    trainingMode={Object.keys(neuralModels).length > 1 ? 'shared' : 'independent'}
+                  />
+                </div>
+              );
+            })()}
+
             {Object.values(neuralModels).map((nm) => {
               const cqa = project.cqas.find((c) => c.code === nm.cqaCode);
               return (
