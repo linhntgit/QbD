@@ -84,6 +84,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
       type: 'CPP',
       dataType: 'quantitative',
       controllability: 'controllable',
+      role: 'process_parameter',
       unit: '°C',
       low: 20,
       high: 80,
@@ -100,6 +101,15 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
         const l = field === 'low' ? Number(value) : f.low;
         const h = field === 'high' ? Number(value) : f.high;
         modified.center = Number(((l + h) / 2).toFixed(2));
+      }
+      if (field === 'role') {
+        if (value === 'mixture_component') {
+          modified.type = 'Mixture';
+        } else if (value === 'formulation_other') {
+          modified.type = 'Formulation';
+        } else if (value === 'process_parameter') {
+          modified.type = 'CPP';
+        }
       }
       return modified;
     });
@@ -520,7 +530,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                             ? '#ffedd5'
                             : '#eff6ff',
                       }}
-                      value={f.role || (f.type === 'Mixture' ? 'mixture_component' : 'process_parameter')}
+                      value={f.role || (f.type === 'Mixture' ? 'mixture_component' : (f.type === 'CMA' || f.type === 'Formulation') ? 'formulation_other' : 'process_parameter')}
                       onChange={(e) => handleUpdateFactor(f.id, 'role', e.target.value)}
                     >
                       <option value="mixture_component">🧪 Thành phần Hỗn hợp (Σ=100%)</option>
