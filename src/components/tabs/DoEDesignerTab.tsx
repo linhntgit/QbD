@@ -1,10 +1,9 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   LayoutGrid,
   Sparkles,
   RefreshCw,
   Download,
-  Layers,
   ArrowRight,
   Shuffle,
   Gauge,
@@ -21,6 +20,7 @@ import {
   ChevronDown,
   Copy,
   ArrowUpDown,
+  Trash2,
 } from 'lucide-react';
 import type {
   QBDProject,
@@ -73,8 +73,35 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
   const [isProcessingFile, setIsProcessingFile] = useState<boolean>(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [showExportMenu, setShowExportMenu] = useState<boolean>(false);
-  const [copySuccess, setCopySuccess] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // --- Excel Spreadsheet Selection & Bi-directional Clipboard Sync ---
+  interface CellCoord {
+    r: number;
+    c: number;
+  }
+  interface SelectionRange {
+    start: CellCoord;
+    end: CellCoord;
+  }
+
+  const [selection, setSelection] = useState<SelectionRange | null>(null);
+  const [activeCell, setActiveCell] = useState<CellCoord | null>(null);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [toastMsg, setToastMsg] = useState<{ text: string; type: 'success' | 'info' } | null>(null);
+
+  const showToast = (text: string, type: 'success' | 'info' = 'success') => {
+    setToastMsg({ text, type });
+    setTimeout(() => setToastMsg(null), 3500);
+  };
+
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      setIsDragging(false);
+    };
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+  }, []);
 
   const activeFactors = useMemo(
     () => project.factors.filter((f) => f.controllability !== 'constant'),
@@ -84,6 +111,374 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
     () => project.factors.filter((f) => f.role === 'mixture_component' || f.type === 'Mixture'),
     [project.factors]
   );
+
+  // Define dynamic Excel spreadsheet columns (A, B, C, D...)
+  const spreadsheetCols = useMemo(() => {
+    const cols: {
+      id: string;
+      letter: string;
+      title: string;
+      subTitle?: string;
+      type: 'std' | 'run' | 'factor' | 'mixture_sum' | 'coded' | 'cqa';
+      code: string;
+      factor?: typeof project.factors[0];
+      cqa?: typeof project.cqas[0];
+      isEditable: boolean;
+      headerBg: string;
+      headerColor: string;
+    }[] = [];
+
+    const colLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const getLetter = (index: number) => {
+      if (index < 26) return colLetters[index];
+      const first = Math.floor(index / 26) - 1;
+      const second = index % 26;
+      return colLetters[first] + colLetters[second];
+    };
+
+    let colIdx = 0;
+
+    // 1. Std Order
+    cols.push({
+      id: 'col-std',
+      letter: getLetter(colIdx++),
+      title: 'Std',
+      type: 'std',
+      code: 'std',
+      isEditable: false,
+      headerBg: '#f8fafc',
+      headerColor: '#64748b',
+    });
+
+    // 2. Run Order
+    cols.push({
+      id: 'col-run',
+      letter: getLetter(colIdx++),
+      title: 'Run',
+      subTitle: '(Sửa)',
+      type: 'run',
+      code: 'run',
+      isEditable: true,
+      headerBg: '#eff6ff',
+      headerColor: '#1d4ed8',
+    });
+
+    // 3. Factor Actual Columns
+    project.factors.forEach((f) => {
+      const isMix = f.role === 'mixture_component';
+      const isConstant = f.controllability === 'constant';
+      const isUncontrolled = f.controllability === 'uncontrollable_noise';
+      cols.push({
+        id: `col-fac-${f.id}`,
+        letter: getLetter(colIdx++),
+        title: `${f.name} (${f.code}) [${f.unit}]`,
+        subTitle: isMix ? '(Hỗn hợp)' : isUncontrolled ? '(Nhiễu)' : isConstant ? '(Hằng số)' : '(Thực tế)',
+        type: 'factor',
+        code: f.code,
+        factor: f,
+        isEditable: f.controllability !== 'constant',
+        headerBg: isMix ? '#f0fdfa' : isConstant ? '#f1f5f9' : isUncontrolled ? '#fef3c7' : '#eff6ff',
+        headerColor: isMix ? '#0f766e' : isConstant ? '#475569' : isUncontrolled ? '#92400e' : '#1e40af',
+      });
+    });
+
+    // 4. Mixture Sum Column (if mixture factors exist)
+    if (mixtureFactors.length > 0) {
+      cols.push({
+        id: 'col-mix-sum',
+        letter: getLetter(colIdx++),
+        title: 'Σ Hỗn Hợp',
+        subTitle: '(Chuẩn 100%)',
+        type: 'mixture_sum',
+        code: 'mix_sum',
+        isEditable: false,
+        headerBg: '#ecfdf5',
+        headerColor: '#065f46',
+      });
+    }
+
+    // 5. Coded Columns
+    project.factors.forEach((f) => {
+      cols.push({
+        id: `col-coded-${f.id}`,
+        letter: getLetter(colIdx++),
+        title: `${f.code} (Mã)`,
+        type: 'coded',
+        code: f.code,
+        factor: f,
+        isEditable: false,
+        headerBg: '#f8fafc',
+        headerColor: '#64748b',
+      });
+    });
+
+    // 6. CQA Columns
+    project.cqas.forEach((c) => {
+      cols.push({
+        id: `col-cqa-${c.id}`,
+        letter: getLetter(colIdx++),
+        title: `${c.name} (${c.code}) [${c.unit || ''}]`,
+        type: 'cqa',
+        code: c.code,
+        cqa: c,
+        isEditable: true,
+        headerBg: '#ccfbf1',
+        headerColor: '#0f766e',
+      });
+    });
+
+    return cols;
+  }, [project.factors, project.cqas, mixtureFactors]);
+
+  const getCellValue = (run: typeof project.runs[0], col: typeof spreadsheetCols[0]): string | number => {
+    switch (col.type) {
+      case 'std':
+        return run.stdOrder;
+      case 'run':
+        return run.runOrder;
+      case 'factor':
+        return run.factorActual[col.code] ?? '';
+      case 'mixture_sum': {
+        const sum = mixtureFactors.reduce((acc, f) => {
+          const v = Number(run.factorActual[f.code]);
+          return acc + (isNaN(v) ? 0 : v);
+        }, 0);
+        return Number(sum.toFixed(2));
+      }
+      case 'coded': {
+        const v = run.factorCoded[col.code];
+        return col.factor?.controllability === 'constant'
+          ? '🔒 C'
+          : typeof v === 'number'
+          ? Number(v.toFixed(2))
+          : (v ?? '-');
+      }
+      case 'cqa':
+        return run.responses[col.code] ?? '';
+    }
+  };
+
+  const normalizedRange = useMemo(() => {
+    if (!selection) return null;
+    const minR = Math.min(selection.start.r, selection.end.r);
+    const maxR = Math.max(selection.start.r, selection.end.r);
+    const minC = Math.min(selection.start.c, selection.end.c);
+    const maxC = Math.max(selection.start.c, selection.end.c);
+    return { minR, maxR, minC, maxC };
+  }, [selection]);
+
+  const selectionStats = useMemo(() => {
+    if (!normalizedRange || project.runs.length === 0) return null;
+    const { minR, maxR, minC, maxC } = normalizedRange;
+
+    let totalCount = 0;
+    let numericCount = 0;
+    let sum = 0;
+    let min = Infinity;
+    let max = -Infinity;
+
+    for (let r = minR; r <= maxR; r++) {
+      const run = project.runs[r];
+      if (!run) continue;
+      for (let c = minC; c <= maxC; c++) {
+        totalCount++;
+        const val = getCellValue(run, spreadsheetCols[c]);
+        if (typeof val === 'number' && !isNaN(val)) {
+          numericCount++;
+          sum += val;
+          if (val < min) min = val;
+          if (val > max) max = val;
+        }
+      }
+    }
+
+    const startColLetter = spreadsheetCols[minC]?.letter || 'A';
+    const endColLetter = spreadsheetCols[maxC]?.letter || 'A';
+    const rangeName =
+      minR === maxR && minC === maxC
+        ? `${startColLetter}${minR + 1}`
+        : `${startColLetter}${minR + 1}:${endColLetter}${maxR + 1}`;
+
+    return {
+      rangeName,
+      totalCount,
+      numericCount,
+      sum: numericCount > 0 ? Number(sum.toFixed(2)) : 0,
+      avg: numericCount > 0 ? Number((sum / numericCount).toFixed(2)) : 0,
+      min: numericCount > 0 ? min : 0,
+      max: numericCount > 0 ? max : 0,
+    };
+  }, [normalizedRange, project.runs, spreadsheetCols]);
+
+  const handleCopySelection = () => {
+    if (project.runs.length === 0) return;
+    const range = normalizedRange || {
+      minR: 0,
+      maxR: project.runs.length - 1,
+      minC: 0,
+      maxC: spreadsheetCols.length - 1,
+    };
+
+    const rowsText: string[] = [];
+    for (let r = range.minR; r <= range.maxR; r++) {
+      const run = project.runs[r];
+      if (!run) continue;
+      const rowVals: (string | number)[] = [];
+      for (let c = range.minC; c <= range.maxC; c++) {
+        rowVals.push(getCellValue(run, spreadsheetCols[c]));
+      }
+      rowsText.push(rowVals.join('\t'));
+    }
+
+    const tsv = rowsText.join('\n');
+    navigator.clipboard.writeText(tsv).then(() => {
+      const startLetter = spreadsheetCols[range.minC]?.letter;
+      const endLetter = spreadsheetCols[range.maxC]?.letter;
+      const name = `${startLetter}${range.minR + 1}:${endLetter}${range.maxR + 1}`;
+      showToast(`✓ Đã sao chép vùng ${name} (${(range.maxR - range.minR + 1) * (range.maxC - range.minC + 1)} ô) vào Clipboard!`);
+    });
+  };
+
+  const handlePasteMatrix = (clipboardText: string, anchorRow?: number, anchorCol?: number) => {
+    if (!clipboardText || project.runs.length === 0) return;
+    const startR = anchorRow !== undefined ? anchorRow : (normalizedRange ? normalizedRange.minR : (activeCell ? activeCell.r : 0));
+    const startC = anchorCol !== undefined ? anchorCol : (normalizedRange ? normalizedRange.minC : (activeCell ? activeCell.c : 0));
+
+    const lines = clipboardText
+      .trim()
+      .split(/\r?\n/)
+      .map((line) => line.split('\t'));
+
+    if (lines.length === 0) return;
+
+    const updatedRuns = [...project.runs];
+    let pastedCount = 0;
+
+    lines.forEach((line, rOffset) => {
+      const targetR = startR + rOffset;
+      if (targetR >= updatedRuns.length) return;
+
+      const run = { ...updatedRuns[targetR] };
+      const factorActual = { ...run.factorActual };
+      const factorCoded = { ...run.factorCoded };
+      const responses = { ...run.responses };
+      let runOrder = run.runOrder;
+
+      line.forEach((cellVal, cOffset) => {
+        const targetC = startC + cOffset;
+        if (targetC >= spreadsheetCols.length) return;
+
+        const col = spreadsheetCols[targetC];
+        if (!col.isEditable) return;
+
+        const trimmed = cellVal.trim();
+        if (trimmed === '') return;
+
+        if (col.type === 'run') {
+          const num = parseInt(trimmed);
+          if (!isNaN(num)) {
+            runOrder = num;
+            pastedCount++;
+          }
+        } else if (col.type === 'factor' && col.factor) {
+          const f = col.factor;
+          if (f.dataType === 'qualitative') {
+            factorActual[f.code] = trimmed;
+            factorCoded[f.code] = actualToCoded(trimmed, f);
+            pastedCount++;
+          } else {
+            const num = parseFloat(trimmed.replace(/,/g, '.'));
+            if (!isNaN(num)) {
+              factorActual[f.code] = num;
+              factorCoded[f.code] = actualToCoded(num, f);
+              pastedCount++;
+            }
+          }
+        } else if (col.type === 'cqa' && col.cqa) {
+          const c = col.cqa;
+          if (c.dataType === 'qualitative_binary') {
+            responses[c.code] = trimmed.toLowerCase().includes('đạt') || trimmed.toLowerCase() === 'pass' || trimmed === '1' ? 'Đạt' : 'Không đạt';
+            pastedCount++;
+          } else {
+            const num = parseFloat(trimmed.replace(/,/g, '.'));
+            if (!isNaN(num)) {
+              responses[c.code] = num;
+              pastedCount++;
+            } else {
+              responses[c.code] = trimmed;
+              pastedCount++;
+            }
+          }
+        }
+      });
+
+      updatedRuns[targetR] = {
+        ...run,
+        runOrder,
+        factorActual,
+        factorCoded,
+        responses,
+      };
+    });
+
+    onUpdateProject({ runs: updatedRuns });
+
+    const endR = Math.min(updatedRuns.length - 1, startR + lines.length - 1);
+    const endC = Math.min(spreadsheetCols.length - 1, startC + Math.max(...lines.map((l) => l.length)) - 1);
+    setSelection({
+      start: { r: startR, c: startC },
+      end: { r: endR, c: endC },
+    });
+    showToast(`✓ Đã dán thành công ${pastedCount} ô từ Excel!`);
+  };
+
+  const handlePasteFromClipboard = () => {
+    if (navigator.clipboard && navigator.clipboard.readText) {
+      navigator.clipboard.readText().then((text) => {
+        if (text) {
+          handlePasteMatrix(text);
+        } else {
+          setShowImportModal(true);
+          setImportTab('paste');
+        }
+      }).catch(() => {
+        setShowImportModal(true);
+        setImportTab('paste');
+      });
+    } else {
+      setShowImportModal(true);
+      setImportTab('paste');
+    }
+  };
+
+  const handleClearSelection = () => {
+    if (!normalizedRange || project.runs.length === 0) return;
+    const { minR, maxR, minC, maxC } = normalizedRange;
+    const updatedRuns = [...project.runs];
+    let clearedCount = 0;
+
+    for (let r = minR; r <= maxR; r++) {
+      const run = { ...updatedRuns[r] };
+      const factorActual = { ...run.factorActual };
+      const responses = { ...run.responses };
+
+      for (let c = minC; c <= maxC; c++) {
+        const col = spreadsheetCols[c];
+        if (!col.isEditable) continue;
+        if (col.type === 'factor') {
+          factorActual[col.code] = '';
+          clearedCount++;
+        } else if (col.type === 'cqa') {
+          responses[col.code] = '';
+          clearedCount++;
+        }
+      }
+      updatedRuns[r] = { ...run, factorActual, responses };
+    }
+
+    onUpdateProject({ runs: updatedRuns });
+    showToast(`✓ Đã xóa dữ liệu ${clearedCount} ô trong vùng chọn!`);
+  };
   const minRequiredTerms = useMemo(
     () => calculateNumModelTerms(activeFactors.length, designConfig.dOptimalModel || 'Quadratic'),
     [activeFactors.length, designConfig.dOptimalModel]
@@ -102,47 +497,6 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
     const { runs, alpha } = generateDoERuns(project.factors, designConfig);
     const updatedConfig = { ...designConfig, alpha };
     onUpdateProject({ doeConfig: updatedConfig, runs });
-  };
-
-  // 1-Click Copy Entire Table to Clipboard as TSV (compatible with Excel, Word, Google Sheets)
-  const handleCopyEntireTable = () => {
-    if (project.runs.length === 0) return;
-
-    const headers: string[] = [
-      'Std',
-      'Run',
-      ...project.factors.map((f) => `${f.name} (${f.code}) [${f.unit}]`),
-      ...(mixtureFactors.length > 0 ? ['Σ Mixture (%)'] : []),
-      ...project.factors.map((f) => `${f.code} (Coded)`),
-      ...project.cqas.map((c) => `${c.name} (${c.code}) [${c.unit || ''}]`),
-    ];
-
-    const rows = project.runs.map((run) => {
-      const sumMix = mixtureFactors.reduce((acc, f) => {
-        const v = Number(run.factorActual[f.code]);
-        return acc + (isNaN(v) ? 0 : v);
-      }, 0);
-
-      const row: (string | number)[] = [
-        run.stdOrder,
-        run.runOrder,
-        ...project.factors.map((f) => run.factorActual[f.code] ?? ''),
-        ...(mixtureFactors.length > 0 ? [Number(sumMix.toFixed(2))] : []),
-        ...project.factors.map((f) =>
-          typeof run.factorCoded[f.code] === 'number'
-            ? Number(run.factorCoded[f.code]).toFixed(2)
-            : run.factorCoded[f.code] ?? ''
-        ),
-        ...project.cqas.map((c) => run.responses[c.code] ?? ''),
-      ];
-      return row.join('\t');
-    });
-
-    const tsv = [headers.join('\t'), ...rows].join('\n');
-    navigator.clipboard.writeText(tsv).then(() => {
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2500);
-    });
   };
 
   // Manual Edit for Randomized Run Order
@@ -235,97 +589,6 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
         },
       };
     });
-    onUpdateProject({ runs: updatedRuns });
-  };
-
-  // Direct paste into table cells (handles multi-cell copy from Excel)
-  const handleCellPaste = (
-    e: React.ClipboardEvent<HTMLInputElement>,
-    startRunIdx: number,
-    startColType: 'factor' | 'cqa',
-    startColCode: string
-  ) => {
-    const clipboardData = e.clipboardData.getData('text');
-    if (!clipboardData || (!clipboardData.includes('\t') && !clipboardData.includes('\n'))) {
-      return; // Regular single-cell paste handled by browser
-    }
-    e.preventDefault();
-
-    const lines = clipboardData
-      .trim()
-      .split(/\r?\n/)
-      .map((l) => l.split('\t'));
-
-    if (lines.length === 0) return;
-
-    const allEditableCols: { type: 'factor' | 'cqa'; code: string }[] = [
-      ...project.factors.map((f) => ({ type: 'factor' as const, code: f.code })),
-      ...project.cqas.map((c) => ({ type: 'cqa' as const, code: c.code })),
-    ];
-
-    let startColIdx = 0;
-    if (startColType === 'factor') {
-      startColIdx = project.factors.findIndex((f) => f.code === startColCode);
-      if (startColIdx === -1) startColIdx = 0;
-    } else {
-      const cqaIdx = project.cqas.findIndex((c) => c.code === startColCode);
-      startColIdx = project.factors.length + (cqaIdx >= 0 ? cqaIdx : 0);
-    }
-
-    const updatedRuns = [...project.runs];
-
-    lines.forEach((line, rOffset) => {
-      const targetRunIdx = startRunIdx + rOffset;
-      if (targetRunIdx >= updatedRuns.length) return;
-
-      const run = { ...updatedRuns[targetRunIdx] };
-      const factorActual = { ...run.factorActual };
-      const factorCoded = { ...run.factorCoded };
-      const responses = { ...run.responses };
-
-      line.forEach((cellVal, cOffset) => {
-        const targetColIdx = startColIdx + cOffset;
-        if (targetColIdx >= allEditableCols.length) return;
-
-        const col = allEditableCols[targetColIdx];
-        const trimmedVal = cellVal.trim();
-        if (trimmedVal === '') return;
-
-        if (col.type === 'factor') {
-          const factor = project.factors.find((f) => f.code === col.code);
-          if (factor) {
-            if (factor.dataType === 'qualitative') {
-              factorActual[factor.code] = trimmedVal;
-              factorCoded[factor.code] = actualToCoded(trimmedVal, factor);
-            } else {
-              const num = parseFloat(trimmedVal.replace(/,/g, '.'));
-              if (!isNaN(num)) {
-                factorActual[factor.code] = num;
-                factorCoded[factor.code] = actualToCoded(num, factor);
-              }
-            }
-          }
-        } else {
-          const cqa = project.cqas.find((c) => c.code === col.code);
-          if (cqa) {
-            if (cqa.dataType?.startsWith('qualitative')) {
-              responses[cqa.code] = trimmedVal;
-            } else {
-              const num = parseFloat(trimmedVal.replace(/,/g, '.'));
-              if (!isNaN(num)) {
-                responses[cqa.code] = num;
-              }
-            }
-          }
-        }
-      });
-
-      run.factorActual = factorActual;
-      run.factorCoded = factorCoded;
-      run.responses = responses;
-      updatedRuns[targetRunIdx] = run;
-    });
-
     onUpdateProject({ runs: updatedRuns });
   };
 
@@ -671,17 +934,24 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
         </div>
       )}
 
-      {/* Experimental Matrix & Runs Table */}
-      <div className="qbd-card">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '0.85rem' }}>
+      {/* Experimental Matrix & Runs Table (Excel-like Interactive Spreadsheet) */}
+      <div className="qbd-card" style={{ padding: '1rem', border: '1px solid #cbd5e1' }}>
+        
+        {/* Top Header & Action Toolbar */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <Layers size={19} color="#0f766e" />
-            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#0f172a' }}>
-              Ma Trận Thực Nghiệm & Bảng Nhập Kết Quả ({project.runs.length} lần chạy)
-            </h3>
+            <FileSpreadsheet size={22} color="#16a34a" />
+            <div>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
+                Bảng Tính Ma Trận Thực Nghiệm &amp; Kết Quả ({project.runs.length} lần chạy)
+              </h3>
+              <p style={{ fontSize: '0.75rem', color: '#64748b', margin: 0, marginTop: '0.1rem' }}>
+                Hỗ trợ chọn/bôi đen vùng dữ liệu 2D, Copy (Ctrl+C), Paste 2 chiều từ MS Excel (Ctrl+V) &amp; Xóa (Del).
+              </p>
+            </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
             {/* Hidden File Input for Excel/CSV */}
             <input
               type="file"
@@ -691,83 +961,106 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               onChange={handleFileUpload}
             />
 
-            {/* 1-Click Copy Entire Table to Clipboard */}
+            {/* Copy Selected Range / Entire Table */}
             <button
-              onClick={handleCopyEntireTable}
+              onClick={handleCopySelection}
               className="btn btn-secondary"
               style={{
                 fontSize: '0.8rem',
-                padding: '0.35rem 0.75rem',
-                backgroundColor: copySuccess ? '#dcfce7' : undefined,
-                color: copySuccess ? '#15803d' : undefined,
-                borderColor: copySuccess ? '#86efac' : undefined,
+                padding: '0.35rem 0.65rem',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.35rem',
+                backgroundColor: '#ffffff',
+                borderColor: '#cbd5e1',
               }}
-              title="Sao chép toàn bộ bảng số liệu sang clipboard để paste trực tiếp vào MS Excel, Word, Google Sheets"
+              title="Sao chép vùng ô đang chọn (hoặc toàn bộ bảng nếu chưa chọn) sang Clipboard (Ctrl+C)"
             >
-              {copySuccess ? <Check size={14} /> : <Copy size={14} />}
-              <span>{copySuccess ? '✓ Đã Sao Chép!' : '📋 Sao Chép Bảng'}</span>
+              <Copy size={14} color="#2563eb" />
+              <span>📋 Copy Vùng (Ctrl+C)</span>
             </button>
 
-            {/* Smart Paste from Excel */}
+            {/* Paste from Clipboard */}
             <button
-              onClick={() => {
-                setShowImportModal(true);
-                setImportTab('paste');
-                setFileError(null);
+              onClick={handlePasteFromClipboard}
+              className="btn btn-secondary"
+              style={{
+                fontSize: '0.8rem',
+                padding: '0.35rem 0.65rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                backgroundColor: '#ffffff',
+                borderColor: '#cbd5e1',
               }}
-              className="btn btn-primary"
-              style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem', backgroundColor: '#1d4ed8' }}
-              title="Mở hộp thoại dán số liệu trực tiếp từ bảng tính MS Excel"
+              title="Dán dữ liệu từ Clipboard vào ô/vùng đang chọn (Ctrl+V)"
             >
-              <Clipboard size={14} />
-              <span>Dán từ Excel</span>
+              <Clipboard size={14} color="#16a34a" />
+              <span>📥 Dán Dữ Liệu (Ctrl+V)</span>
+            </button>
+
+            {/* Clear Selected Cells */}
+            <button
+              onClick={handleClearSelection}
+              className="btn btn-secondary"
+              style={{
+                fontSize: '0.8rem',
+                padding: '0.35rem 0.6rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.3rem',
+                backgroundColor: '#ffffff',
+                borderColor: '#cbd5e1',
+                color: '#dc2626',
+              }}
+              title="Xóa giá trị trong các ô đang chọn (Delete)"
+            >
+              <Trash2 size={13} />
+              <span>Xóa Ô (Del)</span>
             </button>
 
             {/* Upload Excel / CSV */}
             <button
               onClick={() => fileInputRef.current?.click()}
               className="btn btn-primary"
-              style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem', backgroundColor: '#0284c7' }}
+              style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem', backgroundColor: '#0284c7' }}
               title="Tải lên file dữ liệu MS Excel (.xlsx) hoặc CSV (.csv)"
               disabled={isProcessingFile}
             >
               <Upload size={14} />
-              <span>{isProcessingFile ? 'Đang đọc file...' : '📤 Tải Lên'}</span>
+              <span>{isProcessingFile ? 'Đang đọc...' : '📤 Tải Lên'}</span>
             </button>
 
             {/* Randomize Run Order */}
             <button
               onClick={handleRandomizeRunOrder}
               className="btn btn-secondary"
-              style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem' }}
+              style={{ fontSize: '0.8rem', padding: '0.35rem 0.6rem' }}
               title="Sinh ngẫu nhiên số thứ tự thực hiện thí nghiệm (Randomized Run Order) theo chuẩn DoE"
             >
-              <Shuffle size={14} />
-              <span>🎲 Xáo Run Order</span>
+              <Shuffle size={13} />
+              <span>🎲 Xáo Run</span>
             </button>
 
             {/* Sort Runs by Run Order */}
             <button
               onClick={() => handleSortRuns('run')}
               className="btn btn-secondary"
-              style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem' }}
+              style={{ fontSize: '0.8rem', padding: '0.35rem 0.6rem' }}
               title="Sắp xếp danh sách bảng theo thứ tự thực hiện ngẫu nhiên (Run Order)"
             >
-              <ArrowUpDown size={14} />
-              <span>Sắp Xếp (Run)</span>
+              <ArrowUpDown size={13} />
+              <span>Sắp (Run)</span>
             </button>
 
             {/* Auto-fill Simulation Demo */}
             <button
               onClick={handleAutoSimulateData}
               className="btn btn-teal"
-              style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
+              style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem' }}
               title="Tự động sinh số liệu thực nghiệm mô phỏng dựa trên mô hình hóa dược phẩm để test nhanh"
             >
-              <Sparkles size={14} />
+              <Sparkles size={13} />
               <span>Điền Mô Phỏng</span>
             </button>
 
@@ -776,11 +1069,11 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               <button
                 onClick={() => setShowExportMenu(!showExportMenu)}
                 className="btn btn-secondary"
-                style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
                 title="Tải bảng số liệu về máy tính dưới các định dạng"
               >
-                <Download size={14} />
-                <span>Xuất Dữ Liệu</span>
+                <Download size={13} />
+                <span>Xuất File</span>
                 <ChevronDown size={12} />
               </button>
 
@@ -891,6 +1184,115 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
           </div>
         </div>
 
+        {/* Excel Formula / Name Box & Statistics Status Bar */}
+        <div
+          style={{
+            backgroundColor: '#f8fafc',
+            border: '1px solid #cbd5e1',
+            borderRadius: '4px',
+            padding: '0.35rem 0.65rem',
+            marginBottom: '0.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '0.5rem',
+            fontSize: '0.78rem',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            {/* Excel Name Box */}
+            <div
+              style={{
+                backgroundColor: '#ffffff',
+                border: '1px solid #94a3b8',
+                borderRadius: '3px',
+                padding: '0.15rem 0.5rem',
+                fontWeight: '700',
+                fontFamily: 'monospace',
+                color: '#0f172a',
+                minWidth: '70px',
+                textAlign: 'center',
+              }}
+              title="Tọa độ ô hoặc vùng chọn hiện tại (theo chuẩn bảng tính Excel)"
+            >
+              {selectionStats ? selectionStats.rangeName : 'A1'}
+            </div>
+
+            {/* Formula fx symbol */}
+            <span style={{ fontWeight: '800', fontStyle: 'italic', color: '#16a34a', fontSize: '0.9rem' }}>
+              fx
+            </span>
+
+            {/* Selection Summary Statistics */}
+            {selectionStats && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: '#334155' }}>
+                <span style={{ fontWeight: '600', color: '#0f172a' }}>
+                  {selectionStats.totalCount > 1
+                    ? `Đã chọn ${selectionStats.totalCount} ô`
+                    : '1 ô'}
+                </span>
+                {selectionStats.numericCount > 0 && (
+                  <>
+                    <span style={{ color: '#94a3b8' }}>|</span>
+                    <span><strong>Tổng:</strong> {selectionStats.sum}</span>
+                    <span style={{ color: '#94a3b8' }}>|</span>
+                    <span><strong>TB:</strong> {selectionStats.avg}</span>
+                    <span style={{ color: '#94a3b8' }}>|</span>
+                    <span><strong>Min:</strong> {selectionStats.min}</span>
+                    <span style={{ color: '#94a3b8' }}>|</span>
+                    <span><strong>Max:</strong> {selectionStats.max}</span>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Toast Notification Pill */}
+          {toastMsg && (
+            <div
+              className="animate-fade-in"
+              style={{
+                backgroundColor: toastMsg.type === 'success' ? '#dcfce7' : '#e0f2fe',
+                color: toastMsg.type === 'success' ? '#15803d' : '#0369a1',
+                border: `1px solid ${toastMsg.type === 'success' ? '#86efac' : '#7dd3fc'}`,
+                padding: '0.15rem 0.6rem',
+                borderRadius: '4px',
+                fontWeight: '700',
+                fontSize: '0.75rem',
+              }}
+            >
+              {toastMsg.text}
+            </div>
+          )}
+
+          {/* Mixture Constraint Audit Indicator */}
+          {mixtureFactors.length > 0 && (
+            <div>
+              {(() => {
+                const allPass = project.runs.every((r) => {
+                  const sum = mixtureFactors.reduce((acc, f) => acc + (Number(r.factorActual[f.code]) || 0), 0);
+                  return Math.abs(sum - 100) < 0.1;
+                });
+                return (
+                  <span
+                    style={{
+                      fontWeight: '700',
+                      padding: '0.15rem 0.45rem',
+                      borderRadius: '4px',
+                      backgroundColor: allPass ? '#dcfce7' : '#fee2e2',
+                      color: allPass ? '#15803d' : '#b91c1c',
+                      border: `1px solid ${allPass ? '#86efac' : '#fca5a5'}`,
+                    }}
+                  >
+                    {allPass ? `✓ Ràng buộc Hỗn Hợp: Σ = 100%` : `⚠ Chú ý: Có hàng chưa đạt Σ = 100%`}
+                  </span>
+                );
+              })()}
+            </div>
+          )}
+        </div>
+
         {project.runs.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#64748b' }}>
             <LayoutGrid size={40} color="#cbd5e1" style={{ margin: '0 auto 0.75rem' }} />
@@ -900,208 +1302,326 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
             </p>
           </div>
         ) : (
-          <div>
-            {/* Info & Mixture Validation Audit Bar */}
-            <div
+          /* Excel Spreadsheet Interactive Grid */
+          <div
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+                const sel = window.getSelection();
+                if (!sel || sel.toString() === '') {
+                  e.preventDefault();
+                  handleCopySelection();
+                }
+              } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+                e.preventDefault();
+                setSelection({
+                  start: { r: 0, c: 0 },
+                  end: { r: project.runs.length - 1, c: spreadsheetCols.length - 1 },
+                });
+              } else if (e.key === 'Delete') {
+                const activeEl = document.activeElement;
+                if (!activeEl || activeEl.tagName !== 'INPUT') {
+                  e.preventDefault();
+                  handleClearSelection();
+                }
+              }
+            }}
+            style={{
+              maxHeight: '560px',
+              overflow: 'auto',
+              border: '1px solid #cbd5e1',
+              borderRadius: '4px',
+              backgroundColor: '#ffffff',
+              outline: 'none',
+              userSelect: isDragging ? 'none' : 'text',
+            }}
+          >
+            <table
               style={{
-                backgroundColor: '#f0fdfa',
-                border: '1px solid #ccfbf1',
-                borderRadius: '0.375rem',
-                padding: '0.45rem 0.75rem',
-                marginBottom: '0.65rem',
-                fontSize: '0.76rem',
-                color: '#0f766e',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: '0.4rem',
+                width: '100%',
+                borderCollapse: 'collapse',
+                fontSize: '0.82rem',
+                tableLayout: 'auto',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <span>💡</span>
-                <span>
-                  <strong>Chọn &amp; Sao chép tự do:</strong> Bạn có thể bôi đen bất kỳ vùng dữ liệu nào hoặc nhấn <strong>"📋 Sao Chép Bảng"</strong> để dán sang MS Excel/Word. Ô <strong>Run</strong> có thể chỉnh sửa thủ công theo thứ tự thực tế tại Lab.
-                </span>
-              </div>
-              {mixtureFactors.length > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  {(() => {
-                    const allPass = project.runs.every((r) => {
-                      const sum = mixtureFactors.reduce((acc, f) => acc + (Number(r.factorActual[f.code]) || 0), 0);
-                      return Math.abs(sum - 100) < 0.1;
-                    });
-                    return (
-                      <span
-                        style={{
-                          fontWeight: '700',
-                          padding: '0.15rem 0.45rem',
-                          borderRadius: '4px',
-                          backgroundColor: allPass ? '#dcfce7' : '#fee2e2',
-                          color: allPass ? '#15803d' : '#b91c1c',
-                          border: `1px solid ${allPass ? '#86efac' : '#fca5a5'}`,
-                        }}
-                      >
-                        {allPass ? `✓ Ràng buộc Hỗn Hợp: 100% các lần chạy đạt chuẩn Σ = 100%` : `⚠ Chú ý: Có lần chạy chưa đạt Σ Hỗn Hợp = 100%`}
-                      </span>
-                    );
-                  })()}
-                </div>
-              )}
-            </div>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                {/* Header Row 1: Excel Column Letters (A, B, C, D...) */}
+                <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #cbd5e1' }}>
+                  {/* Select All Top-Left Cell */}
+                  <th
+                    onClick={() => {
+                      setSelection({
+                        start: { r: 0, c: 0 },
+                        end: { r: project.runs.length - 1, c: spreadsheetCols.length - 1 },
+                      });
+                    }}
+                    style={{
+                      width: '36px',
+                      minWidth: '36px',
+                      backgroundColor: '#e2e8f0',
+                      borderRight: '1px solid #cbd5e1',
+                      borderBottom: '1px solid #cbd5e1',
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      padding: '0.2rem',
+                    }}
+                    title="Chọn toàn bộ bảng tính"
+                  >
+                    <div style={{ width: '8px', height: '8px', borderRight: '2px solid #94a3b8', borderBottom: '2px solid #94a3b8', margin: '0 auto' }} />
+                  </th>
 
-            <div className="table-container" style={{ maxHeight: '550px', userSelect: 'text' }}>
-              <table className="qbd-table" style={{ userSelect: 'text' }}>
-                <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                  <tr>
-                    <th style={{ width: '45px', textAlign: 'center' }}>Std</th>
-                    <th style={{ width: '65px', textAlign: 'center' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                        <span>Run</span>
-                        <span style={{ fontSize: '0.62rem', fontWeight: 'normal', color: '#2563eb' }}>(Sửa được)</span>
+                  {spreadsheetCols.map((col, colIdx) => (
+                    <th
+                      key={`letter-${col.id}`}
+                      onClick={() => {
+                        setSelection({
+                          start: { r: 0, c: colIdx },
+                          end: { r: project.runs.length - 1, c: colIdx },
+                        });
+                        setActiveCell({ r: 0, c: colIdx });
+                      }}
+                      style={{
+                        backgroundColor: '#f1f5f9',
+                        color: '#475569',
+                        fontWeight: '700',
+                        fontSize: '0.72rem',
+                        textAlign: 'center',
+                        padding: '0.2rem 0.4rem',
+                        borderRight: '1px solid #cbd5e1',
+                        borderBottom: '1px solid #cbd5e1',
+                        cursor: 'pointer',
+                      }}
+                      title={`Bấm để chọn toàn bộ Cột ${col.letter} (${col.title})`}
+                    >
+                      {col.letter}
+                    </th>
+                  ))}
+                </tr>
+
+                {/* Header Row 2: Variable & CQA Titles */}
+                <tr style={{ borderBottom: '2px solid #94a3b8' }}>
+                  <th
+                    style={{
+                      backgroundColor: '#f8fafc',
+                      color: '#64748b',
+                      borderRight: '1px solid #cbd5e1',
+                      textAlign: 'center',
+                      fontSize: '0.7rem',
+                      fontWeight: '700',
+                      padding: '0.35rem 0.2rem',
+                    }}
+                  >
+                    #
+                  </th>
+
+                  {spreadsheetCols.map((col, colIdx) => (
+                    <th
+                      key={`title-${col.id}`}
+                      onClick={() => {
+                        setSelection({
+                          start: { r: 0, c: colIdx },
+                          end: { r: project.runs.length - 1, c: colIdx },
+                        });
+                        setActiveCell({ r: 0, c: colIdx });
+                      }}
+                      style={{
+                        backgroundColor: col.headerBg,
+                        color: col.headerColor,
+                        padding: '0.45rem 0.5rem',
+                        textAlign: col.type === 'std' || col.type === 'run' || col.type === 'mixture_sum' || col.type === 'coded' ? 'center' : 'left',
+                        fontWeight: '700',
+                        fontSize: '0.78rem',
+                        borderRight: '1px solid #cbd5e1',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                        <span>{col.title}</span>
+                        {col.subTitle && (
+                          <span style={{ fontSize: '0.66rem', fontWeight: 'normal', opacity: 0.85 }}>
+                            {col.subTitle}
+                          </span>
+                        )}
                       </div>
                     </th>
-                    {/* Factor Actual Headers */}
-                    {project.factors.map((f) => (
-                      <th
-                        key={`head-fac-${f.id}`}
-                        style={{
-                          backgroundColor:
-                            f.role === 'mixture_component'
-                              ? '#f0fdfa'
-                              : f.controllability === 'constant'
-                              ? '#f1f5f9'
-                              : f.controllability === 'uncontrollable_noise'
-                              ? '#fef3c7'
-                              : '#eff6ff',
-                          color:
-                            f.role === 'mixture_component'
-                              ? '#0f766e'
-                              : f.controllability === 'constant'
-                              ? '#475569'
-                              : f.controllability === 'uncontrollable_noise'
-                              ? '#92400e'
-                              : '#1e40af',
-                          minWidth: '130px',
-                        }}
-                      >
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                            <span>{f.role === 'mixture_component' ? '🧪' : f.controllability === 'constant' ? '🔒' : f.controllability === 'uncontrollable_noise' ? '🌪️' : '🎯'}</span>
-                            <span>{f.name} ({f.code}) [{f.unit}]</span>
-                          </div>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 'normal', opacity: 0.85 }}>
-                            {f.role === 'mixture_component' ? '(Thành phần hỗn hợp)' : f.controllability === 'uncontrollable_noise' ? '(Biến nhiễu - Đo thực tế)' : '(Giá trị thực tế)'}
-                          </span>
-                        </div>
-                      </th>
-                    ))}
+                  ))}
+                </tr>
+              </thead>
 
-                    {/* Mixture Sum Validation Column */}
-                    {mixtureFactors.length > 0 && (
-                      <th
+              <tbody>
+                {project.runs.map((run, runIdx) => {
+                  const sumMix = mixtureFactors.reduce((acc, f) => {
+                    const v = Number(run.factorActual[f.code]);
+                    return acc + (isNaN(v) ? 0 : v);
+                  }, 0);
+                  const is100 = Math.abs(sumMix - 100) < 0.1;
+
+                  return (
+                    <tr key={run.id} style={{ height: '32px' }}>
+                      {/* Excel Row Header Number (1, 2, 3...) */}
+                      <td
+                        onClick={() => {
+                          setSelection({
+                            start: { r: runIdx, c: 0 },
+                            end: { r: runIdx, c: spreadsheetCols.length - 1 },
+                          });
+                          setActiveCell({ r: runIdx, c: 0 });
+                        }}
                         style={{
-                          backgroundColor: '#ecfdf5',
-                          color: '#065f46',
+                          backgroundColor: '#f8fafc',
+                          color: '#64748b',
+                          fontWeight: '700',
                           textAlign: 'center',
-                          minWidth: '95px',
-                          borderLeft: '2px solid #a7f3d0',
-                          borderRight: '2px solid #a7f3d0',
+                          fontSize: '0.72rem',
+                          borderRight: '1px solid #cbd5e1',
+                          borderBottom: '1px solid #cbd5e1',
+                          cursor: 'pointer',
+                          padding: '0.2rem',
+                          userSelect: 'none',
                         }}
+                        title={`Bấm để chọn toàn bộ Hàng ${runIdx + 1}`}
                       >
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                          <span>Σ Hỗn Hợp</span>
-                          <span style={{ fontSize: '0.65rem', fontWeight: 'normal', color: '#047857' }}>(Chuẩn = 100%)</span>
-                        </div>
-                      </th>
-                    )}
+                        {runIdx + 1}
+                      </td>
 
-                    {/* Coded Headers */}
-                    {project.factors.map((f) => (
-                      <th key={`head-coded-${f.id}`} style={{ backgroundColor: '#f1f5f9', color: '#475569', textAlign: 'center', minWidth: '70px' }}>
-                        {f.code} (Mã)
-                      </th>
-                    ))}
-                    {/* CQA Response Headers */}
-                    {project.cqas.map((c) => (
-                      <th key={`head-cqa-${c.id}`} style={{ backgroundColor: '#ccfbf1', color: '#0f766e', minWidth: '120px' }}>
-                        {c.name} ({c.code}) {c.dataType?.startsWith('qualitative') ? '[Định tính]' : `[${c.unit}]`}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {project.runs.map((run, runIdx) => {
-                    const sumMix = mixtureFactors.reduce((acc, f) => {
-                      const v = Number(run.factorActual[f.code]);
-                      return acc + (isNaN(v) ? 0 : v);
-                    }, 0);
-                    const is100 = Math.abs(sumMix - 100) < 0.1;
+                      {/* Excel Data Cells */}
+                      {spreadsheetCols.map((col, colIdx) => {
+                        const inRange =
+                          normalizedRange &&
+                          runIdx >= normalizedRange.minR &&
+                          runIdx <= normalizedRange.maxR &&
+                          colIdx >= normalizedRange.minC &&
+                          colIdx <= normalizedRange.maxC;
 
-                    return (
-                      <tr key={run.id}>
-                        <td style={{ textAlign: 'center', fontWeight: '600', color: '#64748b' }}>
-                          {run.stdOrder}
-                        </td>
+                        const isActive =
+                          activeCell &&
+                          activeCell.r === runIdx &&
+                          activeCell.c === colIdx;
 
-                        {/* Editable Run Order Input */}
-                        <td style={{ textAlign: 'center', padding: '0.2rem 0.3rem' }}>
-                          <input
-                            type="number"
-                            min={1}
-                            max={999}
-                            className="input-field"
-                            style={{
-                              width: '48px',
-                              textAlign: 'center',
-                              fontWeight: '700',
-                              color: '#1e40af',
-                              padding: '0.2rem',
-                              fontSize: '0.82rem',
-                              backgroundColor: '#f8fafc',
-                              borderColor: '#93c5fd',
-                              margin: '0 auto',
-                              display: 'block',
+                        const isEdgeTop = inRange && runIdx === normalizedRange.minR;
+                        const isEdgeBottom = inRange && runIdx === normalizedRange.maxR;
+                        const isEdgeLeft = inRange && colIdx === normalizedRange.minC;
+                        const isEdgeRight = inRange && colIdx === normalizedRange.maxC;
+
+                        return (
+                          <td
+                            key={`cell-${run.id}-${col.id}`}
+                            onMouseDown={(e) => {
+                              if (e.shiftKey && activeCell) {
+                                setSelection({
+                                  start: activeCell,
+                                  end: { r: runIdx, c: colIdx },
+                                });
+                              } else {
+                                setActiveCell({ r: runIdx, c: colIdx });
+                                setSelection({
+                                  start: { r: runIdx, c: colIdx },
+                                  end: { r: runIdx, c: colIdx },
+                                });
+                                setIsDragging(true);
+                              }
                             }}
-                            title="Thứ tự thực hiện thí nghiệm ngẫu nhiên (Bạn có thể sửa thủ công theo thứ tự thực tế tại Lab)"
-                            value={run.runOrder}
-                            onChange={(e) => handleRunOrderChange(run.id, parseInt(e.target.value) || 1)}
-                          />
-                        </td>
+                            onMouseEnter={() => {
+                              if (isDragging && selection) {
+                                setSelection({
+                                  ...selection,
+                                  end: { r: runIdx, c: colIdx },
+                                });
+                              }
+                            }}
+                            style={{
+                              padding: 0,
+                              backgroundColor: inRange
+                                ? '#dbeafe'
+                                : col.type === 'mixture_sum'
+                                ? '#f0fdf4'
+                                : col.type === 'coded'
+                                ? '#f8fafc'
+                                : col.factor?.role === 'mixture_component'
+                                ? '#f0fdfa'
+                                : col.factor?.controllability === 'constant'
+                                ? '#f8fafc'
+                                : col.factor?.controllability === 'uncontrollable_noise'
+                                ? '#fffbeb'
+                                : col.type === 'cqa'
+                                ? '#f0fdfa'
+                                : '#ffffff',
+                              borderTop: isEdgeTop ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                              borderBottom: isEdgeBottom ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                              borderLeft: isEdgeLeft ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                              borderRight: isEdgeRight ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                              boxShadow: isActive ? 'inset 0 0 0 2px #1d4ed8' : undefined,
+                              textAlign: col.type === 'std' || col.type === 'run' || col.type === 'mixture_sum' || col.type === 'coded' ? 'center' : 'left',
+                              position: 'relative',
+                            }}
+                          >
+                            {/* 1. Std Order (Read-only) */}
+                            {col.type === 'std' && (
+                              <div style={{ padding: '0.35rem', fontWeight: '600', color: '#64748b', textAlign: 'center' }}>
+                                {run.stdOrder}
+                              </div>
+                            )}
 
-                        {/* Editable Factor Actual Inputs */}
-                        {project.factors.map((f) => {
-                          const isConstant = f.controllability === 'constant';
-                          const isUncontrolled = f.controllability === 'uncontrollable_noise';
-                          const isMix = f.role === 'mixture_component';
-                          const val = run.factorActual[f.code];
+                            {/* 2. Run Order (Editable) */}
+                            {col.type === 'run' && (
+                              <input
+                                type="number"
+                                min={1}
+                                max={999}
+                                style={{
+                                  width: '100%',
+                                  height: '32px',
+                                  border: 'none',
+                                  outline: 'none',
+                                  textAlign: 'center',
+                                  fontWeight: '700',
+                                  color: '#1d4ed8',
+                                  backgroundColor: 'transparent',
+                                  fontSize: '0.82rem',
+                                  padding: '0.2rem',
+                                }}
+                                value={run.runOrder}
+                                onFocus={() => {
+                                  setActiveCell({ r: runIdx, c: colIdx });
+                                  setSelection({ start: { r: runIdx, c: colIdx }, end: { r: runIdx, c: colIdx } });
+                                }}
+                                onChange={(e) => handleRunOrderChange(run.id, parseInt(e.target.value) || 1)}
+                                onPaste={(e) => {
+                                  const text = e.clipboardData.getData('text');
+                                  if (text && (text.includes('\t') || text.includes('\n'))) {
+                                    e.preventDefault();
+                                    handlePasteMatrix(text, runIdx, colIdx);
+                                  }
+                                }}
+                              />
+                            )}
 
-                          return (
-                            <td
-                              key={`actual-${run.id}-${f.code}`}
-                              style={{
-                                backgroundColor: isMix ? '#f0fdfa' : isConstant ? '#f8fafc' : isUncontrolled ? '#fffbeb' : '#ffffff',
-                                padding: '0.25rem 0.35rem',
-                              }}
-                            >
-                              {f.dataType === 'qualitative' ? (
+                            {/* 3. Factor Actual (Editable) */}
+                            {col.type === 'factor' && col.factor && (
+                              col.factor.dataType === 'qualitative' ? (
                                 <select
-                                  className="input-field"
                                   style={{
-                                    padding: '0.2rem 0.35rem',
+                                    width: '100%',
+                                    height: '32px',
+                                    border: 'none',
+                                    outline: 'none',
+                                    backgroundColor: 'transparent',
                                     fontSize: '0.8rem',
                                     fontWeight: '600',
                                     color: '#1e3a8a',
-                                    width: '100%',
+                                    padding: '0 0.4rem',
                                   }}
-                                  value={typeof val === 'string' ? val : ''}
-                                  onChange={(e) => handleFactorActualChange(run.id, f.code, e.target.value)}
+                                  value={typeof run.factorActual[col.code] === 'string' ? run.factorActual[col.code] : ''}
+                                  onFocus={() => {
+                                    setActiveCell({ r: runIdx, c: colIdx });
+                                    setSelection({ start: { r: runIdx, c: colIdx }, end: { r: runIdx, c: colIdx } });
+                                  }}
+                                  onChange={(e) => handleFactorActualChange(run.id, col.code, e.target.value)}
                                 >
-                                  {f.categories && f.categories.length > 0 ? (
-                                    f.categories.map((cat) => (
-                                      <option key={cat} value={cat}>
-                                        {cat}
-                                      </option>
+                                  {col.factor.categories && col.factor.categories.length > 0 ? (
+                                    col.factor.categories.map((cat) => (
+                                      <option key={cat} value={cat}>{cat}</option>
                                     ))
                                   ) : (
                                     <>
@@ -1114,108 +1634,144 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                                 <input
                                   type="number"
                                   step="any"
-                                  className="input-field"
+                                  disabled={col.factor.controllability === 'constant'}
                                   style={{
-                                    padding: '0.25rem 0.4rem',
+                                    width: '100%',
+                                    height: '32px',
+                                    border: 'none',
+                                    outline: 'none',
+                                    backgroundColor: 'transparent',
                                     fontSize: '0.82rem',
                                     fontWeight: '600',
-                                    width: '100%',
-                                    color: isMix ? '#0f766e' : isUncontrolled ? '#b45309' : isConstant ? '#475569' : '#1e3a8a',
-                                    backgroundColor: isMix ? '#f0fdfa' : isConstant ? '#f1f5f9' : isUncontrolled ? '#fef3c7' : '#ffffff',
-                                    borderColor: isMix ? '#99f6e4' : isUncontrolled ? '#f59e0b' : undefined,
+                                    color: col.factor.role === 'mixture_component'
+                                      ? '#0f766e'
+                                      : col.factor.controllability === 'uncontrollable_noise'
+                                      ? '#b45309'
+                                      : col.factor.controllability === 'constant'
+                                      ? '#64748b'
+                                      : '#1e3a8a',
+                                    padding: '0 0.5rem',
+                                    textAlign: 'center',
                                   }}
-                                  value={val !== undefined && val !== null ? val : ''}
-                                  placeholder="Nhập số..."
-                                  title={isUncontrolled ? 'Biến nhiễu không kiểm soát (Uncontrolled Noise) - Nhập giá trị thực tế đo được' : `${f.name} [${f.unit}]`}
-                                  onChange={(e) => handleFactorActualChange(run.id, f.code, e.target.value)}
-                                  onPaste={(e) => handleCellPaste(e, runIdx, 'factor', f.code)}
+                                  value={run.factorActual[col.code] !== undefined && run.factorActual[col.code] !== null ? run.factorActual[col.code] : ''}
+                                  placeholder="Nhập..."
+                                  onFocus={() => {
+                                    setActiveCell({ r: runIdx, c: colIdx });
+                                    setSelection({ start: { r: runIdx, c: colIdx }, end: { r: runIdx, c: colIdx } });
+                                  }}
+                                  onChange={(e) => handleFactorActualChange(run.id, col.code, e.target.value)}
+                                  onPaste={(e) => {
+                                    const text = e.clipboardData.getData('text');
+                                    if (text && (text.includes('\t') || text.includes('\n'))) {
+                                      e.preventDefault();
+                                      handlePasteMatrix(text, runIdx, colIdx);
+                                    }
+                                  }}
                                 />
-                              )}
-                            </td>
-                          );
-                        })}
+                              )
+                            )}
 
-                        {/* Mixture Sum Validation Cell */}
-                        {mixtureFactors.length > 0 && (
-                          <td
-                            style={{
-                              textAlign: 'center',
-                              backgroundColor: '#f0fdf4',
-                              padding: '0.25rem 0.35rem',
-                              borderLeft: '2px solid #a7f3d0',
-                              borderRight: '2px solid #a7f3d0',
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: '0.75rem',
-                                fontWeight: '700',
-                                padding: '0.15rem 0.45rem',
-                                borderRadius: '4px',
-                                backgroundColor: is100 ? '#dcfce7' : '#fee2e2',
-                                color: is100 ? '#15803d' : '#b91c1c',
-                                border: `1px solid ${is100 ? '#86efac' : '#fca5a5'}`,
-                                display: 'inline-block',
-                              }}
-                              title={is100 ? 'Đạt chuẩn 100%' : `Tổng = ${sumMix.toFixed(2)}%, không đạt 100%`}
-                            >
-                              {is100 ? '✓ 100%' : `⚠ ${sumMix.toFixed(1)}%`}
-                            </span>
+                            {/* 4. Mixture Sum (Read-only calculated) */}
+                            {col.type === 'mixture_sum' && (
+                              <div style={{ textAlign: 'center', padding: '0.2rem' }}>
+                                <span
+                                  style={{
+                                    fontSize: '0.74rem',
+                                    fontWeight: '700',
+                                    padding: '0.12rem 0.45rem',
+                                    borderRadius: '4px',
+                                    backgroundColor: is100 ? '#dcfce7' : '#fee2e2',
+                                    color: is100 ? '#15803d' : '#b91c1c',
+                                    border: `1px solid ${is100 ? '#86efac' : '#fca5a5'}`,
+                                    display: 'inline-block',
+                                  }}
+                                  title={is100 ? 'Đạt chuẩn 100%' : `Tổng = ${sumMix.toFixed(2)}%, không đạt 100%`}
+                                >
+                                  {is100 ? '✓ 100%' : `⚠ ${sumMix.toFixed(1)}%`}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* 5. Coded Value (Read-only) */}
+                            {col.type === 'coded' && (
+                              <div style={{ textAlign: 'center', color: '#64748b', fontFamily: 'monospace', fontSize: '0.78rem', padding: '0.35rem' }}>
+                                {col.factor?.controllability === 'constant'
+                                  ? '🔒 C'
+                                  : typeof run.factorCoded[col.code] === 'number'
+                                  ? Number(run.factorCoded[col.code]).toFixed(2)
+                                  : run.factorCoded[col.code] ?? '-'}
+                              </div>
+                            )}
+
+                            {/* 6. CQA Responses (Editable) */}
+                            {col.type === 'cqa' && col.cqa && (
+                              col.cqa.dataType === 'qualitative_binary' ? (
+                                <select
+                                  style={{
+                                    width: '100%',
+                                    height: '32px',
+                                    border: 'none',
+                                    outline: 'none',
+                                    backgroundColor: 'transparent',
+                                    fontSize: '0.8rem',
+                                    fontWeight: '600',
+                                    color: '#0f766e',
+                                    padding: '0 0.4rem',
+                                  }}
+                                  value={run.responses[col.code] ?? 'Đạt'}
+                                  onFocus={() => {
+                                    setActiveCell({ r: runIdx, c: colIdx });
+                                    setSelection({ start: { r: runIdx, c: colIdx }, end: { r: runIdx, c: colIdx } });
+                                  }}
+                                  onChange={(e) => handleResponseChange(run.id, col.code, e.target.value)}
+                                >
+                                  <option value="Đạt">✓ Đạt (Pass)</option>
+                                  <option value="Không đạt">✗ Không đạt (Fail)</option>
+                                </select>
+                              ) : (
+                                <input
+                                  type="number"
+                                  step="any"
+                                  style={{
+                                    width: '100%',
+                                    height: '32px',
+                                    border: 'none',
+                                    outline: 'none',
+                                    backgroundColor: 'transparent',
+                                    fontSize: '0.82rem',
+                                    fontWeight: '600',
+                                    color: '#0f766e',
+                                    padding: '0 0.5rem',
+                                    textAlign: 'center',
+                                  }}
+                                  value={run.responses[col.code] ?? ''}
+                                  placeholder="Nhập..."
+                                  onFocus={() => {
+                                    setActiveCell({ r: runIdx, c: colIdx });
+                                    setSelection({ start: { r: runIdx, c: colIdx }, end: { r: runIdx, c: colIdx } });
+                                  }}
+                                  onChange={(e) => handleResponseChange(run.id, col.code, e.target.value)}
+                                  onPaste={(e) => {
+                                    const text = e.clipboardData.getData('text');
+                                    if (text && (text.includes('\t') || text.includes('\n'))) {
+                                      e.preventDefault();
+                                      handlePasteMatrix(text, runIdx, colIdx);
+                                    }
+                                  }}
+                                />
+                              )
+                            )}
                           </td>
-                        )}
-
-                        {/* Recalculated Coded Values */}
-                      {project.factors.map((f) => (
-                        <td key={`coded-${run.id}-${f.code}`} style={{ textAlign: 'center', color: '#64748b' }} className="font-mono">
-                          {f.controllability === 'constant'
-                            ? '🔒 C'
-                            : typeof run.factorCoded[f.code] === 'number'
-                            ? Number(run.factorCoded[f.code]).toFixed(2)
-                            : run.factorCoded[f.code] ?? '-'}
-                        </td>
-                      ))}
-
-                      {/* CQA Responses (Editable Input) */}
-                      {project.cqas.map((c) => (
-                        <td key={`resp-${run.id}-${c.code}`} style={{ backgroundColor: '#f0fdfa' }}>
-                          {c.dataType === 'qualitative_binary' ? (
-                            <select
-                              className="input-field"
-                              style={{ padding: '0.2rem 0.4rem', fontWeight: '600', color: '#0f766e', fontSize: '0.8rem' }}
-                              value={run.responses[c.code] ?? 'Đạt'}
-                              onChange={(e) => handleResponseChange(run.id, c.code, e.target.value)}
-                            >
-                              <option value="Đạt">✓ Đạt (Pass)</option>
-                              <option value="Không đạt">✗ Không đạt (Fail)</option>
-                            </select>
-                          ) : (
-                            <input
-                              type="number"
-                              step="any"
-                              className="input-field"
-                              style={{
-                                padding: '0.25rem 0.5rem',
-                                fontWeight: '600',
-                                color: '#0f766e',
-                                backgroundColor: '#ffffff',
-                              }}
-                              value={run.responses[c.code] ?? ''}
-                              placeholder="Nhập..."
-                              onChange={(e) => handleResponseChange(run.id, c.code, e.target.value)}
-                              onPaste={(e) => handleCellPaste(e, runIdx, 'cqa', c.code)}
-                            />
-                          )}
-                        </td>
-                      ))}
+                        );
+                      })}
                     </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
 
       {/* Modal: Smart Excel / CSV Import & Validation */}
       {showImportModal && (
