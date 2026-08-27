@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   LayoutGrid,
   Sparkles,
@@ -9,6 +9,16 @@ import {
   Shuffle,
   Gauge,
   Award,
+  Clipboard,
+  Upload,
+  FileSpreadsheet,
+  FileText,
+  CheckCircle2,
+  AlertCircle,
+  X,
+  FileDown,
+  Check,
+  ChevronDown,
 } from 'lucide-react';
 import type {
   QBDProject,
@@ -22,6 +32,14 @@ import {
   calculateNumModelTerms,
   actualToCoded,
 } from '../../services/doeGenerator';
+import {
+  exportToExcel,
+  exportToCSV,
+  exportTemplateExcel,
+  parseExcelFile,
+  parseClipboardExcel,
+  type ParsedDoEData,
+} from '../../services/doeExcelService';
 
 interface DoEDesignerTabProps {
   project: QBDProject;
@@ -44,6 +62,16 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
       dOptimalModel: 'quadratic',
     }
   );
+
+  // Excel / CSV / Clipboard import & export states
+  const [showImportModal, setShowImportModal] = useState<boolean>(false);
+  const [importTab, setImportTab] = useState<'paste' | 'file'>('paste');
+  const [rawPasteText, setRawPasteText] = useState<string>('');
+  const [parsedData, setParsedData] = useState<ParsedDoEData | null>(null);
+  const [isProcessingFile, setIsProcessingFile] = useState<boolean>(false);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [showExportMenu, setShowExportMenu] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeFactors = useMemo(
     () => project.factors.filter((f) => f.controllability !== 'constant'),
@@ -129,6 +157,97 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
     onUpdateProject({ runs: updatedRuns });
   };
 
+  // Direct paste into table cells (handles multi-cell copy from Excel)
+  const handleCellPaste = (
+    e: React.ClipboardEvent<HTMLInputElement>,
+    startRunIdx: number,
+    startColType: 'factor' | 'cqa',
+    startColCode: string
+  ) => {
+    const clipboardData = e.clipboardData.getData('text');
+    if (!clipboardData || (!clipboardData.includes('\t') && !clipboardData.includes('\n'))) {
+      return; // Regular single-cell paste handled by browser
+    }
+    e.preventDefault();
+
+    const lines = clipboardData
+      .trim()
+      .split(/\r?\n/)
+      .map((l) => l.split('\t'));
+
+    if (lines.length === 0) return;
+
+    const allEditableCols: { type: 'factor' | 'cqa'; code: string }[] = [
+      ...project.factors.map((f) => ({ type: 'factor' as const, code: f.code })),
+      ...project.cqas.map((c) => ({ type: 'cqa' as const, code: c.code })),
+    ];
+
+    let startColIdx = 0;
+    if (startColType === 'factor') {
+      startColIdx = project.factors.findIndex((f) => f.code === startColCode);
+      if (startColIdx === -1) startColIdx = 0;
+    } else {
+      const cqaIdx = project.cqas.findIndex((c) => c.code === startColCode);
+      startColIdx = project.factors.length + (cqaIdx >= 0 ? cqaIdx : 0);
+    }
+
+    const updatedRuns = [...project.runs];
+
+    lines.forEach((line, rOffset) => {
+      const targetRunIdx = startRunIdx + rOffset;
+      if (targetRunIdx >= updatedRuns.length) return;
+
+      const run = { ...updatedRuns[targetRunIdx] };
+      const factorActual = { ...run.factorActual };
+      const factorCoded = { ...run.factorCoded };
+      const responses = { ...run.responses };
+
+      line.forEach((cellVal, cOffset) => {
+        const targetColIdx = startColIdx + cOffset;
+        if (targetColIdx >= allEditableCols.length) return;
+
+        const col = allEditableCols[targetColIdx];
+        const trimmedVal = cellVal.trim();
+        if (trimmedVal === '') return;
+
+        if (col.type === 'factor') {
+          const factor = project.factors.find((f) => f.code === col.code);
+          if (factor) {
+            if (factor.dataType === 'qualitative') {
+              factorActual[factor.code] = trimmedVal;
+              factorCoded[factor.code] = actualToCoded(trimmedVal, factor);
+            } else {
+              const num = parseFloat(trimmedVal.replace(/,/g, '.'));
+              if (!isNaN(num)) {
+                factorActual[factor.code] = num;
+                factorCoded[factor.code] = actualToCoded(num, factor);
+              }
+            }
+          }
+        } else {
+          const cqa = project.cqas.find((c) => c.code === col.code);
+          if (cqa) {
+            if (cqa.dataType?.startsWith('qualitative')) {
+              responses[cqa.code] = trimmedVal;
+            } else {
+              const num = parseFloat(trimmedVal.replace(/,/g, '.'));
+              if (!isNaN(num)) {
+                responses[cqa.code] = num;
+              }
+            }
+          }
+        }
+      });
+
+      run.factorActual = factorActual;
+      run.factorCoded = factorCoded;
+      run.responses = responses;
+      updatedRuns[targetRunIdx] = run;
+    });
+
+    onUpdateProject({ runs: updatedRuns });
+  };
+
   // Smart Auto-Fill simulated pharma response data based on factor interactions
   const handleAutoSimulateData = () => {
     if (project.runs.length === 0) return;
@@ -138,7 +257,6 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
 
       project.cqas.forEach((cqa) => {
         if (cqa.dataType === 'qualitative_binary') {
-          // Pass/fail simulation
           const pass = Math.random() > 0.15;
           resp[cqa.code] = pass ? 'Đạt' : 'Không đạt';
           return;
@@ -147,7 +265,6 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
         const base = cqa.target ?? (cqa.lowerLimit ? (cqa.lowerLimit + (cqa.upperLimit || 100)) / 2 : 50);
         let effect = 0;
 
-        // Nonlinear response generation based on factors
         project.factors.forEach((f, idx) => {
           if (f.controllability === 'constant') return;
           const coded = run.factorCoded[f.code] ?? 0;
@@ -155,14 +272,12 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
           effect += coded * weight - 0.5 * coded * coded * weight;
         });
 
-        // 2FI interaction term
         if (project.factors.length >= 2) {
           const x1 = run.factorCoded[project.factors[0]?.code] ?? 0;
           const x2 = run.factorCoded[project.factors[1]?.code] ?? 0;
           effect += x1 * x2 * 4.2;
         }
 
-        // Small Gaussian noise
         const noise = (Math.random() - 0.5) * (base * 0.03);
         const val = Number((base + effect + noise).toFixed(2));
         resp[cqa.code] = val;
@@ -177,34 +292,48 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
     onUpdateProject({ runs: simulatedRuns });
   };
 
-  const handleExportCSV = () => {
-    if (project.runs.length === 0) return;
+  // Parse clipboard text from Textarea
+  const handleParseClipboardText = (text: string) => {
+    setRawPasteText(text);
+    if (!text.trim()) {
+      setParsedData(null);
+      return;
+    }
+    const result = parseClipboardExcel(text, project.factors, project.cqas, project.runs);
+    setParsedData(result);
+  };
 
-    const headers = [
-      'StdOrder',
-      'RunOrder',
-      ...project.factors.map((f) => `${f.name}(${f.code})`),
-      ...project.cqas.map((c) => `${c.name}(${c.code})`),
-    ];
+  // Handle file upload
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    setIsProcessingFile(true);
+    setFileError(null);
+    try {
+      const result = await parseExcelFile(file, project.factors, project.cqas, project.runs);
+      setParsedData(result);
+      setShowImportModal(true);
+      setImportTab('file');
+    } catch (err: any) {
+      setFileError(err.message || 'Lỗi khi đọc file Excel/CSV.');
+      setShowImportModal(true);
+      setImportTab('file');
+    } finally {
+      setIsProcessingFile(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
 
-    const rows = project.runs.map((r) => [
-      r.stdOrder,
-      r.runOrder,
-      ...project.factors.map((f) => r.factorActual[f.code] ?? ''),
-      ...project.cqas.map((c) => r.responses[c.code] ?? ''),
-    ]);
-
-    const csvContent =
-      'data:text/csv;charset=utf-8,\uFEFF' +
-      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `${project.name.replace(/\s+/g, '_')}_DoE_Matrix.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  // Apply parsed data into project runs
+  const handleApplyImportedData = () => {
+    if (!parsedData || parsedData.runs.length === 0) return;
+    onUpdateProject({ runs: parsedData.runs });
+    setShowImportModal(false);
+    setParsedData(null);
+    setRawPasteText('');
   };
 
   return (
@@ -471,26 +600,171 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
             </h3>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {/* Hidden File Input for Excel/CSV */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              style={{ display: 'none' }}
+              accept=".xlsx,.xls,.csv"
+              onChange={handleFileUpload}
+            />
+
+            {/* Smart Paste from Excel */}
+            <button
+              onClick={() => {
+                setShowImportModal(true);
+                setImportTab('paste');
+                setFileError(null);
+              }}
+              className="btn btn-primary"
+              style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem', backgroundColor: '#1d4ed8' }}
+              title="Mở hộp thoại dán số liệu trực tiếp từ bảng tính MS Excel"
+            >
+              <Clipboard size={14} />
+              <span>📋 Dán từ Excel</span>
+            </button>
+
+            {/* Upload Excel / CSV */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="btn btn-primary"
+              style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem', backgroundColor: '#0284c7' }}
+              title="Tải lên file dữ liệu MS Excel (.xlsx) hoặc CSV (.csv)"
+              disabled={isProcessingFile}
+            >
+              <Upload size={14} />
+              <span>{isProcessingFile ? 'Đang đọc file...' : '📤 Tải Lên (.xlsx/.csv)'}</span>
+            </button>
+
+            {/* Auto-fill Simulation Demo */}
             <button
               onClick={handleAutoSimulateData}
               className="btn btn-teal"
               style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
               title="Tự động sinh số liệu thực nghiệm mô phỏng dựa trên mô hình hóa dược phẩm để test nhanh"
             >
-              <Sparkles size={15} />
-              <span>Điền Số Liệu Mô Phỏng (Demo)</span>
+              <Sparkles size={14} />
+              <span>Điền Mô Phỏng</span>
             </button>
 
-            <button
-              onClick={handleExportCSV}
-              className="btn btn-secondary"
-              style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
-              title="Tải bảng ma trận dưới dạng file CSV"
-            >
-              <Download size={15} />
-              <span>Xuất CSV</span>
-            </button>
+            {/* Export Dropdown Menu */}
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                className="btn btn-secondary"
+                style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                title="Tải bảng số liệu về máy tính dưới các định dạng"
+              >
+                <Download size={14} />
+                <span>Xuất Dữ Liệu</span>
+                <ChevronDown size={12} />
+              </button>
+
+              {showExportMenu && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: 0,
+                    marginTop: '0.25rem',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '0.5rem',
+                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                    zIndex: 50,
+                    minWidth: '220px',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <button
+                    onClick={() => {
+                      exportToExcel(project);
+                      setShowExportMenu(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.6rem 0.85rem',
+                      textAlign: 'left',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      borderBottom: '1px solid #f1f5f9',
+                      fontSize: '0.8rem',
+                      color: '#0f172a',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
+                    <FileSpreadsheet size={15} color="#16a34a" />
+                    <div>
+                      <div style={{ fontWeight: '600' }}>Xuất File Excel (.xlsx)</div>
+                      <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Đầy đủ biến X, mã hóa, đáp ứng Y</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      exportToCSV(project);
+                      setShowExportMenu(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.6rem 0.85rem',
+                      textAlign: 'left',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      borderBottom: '1px solid #f1f5f9',
+                      fontSize: '0.8rem',
+                      color: '#0f172a',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
+                    <FileText size={15} color="#0284c7" />
+                    <div>
+                      <div style={{ fontWeight: '600' }}>Xuất File CSV (.csv)</div>
+                      <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Chuẩn UTF-8 BOM tiếng Việt</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      exportTemplateExcel(project);
+                      setShowExportMenu(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.6rem 0.85rem',
+                      textAlign: 'left',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      fontSize: '0.8rem',
+                      color: '#0f172a',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
+                    <FileDown size={15} color="#d97706" />
+                    <div>
+                      <div style={{ fontWeight: '600' }}>Tải Mẫu Nhập Liệu Lab</div>
+                      <div style={{ fontSize: '0.7rem', color: '#64748b' }}>File Excel mẫu để kỹ thuật viên điền</div>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -515,12 +789,19 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                 color: '#0f766e',
                 display: 'flex',
                 alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
                 gap: '0.4rem',
               }}
             >
-              <span>💡</span>
-              <span>
-                <strong>Hiệu chỉnh thực nghiệm:</strong> Bạn có thể sửa trực tiếp số liệu các biến X thực tế (đặc biệt là biến nhiễu <em>Uncontrolled Noise</em> hoặc khi điều kiện vận hành thực tế bị lệch so với thiết kế). Hệ thống sẽ tự động cập nhật mức mã hóa (Coded) và truyền số liệu này sang mô hình ANOVA / Mạng nơ-ron.
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span>💡</span>
+                <span>
+                  <strong>Hỗ trợ dán trực tiếp (Copy/Paste):</strong> Bạn có thể copy một vùng ô số liệu từ Excel và nhấn <code>Ctrl+V</code> trực tiếp vào bất kỳ ô nào trong bảng.
+                </span>
+              </div>
+              <span style={{ fontSize: '0.72rem', color: '#0d9488', fontWeight: '600' }}>
+                ✓ Tự động chuẩn hóa Coded &amp; cập nhật phân tích
               </span>
             </div>
 
@@ -566,7 +847,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {project.runs.map((run) => (
+                  {project.runs.map((run, runIdx) => (
                     <tr key={run.id}>
                       <td style={{ textAlign: 'center', fontWeight: '600', color: '#64748b' }}>
                         {run.stdOrder}
@@ -633,6 +914,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                                 placeholder="Nhập số..."
                                 title={isUncontrolled ? 'Biến nhiễu không kiểm soát (Uncontrolled Noise) - Nhập giá trị thực tế đo được' : `${f.name} [${f.unit}]`}
                                 onChange={(e) => handleFactorActualChange(run.id, f.code, e.target.value)}
+                                onPaste={(e) => handleCellPaste(e, runIdx, 'factor', f.code)}
                               />
                             )}
                           </td>
@@ -677,6 +959,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                               value={run.responses[c.code] ?? ''}
                               placeholder="Nhập..."
                               onChange={(e) => handleResponseChange(run.id, c.code, e.target.value)}
+                              onPaste={(e) => handleCellPaste(e, runIdx, 'cqa', c.code)}
                             />
                           )}
                         </td>
@@ -690,6 +973,300 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
         )}
       </div>
 
+      {/* Modal: Smart Excel / CSV Import & Validation */}
+      {showImportModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1rem',
+          }}
+        >
+          <div
+            className="qbd-card animate-fade-in"
+            style={{
+              width: '100%',
+              maxWidth: '850px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              backgroundColor: '#ffffff',
+              borderRadius: '0.75rem',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              padding: '1.25rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem',
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <FileSpreadsheet size={22} color="#1d4ed8" />
+                <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
+                  Nhập &amp; Đối Soát Bảng Số Liệu Thực Nghiệm Từ Excel / CSV
+                </h3>
+              </div>
+              <button
+                onClick={() => {
+                  setShowImportModal(false);
+                  setParsedData(null);
+                }}
+                className="btn"
+                style={{ padding: '0.35rem', color: '#64748b', border: 'none', background: 'transparent', cursor: 'pointer' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Navigation Tabs */}
+            <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>
+              <button
+                onClick={() => setImportTab('paste')}
+                className={`btn ${importTab === 'paste' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ fontSize: '0.82rem', padding: '0.4rem 0.9rem', borderRadius: '0.375rem 0.375rem 0 0' }}
+              >
+                <Clipboard size={14} />
+                <span>1. Dán từ Clipboard (Copy/Paste)</span>
+              </button>
+
+              <button
+                onClick={() => setImportTab('file')}
+                className={`btn ${importTab === 'file' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ fontSize: '0.82rem', padding: '0.4rem 0.9rem', borderRadius: '0.375rem 0.375rem 0 0' }}
+              >
+                <Upload size={14} />
+                <span>2. Tải Lên File (.xlsx / .csv)</span>
+              </button>
+            </div>
+
+            {/* Tab 1: Paste Textarea */}
+            {importTab === 'paste' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                <div style={{ fontSize: '0.78rem', color: '#475569' }}>
+                  Sao chép vùng bảng trong <strong>MS Excel</strong> (kèm tiêu đề cột hoặc chỉ các cột số liệu) rồi dán <strong>(Ctrl+V)</strong> vào ô dưới đây:
+                </div>
+                <textarea
+                  className="input-field font-mono"
+                  rows={6}
+                  style={{ width: '100%', fontSize: '0.78rem', lineHeight: '1.4', padding: '0.6rem', resize: 'vertical' }}
+                  placeholder="Dán dữ liệu bảng từ Excel vào đây (Tab-separated)..."
+                  value={rawPasteText}
+                  onChange={(e) => handleParseClipboardText(e.target.value)}
+                />
+              </div>
+            )}
+
+            {/* Tab 2: File Upload Area */}
+            {importTab === 'file' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    border: '2px dashed #93c5fd',
+                    backgroundColor: '#eff6ff',
+                    borderRadius: '0.5rem',
+                    padding: '1.75rem 1rem',
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#2563eb')}
+                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#93c5fd')}
+                >
+                  <Upload size={32} color="#2563eb" style={{ margin: '0 auto 0.5rem' }} />
+                  <div style={{ fontWeight: '600', color: '#1e40af', fontSize: '0.9rem' }}>
+                    Click để chọn file hoặc kéo thả file Excel / CSV vào đây
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
+                    Hỗ trợ định dạng: .xlsx, .xls, .csv
+                  </div>
+                </div>
+
+                {fileError && (
+                  <div
+                    style={{
+                      backgroundColor: '#fef2f2',
+                      border: '1px solid #fecaca',
+                      borderRadius: '0.375rem',
+                      padding: '0.6rem',
+                      color: '#b91c1c',
+                      fontSize: '0.8rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                    }}
+                  >
+                    <AlertCircle size={16} />
+                    <span>{fileError}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Validation & Column Matching Inspection Results */}
+            {parsedData && (
+              <div
+                style={{
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '0.5rem',
+                  backgroundColor: '#f8fafc',
+                  padding: '0.85rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.75rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    {parsedData.isValid ? (
+                      <CheckCircle2 size={18} color="#16a34a" />
+                    ) : (
+                      <AlertCircle size={18} color="#dc2626" />
+                    )}
+                    <span style={{ fontSize: '0.88rem', fontWeight: '700', color: parsedData.isValid ? '#15803d' : '#b91c1c' }}>
+                      {parsedData.isValid
+                        ? `✓ Đã nhận diện thành công ${parsedData.numRuns} lần chạy thực nghiệm`
+                        : `⚠ Phát hiện lỗi trong cấu trúc dữ liệu`}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    Tìm thấy {parsedData.headers.length} cột
+                  </span>
+                </div>
+
+                {/* Column Mappings Badges */}
+                <div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: '700', color: '#475569', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
+                    Đối Soát Ánh Xạ Cột (Column Schema Matching):
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+                    {parsedData.columnMappings.map((map, idx) => {
+                      const isMatched = map.matchedType !== 'ignored';
+                      return (
+                        <span
+                          key={`map-${idx}`}
+                          style={{
+                            fontSize: '0.72rem',
+                            padding: '0.2rem 0.5rem',
+                            borderRadius: '0.25rem',
+                            backgroundColor: isMatched ? '#dcfce7' : '#f1f5f9',
+                            color: isMatched ? '#166534' : '#64748b',
+                            border: `1px solid ${isMatched ? '#86efac' : '#cbd5e1'}`,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                          }}
+                        >
+                          {isMatched ? '✓' : '•'} <strong>{map.headerName || `Cột ${idx + 1}`}</strong> →{' '}
+                          {map.matchedCode ? `${map.matchedCode} (${map.matchedName})` : map.matchedName || 'Bỏ qua'}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Data Errors / Warnings list */}
+                {parsedData.errors.length > 0 && (
+                  <div style={{ maxHeight: '100px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    {parsedData.errors.map((err, eIdx) => (
+                      <div
+                        key={`err-${eIdx}`}
+                        style={{
+                          fontSize: '0.73rem',
+                          color: err.severity === 'error' ? '#b91c1c' : '#b45309',
+                          backgroundColor: err.severity === 'error' ? '#fef2f2' : '#fffbeb',
+                          padding: '0.25rem 0.5rem',
+                          borderRadius: '0.25rem',
+                          border: `1px solid ${err.severity === 'error' ? '#fecaca' : '#fde68a'}`,
+                        }}
+                      >
+                        <strong>[Dòng {err.row} - Cột {err.column}]:</strong> {err.message}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Data Preview Table (First 5 Rows) */}
+                <div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: '700', color: '#475569', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
+                    Xem Trước Dữ Liệu Sau Khi Chuyển Đổi (5 dòng đầu):
+                  </div>
+                  <div style={{ maxHeight: '160px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '0.375rem' }}>
+                    <table className="qbd-table" style={{ fontSize: '0.72rem' }}>
+                      <thead>
+                        <tr>
+                          <th style={{ width: '35px' }}>Run</th>
+                          {project.factors.map((f) => (
+                            <th key={`prev-f-${f.id}`}>{f.code}</th>
+                          ))}
+                          {project.cqas.map((c) => (
+                            <th key={`prev-c-${c.id}`}>{c.code}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {parsedData.runs.slice(0, 5).map((r, rIdx) => (
+                          <tr key={`prev-row-${rIdx}`}>
+                            <td style={{ fontWeight: '700', textAlign: 'center' }}>{r.runOrder}</td>
+                            {project.factors.map((f) => (
+                              <td key={`prev-f-val-${f.id}`}>{r.factorActual[f.code] ?? '-'}</td>
+                            ))}
+                            {project.cqas.map((c) => (
+                              <td key={`prev-c-val-${c.id}`} style={{ fontWeight: '600', color: '#0f766e' }}>
+                                {r.responses[c.code] ?? '-'}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Modal Footer Actions */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem' }}>
+              <button
+                onClick={() => {
+                  setShowImportModal(false);
+                  setParsedData(null);
+                  setRawPasteText('');
+                }}
+                className="btn btn-secondary"
+                style={{ fontSize: '0.82rem', padding: '0.45rem 1rem' }}
+              >
+                Hủy Bỏ
+              </button>
+
+              <button
+                onClick={handleApplyImportedData}
+                disabled={!parsedData || !parsedData.isValid || parsedData.runs.length === 0}
+                className="btn btn-primary"
+                style={{
+                  fontSize: '0.82rem',
+                  padding: '0.45rem 1.25rem',
+                  backgroundColor: !parsedData || !parsedData.isValid ? '#94a3b8' : '#16a34a',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                }}
+              >
+                <Check size={16} />
+                <span>✓ Xác Nhận &amp; Cập Nhật Vào Ma Trận Thí Nghiệm</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
+
