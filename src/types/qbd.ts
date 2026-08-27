@@ -31,7 +31,11 @@ export interface CQA {
   tShape?: number;
 }
 
-export type FactorRole = 'mixture_component' | 'process_independent';
+export type FactorRole = 
+  | 'mixture_component'      // Thành phần hỗn hợp (tổng % = 100%)
+  | 'formulation_other'       // Biến công thức khác (khối lượng, số lượng, loại chất ngoài hỗn hợp)
+  | 'process_parameter'      // Biến quy trình (nhiệt độ, lực dập, tốc độ...)
+  | 'process_independent';   // Legacy alias for process_parameter
 
 export interface Factor {
   id: string;
@@ -40,7 +44,7 @@ export interface Factor {
   type: FactorType;
   dataType: FactorDataType; // quantitative, quantitative_multilevel, qualitative
   controllability: FactorControllability; // controllable, uncontrollable_noise, constant
-  role?: FactorRole; // 'mixture_component' (sum = 1/100%) or 'process_independent'
+  role?: FactorRole; // 'mixture_component' (sum = 100%), 'formulation_other', or 'process_parameter'
   unit: string;
   low: number; // -1 (or min % in mixture)
   high: number; // +1 (or max % in mixture)

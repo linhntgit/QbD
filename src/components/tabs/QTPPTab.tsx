@@ -418,15 +418,64 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
           </button>
         </div>
 
+        {/* Mixture components constraint check alert */}
+        {(() => {
+          const mixFactors = project.factors.filter((f) => f.role === 'mixture_component');
+          if (mixFactors.length === 0) return null;
+          const sumLow = mixFactors.reduce((acc, f) => acc + (Number(f.low) || 0), 0);
+          const sumHigh = mixFactors.reduce((acc, f) => acc + (Number(f.high) || 0), 0);
+          const isValidRange = sumLow <= 100 && sumHigh >= 100;
+
+          return (
+            <div
+              style={{
+                marginBottom: '0.85rem',
+                padding: '0.65rem 0.9rem',
+                borderRadius: '8px',
+                backgroundColor: isValidRange ? '#f0fdf4' : '#fffbeb',
+                border: `1px solid ${isValidRange ? '#86efac' : '#fde047'}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontSize: '0.8rem',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '1rem' }}>🧪</span>
+                <div>
+                  <span style={{ fontWeight: '700', color: isValidRange ? '#166534' : '#854d0e' }}>
+                    {mixFactors.length} Biến Thành Phần Hỗn Hợp ({mixFactors.map((f) => f.code).join(', ')}):
+                  </span>{' '}
+                  <span style={{ color: '#334155' }}>
+                    Tổng mức thấp $\Sigma(L) = {sumLow.toFixed(1)}\%$, Tổng mức cao $\Sigma(U) = {sumHigh.toFixed(1)}\%$. (Bảng thí nghiệm sẽ luôn đảm bảo $\Sigma = 100\%$).
+                  </span>
+                </div>
+              </div>
+              <span
+                style={{
+                  fontWeight: '700',
+                  padding: '0.2rem 0.55rem',
+                  borderRadius: '6px',
+                  backgroundColor: isValidRange ? '#dcfce7' : '#fef9c3',
+                  color: isValidRange ? '#15803d' : '#a16207',
+                  border: `1px solid ${isValidRange ? '#bbf7d0' : '#fef08a'}`,
+                }}
+              >
+                {isValidRange ? '✓ Khoảng biên Hợp lệ (ΣL ≤ 100% ≤ ΣU)' : '⚠ Chú ý: Cần ΣL ≤ 100% ≤ ΣU'}
+              </span>
+            </div>
+          );
+        })()}
+
         <div className="table-container">
           <table className="qbd-table">
             <thead>
               <tr>
                 <th style={{ width: '5%' }}>Mã</th>
                 <th style={{ width: '18%' }}>Tên Biến (Nhân tố X)</th>
-                <th style={{ width: '14%' }}>Vai Trò (Mixture / Process)</th>
+                <th style={{ width: '15%' }}>Vai Trò (Phân Loại X)</th>
                 <th style={{ width: '12%' }}>Bản Chất Dữ Liệu</th>
-                <th style={{ width: '15%' }}>Khả Năng Kiểm Soát</th>
+                <th style={{ width: '14%' }}>Khả Năng Kiểm Soát</th>
                 <th style={{ width: '6%' }}>Đơn vị</th>
                 <th style={{ width: '9%' }}>Mức Thấp (-1)</th>
                 <th style={{ width: '9%' }}>Mức Tâm (0)</th>
@@ -436,7 +485,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
             </thead>
             <tbody>
               {project.factors.map((f) => (
-                <tr key={f.id} style={{ backgroundColor: f.role === 'mixture_component' ? '#f0fdfa' : f.controllability === 'constant' ? '#f8fafc' : f.controllability === 'uncontrollable_noise' ? '#fffbeb' : 'inherit' }}>
+                <tr key={f.id} style={{ backgroundColor: f.role === 'mixture_component' ? '#f0fdfa' : f.role === 'formulation_other' ? '#fff7ed' : f.controllability === 'constant' ? '#f8fafc' : f.controllability === 'uncontrollable_noise' ? '#fffbeb' : 'inherit' }}>
                   <td>
                     <span className="font-mono font-bold" style={{ color: '#b45309', fontWeight: '700' }}>
                       {f.code}
@@ -451,21 +500,32 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                     />
                   </td>
 
-                  {/* Factor Role: Mixture Component vs Process Independent */}
+                  {/* Factor Role: 3 Categories (Mixture Component, Other Formulation, Process Parameter) */}
                   <td>
                     <select
                       className="input-field"
                       style={{
                         fontSize: '0.78rem',
                         fontWeight: '600',
-                        color: f.role === 'mixture_component' ? '#0f766e' : '#1e40af',
-                        backgroundColor: f.role === 'mixture_component' ? '#ccfbf1' : '#eff6ff',
+                        color:
+                          f.role === 'mixture_component'
+                            ? '#0f766e'
+                            : f.role === 'formulation_other'
+                            ? '#9a3412'
+                            : '#1e40af',
+                        backgroundColor:
+                          f.role === 'mixture_component'
+                            ? '#ccfbf1'
+                            : f.role === 'formulation_other'
+                            ? '#ffedd5'
+                            : '#eff6ff',
                       }}
-                      value={f.role || (f.type === 'Mixture' ? 'mixture_component' : 'process_independent')}
+                      value={f.role || (f.type === 'Mixture' ? 'mixture_component' : 'process_parameter')}
                       onChange={(e) => handleUpdateFactor(f.id, 'role', e.target.value)}
                     >
-                      <option value="process_independent">⚙️ Biến Quy Trình / Độc Lập</option>
                       <option value="mixture_component">🧪 Thành phần Hỗn hợp (Σ=100%)</option>
+                      <option value="formulation_other">💊 Biến công thức khác</option>
+                      <option value="process_parameter">⚙️ Biến quy trình</option>
                     </select>
                   </td>
 

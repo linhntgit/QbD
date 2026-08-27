@@ -19,6 +19,8 @@ import {
   FileDown,
   Check,
   ChevronDown,
+  Copy,
+  ArrowUpDown,
 } from 'lucide-react';
 import type {
   QBDProject,
@@ -71,10 +73,15 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
   const [isProcessingFile, setIsProcessingFile] = useState<boolean>(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [showExportMenu, setShowExportMenu] = useState<boolean>(false);
+  const [copySuccess, setCopySuccess] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeFactors = useMemo(
     () => project.factors.filter((f) => f.controllability !== 'constant'),
+    [project.factors]
+  );
+  const mixtureFactors = useMemo(
+    () => project.factors.filter((f) => f.role === 'mixture_component' || f.type === 'Mixture'),
     [project.factors]
   );
   const minRequiredTerms = useMemo(
@@ -95,6 +102,80 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
     const { runs, alpha } = generateDoERuns(project.factors, designConfig);
     const updatedConfig = { ...designConfig, alpha };
     onUpdateProject({ doeConfig: updatedConfig, runs });
+  };
+
+  // 1-Click Copy Entire Table to Clipboard as TSV (compatible with Excel, Word, Google Sheets)
+  const handleCopyEntireTable = () => {
+    if (project.runs.length === 0) return;
+
+    const headers: string[] = [
+      'Std',
+      'Run',
+      ...project.factors.map((f) => `${f.name} (${f.code}) [${f.unit}]`),
+      ...(mixtureFactors.length > 0 ? ['Σ Mixture (%)'] : []),
+      ...project.factors.map((f) => `${f.code} (Coded)`),
+      ...project.cqas.map((c) => `${c.name} (${c.code}) [${c.unit || ''}]`),
+    ];
+
+    const rows = project.runs.map((run) => {
+      const sumMix = mixtureFactors.reduce((acc, f) => {
+        const v = Number(run.factorActual[f.code]);
+        return acc + (isNaN(v) ? 0 : v);
+      }, 0);
+
+      const row: (string | number)[] = [
+        run.stdOrder,
+        run.runOrder,
+        ...project.factors.map((f) => run.factorActual[f.code] ?? ''),
+        ...(mixtureFactors.length > 0 ? [Number(sumMix.toFixed(2))] : []),
+        ...project.factors.map((f) =>
+          typeof run.factorCoded[f.code] === 'number'
+            ? Number(run.factorCoded[f.code]).toFixed(2)
+            : run.factorCoded[f.code] ?? ''
+        ),
+        ...project.cqas.map((c) => run.responses[c.code] ?? ''),
+      ];
+      return row.join('\t');
+    });
+
+    const tsv = [headers.join('\t'), ...rows].join('\n');
+    navigator.clipboard.writeText(tsv).then(() => {
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2500);
+    });
+  };
+
+  // Manual Edit for Randomized Run Order
+  const handleRunOrderChange = (runId: string, newOrder: number) => {
+    const updatedRuns = project.runs.map((r) => {
+      if (r.id !== runId) return r;
+      return { ...r, runOrder: newOrder };
+    });
+    onUpdateProject({ runs: updatedRuns });
+  };
+
+  // Re-randomize Run Order (Fisher-Yates)
+  const handleRandomizeRunOrder = () => {
+    if (project.runs.length === 0) return;
+    const n = project.runs.length;
+    const orders = Array.from({ length: n }, (_, i) => i + 1);
+    for (let i = n - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [orders[i], orders[j]] = [orders[j], orders[i]];
+    }
+    const updatedRuns = project.runs.map((r, idx) => ({
+      ...r,
+      runOrder: orders[idx],
+    }));
+    onUpdateProject({ runs: updatedRuns });
+  };
+
+  // Sort Runs by Run Order or Std Order
+  const handleSortRuns = (by: 'run' | 'std') => {
+    const sorted = [...project.runs].sort((a, b) => {
+      return by === 'run' ? a.runOrder - b.runOrder : a.stdOrder - b.stdOrder;
+    });
+    onUpdateProject({ runs: sorted });
   };
 
   const handleFactorActualChange = (runId: string, factorCode: string, rawVal: string) => {
@@ -610,6 +691,26 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               onChange={handleFileUpload}
             />
 
+            {/* 1-Click Copy Entire Table to Clipboard */}
+            <button
+              onClick={handleCopyEntireTable}
+              className="btn btn-secondary"
+              style={{
+                fontSize: '0.8rem',
+                padding: '0.35rem 0.75rem',
+                backgroundColor: copySuccess ? '#dcfce7' : undefined,
+                color: copySuccess ? '#15803d' : undefined,
+                borderColor: copySuccess ? '#86efac' : undefined,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+              }}
+              title="Sao chép toàn bộ bảng số liệu sang clipboard để paste trực tiếp vào MS Excel, Word, Google Sheets"
+            >
+              {copySuccess ? <Check size={14} /> : <Copy size={14} />}
+              <span>{copySuccess ? '✓ Đã Sao Chép!' : '📋 Sao Chép Bảng'}</span>
+            </button>
+
             {/* Smart Paste from Excel */}
             <button
               onClick={() => {
@@ -622,7 +723,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               title="Mở hộp thoại dán số liệu trực tiếp từ bảng tính MS Excel"
             >
               <Clipboard size={14} />
-              <span>📋 Dán từ Excel</span>
+              <span>Dán từ Excel</span>
             </button>
 
             {/* Upload Excel / CSV */}
@@ -634,7 +735,29 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               disabled={isProcessingFile}
             >
               <Upload size={14} />
-              <span>{isProcessingFile ? 'Đang đọc file...' : '📤 Tải Lên (.xlsx/.csv)'}</span>
+              <span>{isProcessingFile ? 'Đang đọc file...' : '📤 Tải Lên'}</span>
+            </button>
+
+            {/* Randomize Run Order */}
+            <button
+              onClick={handleRandomizeRunOrder}
+              className="btn btn-secondary"
+              style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem' }}
+              title="Sinh ngẫu nhiên số thứ tự thực hiện thí nghiệm (Randomized Run Order) theo chuẩn DoE"
+            >
+              <Shuffle size={14} />
+              <span>🎲 Xáo Run Order</span>
+            </button>
+
+            {/* Sort Runs by Run Order */}
+            <button
+              onClick={() => handleSortRuns('run')}
+              className="btn btn-secondary"
+              style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem' }}
+              title="Sắp xếp danh sách bảng theo thứ tự thực hiện ngẫu nhiên (Run Order)"
+            >
+              <ArrowUpDown size={14} />
+              <span>Sắp Xếp (Run)</span>
             </button>
 
             {/* Auto-fill Simulation Demo */}
@@ -778,6 +901,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
           </div>
         ) : (
           <div>
+            {/* Info & Mixture Validation Audit Bar */}
             <div
               style={{
                 backgroundColor: '#f0fdfa',
@@ -797,41 +921,101 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <span>💡</span>
                 <span>
-                  <strong>Hỗ trợ dán trực tiếp (Copy/Paste):</strong> Bạn có thể copy một vùng ô số liệu từ Excel và nhấn <code>Ctrl+V</code> trực tiếp vào bất kỳ ô nào trong bảng.
+                  <strong>Chọn &amp; Sao chép tự do:</strong> Bạn có thể bôi đen bất kỳ vùng dữ liệu nào hoặc nhấn <strong>"📋 Sao Chép Bảng"</strong> để dán sang MS Excel/Word. Ô <strong>Run</strong> có thể chỉnh sửa thủ công theo thứ tự thực tế tại Lab.
                 </span>
               </div>
-              <span style={{ fontSize: '0.72rem', color: '#0d9488', fontWeight: '600' }}>
-                ✓ Tự động chuẩn hóa Coded &amp; cập nhật phân tích
-              </span>
+              {mixtureFactors.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  {(() => {
+                    const allPass = project.runs.every((r) => {
+                      const sum = mixtureFactors.reduce((acc, f) => acc + (Number(r.factorActual[f.code]) || 0), 0);
+                      return Math.abs(sum - 100) < 0.1;
+                    });
+                    return (
+                      <span
+                        style={{
+                          fontWeight: '700',
+                          padding: '0.15rem 0.45rem',
+                          borderRadius: '4px',
+                          backgroundColor: allPass ? '#dcfce7' : '#fee2e2',
+                          color: allPass ? '#15803d' : '#b91c1c',
+                          border: `1px solid ${allPass ? '#86efac' : '#fca5a5'}`,
+                        }}
+                      >
+                        {allPass ? `✓ Ràng buộc Hỗn Hợp: 100% các lần chạy đạt chuẩn Σ = 100%` : `⚠ Chú ý: Có lần chạy chưa đạt Σ Hỗn Hợp = 100%`}
+                      </span>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
 
-            <div className="table-container" style={{ maxHeight: '550px' }}>
-              <table className="qbd-table">
+            <div className="table-container" style={{ maxHeight: '550px', userSelect: 'text' }}>
+              <table className="qbd-table" style={{ userSelect: 'text' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                   <tr>
                     <th style={{ width: '45px', textAlign: 'center' }}>Std</th>
-                    <th style={{ width: '45px', textAlign: 'center' }}>Run</th>
+                    <th style={{ width: '65px', textAlign: 'center' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <span>Run</span>
+                        <span style={{ fontSize: '0.62rem', fontWeight: 'normal', color: '#2563eb' }}>(Sửa được)</span>
+                      </div>
+                    </th>
                     {/* Factor Actual Headers */}
                     {project.factors.map((f) => (
                       <th
                         key={`head-fac-${f.id}`}
                         style={{
-                          backgroundColor: f.controllability === 'constant' ? '#f1f5f9' : f.controllability === 'uncontrollable_noise' ? '#fef3c7' : '#eff6ff',
-                          color: f.controllability === 'constant' ? '#475569' : f.controllability === 'uncontrollable_noise' ? '#92400e' : '#1e40af',
+                          backgroundColor:
+                            f.role === 'mixture_component'
+                              ? '#f0fdfa'
+                              : f.controllability === 'constant'
+                              ? '#f1f5f9'
+                              : f.controllability === 'uncontrollable_noise'
+                              ? '#fef3c7'
+                              : '#eff6ff',
+                          color:
+                            f.role === 'mixture_component'
+                              ? '#0f766e'
+                              : f.controllability === 'constant'
+                              ? '#475569'
+                              : f.controllability === 'uncontrollable_noise'
+                              ? '#92400e'
+                              : '#1e40af',
                           minWidth: '130px',
                         }}
                       >
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                            <span>{f.controllability === 'constant' ? '🔒' : f.controllability === 'uncontrollable_noise' ? '🌪️' : '🎯'}</span>
+                            <span>{f.role === 'mixture_component' ? '🧪' : f.controllability === 'constant' ? '🔒' : f.controllability === 'uncontrollable_noise' ? '🌪️' : '🎯'}</span>
                             <span>{f.name} ({f.code}) [{f.unit}]</span>
                           </div>
                           <span style={{ fontSize: '0.68rem', fontWeight: 'normal', opacity: 0.85 }}>
-                            {f.controllability === 'uncontrollable_noise' ? '(Biến nhiễu - Đo thực tế)' : '(Giá trị thực tế)'}
+                            {f.role === 'mixture_component' ? '(Thành phần hỗn hợp)' : f.controllability === 'uncontrollable_noise' ? '(Biến nhiễu - Đo thực tế)' : '(Giá trị thực tế)'}
                           </span>
                         </div>
                       </th>
                     ))}
+
+                    {/* Mixture Sum Validation Column */}
+                    {mixtureFactors.length > 0 && (
+                      <th
+                        style={{
+                          backgroundColor: '#ecfdf5',
+                          color: '#065f46',
+                          textAlign: 'center',
+                          minWidth: '95px',
+                          borderLeft: '2px solid #a7f3d0',
+                          borderRight: '2px solid #a7f3d0',
+                        }}
+                      >
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <span>Σ Hỗn Hợp</span>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 'normal', color: '#047857' }}>(Chuẩn = 100%)</span>
+                        </div>
+                      </th>
+                    )}
+
                     {/* Coded Headers */}
                     {project.factors.map((f) => (
                       <th key={`head-coded-${f.id}`} style={{ backgroundColor: '#f1f5f9', color: '#475569', textAlign: 'center', minWidth: '70px' }}>
@@ -847,81 +1031,140 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {project.runs.map((run, runIdx) => (
-                    <tr key={run.id}>
-                      <td style={{ textAlign: 'center', fontWeight: '600', color: '#64748b' }}>
-                        {run.stdOrder}
-                      </td>
-                      <td style={{ textAlign: 'center', fontWeight: '700', color: '#1e3a8a' }}>
-                        {run.runOrder}
-                      </td>
+                  {project.runs.map((run, runIdx) => {
+                    const sumMix = mixtureFactors.reduce((acc, f) => {
+                      const v = Number(run.factorActual[f.code]);
+                      return acc + (isNaN(v) ? 0 : v);
+                    }, 0);
+                    const is100 = Math.abs(sumMix - 100) < 0.1;
 
-                      {/* Editable Factor Actual Inputs */}
-                      {project.factors.map((f) => {
-                        const isConstant = f.controllability === 'constant';
-                        const isUncontrolled = f.controllability === 'uncontrollable_noise';
-                        const val = run.factorActual[f.code];
+                    return (
+                      <tr key={run.id}>
+                        <td style={{ textAlign: 'center', fontWeight: '600', color: '#64748b' }}>
+                          {run.stdOrder}
+                        </td>
 
-                        return (
-                          <td
-                            key={`actual-${run.id}-${f.code}`}
+                        {/* Editable Run Order Input */}
+                        <td style={{ textAlign: 'center', padding: '0.2rem 0.3rem' }}>
+                          <input
+                            type="number"
+                            min={1}
+                            max={999}
+                            className="input-field"
                             style={{
-                              backgroundColor: isConstant ? '#f8fafc' : isUncontrolled ? '#fffbeb' : '#ffffff',
+                              width: '48px',
+                              textAlign: 'center',
+                              fontWeight: '700',
+                              color: '#1e40af',
+                              padding: '0.2rem',
+                              fontSize: '0.82rem',
+                              backgroundColor: '#f8fafc',
+                              borderColor: '#93c5fd',
+                              margin: '0 auto',
+                              display: 'block',
+                            }}
+                            title="Thứ tự thực hiện thí nghiệm ngẫu nhiên (Bạn có thể sửa thủ công theo thứ tự thực tế tại Lab)"
+                            value={run.runOrder}
+                            onChange={(e) => handleRunOrderChange(run.id, parseInt(e.target.value) || 1)}
+                          />
+                        </td>
+
+                        {/* Editable Factor Actual Inputs */}
+                        {project.factors.map((f) => {
+                          const isConstant = f.controllability === 'constant';
+                          const isUncontrolled = f.controllability === 'uncontrollable_noise';
+                          const isMix = f.role === 'mixture_component';
+                          const val = run.factorActual[f.code];
+
+                          return (
+                            <td
+                              key={`actual-${run.id}-${f.code}`}
+                              style={{
+                                backgroundColor: isMix ? '#f0fdfa' : isConstant ? '#f8fafc' : isUncontrolled ? '#fffbeb' : '#ffffff',
+                                padding: '0.25rem 0.35rem',
+                              }}
+                            >
+                              {f.dataType === 'qualitative' ? (
+                                <select
+                                  className="input-field"
+                                  style={{
+                                    padding: '0.2rem 0.35rem',
+                                    fontSize: '0.8rem',
+                                    fontWeight: '600',
+                                    color: '#1e3a8a',
+                                    width: '100%',
+                                  }}
+                                  value={typeof val === 'string' ? val : ''}
+                                  onChange={(e) => handleFactorActualChange(run.id, f.code, e.target.value)}
+                                >
+                                  {f.categories && f.categories.length > 0 ? (
+                                    f.categories.map((cat) => (
+                                      <option key={cat} value={cat}>
+                                        {cat}
+                                      </option>
+                                    ))
+                                  ) : (
+                                    <>
+                                      <option value="Mức 1">Mức 1</option>
+                                      <option value="Mức 2">Mức 2</option>
+                                    </>
+                                  )}
+                                </select>
+                              ) : (
+                                <input
+                                  type="number"
+                                  step="any"
+                                  className="input-field"
+                                  style={{
+                                    padding: '0.25rem 0.4rem',
+                                    fontSize: '0.82rem',
+                                    fontWeight: '600',
+                                    width: '100%',
+                                    color: isMix ? '#0f766e' : isUncontrolled ? '#b45309' : isConstant ? '#475569' : '#1e3a8a',
+                                    backgroundColor: isMix ? '#f0fdfa' : isConstant ? '#f1f5f9' : isUncontrolled ? '#fef3c7' : '#ffffff',
+                                    borderColor: isMix ? '#99f6e4' : isUncontrolled ? '#f59e0b' : undefined,
+                                  }}
+                                  value={val !== undefined && val !== null ? val : ''}
+                                  placeholder="Nhập số..."
+                                  title={isUncontrolled ? 'Biến nhiễu không kiểm soát (Uncontrolled Noise) - Nhập giá trị thực tế đo được' : `${f.name} [${f.unit}]`}
+                                  onChange={(e) => handleFactorActualChange(run.id, f.code, e.target.value)}
+                                  onPaste={(e) => handleCellPaste(e, runIdx, 'factor', f.code)}
+                                />
+                              )}
+                            </td>
+                          );
+                        })}
+
+                        {/* Mixture Sum Validation Cell */}
+                        {mixtureFactors.length > 0 && (
+                          <td
+                            style={{
+                              textAlign: 'center',
+                              backgroundColor: '#f0fdf4',
                               padding: '0.25rem 0.35rem',
+                              borderLeft: '2px solid #a7f3d0',
+                              borderRight: '2px solid #a7f3d0',
                             }}
                           >
-                            {f.dataType === 'qualitative' ? (
-                              <select
-                                className="input-field"
-                                style={{
-                                  padding: '0.2rem 0.35rem',
-                                  fontSize: '0.8rem',
-                                  fontWeight: '600',
-                                  color: '#1e3a8a',
-                                  width: '100%',
-                                }}
-                                value={typeof val === 'string' ? val : ''}
-                                onChange={(e) => handleFactorActualChange(run.id, f.code, e.target.value)}
-                              >
-                                {f.categories && f.categories.length > 0 ? (
-                                  f.categories.map((cat) => (
-                                    <option key={cat} value={cat}>
-                                      {cat}
-                                    </option>
-                                  ))
-                                ) : (
-                                  <>
-                                    <option value="Mức 1">Mức 1</option>
-                                    <option value="Mức 2">Mức 2</option>
-                                  </>
-                                )}
-                              </select>
-                            ) : (
-                              <input
-                                type="number"
-                                step="any"
-                                className="input-field"
-                                style={{
-                                  padding: '0.25rem 0.4rem',
-                                  fontSize: '0.82rem',
-                                  fontWeight: '600',
-                                  width: '100%',
-                                  color: isUncontrolled ? '#b45309' : isConstant ? '#475569' : '#1e3a8a',
-                                  backgroundColor: isConstant ? '#f1f5f9' : isUncontrolled ? '#fef3c7' : '#ffffff',
-                                  borderColor: isUncontrolled ? '#f59e0b' : undefined,
-                                }}
-                                value={val !== undefined && val !== null ? val : ''}
-                                placeholder="Nhập số..."
-                                title={isUncontrolled ? 'Biến nhiễu không kiểm soát (Uncontrolled Noise) - Nhập giá trị thực tế đo được' : `${f.name} [${f.unit}]`}
-                                onChange={(e) => handleFactorActualChange(run.id, f.code, e.target.value)}
-                                onPaste={(e) => handleCellPaste(e, runIdx, 'factor', f.code)}
-                              />
-                            )}
+                            <span
+                              style={{
+                                fontSize: '0.75rem',
+                                fontWeight: '700',
+                                padding: '0.15rem 0.45rem',
+                                borderRadius: '4px',
+                                backgroundColor: is100 ? '#dcfce7' : '#fee2e2',
+                                color: is100 ? '#15803d' : '#b91c1c',
+                                border: `1px solid ${is100 ? '#86efac' : '#fca5a5'}`,
+                                display: 'inline-block',
+                              }}
+                              title={is100 ? 'Đạt chuẩn 100%' : `Tổng = ${sumMix.toFixed(2)}%, không đạt 100%`}
+                            >
+                              {is100 ? '✓ 100%' : `⚠ ${sumMix.toFixed(1)}%`}
+                            </span>
                           </td>
-                        );
-                      })}
+                        )}
 
-                      {/* Recalculated Coded Values */}
+                        {/* Recalculated Coded Values */}
                       {project.factors.map((f) => (
                         <td key={`coded-${run.id}-${f.code}`} style={{ textAlign: 'center', color: '#64748b' }} className="font-mono">
                           {f.controllability === 'constant'
@@ -965,13 +1208,14 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                         </td>
                       ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+    </div>
 
       {/* Modal: Smart Excel / CSV Import & Validation */}
       {showImportModal && (
