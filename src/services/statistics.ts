@@ -115,6 +115,9 @@ export function fitModel(
   // A 0/100 surrogate is not a binomial model.  Fail closed until a logistic
   // modelling engine is supplied rather than reporting invalid OLS p-values.
   if (cqa.dataType === 'qualitative_binary' || cqa.objective === 'pass_category') return null;
+  // Block-adjusted inference is not implemented. Fail closed instead of
+  // reporting p-values that confound execution batch with treatment effects.
+  if (new Set(runs.map((run) => run.block ?? 1)).size > 1) return null;
   // Only vary factors that are not constant
   const activeFactors = factors.filter((f) => f.controllability !== 'constant');
 
@@ -399,17 +402,22 @@ export function fitModel(
   // Curvature Test for factorial designs with center points
   let curvatureTest: (ANOVASource & { significant: boolean; note: string }) | undefined = undefined;
 
-  const centerPointRuns = validRuns.filter((r) => {
-    return activeFactors.every((f) => Math.abs(r.run.factorCoded[f.code] ?? 0) <= 0.08);
-  });
-  const factorialRuns = validRuns.filter((r) => {
-    return !activeFactors.every((f) => Math.abs(r.run.factorCoded[f.code] ?? 0) <= 0.08);
-  });
+  const isCenterPoint = (item: (typeof validRuns)[number]) => {
+    return activeFactors.every((f) => Math.abs(item.run.factorCoded[f.code] ?? 0) <= 0.08);
+  };
+  const isFactorialCorner = (item: (typeof validRuns)[number]) => activeFactors.every((factor) =>
+    Math.abs(Math.abs(item.run.factorCoded[factor.code] ?? 0) - 1) <= 0.08
+  );
+  const centerPointRuns = validRuns.filter(isCenterPoint);
+  const factorialRuns = validRuns.filter(isFactorialCorner);
+  const supportsClassicalCurvature =
+    !activeFactors.some((factor) => factor.role === 'mixture_component' || factor.type === 'Mixture') &&
+    validRuns.every((item) => isCenterPoint(item) || isFactorialCorner(item));
 
   const nC = centerPointRuns.length;
   const nF = factorialRuns.length;
 
-  if (nC >= 2 && nF >= 2) {
+  if (supportsClassicalCurvature && nC >= 2 && nF >= 2) {
     const yCenterMean =
       centerPointRuns.reduce((sum, r) => sum + (r.parsedY ?? 0), 0) / nC;
     const yFactMean =
@@ -1084,13 +1092,31 @@ export function runMonteCarloSimulation(
     const denomRight = Math.sqrt(paired.reduce((sum, pair) => sum + Math.pow(pair[1] - meanRight, 2), 0));
     return denomLeft > 0 && denomRight > 0 ? Math.max(-0.95, Math.min(0.95, numerator / (denomLeft * denomRight))) : 0;
   }));
-  const cholesky = correlation.map((row) => new Array(row.length).fill(0));
-  for (let i = 0; i < cholesky.length; i++) {
-    for (let j = 0; j <= i; j++) {
-      const value = correlation[i][j] - Array.from({ length: j }, (_, k) => cholesky[i][k] * cholesky[j][k]).reduce((sum, item) => sum + item, 0);
-      cholesky[i][j] = i === j ? Math.sqrt(Math.max(1e-8, value)) : value / cholesky[j][j];
+  const tryCholesky = (matrix: number[][]): number[][] | null => {
+    const result = matrix.map((row) => new Array(row.length).fill(0));
+    for (let i = 0; i < result.length; i++) {
+      for (let j = 0; j <= i; j++) {
+        const value = matrix[i][j] - Array.from({ length: j }, (_, k) => result[i][k] * result[j][k]).reduce((sum, item) => sum + item, 0);
+        if (i === j) {
+          if (value <= 1e-10) return null;
+          result[i][j] = Math.sqrt(value);
+        } else {
+          result[i][j] = value / result[j][j];
+        }
+      }
     }
+    return result;
+  };
+  // Pairwise residual correlations are not guaranteed positive definite.
+  // Shrink them toward independence until Cholesky is mathematically valid.
+  let correlationShrink = 1;
+  let cholesky: number[][] | null = null;
+  while (!cholesky && correlationShrink >= 0.05) {
+    const candidate = correlation.map((row, i) => row.map((value, j) => i === j ? 1 : value * correlationShrink));
+    cholesky = tryCholesky(candidate);
+    correlationShrink *= 0.9;
   }
+  cholesky ??= correlation.map((row, i) => row.map((_, j) => i === j ? 1 : 0));
 
   for (let s = 0; s < simulations; s++) {
     // Generate randomized factor actuals and convert to coded/proportion
@@ -1111,7 +1137,8 @@ export function runMonteCarloSimulation(
 
       const rawMean = setpointActual[f.code];
       const mean: number = typeof rawMean === 'number' ? rawMean : Number(rawMean) || (f.low + f.high) / 2;
-      const sd = Math.max(1e-5, Math.abs(mean) * (variabilityPercent / 100.0));
+      const scale = Math.max(Math.abs(mean), Math.abs(f.high - f.low) / 2);
+      const sd = Math.max(1e-5, scale * (variabilityPercent / 100.0));
 
       // Box-Muller standard normal transform
       // Truncated normal sampling prevents extrapolation outside the proven
@@ -1167,7 +1194,9 @@ export function runMonteCarloSimulation(
     for (let cqaIndex = 0; cqaIndex < validCQAs.length; cqaIndex++) {
       const cqa = validCQAs[cqaIndex];
       const model = models[cqa.code];
-      const noiseStd = (model.diagnostics as any).stdDev ?? (model.diagnostics as any).rmseTrain ?? (model.diagnostics as any).rmseOverall ?? 0.1;
+      const residualStd = (model.diagnostics as any).stdDev ?? (model.diagnostics as any).rmseVal ?? (model.diagnostics as any).rmseOverall ?? 0.1;
+      const meanPredictionSE = 'predictStandardError' in model ? model.predictStandardError?.(sampleCoded) ?? 0 : 0;
+      const noiseStd = Math.sqrt(residualStd * residualStd + meanPredictionSE * meanPredictionSE);
 
       // Exact Box-Muller Gaussian Noise for model residual variance
       const resError = noiseStd * correlatedZ[cqaIndex];

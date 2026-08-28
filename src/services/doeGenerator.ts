@@ -7,6 +7,7 @@ import {
   matInverse,
 } from './mathUtils';
 import { buildModelVector, getModelTermCount } from './modelTerms';
+import { createSeededRandom } from './random';
 
 /**
  * Convert coded factor value (-1, 0, +1, +alpha, -alpha) to actual physical value or categorical label
@@ -117,8 +118,10 @@ export function generateFractionalFactorial(k: number): number[][] {
     const base = generateFullFactorial(4);
     return base.map(row => [...row, row[0] * row[1] * row[2] * row[3]]);
   }
-  // Default fallback to 2^k
-  return generateFullFactorial(k);
+  // One-half fraction for larger screening designs. Use a resolution-IV
+  // generator Xk = X1*X2*X3 rather than silently expanding to a full 2^k.
+  const base = generateFullFactorial(k - 1);
+  return base.map((row) => [...row, row[0] * row[1] * row[2]]);
 }
 
 /**
@@ -190,13 +193,31 @@ export function generateTaguchi(k: number, arrayType?: string): number[][] {
     [ 1,  1,  0, -1]
   ];
 
-  if (arrayType === 'L4' || (k <= 3 && arrayType !== 'L8' && arrayType !== 'L9')) {
+  const hadamard = (order: number): number[][] => {
+    let matrix = [[1]];
+    while (matrix.length < order) {
+      matrix = [
+        ...matrix.map((row) => [...row, ...row]),
+        ...matrix.map((row) => [...row, ...row.map((value) => -value)]),
+      ];
+    }
+    // The first column is the intercept; remaining columns form the OA.
+    return matrix.map((row) => row.slice(1));
+  };
+
+  const selected = arrayType ?? (k <= 3 ? 'L4' : k <= 7 ? 'L8' : k <= 11 ? 'L12' : 'L16');
+  const capacity = selected === 'L4' ? 3 : selected === 'L8' ? 7 : selected === 'L9' ? 4 : selected === 'L12' ? 11 : 15;
+  if (k < 1 || k > capacity) return [];
+
+  if (selected === 'L4') {
     return L4.map(row => row.slice(0, k));
   }
-  if (arrayType === 'L9') {
+  if (selected === 'L9') {
     return L9_3level.map(row => row.slice(0, k));
   }
-  return L8.map(row => row.slice(0, k));
+  if (selected === 'L8') return L8.map(row => row.slice(0, k));
+  if (selected === 'L12') return generatePlackettBurman(k);
+  return hadamard(16).map((row) => row.slice(0, k));
 }
 
 /**
@@ -507,16 +528,17 @@ export function generateCombinedMixtureProcessMatrix(
  * Main function to generate full DoE Runs table according to user configuration
  */
 export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { runs: DoERun[]; alpha?: number } {
-  const k = factors.length;
+  const designFactors = factors.filter((factor) => factor.controllability !== 'constant');
+  const k = designFactors.length;
   if (k === 0) return { runs: [] };
 
   let codedMatrix: number[][] = [];
   let calculatedAlpha: number | undefined = undefined;
-  let matrixFactors = factors;
+  let matrixFactors = designFactors;
 
   // Separate Mixture components and Independent Process factors
-  const mixtureFactors = factors.filter((f) => f.role === 'mixture_component' || f.type === 'Mixture');
-  const processFactors = factors.filter((f) => f.role !== 'mixture_component' && f.type !== 'Mixture');
+  const mixtureFactors = designFactors.filter((f) => f.role === 'mixture_component' || f.type === 'Mixture');
+  const processFactors = designFactors.filter((f) => f.role !== 'mixture_component' && f.type !== 'Mixture');
 
   const useCrossedCombinedDesign =
     config.category === 'Combined_Mixture_Process' &&
@@ -571,15 +593,15 @@ export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { r
       case 'SimplexLattice':
       case 'SimplexCentroid':
         codedMatrix = generateConstrainedMixtureDesign(
-          factors,
+          designFactors,
           config.designType === 'SimplexLattice' ? 'Lattice' : 'Centroid'
         );
         break;
 
       case 'Combined_Mixture_Factorial':
       case 'Combined_Mixture_RSM': {
-        const mixFactors = mixtureFactors.length > 0 ? mixtureFactors : factors.slice(0, Math.min(3, k));
-        const procFactors = processFactors.length > 0 ? processFactors : factors.slice(mixFactors.length);
+        const mixFactors = mixtureFactors.length > 0 ? mixtureFactors : designFactors.slice(0, Math.min(3, k));
+        const procFactors = processFactors.length > 0 ? processFactors : designFactors.slice(mixFactors.length);
         codedMatrix = generateCombinedMixtureProcessMatrix(
           mixFactors,
           procFactors,
@@ -595,7 +617,7 @@ export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { r
         // model-dependent subset from the constrained mixture × process pool.
         // It must not fall back to the complete crossed design.
         const dModel = config.dOptimalModel || (mixtureFactors.length > 0 ? '2FI' : k <= 3 ? 'Quadratic' : '2FI');
-        const numTerms = calculateNumModelTermsForFactors(factors, dModel);
+        const numTerms = calculateNumModelTermsForFactors(designFactors, dModel);
         // N must exceed p to retain residual degrees of freedom for model fitting.
         const minimumFittableRuns = numTerms + 1;
         const defaultRuns = mixtureFactors.length > 0 && processFactors.length > 0
@@ -604,7 +626,7 @@ export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { r
         const nRuns = config.numRuns
           ? Math.max(minimumFittableRuns, config.numRuns)
           : Math.max(minimumFittableRuns, defaultRuns);
-        codedMatrix = generateDOptimalMatrix(factors, dModel, nRuns);
+        codedMatrix = generateDOptimalMatrix(designFactors, dModel, nRuns);
         break;
       }
 
@@ -657,7 +679,7 @@ export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { r
 
     factors.forEach((f) => {
       const matrixIndex = matrixFactors.indexOf(f);
-      const codedVal = row[matrixIndex] !== undefined ? row[matrixIndex] : 0;
+      const codedVal = matrixIndex >= 0 && row[matrixIndex] !== undefined ? row[matrixIndex] : 0;
       factorCoded[f.code] = codedVal;
       if (f.role === 'mixture_component' || f.type === 'Mixture' || config.category === 'Mixture') {
         if (f.high <= 1.0 && f.unit !== '%') {
@@ -683,9 +705,10 @@ export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { r
 
   // Randomize if requested
   if (config.randomized) {
+    const random = createSeededRandom(config.randomizationSeed ?? 20260828);
     const randomizedIndices = runs.map((_, i) => i);
     for (let i = randomizedIndices.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(random() * (i + 1));
       [randomizedIndices[i], randomizedIndices[j]] = [randomizedIndices[j], randomizedIndices[i]];
     }
     randomizedIndices.forEach((origIdx, newOrder) => {
@@ -795,6 +818,14 @@ export function validateDesignSetup(factors: Factor[], config: DoEDesignConfig):
   }
   if (config.category === 'Combined_Mixture_Process' && !isOptimal) {
     warnings.push('Thiết kế mixture–process nhân chéo đầy đủ có thể tạo rất nhiều run; cân nhắc D-optimal theo ngân sách.');
+  }
+  if (config.designType === 'Taguchi') {
+    const array = config.taguchiArray ?? (active.length <= 3 ? 'L4' : active.length <= 7 ? 'L8' : active.length <= 11 ? 'L12' : 'L16');
+    const capacity = array === 'L4' ? 3 : array === 'L8' ? 7 : array === 'L9' ? 4 : array === 'L12' ? 11 : 15;
+    if (active.length > capacity) errors.push(`${array} chỉ hỗ trợ tối đa ${capacity} factor.`);
+    if (array === 'L9' && active.some((factor) => factor.dataType !== 'quantitative_multilevel')) {
+      warnings.push('L9 là ma trận ba mức; mọi factor nên được khai báo quantitative_multilevel với ba mức hợp lệ.');
+    }
   }
   if ((config.replicates || 1) > 1) warnings.push('Số run hiển thị sẽ tăng theo số lặp lại đã chọn.');
   if ((config.blocks ?? 1) > 1) {

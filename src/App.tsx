@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   AnalysisProvenance,
   QBDProject,
@@ -8,23 +8,25 @@ import type {
   NeuralNetModelResult,
   NeuralTrainingMode,
   ModelingEngine,
+  AnalysisSettings,
+  DesirabilitySolution,
 } from './types/qbd';
 import { CASE_STUDIES } from './data/caseStudies';
 import { fitModel, optimizeDesirability, runMonteCarloSimulation } from './services/statistics';
 import { fitNeuralNetModel, fitMultiOutputNeuralNet, DEFAULT_NEURAL_CONFIG } from './services/neuralNetwork';
-import { exportQBDWordReport } from './services/reportGenerator';
 import { getReportReadiness, loadPersistedProject, persistProject, recordProjectVersion, validateProjectTemplate } from './services/projectGovernance';
 import { stableSeedFromText } from './services/random';
 import { Navbar } from './components/Navbar';
 import { TabNavigation, type TabKey } from './components/TabNavigation';
-import { QTPPTab } from './components/tabs/QTPPTab';
-import { FMEATab } from './components/tabs/FMEATab';
-import { DoEDesignerTab } from './components/tabs/DoEDesignerTab';
-import { StatisticalANOVATab } from './components/tabs/StatisticalANOVATab';
-import { NeuralNetworkTab } from './components/tabs/NeuralNetworkTab';
-import { ResponseSurfaceTab } from './components/tabs/ResponseSurfaceTab';
-import { DesignSpaceTab } from './components/tabs/DesignSpaceTab';
-import { ReportTab } from './components/tabs/ReportTab';
+
+const QTPPTab = lazy(() => import('./components/tabs/QTPPTab').then((module) => ({ default: module.QTPPTab })));
+const FMEATab = lazy(() => import('./components/tabs/FMEATab').then((module) => ({ default: module.FMEATab })));
+const DoEDesignerTab = lazy(() => import('./components/tabs/DoEDesignerTab').then((module) => ({ default: module.DoEDesignerTab })));
+const StatisticalANOVATab = lazy(() => import('./components/tabs/StatisticalANOVATab').then((module) => ({ default: module.StatisticalANOVATab })));
+const NeuralNetworkTab = lazy(() => import('./components/tabs/NeuralNetworkTab').then((module) => ({ default: module.NeuralNetworkTab })));
+const ResponseSurfaceTab = lazy(() => import('./components/tabs/ResponseSurfaceTab').then((module) => ({ default: module.ResponseSurfaceTab })));
+const DesignSpaceTab = lazy(() => import('./components/tabs/DesignSpaceTab').then((module) => ({ default: module.DesignSpaceTab })));
+const ReportTab = lazy(() => import('./components/tabs/ReportTab').then((module) => ({ default: module.ReportTab })));
 
 const createAnalysisProvenance = (projectId: string): AnalysisProvenance => ({
   optimizerSeed: stableSeedFromText(projectId, 'optimizer'),
@@ -34,31 +36,52 @@ const createAnalysisProvenance = (projectId: string): AnalysisProvenance => ({
   monteCarloSimulations: 10_000,
 });
 
+const createAnalysisSettings = (project?: QBDProject): AnalysisSettings => ({
+  modelingEngine: project?.analysisSettings?.modelingEngine ?? project?.modelingEngine ?? 'polynomial',
+  modelTypes: project?.analysisSettings?.modelTypes ?? {},
+  neuralTrainingMode: project?.analysisSettings?.neuralTrainingMode ?? 'independent',
+  sharedNeuralConfig: project?.analysisSettings?.sharedNeuralConfig ?? { ...DEFAULT_NEURAL_CONFIG },
+  neuralConfigs: project?.analysisSettings?.neuralConfigs ?? {},
+  appliedOptimum: project?.analysisSettings?.appliedOptimum,
+});
+
+const normalizeProjectAnalysis = (source: QBDProject): QBDProject => ({
+  ...source,
+  analysisProvenance: source.analysisProvenance ?? createAnalysisProvenance(source.id),
+  analysisSettings: createAnalysisSettings(source),
+});
+
 export function App() {
   // Default project: Case Study 1 (Metoprolol Tablet BBD)
-  const [project, setProject] = useState<QBDProject>(() => loadPersistedProject() || CASE_STUDIES[0]);
+  const [project, setProject] = useState<QBDProject>(() => normalizeProjectAnalysis(loadPersistedProject() || CASE_STUDIES[0]));
   const [activeTab, setActiveTab] = useState<TabKey>('qtpp');
-  const [selectedCQA, setSelectedCQA] = useState<string>(() => (loadPersistedProject() || CASE_STUDIES[0]).cqas[0]?.code || 'Y1');
-  const [modelTypes, setModelTypes] = useState<Record<string, ModelType>>({});
-  const [neuralTrainingMode, setNeuralTrainingMode] = useState<NeuralTrainingMode>('independent');
-  const [sharedNeuralConfig, setSharedNeuralConfig] = useState<NeuralNetConfig>({ ...DEFAULT_NEURAL_CONFIG });
-  const [neuralConfigs, setNeuralConfigs] = useState<Record<string, NeuralNetConfig>>({});
-  const [modelingEngine, setModelingEngine] = useState<ModelingEngine>('polynomial');
+  const [selectedCQA, setSelectedCQA] = useState<string>(() => project.cqas[0]?.code || 'Y1');
+  const [modelTypes, setModelTypes] = useState<Record<string, ModelType>>(() => project.analysisSettings?.modelTypes ?? {});
+  const [neuralTrainingMode, setNeuralTrainingMode] = useState<NeuralTrainingMode>(() => project.analysisSettings?.neuralTrainingMode ?? 'independent');
+  const [sharedNeuralConfig, setSharedNeuralConfig] = useState<NeuralNetConfig>(() => project.analysisSettings?.sharedNeuralConfig ?? { ...DEFAULT_NEURAL_CONFIG });
+  const [neuralConfigs, setNeuralConfigs] = useState<Record<string, NeuralNetConfig>>(() => project.analysisSettings?.neuralConfigs ?? {});
+  const [modelingEngine, setModelingEngine] = useState<ModelingEngine>(() => project.analysisSettings?.modelingEngine ?? 'polynomial');
+  const [storageWarning, setStorageWarning] = useState<string | null>(null);
   const hasPersistedInitialProject = useRef(false);
   const pendingAuditAction = useRef('Khởi tạo project');
-
-  useEffect(() => {
-    if (!project.analysisProvenance) {
-      setProject((previous) => ({ ...previous, analysisProvenance: createAnalysisProvenance(previous.id) }));
-    }
-  }, [project.analysisProvenance, project.id]);
+  const lastSnapshot = useRef({ action: '', timestamp: 0 });
 
   const analysisProvenance = project.analysisProvenance ?? createAnalysisProvenance(project.id);
 
   useEffect(() => {
-    persistProject(project);
-    if (hasPersistedInitialProject.current) recordProjectVersion(project, pendingAuditAction.current);
-    hasPersistedInitialProject.current = true;
+    const timer = window.setTimeout(() => {
+      const persisted = persistProject(project);
+      setStorageWarning(persisted ? null : 'Autosave trình duyệt đã thất bại hoặc hết dung lượng. Hãy dùng nút Lưu để xuất JSON ngay.');
+      const now = Date.now();
+      const action = pendingAuditAction.current;
+      const shouldCheckpoint = hasPersistedInitialProject.current &&
+        (action !== lastSnapshot.current.action || now - lastSnapshot.current.timestamp >= 30_000);
+      if (shouldCheckpoint && recordProjectVersion(project, action)) {
+        lastSnapshot.current = { action, timestamp: now };
+      }
+      hasPersistedInitialProject.current = true;
+    }, 500);
+    return () => window.clearTimeout(timer);
   }, [project]);
 
   // Calculate ANOVA Models dynamically for all CQAs
@@ -92,55 +115,49 @@ export function App() {
 
   // Active Models based on selected Modeling Engine (Polynomial or Neural)
   const activeModels = useMemo<Record<string, StatisticalModelResult | NeuralNetModelResult>>(() => {
-    if (modelingEngine === 'neural' && Object.keys(neuralModels).length > 0) {
-      return neuralModels;
-    }
-    return models;
+    return modelingEngine === 'neural' ? neuralModels : models;
   }, [modelingEngine, models, neuralModels]);
 
   // Handle Training Shared Neural Network model (fits all CQAs at once)
   const handleTrainSharedNeuralModel = (config: NeuralNetConfig) => {
-    setSharedNeuralConfig({
-      ...config,
-      seed: config.seed,
-    });
+    const next = { ...config, seed: config.seed };
+    setSharedNeuralConfig(next);
+    persistAnalysisSettings({ sharedNeuralConfig: next, appliedOptimum: undefined });
   };
 
   // Handle Training specific Independent Neural Network model with custom hyperparameters
   const handleTrainIndependentNeuralModel = (cqaCode: string, config: NeuralNetConfig) => {
-    setNeuralConfigs((prev) => ({
-      ...prev,
-      [cqaCode]: { ...config, seed: config.seed },
-    }));
+    const next = { ...neuralConfigs, [cqaCode]: { ...config, seed: config.seed } };
+    setNeuralConfigs(next);
+    persistAnalysisSettings({ neuralConfigs: next, appliedOptimum: undefined });
   };
 
   // Handle Batch Training all Independent Neural Network models
   const handleTrainAllIndependentNeuralModels = () => {
-    setNeuralConfigs((prev) => {
-      const next: Record<string, NeuralNetConfig> = {};
-      project.cqas.forEach((cqa) => {
-        const existing = prev[cqa.code] || DEFAULT_NEURAL_CONFIG;
-        next[cqa.code] = { ...existing, seed: existing.seed };
-      });
-      return next;
+    const next: Record<string, NeuralNetConfig> = {};
+    project.cqas.forEach((cqa) => {
+      const existing = neuralConfigs[cqa.code] || DEFAULT_NEURAL_CONFIG;
+      next[cqa.code] = { ...existing, seed: existing.seed };
     });
+    setNeuralConfigs(next);
+    persistAnalysisSettings({ neuralConfigs: next, appliedOptimum: undefined });
   };
 
   // Handle Copying config to all CQAs
   const handleCopyNeuralConfigToAll = (sourceConfig: NeuralNetConfig) => {
-    setNeuralConfigs(() => {
-      const next: Record<string, NeuralNetConfig> = {};
-      project.cqas.forEach((cqa) => {
-        next[cqa.code] = { ...sourceConfig, seed: sourceConfig.seed };
-      });
-      return next;
+    const next: Record<string, NeuralNetConfig> = {};
+    project.cqas.forEach((cqa) => {
+      next[cqa.code] = { ...sourceConfig, seed: sourceConfig.seed };
     });
+    setNeuralConfigs(next);
+    persistAnalysisSettings({ neuralConfigs: next, appliedOptimum: undefined });
   };
 
   // Calculate Desirability Optimum dynamically from active modeling engine
-  const optimum = useMemo(() => {
+  const calculatedOptimum = useMemo(() => {
     return optimizeDesirability(project.factors, project.cqas, activeModels, undefined, analysisProvenance.optimizerSeed);
   }, [project.factors, project.cqas, activeModels, analysisProvenance.optimizerSeed]);
+  const optimum = project.analysisSettings?.appliedOptimum ?? calculatedOptimum;
 
   // Calculate Monte Carlo Simulation from active modeling engine
   const monteCarlo = useMemo(() => {
@@ -155,13 +172,66 @@ export function App() {
       analysisProvenance.monteCarloSeed,
     );
   }, [optimum, project.factors, project.cqas, activeModels, analysisProvenance]);
+  const reportReadiness = useMemo(
+    () => getReportReadiness(project, activeModels, optimum, monteCarlo),
+    [project, activeModels, optimum, monteCarlo],
+  );
 
   // Update Project Handler
   const handleUpdateProject = (updated: Partial<QBDProject>) => {
     pendingAuditAction.current = `Cập nhật: ${Object.keys(updated).join(', ')}`;
-    setProject((prev) => ({
-      ...prev,
-      ...updated,
+    setProject((prev) => {
+      const invalidatesModel = Boolean(updated.factors || updated.cqas || updated.runs);
+      const analysisSettings = invalidatesModel
+        ? { ...createAnalysisSettings(prev), appliedOptimum: undefined }
+        : prev.analysisSettings;
+      return {
+        ...prev,
+        ...updated,
+        analysisSettings,
+        updatedDate: new Date().toISOString().slice(0, 10),
+      };
+    });
+  };
+
+  function persistAnalysisSettings(updated: Partial<AnalysisSettings>) {
+    pendingAuditAction.current = `Cập nhật cấu hình phân tích: ${Object.keys(updated).join(', ')}`;
+    setProject((previous) => ({
+      ...previous,
+      modelingEngine: updated.modelingEngine ?? previous.modelingEngine,
+      analysisSettings: { ...createAnalysisSettings(previous), ...updated },
+      updatedDate: new Date().toISOString().slice(0, 10),
+    }));
+  }
+
+  const handleModelingEngineChange = (engine: ModelingEngine) => {
+    setModelingEngine(engine);
+    persistAnalysisSettings({ modelingEngine: engine, appliedOptimum: undefined });
+  };
+
+  const handleModelTypeChange = (code: string, type: ModelType) => {
+    const next = { ...modelTypes, [code]: type };
+    setModelTypes(next);
+    persistAnalysisSettings({ modelTypes: next, appliedOptimum: undefined });
+  };
+
+  const handleNeuralTrainingModeChange = (mode: NeuralTrainingMode) => {
+    setNeuralTrainingMode(mode);
+    persistAnalysisSettings({ neuralTrainingMode: mode, appliedOptimum: undefined });
+  };
+
+  const handleApplyOptimum = (solution: DesirabilitySolution) => {
+    persistAnalysisSettings({ appliedOptimum: solution });
+  };
+
+  const handleMonteCarloConfigChange = (variabilityPercent: number, simulations: number) => {
+    setProject((previous) => ({
+      ...previous,
+      analysisProvenance: {
+        ...(previous.analysisProvenance ?? createAnalysisProvenance(previous.id)),
+        monteCarloVariabilityPercent: variabilityPercent,
+        monteCarloSimulations: simulations,
+      },
       updatedDate: new Date().toISOString().slice(0, 10),
     }));
   };
@@ -174,7 +244,13 @@ export function App() {
       return;
     }
     pendingAuditAction.current = 'Tải project/case study';
-    setProject(newProj);
+    const normalized = normalizeProjectAnalysis(newProj);
+    setProject(normalized);
+    setModelTypes(normalized.analysisSettings?.modelTypes ?? {});
+    setNeuralTrainingMode(normalized.analysisSettings?.neuralTrainingMode ?? 'independent');
+    setSharedNeuralConfig(normalized.analysisSettings?.sharedNeuralConfig ?? { ...DEFAULT_NEURAL_CONFIG });
+    setNeuralConfigs(normalized.analysisSettings?.neuralConfigs ?? {});
+    setModelingEngine(normalized.analysisSettings?.modelingEngine ?? 'polynomial');
     if (newProj.cqas.length > 0) {
       setSelectedCQA(newProj.cqas[0].code);
     }
@@ -252,14 +328,26 @@ export function App() {
     };
 
     pendingAuditAction.current = 'Tạo project mới';
-    setProject(blankProject);
+    const normalized = normalizeProjectAnalysis(blankProject);
+    setProject(normalized);
+    setModelTypes({});
+    setNeuralTrainingMode('independent');
+    setSharedNeuralConfig({ ...DEFAULT_NEURAL_CONFIG });
+    setNeuralConfigs({});
+    setModelingEngine('polynomial');
     setSelectedCQA('Y1');
     setActiveTab('qtpp');
   };
 
   const handleRestoreProject = (snapshot: QBDProject) => {
     pendingAuditAction.current = 'Khôi phục snapshot lịch sử';
-    setProject(snapshot);
+    const normalized = normalizeProjectAnalysis(snapshot);
+    setProject(normalized);
+    setModelTypes(normalized.analysisSettings?.modelTypes ?? {});
+    setNeuralTrainingMode(normalized.analysisSettings?.neuralTrainingMode ?? 'independent');
+    setSharedNeuralConfig(normalized.analysisSettings?.sharedNeuralConfig ?? { ...DEFAULT_NEURAL_CONFIG });
+    setNeuralConfigs(normalized.analysisSettings?.neuralConfigs ?? {});
+    setModelingEngine(normalized.analysisSettings?.modelingEngine ?? 'polynomial');
     setSelectedCQA(snapshot.cqas[0]?.code || 'Y1');
   };
 
@@ -276,12 +364,12 @@ export function App() {
   };
 
   // Export Word Report
-  const handleExportWord = () => {
-    const readiness = getReportReadiness(project);
-    if (!readiness.readyForScientificReport) {
-      window.alert(`Chưa thể xuất báo cáo khoa học cuối cùng.\n${[...readiness.errors, ...readiness.warnings].slice(0, 8).join('\n')}`);
+  const handleExportWord = async () => {
+    if (!reportReadiness.readyForScientificReport) {
+      window.alert(`Chưa thể xuất báo cáo khoa học cuối cùng.\n${[...reportReadiness.errors, ...reportReadiness.warnings].slice(0, 8).join('\n')}`);
       return;
     }
+    const { exportQBDWordReport } = await import('./services/reportGenerator');
     exportQBDWordReport(project, models, optimum, monteCarlo, neuralModels, modelingEngine);
   };
 
@@ -292,12 +380,13 @@ export function App() {
         project={project}
         activeTab={activeTab}
         modelingEngine={modelingEngine}
-        onToggleEngine={setModelingEngine}
+        onToggleEngine={handleModelingEngineChange}
         onNavigateToTab={setActiveTab}
         onLoadProject={handleLoadProject}
         onExportWord={handleExportWord}
         onSaveJSON={handleSaveJSON}
         onNewProject={handleNewProject}
+        canExportWord={reportReadiness.readyForScientificReport}
       />
 
       {/* QbD Workflow Step Navigation */}
@@ -305,6 +394,8 @@ export function App() {
 
       {/* Main Tab Content */}
       <main style={{ flex: 1, maxWidth: '1440px', width: '100%', margin: '0 auto', padding: '1.5rem 1.25rem' }}>
+        {storageWarning && <div className="qbd-card" role="alert" style={{ borderLeft: '4px solid #d97706', color: '#92400e', marginBottom: '1rem' }}>{storageWarning}</div>}
+        <Suspense fallback={<div className="qbd-card" role="status" aria-live="polite">Đang tải mô-đun phân tích…</div>}>
         {activeTab === 'qtpp' && (
           <QTPPTab project={project} onUpdateProject={handleUpdateProject} />
         )}
@@ -333,9 +424,9 @@ export function App() {
             selectedCQA={selectedCQA}
             onSelectCQA={setSelectedCQA}
             modelTypes={modelTypes}
-            onModelTypeChange={(code, type) => setModelTypes({ ...modelTypes, [code]: type })}
+            onModelTypeChange={handleModelTypeChange}
             modelingEngine={modelingEngine}
-            onSelectEngine={setModelingEngine}
+            onSelectEngine={handleModelingEngineChange}
             onNavigateToRSM={() => setActiveTab('rsm')}
             onNavigateToNeural={() => setActiveTab('neural')}
           />
@@ -347,7 +438,7 @@ export function App() {
             models={models}
             neuralModels={neuralModels}
             neuralTrainingMode={neuralTrainingMode}
-            onSetNeuralTrainingMode={setNeuralTrainingMode}
+            onSetNeuralTrainingMode={handleNeuralTrainingModeChange}
             sharedNeuralConfig={sharedNeuralConfig}
             onTrainSharedModel={handleTrainSharedNeuralModel}
             neuralConfigs={neuralConfigs}
@@ -357,7 +448,7 @@ export function App() {
             selectedCQA={selectedCQA}
             onSelectCQA={setSelectedCQA}
             modelingEngine={modelingEngine}
-            onSelectEngine={setModelingEngine}
+            onSelectEngine={handleModelingEngineChange}
             onNavigateToRSM={() => setActiveTab('rsm')}
             onNavigateToDesignSpace={() => setActiveTab('design_space')}
           />
@@ -370,7 +461,7 @@ export function App() {
             selectedCQA={selectedCQA}
             onSelectCQA={setSelectedCQA}
             modelingEngine={modelingEngine}
-            onToggleEngine={setModelingEngine}
+            onToggleEngine={handleModelingEngineChange}
             onNavigateToDesignSpace={() => setActiveTab('design_space')}
           />
         )}
@@ -380,7 +471,15 @@ export function App() {
             project={project}
             models={activeModels}
             modelingEngine={modelingEngine}
-            onToggleEngine={setModelingEngine}
+            onToggleEngine={handleModelingEngineChange}
+            optimum={optimum}
+            monteCarlo={monteCarlo}
+            monteCarloVariabilityPercent={analysisProvenance.monteCarloVariabilityPercent}
+            monteCarloSimulations={analysisProvenance.monteCarloSimulations}
+            monteCarloSeed={analysisProvenance.monteCarloSeed}
+            optimizerSeed={analysisProvenance.optimizerSeed}
+            onApplyOptimum={handleApplyOptimum}
+            onMonteCarloConfigChange={handleMonteCarloConfigChange}
             onUpdateProject={handleUpdateProject}
             onNavigateToReport={() => setActiveTab('report')}
           />
@@ -394,10 +493,11 @@ export function App() {
             monteCarlo={monteCarlo}
             neuralModels={neuralModels}
             modelingEngine={modelingEngine}
-            onToggleEngine={setModelingEngine}
+            onToggleEngine={handleModelingEngineChange}
             onRestoreSnapshot={handleRestoreProject}
           />
         )}
+        </Suspense>
       </main>
 
       {/* Scientific Footer */}

@@ -279,7 +279,10 @@ export function fitNeuralNetModel(
   const lambda = config.weightDecay;
   const lr = config.learningRate;
   const parameterCount = calculateNeuralArchitectureMetrics(numInputs, h1, h2, 1, N).totalParameters;
-  if (N <= parameterCount) return null;
+  const expectedValidationCount = config.validationMethod === 'holdout' && config.holdoutRatio > 0 && N >= 6
+    ? Math.max(1, Math.min(Math.floor(N * 0.4), Math.round(N * config.holdoutRatio)))
+    : 0;
+  if (N - expectedValidationCount <= parameterCount) return null;
 
   // Keep one validation partition across restarts.  Re-splitting every tour
   // makes selection among tours optimistically biased.
@@ -944,7 +947,10 @@ export function fitMultiOutputNeuralNet(
   const lr = config.learningRate;
 
   const totalParams = calculateNeuralArchitectureMetrics(numInputs, h1, h2, numOutputs, N).totalParameters;
-  if (N <= totalParams) return {};
+  const expectedValidationCount = config.validationMethod === 'holdout' && config.holdoutRatio > 0 && N >= 6
+    ? Math.max(1, Math.min(Math.floor(N * 0.4), Math.round(N * config.holdoutRatio)))
+    : 0;
+  if (N - expectedValidationCount <= totalParams) return {};
 
   const splitRng = createRNG(config.seed + 7919);
   const validationIndices = Array.from({ length: N }, (_, i) => i);

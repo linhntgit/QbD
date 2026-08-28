@@ -1,3 +1,5 @@
+import type { NeuralNetConfig, NeuralTrainingMode } from './neuralNetwork';
+
 export type FactorType = 'CMA' | 'CPP' | 'Formulation' | 'Process' | 'Mixture';
 export type FactorDataType = 'quantitative' | 'quantitative_multilevel' | 'qualitative';
 export type FactorControllability = 'controllable' | 'uncontrollable_noise' | 'constant';
@@ -113,6 +115,7 @@ export interface DoEDesignConfig {
   centerPoints: number;
   replicates: number;
   randomized: boolean;
+  randomizationSeed?: number;
   alpha?: number;
   taguchiArray?: 'L4' | 'L8' | 'L9' | 'L12' | 'L16';
   numRuns?: number; // Target number of runs for D-Optimal
@@ -270,6 +273,8 @@ export interface DesignSpaceRanges {
   norLow: number; // Normal Operating Range
   norHigh: number;
   target: number | string;
+  evidenceLevel?: 'provisional_screening' | 'confirmed';
+  evidenceNote?: string;
 }
 
 export interface MonteCarloResult {
@@ -300,6 +305,20 @@ export interface AnalysisProvenance {
   monteCarloSimulations: number;
 }
 
+/**
+ * Persisted analysis choices. These settings are part of the scientific
+ * provenance and must travel with JSON exports and project snapshots.
+ */
+export interface AnalysisSettings {
+  modelingEngine: ModelingEngine;
+  modelTypes: Record<string, ModelType>;
+  neuralTrainingMode: NeuralTrainingMode;
+  sharedNeuralConfig: NeuralNetConfig;
+  neuralConfigs: Record<string, NeuralNetConfig>;
+  /** Last explicitly applied profiler solution, serialized without functions. */
+  appliedOptimum?: DesirabilitySolution;
+}
+
 export interface QBDProject {
   id: string;
   name: string;
@@ -320,6 +339,7 @@ export interface QBDProject {
   designSpace: DesignSpaceRanges[];
   modelingEngine?: ModelingEngine;
   analysisProvenance?: AnalysisProvenance;
+  analysisSettings?: AnalysisSettings;
 }
 
 export * from './neuralNetwork';

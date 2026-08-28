@@ -126,14 +126,17 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
   const numSamples = project.runs.length;
 
   const archMetrics = useMemo(() => {
+    const validationCount = localConfig.validationMethod === 'holdout' && numSamples >= 6
+      ? Math.max(1, Math.min(Math.floor(numSamples * 0.4), Math.round(numSamples * localConfig.holdoutRatio)))
+      : 0;
     return calculateNeuralArchitectureMetrics(
       numInputs,
       localConfig.hiddenNodes1,
       localConfig.hiddenNodes2,
       numOutputs,
-      numSamples
+      numSamples - validationCount
     );
-  }, [numInputs, localConfig.hiddenNodes1, localConfig.hiddenNodes2, numOutputs, numSamples]);
+  }, [numInputs, localConfig.hiddenNodes1, localConfig.hiddenNodes2, localConfig.holdoutRatio, localConfig.validationMethod, numOutputs, numSamples]);
 
   // Live Training / Fitting State
   const [isTraining, setIsTraining] = useState<boolean>(false);

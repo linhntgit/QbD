@@ -770,16 +770,20 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
   const handleRandomizeRunOrder = () => {
     if (project.runs.length === 0) return;
     const n = project.runs.length;
+    const nextSeed = (designConfig.randomizationSeed ?? 20260828) + 1;
+    const random = createSeededRandom(nextSeed);
     const orders = Array.from({ length: n }, (_, i) => i + 1);
     for (let i = n - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(random() * (i + 1));
       [orders[i], orders[j]] = [orders[j], orders[i]];
     }
     const updatedRuns = project.runs.map((r, idx) => ({
       ...r,
       runOrder: orders[idx],
     }));
-    onUpdateProject({ runs: updatedRuns });
+    const nextConfig = { ...designConfig, randomized: true, randomizationSeed: nextSeed };
+    setDesignConfig(nextConfig);
+    onUpdateProject({ runs: updatedRuns, doeConfig: nextConfig });
   };
 
   // Sort Runs by Run Order or Std Order
@@ -1113,6 +1117,26 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
             </select>
           </div>
 
+          {designConfig.designType === 'Taguchi' && (
+            <div>
+              <label htmlFor="taguchi-array" style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: '#475569', marginBottom: '0.3rem' }}>
+                Ma trận trực giao Taguchi
+              </label>
+              <select
+                id="taguchi-array"
+                className="input-field"
+                value={designConfig.taguchiArray ?? (project.factors.filter((factor) => factor.controllability !== 'constant').length <= 3 ? 'L4' : 'L8')}
+                onChange={(event) => setDesignConfig({ ...designConfig, taguchiArray: event.target.value as 'L4' | 'L8' | 'L9' | 'L12' | 'L16' })}
+              >
+                <option value="L4">L4 · 3 factor hai mức</option>
+                <option value="L8">L8 · 7 factor hai mức</option>
+                <option value="L9">L9 · 4 factor ba mức</option>
+                <option value="L12">L12 · 11 factor hai mức</option>
+                <option value="L16">L16 · 15 factor hai mức</option>
+              </select>
+            </div>
+          )}
+
           {/* D-Optimal Target Model & Run Count */}
           {isOptimalDesign ? (
             <>
@@ -1181,12 +1205,25 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               <Shuffle size={15} color="#475569" />
               <span>Ngẫu nhiên hóa (Randomize)</span>
             </label>
+            {designConfig.randomized && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', color: '#475569' }}>
+                Seed
+                <input
+                  aria-label="Seed ngẫu nhiên hóa run order"
+                  type="number"
+                  className="input-field"
+                  style={{ width: '110px', padding: '0.25rem 0.35rem' }}
+                  value={designConfig.randomizationSeed ?? 20260828}
+                  onChange={(event) => setDesignConfig({ ...designConfig, randomizationSeed: Number(event.target.value) || 20260828 })}
+                />
+              </label>
+            )}
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', color: '#475569' }}>
               Chia lịch thành
               <input type="number" min={1} max={10} className="input-field" style={{ width: '64px', padding: '0.25rem 0.35rem' }} value={designConfig.blocks ?? 1} onChange={(e) => setDesignConfig({ ...designConfig, blocks: Math.max(1, Math.min(10, Number(e.target.value))) })} />
               block
             </label>
-            <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Block là kế hoạch chạy; chưa tự thêm hiệu ứng block vào ANOVA.</span>
+            <span style={{ fontSize: '0.7rem', color: '#b45309' }}>Khi block &gt; 1, app khóa OLS/ANOVA vì chưa có block-adjusted model; dùng phần mềm thống kê chuyên dụng hoặc đưa block về 1.</span>
           </div>
         </div>
       </div>

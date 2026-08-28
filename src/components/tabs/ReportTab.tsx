@@ -43,7 +43,8 @@ export const ReportTab: React.FC<ReportTabProps> = ({
   onRestoreSnapshot,
 }) => {
   const traceability = getTraceabilitySummary(project);
-  const reportReadiness = getReportReadiness(project);
+  const reportModels = modelingEngine === 'neural' ? (neuralModels ?? {}) : models;
+  const reportReadiness = getReportReadiness(project, reportModels, optimum, monteCarlo);
   const handleDownloadWord = () => {
     if (!reportReadiness.readyForScientificReport) {
       window.alert(`Chưa thể xuất báo cáo khoa học cuối cùng.\n${[...reportReadiness.errors, ...reportReadiness.warnings].slice(0, 8).join('\n')}`);

@@ -1,4 +1,11 @@
-import type { Factor, QBDProject } from '../types/qbd';
+import type {
+  DesirabilitySolution,
+  Factor,
+  MonteCarloResult,
+  NeuralNetModelResult,
+  QBDProject,
+  StatisticalModelResult,
+} from '../types/qbd';
 
 export interface ProjectAuditEntry {
   id: string;
@@ -37,14 +44,15 @@ export function loadPersistedProject(): QBDProject | null {
   }
 }
 
-export function persistProject(project: QBDProject): void {
-  if (!storageAvailable()) return;
+export function persistProject(project: QBDProject): boolean {
+  if (!storageAvailable()) return false;
   try {
     const serialized = JSON.stringify(project);
     window.localStorage.setItem(projectKey(project.id), serialized);
     window.localStorage.setItem('qbd.project.last', serialized);
+    return true;
   } catch {
-    // Browser storage is an optional convenience layer; the user can still use JSON export.
+    return false;
   }
 }
 
@@ -58,8 +66,8 @@ export function getProjectHistory(projectId: string): ProjectVersionSnapshot[] {
   }
 }
 
-export function recordProjectVersion(project: QBDProject, action: string): void {
-  if (!storageAvailable()) return;
+export function recordProjectVersion(project: QBDProject, action: string): boolean {
+  if (!storageAvailable()) return false;
   try {
     const history = getProjectHistory(project.id);
     const timestamp = new Date().toISOString();
@@ -71,8 +79,9 @@ export function recordProjectVersion(project: QBDProject, action: string): void 
       project: cloneProject(project),
     };
     window.localStorage.setItem(historyKey(project.id), JSON.stringify([snapshot, ...history].slice(0, 25)));
+    return true;
   } catch {
-    // Do not block scientific work because local browser storage is unavailable.
+    return false;
   }
 }
 
@@ -155,15 +164,59 @@ export function validateProjectTemplate(project: QBDProject): ProjectValidationR
 }
 
 /** A final scientific report requires a valid project and complete CQA data. */
-export function getReportReadiness(project: QBDProject): ReportReadinessResult {
+export function getReportReadiness(
+  project: QBDProject,
+  models: Record<string, StatisticalModelResult | NeuralNetModelResult>,
+  optimum: DesirabilitySolution | null,
+  monteCarlo: MonteCarloResult | null,
+): ReportReadinessResult {
   const validation = validateProjectTemplate(project);
+  const errors = [...validation.errors];
+  const warnings = [...validation.warnings];
   const incomplete = project.runs.flatMap((run) => project.cqas
     .filter((cqa) => run.responses[cqa.code] === undefined || run.responses[cqa.code] === null || run.responses[cqa.code] === '')
     .map((cqa) => `Run ${run.runOrder}: thiếu ${cqa.code}.`));
+  warnings.push(...incomplete);
+
+  project.cqas.forEach((cqa) => {
+    if (cqa.dataType?.startsWith('qualitative') || cqa.objective === 'pass_category') {
+      warnings.push(`${cqa.code}: chưa có mô hình logistic/ordinal; CQA định tính chỉ được báo cáo mô tả.`);
+      return;
+    }
+    const model = models[cqa.code];
+    if (!model) {
+      errors.push(`${cqa.code}: không có mô hình khả định cho báo cáo khoa học.`);
+      return;
+    }
+    if ('terms' in model) {
+      const df = model.residualDegreesOfFreedom ?? 0;
+      const q2 = model.diagnostics.qSquared ?? model.diagnostics.predRSquared;
+      const pLof = model.diagnostics.pLOF;
+      if (df <= 0) errors.push(`${cqa.code}: mô hình không còn bậc tự do dư.`);
+      else if (df < 4) warnings.push(`${cqa.code}: chỉ có ${df} bậc tự do dư; độ chính xác suy luận thấp.`);
+      if (!Number.isFinite(q2) || q2 < 0) errors.push(`${cqa.code}: Q²/predicted R² không hợp lệ hoặc âm.`);
+      if (pLof !== undefined && pLof < 0.05) errors.push(`${cqa.code}: lack-of-fit có ý nghĩa (p < 0,05).`);
+      if (pLof === undefined) warnings.push(`${cqa.code}: chưa ước lượng được lack-of-fit do thiếu pure-error replication.`);
+    } else {
+      if (model.config.validationMethod === 'none') errors.push(`${cqa.code}: NN chưa có validation holdout.`);
+      if (!Number.isFinite(model.diagnostics.rSquaredVal)) errors.push(`${cqa.code}: NN không có chỉ số validation hợp lệ.`);
+      if ((model.parameterCount ?? 0) >= model.diagnostics.residuals.filter((item) => !item.isValidation).length) {
+        errors.push(`${cqa.code}: số tham số NN không nhỏ hơn số mẫu training.`);
+      }
+    }
+  });
+
+  if (!optimum) errors.push('Chưa có nghiệm tối ưu đa đáp ứng có thể tái lập.');
+  if (!monteCarlo) errors.push('Chưa có đánh giá Monte Carlo dùng chung với báo cáo.');
+  else if (monteCarlo.reliabilityPercent < 99) warnings.push(`Monte Carlo reliability chỉ đạt ${monteCarlo.reliabilityPercent}%.`);
+  if (project.designSpace.length === 0) warnings.push('Chưa lưu vùng vận hành provisional/PAR screening vào project.');
+  warnings.push('Confirmation run độc lập chưa được quản lý như một trạng thái phê duyệt; cần xác nhận ngoài app trước quyết định đăng ký.');
+
   return {
-    ...validation,
-    readyForScientificReport: validation.valid && project.runs.length > 0 && incomplete.length === 0,
-    warnings: incomplete.length > 0 ? [...validation.warnings, ...incomplete] : validation.warnings,
+    valid: errors.length === 0,
+    errors,
+    warnings,
+    readyForScientificReport: errors.length === 0 && project.runs.length > 0 && incomplete.length === 0,
   };
 }
 

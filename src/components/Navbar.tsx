@@ -23,6 +23,7 @@ interface NavbarProps {
   onExportWord: () => void;
   onSaveJSON: () => void;
   onNewProject: () => void;
+  canExportWord?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -35,6 +36,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onExportWord,
   onSaveJSON,
   onNewProject,
+  canExportWord = false,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -178,6 +180,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
               <BookOpen size={16} color="#0f766e" />
               <select
+                aria-label="Chọn case study mẫu"
                 className="input-field"
                 style={{ width: '200px', padding: '0.35rem 0.5rem', fontSize: '0.8rem' }}
                 value={project.id}
@@ -211,9 +214,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             {/* Export Word */}
             <button
               onClick={onExportWord}
+              disabled={!canExportWord}
               className="btn btn-secondary"
               style={{ fontSize: '0.82rem', padding: '0.4rem 0.75rem' }}
-              title="Xuất hồ sơ phát triển thuốc ICH CTD Module 3.2.P.2 sang định dạng MS Word"
+              title={canExportWord ? 'Xuất hồ sơ phát triển thuốc ICH CTD Module 3.2.P.2 sang định dạng MS Word' : 'Báo cáo đang bị khóa bởi scientific readiness gate'}
             >
               <FileText size={16} color="#0f766e" />
               <span>Xuất Word (.docx)</span>
@@ -242,6 +246,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
             <input
               type="file"
+              aria-label="Mở project QbD từ file JSON"
               ref={fileInputRef}
               style={{ display: 'none' }}
               accept=".json"

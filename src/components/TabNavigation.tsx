@@ -90,7 +90,8 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({
   ];
 
   return (
-    <div
+    <nav
+      aria-label="Quy trình phát triển QbD"
       style={{
         backgroundColor: '#ffffff',
         borderBottom: '1px solid #cbd5e1',
@@ -99,6 +100,7 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({
       }}
     >
       <div
+        role="tablist"
         style={{
           maxWidth: '1440px',
           margin: '0 auto',
@@ -117,6 +119,11 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({
           return (
             <button
               key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              aria-current={isActive ? 'step' : undefined}
+              aria-label={`${tab.label}: ${tab.subtitle}`}
               onClick={() => onTabChange(tab.key)}
               style={{
                 display: 'flex',
@@ -172,6 +179,6 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({
           );
         })}
       </div>
-    </div>
+    </nav>
   );
 };

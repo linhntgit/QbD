@@ -225,6 +225,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                 <tr key={item.id}>
                   <td>
                     <input
+                      aria-label={`Yếu tố QTPP ${item.element || item.id}`}
                       type="text"
                       className="input-field"
                       value={item.element}
@@ -233,6 +234,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                   </td>
                   <td>
                     <input
+                      aria-label={`Mục tiêu QTPP của ${item.element || item.id}`}
                       type="text"
                       className="input-field"
                       value={item.target}
@@ -241,6 +243,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                   </td>
                   <td>
                     <input
+                      aria-label={`Căn cứ khoa học của ${item.element || item.id}`}
                       type="text"
                       className="input-field"
                       value={item.justification}
@@ -309,6 +312,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                   </td>
                   <td>
                     <input
+                      aria-label={`Tên CQA ${cqa.code}`}
                       type="text"
                       className="input-field"
                       value={cqa.name}
@@ -317,6 +321,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                   </td>
                   <td>
                     <select
+                      aria-label={`Kiểu dữ liệu CQA ${cqa.code}`}
                       className="input-field"
                       style={{ fontSize: '0.78rem' }}
                       value={cqa.dataType || 'quantitative'}
@@ -329,6 +334,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                   </td>
                   <td>
                     <input
+                      aria-label={`Đơn vị CQA ${cqa.code}`}
                       type="text"
                       className="input-field"
                       style={{ textAlign: 'center' }}
@@ -338,6 +344,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                   </td>
                   <td>
                     <input
+                      aria-label={`Giới hạn dưới CQA ${cqa.code}`}
                       type="number"
                       step="any"
                       className="input-field"
@@ -348,6 +355,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                   </td>
                   <td>
                     <input
+                      aria-label={`Mục tiêu CQA ${cqa.code}`}
                       type="number"
                       step="any"
                       className="input-field"
@@ -358,6 +366,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                   </td>
                   <td>
                     <input
+                      aria-label={`Giới hạn trên CQA ${cqa.code}`}
                       type="number"
                       step="any"
                       className="input-field"
@@ -368,6 +377,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                   </td>
                   <td>
                     <select
+                      aria-label={`Mục tiêu tối ưu CQA ${cqa.code}`}
                       className="input-field"
                       style={{ fontSize: '0.78rem' }}
                       value={cqa.objective}
@@ -382,6 +392,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                   </td>
                   <td>
                     <input
+                      aria-label={`Trọng số CQA ${cqa.code}`}
                       type="number"
                       step="any"
                       min={0.1}
@@ -503,6 +514,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                   </td>
                   <td>
                     <input
+                      aria-label={`Tên factor ${f.code}`}
                       type="text"
                       className="input-field"
                       value={f.name}
@@ -513,6 +525,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                   {/* Factor Role: 3 Categories (Mixture Component, Other Formulation, Process Parameter) */}
                   <td>
                     <select
+                      aria-label={`Vai trò factor ${f.code}`}
                       className="input-field"
                       style={{
                         fontSize: '0.78rem',
@@ -542,6 +555,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                   {/* Data Nature */}
                   <td>
                     <select
+                      aria-label={`Kiểu dữ liệu factor ${f.code}`}
                       className="input-field"
                       style={{ fontSize: '0.78rem' }}
                       value={f.dataType || 'quantitative'}
@@ -556,6 +570,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                   {/* Controllability */}
                   <td>
                     <select
+                      aria-label={`Khả năng kiểm soát factor ${f.code}`}
                       className="input-field"
                       style={{
                         fontSize: '0.78rem',
@@ -573,6 +588,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
 
                   <td>
                     <input
+                      aria-label={`Đơn vị factor ${f.code}`}
                       type="text"
                       className="input-field"
                       style={{ textAlign: 'center' }}
@@ -588,6 +604,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                         <Lock size={14} color="#64748b" />
                         <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Giá trị cố định:</span>
                         <input
+                          aria-label={`Giá trị cố định factor ${f.code}`}
                           type="text"
                           className="input-field"
                           style={{ flex: 1, backgroundColor: '#ffffff', fontWeight: '700' }}
@@ -601,6 +618,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                     <td colSpan={3}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <input
+                          aria-label={`Mức định tính 1 của factor ${f.code}`}
                           type="text"
                           className="input-field"
                           placeholder="Mức 1 (vd: Hãng A)"
@@ -612,6 +630,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                           }}
                         />
                         <input
+                          aria-label={`Mức định tính 2 của factor ${f.code}`}
                           type="text"
                           className="input-field"
                           placeholder="Mức 2 (vd: Hãng B)"
@@ -628,6 +647,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                     <>
                       <td>
                         <input
+                          aria-label={`Mức thấp factor ${f.code}`}
                           type="number"
                           step="any"
                           className="input-field"
@@ -637,6 +657,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                       </td>
                       <td>
                         <input
+                          aria-label={`Mức tâm factor ${f.code}`}
                           type="number"
                           step="any"
                           className="input-field"
@@ -647,6 +668,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                       </td>
                       <td>
                         <input
+                          aria-label={`Mức cao factor ${f.code}`}
                           type="number"
                           step="any"
                           className="input-field"

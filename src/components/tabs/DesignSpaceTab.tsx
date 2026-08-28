@@ -29,7 +29,6 @@ import type {
 import { PlotlyChart } from '../PlotlyChart';
 import { DesirabilityProfiler } from '../DesirabilityProfiler';
 import {
-  optimizeDesirability,
   runMonteCarloSimulation,
   generateControlStrategy,
 } from '../../services/statistics';
@@ -45,6 +44,14 @@ interface DesignSpaceTabProps {
   onToggleEngine?: (engine: ModelingEngine) => void;
   onUpdateProject: (updated: Partial<QBDProject>) => void;
   onNavigateToReport: () => void;
+  optimum: DesirabilitySolution | null;
+  monteCarlo: MonteCarloResult | null;
+  monteCarloVariabilityPercent: number;
+  monteCarloSimulations: number;
+  monteCarloSeed: number;
+  optimizerSeed: number;
+  onApplyOptimum: (solution: DesirabilitySolution) => void;
+  onMonteCarloConfigChange: (variabilityPercent: number, simulations: number) => void;
 }
 
 export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
@@ -54,6 +61,14 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
   onToggleEngine,
   onUpdateProject,
   onNavigateToReport,
+  optimum: sharedOptimum,
+  monteCarlo: sharedMonteCarlo,
+  monteCarloVariabilityPercent,
+  monteCarloSimulations,
+  monteCarloSeed,
+  optimizerSeed: _optimizerSeed,
+  onApplyOptimum,
+  onMonteCarloConfigChange,
 }) => {
   const factors = project.factors;
   const cqas = project.cqas;
@@ -108,9 +123,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
   const [showBoundaryLines, setShowBoundaryLines] = useState<boolean>(true);
 
   // Desirability Optimum State
-  const [optimum, setOptimum] = useState<DesirabilitySolution | null>(() =>
-    optimizeDesirability(factors, cqas, models)
-  );
+  const [optimum, setOptimum] = useState<DesirabilitySolution | null>(sharedOptimum);
 
   // Sliced / Fixed Factors state for 2D Design Space cross-section
   const [sliceFactorsCoded, setSliceFactorsCoded] = useState<Record<string, number>>(() => {
@@ -122,45 +135,29 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
   });
 
   // Monte Carlo State
-  const [mcVariability, setMcVariability] = useState<number>(2.0); // 2% RSD
-  const [mcSimulations, setMcSimulations] = useState<number>(10000); // Customizable Batch count
+  const [mcVariability, setMcVariability] = useState<number>(monteCarloVariabilityPercent);
+  const [mcSimulations, setMcSimulations] = useState<number>(monteCarloSimulations);
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
   const [simProgress, setSimProgress] = useState<number>(0);
 
-  const [mcResult, setMcResult] = useState<MonteCarloResult | null>(() => {
-    if (!optimum) return null;
-    return runMonteCarloSimulation(
-      optimum.actualFactors,
-      factors,
-      cqas,
-      models,
-      2.0,
-      10000
-    );
-  });
+  const [mcResult, setMcResult] = useState<MonteCarloResult | null>(sharedMonteCarlo);
 
   const robustness = useMemo(
     () => optimum ? assessDesignSpaceRobustness(optimum.actualFactors, factors, cqas, models, mcResult) : null,
     [optimum, factors, cqas, models, mcResult],
   );
 
-  // Sync optimum, slice factors, and Monte Carlo when models, engine or project changes
+  // The App owns the scientific result. This tab only mirrors it for interactive
+  // display, so report export and the visible Design Space cannot diverge.
   useEffect(() => {
-    const newOpt = optimizeDesirability(factors, cqas, models);
-    setOptimum(newOpt);
-    if (newOpt) {
-      setSliceFactorsCoded({ ...newOpt.codedFactors });
-      const mc = runMonteCarloSimulation(
-        newOpt.actualFactors,
-        factors,
-        cqas,
-        models,
-        mcVariability,
-        mcSimulations
-      );
-      setMcResult(mc);
+    setOptimum(sharedOptimum);
+    setMcResult(sharedMonteCarlo);
+    setMcVariability(monteCarloVariabilityPercent);
+    setMcSimulations(monteCarloSimulations);
+    if (sharedOptimum) {
+      setSliceFactorsCoded({ ...sharedOptimum.codedFactors });
     }
-  }, [project.id, models, modelingEngine, factors, cqas, mcVariability, mcSimulations]);
+  }, [sharedOptimum, sharedMonteCarlo, monteCarloVariabilityPercent, monteCarloSimulations]);
 
   // Execute Monte Carlo with non-blocking realistic simulation feedback
   const executeSimulation = (
@@ -182,7 +179,8 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
             cqas,
             models,
             variability,
-            batches
+            batches,
+            monteCarloSeed,
           );
           setMcResult(mc);
           setSimProgress(100);
@@ -203,21 +201,30 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
   const handleApplyOptimumFromProfiler = (solution: DesirabilitySolution) => {
     setOptimum(solution);
     setSliceFactorsCoded({ ...solution.codedFactors });
+    onApplyOptimum(solution);
 
-    // Automatically update Design Space Ranges based on Optimum
+    // Persist only a provisional, model-based screening range. A true PAR
+    // requires multivariate acceptance evidence and confirmation runs.
+    const screening = assessDesignSpaceRobustness(solution.actualFactors, factors, cqas, models, null);
+    const screeningByFactor = new Map(screening.sensitivities.map((item) => [item.factorCode, item]));
     const newDesignSpace: DesignSpaceRanges[] = factors.map((f) => {
       const rawOpt = solution.actualFactors[f.code];
       const optValNum = typeof rawOpt === 'number' ? rawOpt : f.low;
-      const range = f.high - f.low;
+      const sensitivity = screeningByFactor.get(f.code);
+      const provisionalLow = sensitivity?.parLow ?? optValNum;
+      const provisionalHigh = sensitivity?.parHigh ?? optValNum;
+      const norHalfWidth = Math.max(0, (provisionalHigh - provisionalLow) / 6);
       return {
         factorCode: f.code,
         knowledgeLow: f.low,
         knowledgeHigh: f.high,
-        parLow: Number(Math.max(f.low, optValNum - range * 0.15).toFixed(2)),
-        parHigh: Number(Math.min(f.high, optValNum + range * 0.15).toFixed(2)),
-        norLow: Number(Math.max(f.low, optValNum - range * 0.05).toFixed(2)),
-        norHigh: Number(Math.min(f.high, optValNum + range * 0.05).toFixed(2)),
+        parLow: Number(provisionalLow.toFixed(4)),
+        parHigh: Number(provisionalHigh.toFixed(4)),
+        norLow: Number(Math.max(provisionalLow, optValNum - norHalfWidth).toFixed(4)),
+        norHigh: Number(Math.min(provisionalHigh, optValNum + norHalfWidth).toFixed(4)),
         target: rawOpt ?? f.low,
+        evidenceLevel: 'provisional_screening',
+        evidenceNote: sensitivity?.note ?? 'OAT model screen at the selected setpoint; not a confirmed multivariate PAR.',
       };
     });
     onUpdateProject({ designSpace: newDesignSpace });
@@ -231,6 +238,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
     if (!optimum) return;
     const batches = customBatches ?? mcSimulations;
     const rsd = customRsd ?? mcVariability;
+    onMonteCarloConfigChange(rsd, batches);
     executeSimulation(optimum.actualFactors, batches, rsd);
   };
 
@@ -496,6 +504,20 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
       : [factorX?.code, factorY?.code];
 
   const fixedFactorsList = factors.filter((f) => !activeAxisCodes.includes(f.code));
+
+  const missingModelCodes = cqas.filter((cqa) => !models[cqa.code]).map((cqa) => cqa.code);
+  if (missingModelCodes.length > 0 || !optimum) {
+    return (
+      <div className="qbd-card" role="alert" style={{ borderLeft: '4px solid #d97706', color: '#92400e' }}>
+        <h2 style={{ fontSize: '1rem', marginBottom: '0.35rem' }}>Design Space chưa thể được tính</h2>
+        <p style={{ margin: 0, fontSize: '0.82rem' }}>
+          {missingModelCodes.length > 0
+            ? `Thiếu mô hình khả định cho: ${missingModelCodes.join(', ')}. Hãy chọn mô hình đơn giản hơn, bổ sung run hoặc xử lý block trước khi tạo overlay/PAR.`
+            : 'Chưa tìm được nghiệm desirability khả thi cho toàn bộ CQA.'}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -1010,10 +1032,10 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                 <strong>1. Knowledge Space:</strong> Toàn bộ miền giá trị đã được khảo sát bằng DoE.
               </div>
               <div>
-                <strong>2. Design Space / PAR:</strong> Phạm vi được chứng minh đảm bảo 100% CQA đạt tiêu chuẩn.
+                <strong>2. Provisional PAR screening:</strong> Phạm vi sàng lọc từ mô hình; chưa được xem là PAR đã chứng minh cho đến khi có kiểm tra đa biến và confirmation run.
               </div>
               <div>
-                <strong>3. Normal Operating Range (NOR):</strong> Dải vận hành hàng ngày trong sản xuất (Target ± dung sai nhỏ).
+                <strong>3. Provisional NOR:</strong> Dải vận hành đề xuất nằm trong screening range; cần phê duyệt và xác nhận trước khi dùng sản xuất.
               </div>
             </div>
           </div>

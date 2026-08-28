@@ -8,7 +8,7 @@
 
 - Xây dựng **QTPP**, CQA, CMA và CPP; quản lý đánh giá rủi ro FMEA.
 - Tạo ma trận DoE: full/fractional factorial, Box–Behnken, CCD, D-optimal, mixture và combined mixture–process; thiết kế mixture–process có tùy chọn D-optimal 14/24/30 run theo mức độ mô hình.
-- Nhập/xuất bảng DoE qua Excel hoặc CSV; tạo dữ liệu thử nghiệm mô phỏng có giới hạn vật lý phù hợp theo loại đáp ứng.
+- Nhập/xuất bảng DoE bằng CSV UTF-8 tương thích Excel hoặc copy/paste trực tiếp từ Excel; không đọc workbook `.xlsx` nhị phân.
 - Phân tích hồi quy đa thức và ANOVA, bao gồm kiểm tra thiếu bậc tự do, đa cộng tuyến và tính khả định của mô hình.
 - Huấn luyện mô hình mạng nơ-ron theo từng CQA hoặc đa đầu ra.
 - Hiển thị response surface, contour/ternary plot, profiler, desirability và Design Space qua mô phỏng Monte Carlo.
@@ -51,7 +51,7 @@ npm run preview
 - React 19 + TypeScript
 - Vite
 - Plotly.js cho biểu đồ và bề mặt đáp ứng
-- SheetJS (`xlsx`) cho Excel/CSV
+- Trình đọc/ghi CSV nội bộ, giới hạn import 10 MB; không phụ thuộc parser workbook nhị phân
 - `docx` cho báo cáo Word
 
 ## Cấu trúc chính
@@ -71,3 +71,5 @@ Kho đã có GitHub Actions để build và triển khai GitHub Pages khi có th
 ## Lưu ý khoa học
 
 Kết quả thống kê và Design Space phụ thuộc vào chất lượng, cỡ mẫu, thiết kế, phương pháp phân tích và giả định mô hình. Trước khi sử dụng cho mục đích GxP hoặc hồ sơ đăng ký, cần có đánh giá độc lập của chuyên gia phát triển dược phẩm và thống kê.
+
+Các dải được lưu từ Prediction Profiler là **provisional screening ranges**, không phải PAR đã xác nhận. PAR/Design Space chính thức cần đánh giá đa biến, uncertainty phù hợp, confirmation run độc lập và phê duyệt theo hệ thống chất lượng. OLS/ANOVA trong app sẽ khóa khi thiết kế có nhiều block vì phiên bản hiện tại chưa ước lượng hiệu ứng block.
