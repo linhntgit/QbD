@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { CQA, DoEDesignConfig, DoERun, Factor } from '../types/qbd';
+import { CASE_STUDIES } from '../data/caseStudies';
 import {
   generateDoERuns,
   generateFractionalFactorial,
   generateTaguchi,
   validateDesignSetup,
 } from './doeGenerator';
-import { fitModel } from './statistics';
+import { getReportReadiness } from './projectGovernance';
+import { fitModel, generateUpdatedRiskAssessment, runMonteCarloSimulation } from './statistics';
 
 const factor = (code: string, controllability: Factor['controllability'] = 'controllable'): Factor => ({
   id: code,
@@ -109,5 +111,39 @@ describe('fail-closed statistical inference', () => {
       ? { ...run, factorCoded: { X1: -1.414 }, factorActual: { X1: -2.07 } }
       : run);
     expect(fitModel(cqa, [factor('X1')], axialLike, 'Linear')?.curvatureTest).toBeUndefined();
+  });
+});
+
+describe('reproducible analysis and report release gate', () => {
+  it('locks the scientific report when required CQA models are absent', () => {
+    const readiness = getReportReadiness(CASE_STUDIES[0], {}, null, null);
+    expect(readiness.readyForScientificReport).toBe(false);
+    expect(readiness.errors.some((message) => message.includes('Y1') && message.includes('không có mô hình'))).toBe(true);
+    expect(readiness.errors).toContain('Chưa có nghiệm tối ưu đa đáp ứng có thể tái lập.');
+    expect(readiness.errors).toContain('Chưa có đánh giá Monte Carlo dùng chung với báo cáo.');
+  });
+
+  it('does not silently downgrade risk when model or confirmation evidence is absent', () => {
+    const updated = generateUpdatedRiskAssessment(CASE_STUDIES[2], {});
+    expect(updated.length).toBeGreaterThan(0);
+    expect(updated.every((item) => item.updatedRisk === 'Medium')).toBe(true);
+  });
+
+  it('reproduces Monte Carlo results exactly from the persisted seed', () => {
+    const cqa: CQA = {
+      id: 'Y1', code: 'Y1', name: 'Response', unit: '', objective: 'target', weight: 1,
+      lowerLimit: 3, target: 5, upperLimit: 7,
+    };
+    const model = {
+      predict: (coded: Record<string, number>) => 5 + coded.X1,
+      diagnostics: { stdDev: 0.25, residuals: [] },
+    } as any;
+    const factors = [factor('X1')];
+    const models = { Y1: model };
+    const first = runMonteCarloSimulation({ X1: 5 }, factors, [cqa], models, 2, 500, 8675309);
+    const second = runMonteCarloSimulation({ X1: 5 }, factors, [cqa], models, 2, 500, 8675309);
+    const { executionTimeMs: _firstTime, ...firstScientificResult } = first;
+    const { executionTimeMs: _secondTime, ...secondScientificResult } = second;
+    expect(secondScientificResult).toEqual(firstScientificResult);
   });
 });

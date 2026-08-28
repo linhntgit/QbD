@@ -300,8 +300,8 @@ export function fitNeuralNetModel(
     : 0;
   if (N - expectedValidationCount <= parameterCount) return null;
 
-  // Keep one validation partition across restarts.  Re-splitting every tour
-  // makes selection among tours optimistically biased.
+  // Keep one final holdout partition across restarts. The holdout is never
+  // used to select an epoch or restart; it is evaluated only after training.
   const splitRng = createRNG(config.seed + 7919);
   const validationIndices = Array.from({ length: N }, (_, i) => i);
   for (let i = N - 1; i > 0; i--) {
@@ -309,7 +309,7 @@ export function fitNeuralNetModel(
     [validationIndices[i], validationIndices[j]] = [validationIndices[j], validationIndices[i]];
   }
 
-  let bestGlobalValLoss = Infinity;
+  let bestGlobalSelectionLoss = Infinity;
   let bestGlobalWeights: NeuralLayerWeights | null = null;
   let bestGlobalTourIndex = 0;
   let bestGlobalLossHistory: { epoch: number; trainLoss: number; valLoss?: number }[] = [];
@@ -336,7 +336,6 @@ export function fitNeuralNetModel(
     }
 
     const nTrain = trainIdx.length;
-    const nVal = valIdx.length;
 
     // Xavier/Glorot Initialization
     const std1 = Math.sqrt(2.0 / (numInputs + h1));
@@ -382,7 +381,7 @@ export function fitNeuralNetModel(
     const beta2 = 0.999;
     const eps = 1e-8;
 
-    let tourBestValLoss = Infinity;
+    let tourBestSelectionLoss = Infinity;
     let tourBestWeights: NeuralLayerWeights = {
       W1: W1.map((r) => [...r]),
       b1: [...b1],
@@ -573,47 +572,15 @@ export function fitNeuralNetModel(
         bOut -= (lr * mHat) / (Math.sqrt(vHat) + eps);
       }
 
-      // Compute Validation Loss
-      let valSSE = 0;
-      if (nVal > 0) {
-        for (let i = 0; i < nVal; i++) {
-          const idx = valIdx[i];
-          const x = X_all[idx];
-          const yTrue = Y_norm_all[idx];
-
-          // Forward
-          let aLastVal: number[] = [];
-          const a1Val: number[] = new Array(h1).fill(0);
-          for (let j = 0; j < h1; j++) {
-            let sum = b1[j];
-            for (let k = 0; k < numInputs; k++) sum += x[k] * W1[k][j];
-            a1Val[j] = activate(sum, act);
-          }
-          if (hasLayer2) {
-            const a2Val: number[] = new Array(h2).fill(0);
-            for (let j = 0; j < h2; j++) {
-              let sum = b2[j];
-              for (let k = 0; k < h1; k++) sum += a1Val[k] * W2[k][j];
-              a2Val[j] = activate(sum, act);
-            }
-            aLastVal = a2Val;
-          } else {
-            aLastVal = a1Val;
-          }
-
-          let predNorm = bOut;
-          for (let k = 0; k < lastHidden; k++) predNorm += aLastVal[k] * WOut[k][0];
-          const err = predNorm - yTrue;
-          valSSE += err * err;
-        }
-      }
-
       const trainMSE = trainSSE / nTrain;
-      const valMSE = nVal > 0 ? valSSE / nVal : trainMSE;
-      const criterionLoss = nVal > 0 ? valMSE : trainMSE;
+      let l2Penalty = 0;
+      W1.forEach((row) => row.forEach((weight) => { l2Penalty += weight * weight; }));
+      W2.forEach((row) => row.forEach((weight) => { l2Penalty += weight * weight; }));
+      WOut.forEach((row) => row.forEach((weight) => { l2Penalty += weight * weight; }));
+      const selectionLoss = trainMSE + 0.5 * lambda * l2Penalty;
 
-      if (criterionLoss < tourBestValLoss) {
-        tourBestValLoss = criterionLoss;
+      if (selectionLoss < tourBestSelectionLoss) {
+        tourBestSelectionLoss = selectionLoss;
         tourBestWeights = {
           W1: W1.map((r) => [...r]),
           b1: [...b1],
@@ -629,14 +596,13 @@ export function fitNeuralNetModel(
         lossHistory.push({
           epoch,
           trainLoss: Number(trainMSE.toFixed(5)),
-          valLoss: nVal > 0 ? Number(valMSE.toFixed(5)) : undefined,
         });
       }
     }
 
     // Check if this tour is the best across all tours
-    if (tourBestValLoss < bestGlobalValLoss) {
-      bestGlobalValLoss = tourBestValLoss;
+    if (tourBestSelectionLoss < bestGlobalSelectionLoss) {
+      bestGlobalSelectionLoss = tourBestSelectionLoss;
       bestGlobalWeights = tourBestWeights;
       bestGlobalTourIndex = tour + 1;
       bestGlobalLossHistory = lossHistory;
@@ -985,7 +951,9 @@ export function fitMultiOutputNeuralNet(
     [validationIndices[i], validationIndices[j]] = [validationIndices[j], validationIndices[i]];
   }
 
-  let bestGlobalValLoss = Infinity;
+  // Reserve one fixed final holdout. Epoch and restart selection below use
+  // regularized training loss only, preventing optimistic holdout reuse.
+  let bestGlobalSelectionLoss = Infinity;
   let bestGlobalWeights: {
     W1: number[][];
     b1: number[];
@@ -1018,7 +986,6 @@ export function fitMultiOutputNeuralNet(
     }
 
     const nTrain = trainIdx.length;
-    const nVal = valIdx.length;
 
     // Xavier/Glorot Initialization
     const std1 = Math.sqrt(2.0 / (numInputs + h1));
@@ -1063,7 +1030,7 @@ export function fitMultiOutputNeuralNet(
     const beta2 = 0.999;
     const eps = 1e-8;
 
-    let tourBestValLoss = Infinity;
+    let tourBestSelectionLoss = Infinity;
     let tourBestWeights = {
       W1: W1.map((r) => [...r]),
       b1: [...b1],
@@ -1267,87 +1234,31 @@ export function fitMultiOutputNeuralNet(
         bOut[c] -= (lr * mHat) / (Math.sqrt(vHat) + eps);
       }
 
-      // Validation evaluation
-      let valLoss: number | undefined = undefined;
-      let totalTrainLoss = trainSSE / Math.max(1, trainPointsCount) + 0.5 * lambda * l2Sum;
-
-      if (nVal > 0) {
-        let valSSE = 0;
-        let valPointsCount = 0;
-        for (let i = 0; i < nVal; i++) {
-          const idx = valIdx[i];
-          const x = X_all[idx];
-          const yTrueArr = Y_norm_all[idx];
-          const yMask = Y_valid_mask[idx];
-
-          const a1: number[] = new Array(h1).fill(0);
-          for (let j = 0; j < h1; j++) {
-            let sum = b1[j];
-            for (let k = 0; k < numInputs; k++) sum += x[k] * W1[k][j];
-            a1[j] = activate(sum, act);
-          }
-
-          let aLast = a1;
-          if (hasLayer2) {
-            const a2: number[] = new Array(h2).fill(0);
-            for (let j = 0; j < h2; j++) {
-              let sum = b2[j];
-              for (let k = 0; k < h1; k++) sum += a1[k] * W2[k][j];
-              a2[j] = activate(sum, act);
-            }
-            aLast = a2;
-          }
-
-          for (let c = 0; c < numOutputs; c++) {
-            if (!yMask[c]) continue;
-            let yPredNorm = bOut[c];
-            for (let k = 0; k < lastHidden; k++) {
-              yPredNorm += aLast[k] * WOut[k][c];
-            }
-            const err = yPredNorm - yTrueArr[c];
-            valSSE += err * err;
-            valPointsCount++;
-          }
-        }
-        valLoss = valSSE / Math.max(1, valPointsCount);
-
-        if (valLoss < tourBestValLoss) {
-          tourBestValLoss = valLoss;
-          tourBestWeights = {
-            W1: W1.map((r) => [...r]),
-            b1: [...b1],
-            W2: hasLayer2 ? W2.map((r) => [...r]) : undefined,
-            b2: hasLayer2 ? [...b2] : undefined,
-            WOut: WOut.map((r) => [...r]),
-            bOut: [...bOut],
-          };
-        }
-      } else {
-        if (totalTrainLoss < tourBestValLoss) {
-          tourBestValLoss = totalTrainLoss;
-          tourBestWeights = {
-            W1: W1.map((r) => [...r]),
-            b1: [...b1],
-            W2: hasLayer2 ? W2.map((r) => [...r]) : undefined,
-            b2: hasLayer2 ? [...b2] : undefined,
-            WOut: WOut.map((r) => [...r]),
-            bOut: [...bOut],
-          };
-        }
+      // Select epochs and restarts only from the regularized training loss.
+      // The fixed holdout remains untouched until final diagnostics below.
+      const totalTrainLoss = trainSSE / Math.max(1, trainPointsCount) + 0.5 * lambda * l2Sum;
+      if (totalTrainLoss < tourBestSelectionLoss) {
+        tourBestSelectionLoss = totalTrainLoss;
+        tourBestWeights = {
+          W1: W1.map((r) => [...r]),
+          b1: [...b1],
+          W2: hasLayer2 ? W2.map((r) => [...r]) : undefined,
+          b2: hasLayer2 ? [...b2] : undefined,
+          WOut: WOut.map((r) => [...r]),
+          bOut: [...bOut],
+        };
       }
 
       if (epoch % 20 === 0 || epoch === config.maxEpochs) {
         lossHistory.push({
           epoch,
           trainLoss: Number(totalTrainLoss.toFixed(5)),
-          valLoss: valLoss !== undefined ? Number(valLoss.toFixed(5)) : undefined,
         });
       }
     }
 
-    const currentCrit = nVal > 0 ? tourBestValLoss : tourBestValLoss;
-    if (currentCrit < bestGlobalValLoss) {
-      bestGlobalValLoss = currentCrit;
+    if (tourBestSelectionLoss < bestGlobalSelectionLoss) {
+      bestGlobalSelectionLoss = tourBestSelectionLoss;
       bestGlobalWeights = tourBestWeights;
       bestGlobalTourIndex = tour + 1;
       bestGlobalLossHistory = lossHistory;

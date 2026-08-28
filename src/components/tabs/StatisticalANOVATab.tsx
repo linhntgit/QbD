@@ -49,6 +49,8 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
 
   const currentCQA = project.cqas.find((c) => c.code === selectedCQA) || project.cqas[0];
   const model = currentCQA ? models[currentCQA.code] : null;
+  const executionBlocks = new Set(project.runs.map((run) => run.block ?? 1));
+  const hasMultipleBlocks = executionBlocks.size > 1;
   const appliedModelType: ModelType = currentCQA
     ? (modelTypes[currentCQA.code] || model?.modelType || 'Quadratic')
     : 'Quadratic';
@@ -463,10 +465,14 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
         <div className="qbd-card" style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
           <AlertCircle size={40} color="#f59e0b" style={{ margin: '0 auto 0.75rem' }} />
           <p style={{ fontWeight: '600', fontSize: '1rem', color: '#0f172a' }}>
-            Chưa đủ số liệu thực nghiệm để khớp mô hình
+            {hasMultipleBlocks
+              ? 'Phân tích OLS đang khóa vì thiết kế có nhiều block'
+              : 'Chưa đủ số liệu thực nghiệm để khớp mô hình'}
           </p>
           <p style={{ fontSize: '0.82rem', marginTop: '0.35rem' }}>
-            Vui lòng nhập kết quả thí nghiệm trong Tab 3 (DoE Designer) hoặc bấm nút "Điền Số Liệu Mô Phỏng".
+            {hasMultipleBlocks
+              ? `Dữ liệu hiện có ${executionBlocks.size} block. App chưa ước lượng hiệu ứng block, nên không hiển thị ANOVA/hồi quy có thể gây kết luận sai. Hãy dùng thiết kế một block hoặc phân tích bằng mô hình có hiệu ứng block đã được thẩm định.`
+              : 'Vui lòng nhập kết quả thí nghiệm trong Tab 3 (DoE Designer) hoặc bấm nút "Điền Số Liệu Mô Phỏng".'}
           </p>
         </div>
       ) : (

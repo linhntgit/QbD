@@ -66,6 +66,8 @@ export async function exportQBDWordReport(
   modelingEngine: ModelingEngine = 'polynomial'
 ): Promise<void> {
   const sections: any[] = [];
+  const reportModels: Record<string, StatisticalModelResult | NeuralNetModelResult> =
+    modelingEngine === 'neural' ? (neuralModels ?? {}) : models;
 
   // Title & Header Information (FDA Module 3 format)
   sections.push(
@@ -637,7 +639,7 @@ export async function exportQBDWordReport(
   }
 
   // SECTION 2.4: Updated Risk Assessment Table (ICH Q9 & FDA ANDA Standard)
-  const updatedRisks = generateUpdatedRiskAssessment(project, models);
+  const updatedRisks = generateUpdatedRiskAssessment(project, reportModels);
   sections.push(
     new Paragraph({
       text: '2.4 Đánh Giá Rủi Ro Cập Nhật Sau DoE (Updated Risk Assessment & Justifications)',
@@ -645,7 +647,7 @@ export async function exportQBDWordReport(
       spacing: { before: 300, after: 150 },
     }),
     new Paragraph({
-      text: 'Bảng đối chiếu mức độ rủi ro trước và sau khi thực hiện DoE theo chuẩn ICH Q9 và hồ sơ mẫu của US FDA. Sau khi thiết lập được dải vận hành an toàn PAR và chứng minh qua mô hình ANOVA, các rủi ro ban đầu (H/M) được giảm xuống mức thấp (Low):',
+      text: 'Bảng đối chiếu mức độ rủi ro trước và sau DoE. Ứng dụng không tự động hạ rủi ro xuống mức thấp khi chưa có mô hình phù hợp, confirmation run và chiến lược kiểm soát được phê duyệt:',
       spacing: { after: 150 },
     })
   );
@@ -669,7 +671,7 @@ export async function exportQBDWordReport(
             createDataCell(`${item.cqaCode} (${item.cqaName})`, idx % 2 === 1, 20),
             createDataCell(item.initialRisk === 'High' ? 'Cao (High)' : item.initialRisk === 'Medium' ? 'Trung bình (Med)' : 'Thấp (Low)', idx % 2 === 1, 15),
             createDataCell(item.isSignificantInModel ? 'Có (p < 0.05)' : 'Không', idx % 2 === 1, 12),
-            createDataCell('Thấp (Low)', idx % 2 === 1, 15),
+            createDataCell(item.updatedRisk === 'Low' ? 'Thấp (Low)' : 'Trung bình (Medium)', idx % 2 === 1, 15),
             createDataCell(item.justification, idx % 2 === 1, 35),
           ],
         })

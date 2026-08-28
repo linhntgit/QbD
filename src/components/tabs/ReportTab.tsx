@@ -638,7 +638,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {generateUpdatedRiskAssessment(project, models).map((item, idx) => (
+                {generateUpdatedRiskAssessment(project, reportModels).map((item, idx) => (
                   <tr key={idx}>
                     <td style={{ fontWeight: '600' }}>{item.factorCode} ({item.factorName})</td>
                     <td style={{ fontWeight: '600' }}>{item.cqaCode} ({item.cqaName})</td>
@@ -653,7 +653,9 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                       </span>
                     </td>
                     <td style={{ textAlign: 'center' }}>
-                      <span className="badge badge-success">Thấp (Low)</span>
+                      <span className={`badge ${item.updatedRisk === 'Low' ? 'badge-success' : 'badge-warning'}`}>
+                        {item.updatedRisk === 'Low' ? 'Thấp (Low)' : 'Trung bình (Medium)'}
+                      </span>
                     </td>
                     <td style={{ fontSize: '0.75rem', color: '#334155' }}>{item.justification}</td>
                   </tr>
