@@ -126,12 +126,29 @@ export function simulateDemoResponses(
 
   project.cqas.forEach((cqa) => {
     if (cqa.dataType === 'qualitative_binary') {
-      responses[cqa.code] = random() > 0.12 ? 'Đạt' : 'Không đạt';
+      const categories = cqa.categories?.filter(Boolean) ?? ['Không đạt', 'Đạt'];
+      responses[cqa.code] = random() > 0.12 ? (categories[1] ?? categories[0]) : categories[0];
+      return;
+    }
+
+    if (cqa.dataType === 'qualitative_ordinal') {
+      const categories = cqa.categories?.filter(Boolean) ?? ['Mức 1', 'Mức 2', 'Mức 3'];
+      responses[cqa.code] = categories[Math.min(categories.length - 1, Math.floor(random() * categories.length))];
       return;
     }
 
     const sampleValue = simulateSampleCase(project, run, cqa, random);
-    responses[cqa.code] = finish(cqa, sampleValue ?? simulateGenericCase(project, run, cqa, random));
+    const simulated = finish(cqa, sampleValue ?? simulateGenericCase(project, run, cqa, random));
+    if (cqa.dataType === 'quantitative_multilevel' && cqa.categories?.length) {
+      const levels = cqa.categories.map(Number).filter(Number.isFinite);
+      responses[cqa.code] = levels.length > 0
+        ? levels.reduce((nearest, level) =>
+            Math.abs(level - Number(simulated)) < Math.abs(nearest - Number(simulated)) ? level : nearest,
+          levels[0])
+        : simulated;
+    } else {
+      responses[cqa.code] = simulated;
+    }
   });
 
   return responses;

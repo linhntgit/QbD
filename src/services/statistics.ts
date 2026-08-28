@@ -25,6 +25,7 @@ import {
 } from './mathUtils';
 import { buildModelTerms, getModelBlockCounts, type ModelTermDefinition } from './modelTerms';
 import { createSeededRandom } from './random';
+import { codedToActual } from './doeGenerator';
 
 type TermDef = ModelTermDefinition;
 
@@ -990,10 +991,8 @@ export function optimizeDesirability(
         : Number((frac * 100).toFixed(2));
     } else {
       const c = bestCoded[f.code] ?? 0;
-      if (f.dataType === 'qualitative' && f.categories && f.categories.length > 0) {
-        if (c <= -0.5) actualFactors[f.code] = f.categories[0];
-        else if (c >= 0.5) actualFactors[f.code] = f.categories[1] || f.categories[0];
-        else actualFactors[f.code] = f.categories[2] || f.categories[0];
+      if ((f.dataType === 'qualitative' || f.dataType === 'quantitative_multilevel') && f.categories && f.categories.length > 0) {
+        actualFactors[f.code] = codedToActual(c, f);
       } else {
         const center = f.center !== undefined ? f.center : (f.low + f.high) / 2;
         const half = (f.high - f.low) / 2;

@@ -24,6 +24,68 @@ interface QTPPTabProps {
   onUpdateProject: (updated: Partial<QBDProject>) => void;
 }
 
+const MIN_LEVELS = 2;
+const MAX_LEVELS = 10;
+
+interface LevelEditorProps {
+  ariaPrefix: string;
+  values: string[];
+  numeric?: boolean;
+  maxLevels?: number;
+  onChange: (values: string[]) => void;
+}
+
+const LevelEditor: React.FC<LevelEditorProps> = ({ ariaPrefix, values, numeric = false, maxLevels = MAX_LEVELS, onChange }) => {
+  const levels = values.length >= MIN_LEVELS ? values.slice(0, maxLevels) : [...values, ...new Array(MIN_LEVELS - values.length).fill('')];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', padding: '0.2rem 0' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(105px, 1fr))', gap: '0.35rem' }}>
+        {levels.map((level, index) => (
+          <div key={`${ariaPrefix}-${index}`} style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+            <input
+              aria-label={`${ariaPrefix} ${index + 1}`}
+              type={numeric ? 'number' : 'text'}
+              step={numeric ? 'any' : undefined}
+              className="input-field"
+              value={level}
+              placeholder={`Mức ${index + 1}`}
+              onChange={(event) => {
+                const next = [...levels];
+                next[index] = event.target.value;
+                onChange(next);
+              }}
+            />
+            {levels.length > MIN_LEVELS && (
+              <button
+                type="button"
+                aria-label={`Xóa ${ariaPrefix.toLowerCase()} ${index + 1}`}
+                title={`Xóa mức ${index + 1}`}
+                onClick={() => onChange(levels.filter((_, levelIndex) => levelIndex !== index))}
+                style={{ border: 'none', background: 'transparent', color: '#dc2626', cursor: 'pointer', padding: '2px' }}
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          disabled={levels.length >= maxLevels}
+          onClick={() => onChange([...levels, ''])}
+          style={{ fontSize: '0.7rem', padding: '0.2rem 0.45rem', opacity: levels.length >= maxLevels ? 0.55 : 1 }}
+        >
+          <Plus size={12} /> Thêm mức
+        </button>
+        <span style={{ fontSize: '0.68rem', color: '#64748b', whiteSpace: 'nowrap' }}>{levels.length}/{maxLevels} mức</span>
+      </div>
+    </div>
+  );
+};
+
 export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) => {
   // 1. QTPP Management
   const handleAddQTPP = () => {
@@ -70,6 +132,45 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
     onUpdateProject({ cqas: updated });
   };
 
+  const handleCQADataTypeChange = (cqa: CQA, dataType: CQADataType) => {
+    let categories: string[] | undefined;
+    let objective = cqa.objective;
+    let targetCategory = cqa.targetCategory;
+
+    if (dataType === 'quantitative_multilevel') {
+      categories = cqa.dataType === 'quantitative_multilevel' && cqa.categories?.length
+        ? cqa.categories.slice(0, MAX_LEVELS)
+        : [cqa.lowerLimit, cqa.target, cqa.upperLimit]
+            .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+            .map(String);
+      if (categories.length < MIN_LEVELS) categories = ['0', '1', '2'];
+      if (objective === 'pass_category') objective = 'target';
+      targetCategory = undefined;
+    } else if (dataType === 'qualitative_binary') {
+      categories = cqa.dataType?.startsWith('qualitative') && cqa.categories?.length
+        ? cqa.categories.slice(0, 2)
+        : ['Không đạt', 'Đạt'];
+      while (categories.length < 2) categories.push(`Mức ${categories.length + 1}`);
+      objective = 'pass_category';
+      targetCategory = categories[1];
+    } else if (dataType === 'qualitative_ordinal') {
+      categories = cqa.dataType?.startsWith('qualitative') && cqa.categories?.length
+        ? cqa.categories.slice(0, MAX_LEVELS)
+        : ['Mức 1', 'Mức 2', 'Mức 3'];
+      objective = 'pass_category';
+      targetCategory = categories[categories.length - 1];
+    } else {
+      categories = undefined;
+      if (objective === 'pass_category') objective = 'target';
+      targetCategory = undefined;
+    }
+
+    const updated = project.cqas.map((item) => item.id === cqa.id
+      ? { ...item, dataType, categories, objective, targetCategory }
+      : item);
+    onUpdateProject({ cqas: updated });
+  };
+
   const handleDeleteCQA = (id: string) => {
     onUpdateProject({ cqas: project.cqas.filter((cqa) => cqa.id !== id) });
   };
@@ -102,6 +203,18 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
         const h = field === 'high' ? Number(value) : f.high;
         modified.center = Number(((l + h) / 2).toFixed(2));
       }
+      if (field === 'categories' && f.dataType === 'quantitative_multilevel') {
+        const numericLevels = (value as string[])
+          .map((level) => level.trim())
+          .filter(Boolean)
+          .map(Number)
+          .filter(Number.isFinite);
+        if (numericLevels.length >= MIN_LEVELS) {
+          modified.low = Math.min(...numericLevels);
+          modified.high = Math.max(...numericLevels);
+          modified.center = numericLevels[Math.floor(numericLevels.length / 2)];
+        }
+      }
       if (field === 'role') {
         if (value === 'mixture_component') {
           modified.type = 'Mixture';
@@ -113,6 +226,24 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
       }
       return modified;
     });
+    onUpdateProject({ factors: updated });
+  };
+
+  const handleFactorDataTypeChange = (factor: Factor, dataType: FactorDataType) => {
+    let categories: string[] | undefined;
+    if (dataType === 'quantitative_multilevel') {
+      categories = factor.dataType === 'quantitative_multilevel' && factor.categories?.length
+        ? factor.categories.slice(0, MAX_LEVELS)
+        : [factor.low, factor.center ?? (factor.low + factor.high) / 2, factor.high].map(String);
+    } else if (dataType === 'qualitative') {
+      categories = factor.dataType === 'qualitative' && factor.categories?.length
+        ? factor.categories.slice(0, MAX_LEVELS)
+        : ['Mức 1', 'Mức 2'];
+    }
+
+    const updated = project.factors.map((item) => item.id === factor.id
+      ? { ...item, dataType, categories }
+      : item);
     onUpdateProject({ factors: updated });
   };
 
@@ -294,9 +425,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                 <th style={{ width: '22%' }}>Tên CQA (Đáp ứng)</th>
                 <th style={{ width: '15%' }}>Bản Chất Dữ Liệu (Data Type)</th>
                 <th style={{ width: '7%' }}>Đơn vị</th>
-                <th style={{ width: '11%' }}>Giới hạn Dưới (LSL)</th>
-                <th style={{ width: '11%' }}>Mục tiêu (Target)</th>
-                <th style={{ width: '11%' }}>Giới hạn Trên (USL)</th>
+                <th colSpan={3} style={{ width: '33%' }}>Giới hạn định lượng / Các mức cho phép (tối đa 10)</th>
                 <th style={{ width: '12%' }}>Mục tiêu Tối ưu</th>
                 <th style={{ width: '8%' }}>Trọng số</th>
                 <th style={{ width: '4%', textAlign: 'center' }}>Xóa</th>
@@ -325,11 +454,12 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                       className="input-field"
                       style={{ fontSize: '0.78rem' }}
                       value={cqa.dataType || 'quantitative'}
-                      onChange={(e) => handleUpdateCQA(cqa.id, 'dataType', e.target.value as CQADataType)}
+                      onChange={(e) => handleCQADataTypeChange(cqa, e.target.value as CQADataType)}
                     >
-                      <option value="quantitative">🔢 Quantitative (Định lượng)</option>
-                      <option value="qualitative_binary">✅ Qualitative (Đạt / Không đạt)</option>
-                      <option value="qualitative_ordinal">🏷️ Qualitative (Xếp hạng / Bậc)</option>
+                      <option value="quantitative">🔢 Continuous (Định lượng liên tục)</option>
+                      <option value="quantitative_multilevel">📊 Discrete Numeric (Định lượng nhiều mức)</option>
+                      <option value="qualitative_binary">✅ Categorical (Đạt / Không đạt)</option>
+                      <option value="qualitative_ordinal">🏷️ Categorical (Nhiều mức / Thứ bậc)</option>
                     </select>
                   </td>
                   <td>
@@ -342,39 +472,65 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                       onChange={(e) => handleUpdateCQA(cqa.id, 'unit', e.target.value)}
                     />
                   </td>
-                  <td>
-                    <input
-                      aria-label={`Giới hạn dưới CQA ${cqa.code}`}
-                      type="number"
-                      step="any"
-                      className="input-field"
-                      value={cqa.lowerLimit ?? ''}
-                      placeholder={cqa.dataType?.startsWith('qualitative') ? 'N/A' : 'LSL'}
-                      onChange={(e) => handleUpdateCQA(cqa.id, 'lowerLimit', e.target.value ? Number(e.target.value) : undefined)}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      aria-label={`Mục tiêu CQA ${cqa.code}`}
-                      type="number"
-                      step="any"
-                      className="input-field"
-                      value={cqa.target ?? ''}
-                      placeholder={cqa.dataType?.startsWith('qualitative') ? '100% Đạt' : 'Mục tiêu'}
-                      onChange={(e) => handleUpdateCQA(cqa.id, 'target', e.target.value ? Number(e.target.value) : undefined)}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      aria-label={`Giới hạn trên CQA ${cqa.code}`}
-                      type="number"
-                      step="any"
-                      className="input-field"
-                      value={cqa.upperLimit ?? ''}
-                      placeholder={cqa.dataType?.startsWith('qualitative') ? 'N/A' : 'USL'}
-                      onChange={(e) => handleUpdateCQA(cqa.id, 'upperLimit', e.target.value ? Number(e.target.value) : undefined)}
-                    />
-                  </td>
+                  {cqa.dataType && cqa.dataType !== 'quantitative' ? (
+                    <td colSpan={3}>
+                      <LevelEditor
+                        ariaPrefix={`Mức ${cqa.dataType === 'quantitative_multilevel' ? 'định lượng' : 'định tính'} CQA ${cqa.code}`}
+                        numeric={cqa.dataType === 'quantitative_multilevel'}
+                        maxLevels={cqa.dataType === 'qualitative_binary' ? 2 : MAX_LEVELS}
+                        values={cqa.categories ?? (cqa.dataType === 'qualitative_binary' ? ['Không đạt', 'Đạt'] : ['Mức 1', 'Mức 2'])}
+                        onChange={(categories) => {
+                          const limited = cqa.dataType === 'qualitative_binary' ? categories.slice(0, 2) : categories.slice(0, MAX_LEVELS);
+                          const updated = project.cqas.map((item) => item.id === cqa.id
+                            ? {
+                                ...item,
+                                categories: limited,
+                                targetCategory: item.dataType?.startsWith('qualitative')
+                                  ? limited.includes(item.targetCategory ?? '') ? item.targetCategory : limited[limited.length - 1]
+                                  : undefined,
+                              }
+                            : item);
+                          onUpdateProject({ cqas: updated });
+                        }}
+                      />
+                    </td>
+                  ) : (
+                    <>
+                      <td>
+                        <input
+                          aria-label={`Giới hạn dưới CQA ${cqa.code}`}
+                          type="number"
+                          step="any"
+                          className="input-field"
+                          value={cqa.lowerLimit ?? ''}
+                          placeholder="LSL"
+                          onChange={(e) => handleUpdateCQA(cqa.id, 'lowerLimit', e.target.value ? Number(e.target.value) : undefined)}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          aria-label={`Mục tiêu CQA ${cqa.code}`}
+                          type="number"
+                          step="any"
+                          className="input-field"
+                          value={cqa.target ?? ''}
+                          placeholder="Mục tiêu"
+                          onChange={(e) => handleUpdateCQA(cqa.id, 'target', e.target.value ? Number(e.target.value) : undefined)}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          aria-label={`Giới hạn trên CQA ${cqa.code}`}
+                          type="number"
+                          step="any"
+                          className="input-field"
+                          value={cqa.upperLimit ?? ''}
+                          placeholder="USL"
+                          onChange={(e) => handleUpdateCQA(cqa.id, 'upperLimit', e.target.value ? Number(e.target.value) : undefined)}
+                        />
+                      </td>
+                    </>
+                  )}
                   <td>
                     <select
                       aria-label={`Mục tiêu tối ưu CQA ${cqa.code}`}
@@ -498,9 +654,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                 <th style={{ width: '12%' }}>Bản Chất Dữ Liệu</th>
                 <th style={{ width: '14%' }}>Khả Năng Kiểm Soát</th>
                 <th style={{ width: '6%' }}>Đơn vị</th>
-                <th style={{ width: '9%' }}>Mức Thấp (-1)</th>
-                <th style={{ width: '9%' }}>Mức Tâm (0)</th>
-                <th style={{ width: '9%' }}>Mức Cao (+1)</th>
+                <th colSpan={3} style={{ width: '27%' }}>Khoảng liên tục / Các mức cho phép (tối đa 10)</th>
                 <th style={{ width: '5%', textAlign: 'center' }}>Xóa</th>
               </tr>
             </thead>
@@ -559,11 +713,11 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                       className="input-field"
                       style={{ fontSize: '0.78rem' }}
                       value={f.dataType || 'quantitative'}
-                      onChange={(e) => handleUpdateFactor(f.id, 'dataType', e.target.value as FactorDataType)}
+                      onChange={(e) => handleFactorDataTypeChange(f, e.target.value as FactorDataType)}
                     >
-                      <option value="quantitative">🔢 Quantitative (Liên tục)</option>
-                      <option value="quantitative_multilevel">📊 Multilevel (Nhiều mức)</option>
-                      <option value="qualitative">🏷️ Qualitative (Định tính)</option>
+                      <option value="quantitative">🔢 Continuous (Định lượng liên tục)</option>
+                      <option value="quantitative_multilevel">📊 Discrete Numeric (Định lượng nhiều mức)</option>
+                      <option value="qualitative">🏷️ Categorical (Định tính)</option>
                     </select>
                   </td>
 
@@ -614,34 +768,14 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                         />
                       </div>
                     </td>
-                  ) : f.dataType === 'qualitative' ? (
+                  ) : f.dataType === 'qualitative' || f.dataType === 'quantitative_multilevel' ? (
                     <td colSpan={3}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <input
-                          aria-label={`Mức định tính 1 của factor ${f.code}`}
-                          type="text"
-                          className="input-field"
-                          placeholder="Mức 1 (vd: Hãng A)"
-                          value={f.categories?.[0] ?? `${f.low}`}
-                          onChange={(e) => {
-                            const cats = f.categories ? [...f.categories] : ['Mức 1', 'Mức 2'];
-                            cats[0] = e.target.value;
-                            handleUpdateFactor(f.id, 'categories', cats);
-                          }}
-                        />
-                        <input
-                          aria-label={`Mức định tính 2 của factor ${f.code}`}
-                          type="text"
-                          className="input-field"
-                          placeholder="Mức 2 (vd: Hãng B)"
-                          value={f.categories?.[1] ?? `${f.high}`}
-                          onChange={(e) => {
-                            const cats = f.categories ? [...f.categories] : ['Mức 1', 'Mức 2'];
-                            cats[1] = e.target.value;
-                            handleUpdateFactor(f.id, 'categories', cats);
-                          }}
-                        />
-                      </div>
+                      <LevelEditor
+                        ariaPrefix={`Mức ${f.dataType === 'qualitative' ? 'định tính' : 'định lượng'} factor ${f.code}`}
+                        numeric={f.dataType === 'quantitative_multilevel'}
+                        values={f.categories ?? (f.dataType === 'qualitative' ? ['Mức 1', 'Mức 2'] : [f.low, f.center ?? (f.low + f.high) / 2, f.high].map(String))}
+                        onChange={(categories) => handleUpdateFactor(f.id, 'categories', categories.slice(0, MAX_LEVELS))}
+                      />
                     </td>
                   ) : (
                     <>

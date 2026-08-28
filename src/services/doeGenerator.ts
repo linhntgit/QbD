@@ -9,6 +9,27 @@ import {
 import { buildModelVector, getModelTermCount } from './modelTerms';
 import { createSeededRandom } from './random';
 
+const configuredLevels = (factor: Factor): Array<number | string> => {
+  const raw = (factor.categories ?? []).map((level) => level.trim()).filter(Boolean).slice(0, 10);
+  if (factor.dataType === 'quantitative_multilevel') {
+    return raw.map(Number).filter(Number.isFinite);
+  }
+  return raw;
+};
+
+const evenlySpacedCodes = (count: number): number[] => {
+  if (count <= 1) return [0];
+  return Array.from({ length: count }, (_, index) => Number((-1 + (2 * index) / (count - 1)).toFixed(4)));
+};
+
+export function getConfiguredFactorCodes(factor: Factor): number[] {
+  const levels = configuredLevels(factor);
+  if ((factor.dataType === 'qualitative' || factor.dataType === 'quantitative_multilevel') && levels.length >= 2) {
+    return evenlySpacedCodes(levels.length);
+  }
+  return [-1, 0, 1];
+}
+
 /**
  * Convert coded factor value (-1, 0, +1, +alpha, -alpha) to actual physical value or categorical label
  */
@@ -18,19 +39,17 @@ export function codedToActual(coded: number, factor: Factor): number | string {
     return factor.constantValue ?? factor.low;
   }
 
-  // Qualitative / Categorical Factor
-  if (factor.dataType === 'qualitative' && factor.categories && factor.categories.length > 0) {
-    if (coded <= -0.5) return factor.categories[0] || 'Mức 1';
-    if (coded >= 0.5) return factor.categories[1] || (factor.categories.length > 1 ? factor.categories[1] : 'Mức 2');
-    return factor.categories[2] || factor.categories[0] || 'Tâm';
-  }
-
-  // Quantitative Multilevel Factor with custom category labels
-  if (factor.dataType === 'quantitative_multilevel' && factor.categories && factor.categories.length > 0) {
-    if (coded <= -0.5) return factor.categories[0];
-    if (coded >= 0.5) return factor.categories[factor.categories.length - 1];
-    const midIdx = Math.floor(factor.categories.length / 2);
-    return factor.categories[midIdx];
+  // Categorical and discrete-numeric factors use every configured level.
+  if (factor.dataType === 'qualitative' || factor.dataType === 'quantitative_multilevel') {
+    const levels = configuredLevels(factor);
+    if (levels.length > 0) {
+      const codes = evenlySpacedCodes(levels.length);
+      let nearestIndex = 0;
+      for (let index = 1; index < codes.length; index++) {
+        if (Math.abs(codes[index] - coded) < Math.abs(codes[nearestIndex] - coded)) nearestIndex = index;
+      }
+      return levels[nearestIndex];
+    }
   }
 
   // Mixture Component Factor (coded is proportion 0..1, actual is percentage 0..100%)
@@ -53,15 +72,12 @@ export function codedToActual(coded: number, factor: Factor): number | string {
  * Convert actual physical value to coded factor value
  */
 export function actualToCoded(actual: number | string, factor: Factor): number {
-  if (typeof actual === 'string') {
-    if (factor.categories) {
-      const idx = factor.categories.indexOf(actual);
-      if (idx === 0) return -1;
-      if (idx === 1 && factor.categories.length === 2) return 1;
-      if (idx === 1 && factor.categories.length > 2) return 0;
-      if (idx === 2) return 1;
-    }
-    return 0;
+  if (factor.dataType === 'qualitative' || factor.dataType === 'quantitative_multilevel') {
+    const levels = configuredLevels(factor);
+    const index = factor.dataType === 'quantitative_multilevel'
+      ? levels.findIndex((level) => Number(level) === Number(actual))
+      : levels.findIndex((level) => String(level) === String(actual));
+    return index >= 0 ? evenlySpacedCodes(levels.length)[index] : 0;
   }
   const val = typeof actual === 'number' ? actual : Number(actual);
 
@@ -794,6 +810,15 @@ export function validateDesignSetup(factors: Factor[], config: DoEDesignConfig):
 
   if (active.length === 0) errors.push('Cần ít nhất một nhân tố không cố định để tạo thiết kế.');
   active.forEach((factor) => {
+    if (factor.dataType === 'qualitative' || factor.dataType === 'quantitative_multilevel') {
+      const levels = (factor.categories ?? []).map((level) => level.trim()).filter(Boolean);
+      if (levels.length < 2) errors.push(`${factor.code}: cần khai báo ít nhất 2 mức.`);
+      if (levels.length > 10) errors.push(`${factor.code}: chỉ được khai báo tối đa 10 mức.`);
+      if (new Set(levels).size !== levels.length) errors.push(`${factor.code}: các mức không được trùng nhau.`);
+      if (factor.dataType === 'quantitative_multilevel' && levels.some((level) => !Number.isFinite(Number(level)))) {
+        errors.push(`${factor.code}: mọi mức định lượng phải là số hợp lệ.`);
+      }
+    }
     if (factor.dataType !== 'qualitative' && (!Number.isFinite(factor.low) || !Number.isFinite(factor.high) || factor.high <= factor.low)) {
       errors.push(`${factor.code}: cận trên phải lớn hơn cận dưới.`);
     }
@@ -1060,8 +1085,7 @@ function generateCandidatePool(factors: Factor[]): number[][] {
 
     const procLevels: number[][] = processFactors.map((f) => {
       if (f.controllability === 'constant') return [0];
-      if (f.dataType === 'qualitative') return [-1, 1];
-      if (f.dataType === 'quantitative_multilevel') return [-1, 0, 1];
+      if (f.dataType === 'qualitative' || f.dataType === 'quantitative_multilevel') return getConfiguredFactorCodes(f);
       return [-1, 0, 1];
     });
 
@@ -1096,8 +1120,7 @@ function generateCandidatePool(factors: Factor[]): number[][] {
   // Standard process factors grid
   const gridPerFactor: number[][] = factors.map((f) => {
     if (f.controllability === 'constant') return [0];
-    if (f.dataType === 'qualitative') return [-1, 1];
-    if (f.dataType === 'quantitative_multilevel') return [-1, 0, 1];
+    if (f.dataType === 'qualitative' || f.dataType === 'quantitative_multilevel') return getConfiguredFactorCodes(f);
     return [-1, -0.5, 0, 0.5, 1]; // 5 levels for smooth response exploration
   });
 

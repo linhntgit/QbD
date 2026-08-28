@@ -6,7 +6,7 @@ export type FactorControllability = 'controllable' | 'uncontrollable_noise' | 'c
 
 export type ModelingEngine = 'polynomial' | 'neural';
 
-export type CQADataType = 'quantitative' | 'qualitative_binary' | 'qualitative_ordinal';
+export type CQADataType = 'quantitative' | 'quantitative_multilevel' | 'qualitative_binary' | 'qualitative_ordinal';
 export type CQAObjective = 'maximize' | 'minimize' | 'target' | 'range' | 'pass_category';
 
 export interface QTPPItem {
@@ -20,12 +20,12 @@ export interface CQA {
   id: string;
   name: string; // e.g., Dissolution 2h (%), Tensile Strength (MPa), Assay (%), Appearance
   code: string; // Y1, Y2, ...
-  dataType?: CQADataType; // quantitative, qualitative_binary, qualitative_ordinal
+  dataType?: CQADataType; // continuous/discrete quantitative or qualitative response
   unit: string;
   target?: number;
   lowerLimit?: number; // LSL
   upperLimit?: number; // USL
-  categories?: string[]; // for qualitative, e.g. ['Không đạt', 'Đạt'] or ['Cấp 1', 'Cấp 2', 'Cấp 3']
+  categories?: string[]; // allowed levels (2-10) for discrete quantitative or qualitative responses
   targetCategory?: string; // e.g. 'Đạt'
   objective: CQAObjective;
   weight: number; // 1 to 5 (importance)
@@ -52,7 +52,7 @@ export interface Factor {
   high: number; // +1 (or max % in mixture)
   center?: number; // 0 (or center % in mixture)
   alpha?: number; // axial value for CCD
-  categories?: string[]; // e.g. ['Nhà cung cấp A', 'Nhà cung cấp B'] or ['30 rpm', '60 rpm', '90 rpm']
+  categories?: string[]; // allowed levels (2-10), e.g. suppliers or discrete numeric settings
   constantValue?: number | string; // for constant factors (e.g. 500 mg, 40 °C)
   currentValue?: number; // for contour slices
 }

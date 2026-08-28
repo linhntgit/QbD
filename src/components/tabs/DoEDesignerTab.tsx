@@ -361,10 +361,10 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
 
     const mixtureCount = mixtureFactors.length;
     project.factors.forEach((f) => {
-      if (f.dataType === 'qualitative') {
-        const defaultCat = f.categories?.[0] || 'Mức 1';
-        factorActual[f.code] = defaultCat;
-        factorCoded[f.code] = actualToCoded(defaultCat, f);
+      if (f.dataType === 'qualitative' || f.dataType === 'quantitative_multilevel') {
+        const defaultLevel = f.categories?.[0] || (f.dataType === 'qualitative' ? 'Mức 1' : String(f.low));
+        factorActual[f.code] = f.dataType === 'quantitative_multilevel' ? Number(defaultLevel) : defaultLevel;
+        factorCoded[f.code] = actualToCoded(defaultLevel, f);
       } else if (f.role === 'mixture_component' || f.type === 'Mixture') {
         const defaultVal = mixtureCount > 0 ? Number((100 / mixtureCount).toFixed(2)) : (f.center ?? f.low);
         factorActual[f.code] = defaultVal;
@@ -579,8 +579,8 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
           }
         } else if (col.type === 'cqa' && col.cqa) {
           const c = col.cqa;
-          if (c.dataType === 'qualitative_binary') {
-            responses[c.code] = trimmed.toLowerCase().includes('đạt') || trimmed.toLowerCase() === 'pass' || trimmed === '1' ? 'Đạt' : 'Không đạt';
+          if (c.dataType === 'qualitative_binary' || c.dataType === 'qualitative_ordinal') {
+            responses[c.code] = trimmed;
             pastedCount++;
           } else {
             const num = parseFloat(trimmed.replace(/,/g, '.'));
@@ -2223,7 +2223,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
 
                             {/* 3. Factor Actual (Editable) */}
                             {col.type === 'factor' && col.factor && (
-                              col.factor.dataType === 'qualitative' ? (
+                              col.factor.dataType === 'qualitative' || col.factor.dataType === 'quantitative_multilevel' ? (
                                 <select
                                   style={{
                                     width: '100%',
@@ -2236,16 +2236,16 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                                     color: '#1e3a8a',
                                     padding: '0 0.4rem',
                                   }}
-                                  value={typeof run.factorActual[col.code] === 'string' ? run.factorActual[col.code] : ''}
+                                  value={String(run.factorActual[col.code] ?? '')}
                                   onFocus={() => {
                                     setActiveCell({ r: runIdx, c: colIdx });
                                     setSelection({ start: { r: runIdx, c: colIdx }, end: { r: runIdx, c: colIdx } });
                                   }}
                                   onChange={(e) => handleFactorActualChange(run.id, col.code, e.target.value)}
                                 >
-                                  {col.factor.categories && col.factor.categories.length > 0 ? (
-                                    col.factor.categories.map((cat) => (
-                                      <option key={cat} value={cat}>{cat}</option>
+                                  {col.factor.categories && col.factor.categories.filter(Boolean).length > 0 ? (
+                                    col.factor.categories.filter(Boolean).map((level) => (
+                                      <option key={level} value={level}>{level}</option>
                                     ))
                                   ) : (
                                     <>
@@ -2329,7 +2329,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
 
                             {/* 6. CQA Responses (Editable) */}
                             {col.type === 'cqa' && col.cqa && (
-                              col.cqa.dataType === 'qualitative_binary' ? (
+                              col.cqa.dataType !== 'quantitative' && col.cqa.dataType !== undefined ? (
                                 <select
                                   style={{
                                     width: '100%',
@@ -2342,15 +2342,19 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                                     color: '#0f766e',
                                     padding: '0 0.4rem',
                                   }}
-                                  value={run.responses[col.code] ?? 'Đạt'}
+                                  value={String(run.responses[col.code] ?? col.cqa.categories?.[0] ?? '')}
                                   onFocus={() => {
                                     setActiveCell({ r: runIdx, c: colIdx });
                                     setSelection({ start: { r: runIdx, c: colIdx }, end: { r: runIdx, c: colIdx } });
                                   }}
                                   onChange={(e) => handleResponseChange(run.id, col.code, e.target.value)}
                                 >
-                                  <option value="Đạt">✓ Đạt (Pass)</option>
-                                  <option value="Không đạt">✗ Không đạt (Fail)</option>
+                                  {(col.cqa.categories?.filter(Boolean).length
+                                    ? col.cqa.categories.filter(Boolean)
+                                    : col.cqa.dataType === 'qualitative_binary' ? ['Không đạt', 'Đạt'] : ['Mức 1', 'Mức 2']
+                                  ).map((level) => (
+                                    <option key={level} value={level}>{level}</option>
+                                  ))}
                                 </select>
                               ) : (
                                 <input

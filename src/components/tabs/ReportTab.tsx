@@ -255,7 +255,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                   <td style={{ fontWeight: '600' }}>{cqa.name}</td>
                   <td>
                     <span className="badge badge-primary" style={{ fontSize: '0.72rem' }}>
-                      {cqa.dataType === 'qualitative_binary' ? 'Định tính (Pass/Fail)' : cqa.dataType === 'qualitative_ordinal' ? 'Định tính (Thứ bậc)' : 'Định lượng (Quantitative)'}
+                      {cqa.dataType === 'qualitative_binary' ? 'Định tính (Pass/Fail)' : cqa.dataType === 'qualitative_ordinal' ? 'Định tính (Thứ bậc)' : cqa.dataType === 'quantitative_multilevel' ? 'Định lượng (Nhiều mức)' : 'Định lượng (Liên tục)'}
                     </span>
                   </td>
                   <td>{cqa.unit}</td>
@@ -359,7 +359,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                       </span>
                     </td>
                     <td>{f.unit}</td>
-                    <td>{f.controllability === 'constant' ? `${f.constantValue ?? f.low}` : `${f.low} - ${f.high}`}</td>
+                    <td>{f.controllability === 'constant' ? `${f.constantValue ?? f.low}` : f.dataType !== 'quantitative' && f.categories?.length ? f.categories.join(' · ') : `${f.low} - ${f.high}`}</td>
                   </tr>
                 ))}
               </tbody>
