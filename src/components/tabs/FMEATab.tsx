@@ -3,11 +3,11 @@ import {
   ShieldAlert,
   Plus,
   Trash2,
-  GitBranch,
   ArrowRight,
   HelpCircle,
 } from 'lucide-react';
-import type { QBDProject, FMEARiskItem } from '../../types/qbd';
+import type { FishboneDiagram, QBDProject, FMEARiskItem } from '../../types/qbd';
+import { FishboneDiagram as FishboneCanvas } from '../FishboneDiagram';
 
 interface FMEATabProps {
   project: QBDProject;
@@ -15,12 +15,34 @@ interface FMEATabProps {
   onNavigateToDoE: () => void;
 }
 
+const makeDefaultFishbone = (project: QBDProject): FishboneDiagram => {
+  const materialFactors = project.factors.filter((factor) => factor.type === 'CMA' || factor.type === 'Formulation');
+  const processFactors = project.factors.filter((factor) => factor.type === 'CPP' || factor.type === 'Process');
+  const category = (id: string, name: string, causes: string[]) => ({
+    id,
+    name,
+    causes: causes.map((text, index) => ({ id: `${id}-cause-${index}`, text })),
+  });
+  return {
+    effect: 'CQA / chất lượng không đạt',
+    categories: [
+      category('material', 'NGUYÊN LIỆU / MATERIAL', materialFactors.length ? materialFactors.map((factor) => factor.name) : ['Đặc tính nguyên liệu', 'Biến thiên nhà cung cấp']),
+      category('machine', 'THIẾT BỊ / MACHINE', processFactors.length ? processFactors.map((factor) => factor.name) : ['Hiệu chuẩn thiết bị', 'Cài đặt vận hành']),
+      category('method', 'PHƯƠNG PHÁP / METHOD', ['Trình tự thao tác', 'Thời gian và tốc độ xử lý']),
+      category('measurement', 'ĐO LƯỜNG / MEASUREMENT', ['Phương pháp thử', 'Độ lặp lại và sai số đo']),
+      category('environment', 'MÔI TRƯỜNG / ENVIRONMENT', ['Nhiệt độ và độ ẩm', 'Điều kiện bảo quản']),
+      category('people', 'CON NGƯỜI / PEOPLE', ['Đào tạo thao tác', 'Kỹ thuật lấy mẫu']),
+    ],
+  };
+};
+
 export const FMEATab: React.FC<FMEATabProps> = ({
   project,
   onUpdateProject,
   onNavigateToDoE,
 }) => {
   const [activeSubView, setActiveSubView] = useState<'matrix' | 'fishbone'>('matrix');
+  const fishbone = project.fishbone ?? makeDefaultFishbone(project);
 
   const calculateRiskLevel = (rpn: number): 'Low' | 'Medium' | 'High' => {
     if (rpn >= 100) return 'High';
@@ -448,133 +470,8 @@ export const FMEATab: React.FC<FMEATabProps> = ({
           </div>
         </div>
       ) : (
-        /* Ishikawa Fishbone Diagram Visualization */
         <div className="qbd-card">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-            <GitBranch size={20} color="#0f766e" />
-            <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a' }}>
-              Biểu Đồ Xương Cá (Ishikawa Cause-and-Effect Diagram)
-            </h3>
-          </div>
-
-          <div
-            style={{
-              backgroundColor: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              borderRadius: '0.75rem',
-              padding: '1.5rem',
-              position: 'relative',
-              overflowX: 'auto',
-            }}
-          >
-            <div style={{ minWidth: '700px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              
-              {/* Fishbone Branches */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', width: '80%' }}>
-                {/* Branch 1: Material (CMA) */}
-                <div style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '0.5rem', padding: '0.75rem' }}>
-                  <div style={{ fontWeight: '700', fontSize: '0.85rem', color: '#1e3a8a', borderBottom: '2px solid #3b82f6', paddingBottom: '0.25rem', marginBottom: '0.5rem' }}>
-                    1. NGUYÊN LIỆU (Material / CMA)
-                  </div>
-                  <ul style={{ paddingLeft: '1.2rem', fontSize: '0.78rem', color: '#334155' }}>
-                    {project.factors.filter((f) => f.type === 'CMA' || f.type === 'Formulation').map((f) => (
-                      <li key={f.id} style={{ marginBottom: '0.25rem' }}>
-                        <strong>{f.name}</strong> ({f.low} - {f.high} {f.unit})
-                      </li>
-                    ))}
-                    {project.factors.filter((f) => f.type === 'CMA' || f.type === 'Formulation').length === 0 && (
-                      <li style={{ color: '#94a3b8' }}>Chưa có biến CMA</li>
-                    )}
-                  </ul>
-                </div>
-
-                {/* Branch 2: Machine / Equipment */}
-                <div style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '0.5rem', padding: '0.75rem' }}>
-                  <div style={{ fontWeight: '700', fontSize: '0.85rem', color: '#0f766e', borderBottom: '2px solid #0d9488', paddingBottom: '0.25rem', marginBottom: '0.5rem' }}>
-                    2. THIẾT BỊ & THÔNG SỐ (Machine / CPP)
-                  </div>
-                  <ul style={{ paddingLeft: '1.2rem', fontSize: '0.78rem', color: '#334155' }}>
-                    {project.factors.filter((f) => f.type === 'CPP' || f.type === 'Process').map((f) => (
-                      <li key={f.id} style={{ marginBottom: '0.25rem' }}>
-                        <strong>{f.name}</strong> ({f.low} - {f.high} {f.unit})
-                      </li>
-                    ))}
-                    {project.factors.filter((f) => f.type === 'CPP' || f.type === 'Process').length === 0 && (
-                      <li style={{ color: '#94a3b8' }}>Chưa có biến CPP</li>
-                    )}
-                  </ul>
-                </div>
-
-                {/* Branch 3: Method / Quy trình */}
-                <div style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '0.5rem', padding: '0.75rem' }}>
-                  <div style={{ fontWeight: '700', fontSize: '0.85rem', color: '#b45309', borderBottom: '2px solid #f59e0b', paddingBottom: '0.25rem', marginBottom: '0.5rem' }}>
-                    3. PHƯƠNG PHÁP & QUY TRÌNH (Method)
-                  </div>
-                  <ul style={{ paddingLeft: '1.2rem', fontSize: '0.78rem', color: '#334155' }}>
-                    <li>Trình tự nạp liệu & Trộn phân tán</li>
-                    <li>Tốc độ gia nhiệt / Làm nguội</li>
-                    <li>Thời gian ổn định hệ</li>
-                  </ul>
-                </div>
-
-                {/* Branch 4: Measurement */}
-                <div style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '0.5rem', padding: '0.75rem' }}>
-                  <div style={{ fontWeight: '700', fontSize: '0.85rem', color: '#6b21a8', borderBottom: '2px solid #a855f7', paddingBottom: '0.25rem', marginBottom: '0.5rem' }}>
-                    4. ĐO LƯỜNG & KIỂM NGHIỆM (Measurement)
-                  </div>
-                  <ul style={{ paddingLeft: '1.2rem', fontSize: '0.78rem', color: '#334155' }}>
-                    <li>Phương pháp HPLC / Độ hòa tan</li>
-                    <li>Sai số thiết bị đo & Độ lặp lại</li>
-                  </ul>
-                </div>
-
-                {/* Branch 5: Milieu / Environment */}
-                <div style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '0.5rem', padding: '0.75rem' }}>
-                  <div style={{ fontWeight: '700', fontSize: '0.85rem', color: '#475569', borderBottom: '2px solid #94a3b8', paddingBottom: '0.25rem', marginBottom: '0.5rem' }}>
-                    5. MÔI TRƯỜNG (Milieu / Environment)
-                  </div>
-                  <ul style={{ paddingLeft: '1.2rem', fontSize: '0.78rem', color: '#334155' }}>
-                    <li>Nhiệt độ & Độ ẩm phòng pha chế (RH &lt; 40%)</li>
-                    <li>Điều kiện bảo quản mẫu</li>
-                  </ul>
-                </div>
-
-                {/* Branch 6: Man / Con người */}
-                <div style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '0.5rem', padding: '0.75rem' }}>
-                  <div style={{ fontWeight: '700', fontSize: '0.85rem', color: '#0369a1', borderBottom: '2px solid #38bdf8', paddingBottom: '0.25rem', marginBottom: '0.5rem' }}>
-                    6. CON NGƯỜI & THAO TÁC (Man)
-                  </div>
-                  <ul style={{ paddingLeft: '1.2rem', fontSize: '0.78rem', color: '#334155' }}>
-                    <li>Đào tạo GMP & Thao tác dập viên</li>
-                    <li>Kỹ thuật lấy mẫu đại diện</li>
-                  </ul>
-                </div>
-              </div>
-
-              {/* Central Spine Arrow & Fish Head */}
-              <div style={{ display: 'flex', alignItems: 'center', marginLeft: '1.5rem', width: '20%' }}>
-                <div style={{ flex: 1, height: '4px', backgroundColor: '#1e293b' }}></div>
-                <div
-                  style={{
-                    backgroundColor: '#1e3a8a',
-                    color: '#ffffff',
-                    padding: '1rem',
-                    borderRadius: '0.5rem',
-                    fontWeight: '700',
-                    fontSize: '0.85rem',
-                    textAlign: 'center',
-                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
-                  }}
-                >
-                  <div>CHẤT LƯỢNG THUỐC</div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: '400', marginTop: '0.25rem', color: '#bfdbfe' }}>
-                    (QTPP & CQAs Đạt Chuẩn)
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </div>
+          <FishboneCanvas diagram={fishbone} onChange={(updated) => onUpdateProject({ fishbone: updated })} />
         </div>
       )}
 

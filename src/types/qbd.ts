@@ -69,6 +69,24 @@ export interface FMEARiskItem {
   recommendedDoE: boolean;
 }
 
+/** Editable cause-and-effect diagram retained with the project. */
+export interface FishboneCause {
+  id: string;
+  text: string;
+  children?: FishboneCause[];
+}
+
+export interface FishboneCategory {
+  id: string;
+  name: string;
+  causes: FishboneCause[];
+}
+
+export interface FishboneDiagram {
+  effect: string;
+  categories: FishboneCategory[];
+}
+
 export type DoECategory = 'Screening' | 'RSM' | 'Mixture' | 'Combined_Mixture_Process' | 'Custom_Optimal';
 export type DoEDesignGoal = 'screening' | 'optimization' | 'robustness';
 
@@ -296,6 +314,7 @@ export interface QBDProject {
   cqas: CQA[];
   factors: Factor[];
   fmeaRisks: FMEARiskItem[];
+  fishbone?: FishboneDiagram;
   doeConfig: DoEDesignConfig;
   runs: DoERun[];
   designSpace: DesignSpaceRanges[];

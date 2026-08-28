@@ -1,0 +1,193 @@
+import React, { useMemo } from 'react';
+import { CornerDownRight, Plus, Trash2 } from 'lucide-react';
+import type { FishboneCause, FishboneDiagram as FishboneDiagramData } from '../types/qbd';
+
+interface FishboneDiagramProps {
+  diagram: FishboneDiagramData;
+  onChange: (diagram: FishboneDiagramData) => void;
+}
+
+type Side = 'top' | 'bottom';
+
+interface CauseNode {
+  categoryId: string;
+  cause: FishboneCause;
+  level: number;
+  source: { x: number; y: number };
+  end: { x: number; y: number };
+  input: { x: number; y: number };
+}
+
+interface CategoryGeometry {
+  id: string;
+  name: string;
+  colour: string;
+  side: Side;
+  attachment: { x: number; y: number };
+  endpoint: { x: number; y: number };
+  title: { x: number; y: number };
+  causes: CauseNode[];
+}
+
+const FONT = "Inter, 'Segoe UI', Arial, sans-serif";
+const PALETTE = ['#2563eb', '#0f766e', '#b45309', '#7c3aed', '#475569', '#0369a1', '#be123c', '#15803d'];
+const DISPLAY_SCALE = 0.62;
+const SPINE_Y = 480;
+const MAX_CAUSES_PER_BRANCH = 10;
+const makeId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+const updateCauseTree = (causes: FishboneCause[], causeId: string, update: (cause: FishboneCause) => FishboneCause): FishboneCause[] =>
+  causes.map((cause) => cause.id === causeId
+    ? update(cause)
+    : { ...cause, children: cause.children ? updateCauseTree(cause.children, causeId, update) : undefined });
+
+const removeCauseTree = (causes: FishboneCause[], causeId: string): FishboneCause[] =>
+  causes
+    .filter((cause) => cause.id !== causeId)
+    .map((cause) => ({ ...cause, children: cause.children ? removeCauseTree(cause.children, causeId) : undefined }));
+
+const appendChild = (causes: FishboneCause[], parentId: string, child: FishboneCause): FishboneCause[] =>
+  causes.map((cause) => cause.id === parentId
+    ? { ...cause, children: [...(cause.children ?? []), child] }
+    : { ...cause, children: cause.children ? appendChild(cause.children, parentId, child) : undefined });
+
+const findCause = (causes: FishboneCause[], causeId: string): FishboneCause | undefined => {
+  for (const cause of causes) {
+    if (cause.id === causeId) return cause;
+    const found = cause.children ? findCause(cause.children, causeId) : undefined;
+    if (found) return found;
+  }
+  return undefined;
+};
+
+/** A clean, editable Ishikawa canvas. Labels are connected to real bones, not cards. */
+export const FishboneDiagram: React.FC<FishboneDiagramProps> = ({ diagram, onChange }) => {
+  const geometry = useMemo<CategoryGeometry[]>(() => {
+    const categoriesBySide = {
+      top: diagram.categories.filter((_, index) => index % 2 === 0),
+      bottom: diagram.categories.filter((_, index) => index % 2 === 1),
+    };
+
+    const build = (categories: typeof diagram.categories, side: Side): CategoryGeometry[] => categories.map((category, index) => {
+      const attachment = {
+        x: categories.length === 1 ? 700 : 400 + (index * 600) / (categories.length - 1),
+        y: SPINE_Y,
+      };
+      const endpoint = { x: attachment.x - 145, y: side === 'top' ? 120 : 840 };
+      const direction = side === 'top' ? -1 : 1;
+      const nodes: CauseNode[] = [];
+      const addNodes = (causes: FishboneCause[], source: { x: number; y: number }, level: number) => {
+        causes.forEach((cause, causeIndex) => {
+          const fraction = level === 0
+            ? causes.length === 1 ? 0.6 : 0.1 + (causeIndex * 0.82) / (causes.length - 1)
+            : 1;
+          const anchor = level === 0
+            ? { x: endpoint.x + (attachment.x - endpoint.x) * fraction, y: endpoint.y + (attachment.y - endpoint.y) * fraction }
+            : { x: source.x + causeIndex * 16, y: source.y + direction * causeIndex * 34 };
+          // Every minor bone uses the same direction vector, yielding clean
+          // parallel strokes while the anchors are distributed along the parent.
+          const end = { x: anchor.x - (level === 0 ? 72 : 48), y: anchor.y + direction * (level === 0 ? 36 : 24) };
+          nodes.push({ categoryId: category.id, cause, level, source: anchor, end, input: { x: end.x - 170, y: end.y - 16 } });
+          if (cause.children?.length) addNodes(cause.children, end, level + 1);
+        });
+      };
+      addNodes(category.causes, endpoint, 0);
+      return {
+        id: category.id,
+        name: category.name,
+        colour: PALETTE[diagram.categories.findIndex((item) => item.id === category.id) % PALETTE.length],
+        side,
+        attachment,
+        endpoint,
+        title: { x: endpoint.x - 95, y: side === 'top' ? 34 : 925 },
+        causes: nodes,
+      };
+    });
+    return [...build(categoriesBySide.top, 'top'), ...build(categoriesBySide.bottom, 'bottom')];
+  }, [diagram]);
+
+  const updateCategory = (categoryId: string, update: Partial<FishboneDiagramData['categories'][number]>) => onChange({
+    ...diagram,
+    categories: diagram.categories.map((category) => category.id === categoryId ? { ...category, ...update } : category),
+  });
+
+  const updateCause = (categoryId: string, causeId: string, text: string) => {
+    const category = diagram.categories.find((item) => item.id === categoryId);
+    if (category) updateCategory(categoryId, { causes: updateCauseTree(category.causes, causeId, (cause) => ({ ...cause, text })) });
+  };
+
+  const addCause = (categoryId: string, parentId?: string) => {
+    const category = diagram.categories.find((item) => item.id === categoryId);
+    if (!category) return;
+    const siblings = parentId ? findCause(category.causes, parentId)?.children ?? [] : category.causes;
+    if (siblings.length >= MAX_CAUSES_PER_BRANCH) return;
+    const child = { id: makeId('cause'), text: parentId ? 'Nguyên nhân cấp tiếp theo' : 'Nguyên nhân cần xem xét' };
+    updateCategory(categoryId, { causes: parentId ? appendChild(category.causes, parentId, child) : [...category.causes, child] });
+  };
+
+  const canAddCause = (categoryId: string, parentId?: string): boolean => {
+    const category = diagram.categories.find((item) => item.id === categoryId);
+    if (!category) return false;
+    return (parentId ? findCause(category.causes, parentId)?.children ?? [] : category.causes).length < MAX_CAUSES_PER_BRANCH;
+  };
+
+  const removeCause = (categoryId: string, causeId: string) => {
+    const category = diagram.categories.find((item) => item.id === categoryId);
+    if (category) updateCategory(categoryId, { causes: removeCauseTree(category.causes, causeId) });
+  };
+
+  const addCategory = () => {
+    if (diagram.categories.length >= 8) return;
+    onChange({ ...diagram, categories: [...diagram.categories, { id: makeId('category'), name: 'NHÓM NGUYÊN NHÂN', causes: [{ id: makeId('cause'), text: 'Nguyên nhân cần xem xét' }] }] });
+  };
+
+  return (
+    <div style={{ fontFamily: FONT }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div>
+          <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Sơ đồ Ishikawa</h3>
+          <p style={{ margin: '0.2rem 0 0', color: '#64748b', fontSize: '0.76rem' }}>Nhấp vào chữ để sửa; <strong>↳</strong> tạo nhánh con của một nguyên nhân.</p>
+        </div>
+        <button className="btn btn-secondary" onClick={addCategory} disabled={diagram.categories.length >= 8} style={{ fontSize: '0.76rem', padding: '0.35rem 0.65rem' }}><Plus size={14} /> Thêm nhánh chính</button>
+      </div>
+
+      <div style={{ border: '1px solid #dbe4ef', borderRadius: '0.75rem', background: '#fcfdff', overflow: 'hidden' }}>
+        <div style={{ width: '100%', maxWidth: 930, height: 620, margin: '0 auto', position: 'relative' }}>
+          <div style={{ width: 1500, height: 1000, position: 'absolute', top: 0, left: 0, transform: `scale(${DISPLAY_SCALE})`, transformOrigin: 'top left' }}>
+          <svg aria-hidden="true" width="1500" height="1000" viewBox="0 0 1500 1000" style={{ position: 'absolute', inset: 0 }}>
+            <defs><marker id="ishikawa-arrow" markerWidth="12" markerHeight="12" refX="10" refY="4" orient="auto"><path d="M0,0 L0,8 L11,4 z" fill="#334155" /></marker></defs>
+            <path d={`M95 ${SPINE_Y} L1220 ${SPINE_Y}`} stroke="#334155" strokeWidth="5" strokeLinecap="round" markerEnd="url(#ishikawa-arrow)" />
+            <path d={`M95 ${SPINE_Y} L146 431 M95 ${SPINE_Y} L146 529 M95 ${SPINE_Y} L37 ${SPINE_Y}`} stroke="#64748b" strokeWidth="3.5" strokeLinecap="round" />
+            {geometry.map((branch) => <g key={branch.id}>
+              <path d={`M${branch.endpoint.x} ${branch.endpoint.y} L${branch.attachment.x} ${branch.attachment.y}`} stroke={branch.colour} strokeWidth="3.5" strokeLinecap="round" />
+              <circle cx={branch.attachment.x} cy={branch.attachment.y} r="5.5" fill={branch.colour} />
+              {branch.causes.map((cause) => <path key={cause.cause.id} d={`M${cause.source.x} ${cause.source.y} L${cause.end.x} ${cause.end.y}`} stroke={branch.colour} strokeWidth={cause.level === 0 ? '2.2' : '1.7'} strokeLinecap="round" opacity={cause.level === 0 ? 0.85 : 0.65} />)}
+            </g>)}
+            <path d="M1250 400 Q1355 400 1438 480 Q1355 560 1250 560 Z" fill="#103f67" stroke="#082f49" strokeWidth="2.5" />
+            <circle cx="1396" cy="450" r="6.5" fill="#ffffff" /><circle cx="1398" cy="450" r="2.7" fill="#0f172a" />
+          </svg>
+
+          {geometry.map((branch) => <React.Fragment key={branch.id}>
+            <div style={{ position: 'absolute', left: branch.title.x, top: branch.title.y, width: 220, display: 'flex', alignItems: 'center', gap: 3 }}>
+              <input aria-label="Tên nhánh chính" spellCheck={false} value={branch.name} onChange={(event) => updateCategory(branch.id, { name: event.target.value })} style={{ fontFamily: FONT, fontSize: '0.76rem', fontWeight: 800, letterSpacing: '0.02em', flex: 1, minWidth: 0, padding: '0.34rem 0.45rem', color: branch.colour, background: '#ffffff', border: `1px solid ${branch.colour}55`, borderBottom: `3px solid ${branch.colour}`, borderRadius: 5, outline: 'none' }} />
+              <button title={`Thêm nguyên nhân (tối đa ${MAX_CAUSES_PER_BRANCH})`} aria-label="Thêm nguyên nhân" disabled={!canAddCause(branch.id)} onClick={() => addCause(branch.id)} style={{ border: `1px solid ${branch.colour}55`, color: branch.colour, background: '#ffffff', borderRadius: 5, cursor: 'pointer', width: 26, height: 26, display: 'grid', placeItems: 'center', opacity: canAddCause(branch.id) ? 1 : 0.4 }}><Plus size={14} /></button>
+              <button title="Xóa nhánh" aria-label="Xóa nhánh" onClick={() => onChange({ ...diagram, categories: diagram.categories.filter((category) => category.id !== branch.id) })} disabled={diagram.categories.length <= 1} style={{ border: 'none', color: '#dc2626', background: 'transparent', cursor: 'pointer', padding: 3 }}><Trash2 size={14} /></button>
+            </div>
+            {branch.causes.map((cause) => <div key={cause.cause.id} style={{ position: 'absolute', left: cause.input.x, top: cause.input.y, width: Math.max(118, 165 - cause.level * 12), display: 'flex', gap: 2, alignItems: 'center' }}>
+              {cause.level > 0 && <CornerDownRight size={12} color={branch.colour} strokeWidth={2.2} />}
+              <input aria-label={`Nguyên nhân: ${cause.cause.text}`} spellCheck={false} value={cause.cause.text} onChange={(event) => updateCause(branch.id, cause.cause.id, event.target.value)} style={{ fontFamily: FONT, fontSize: cause.level === 0 ? '0.74rem' : '0.69rem', fontWeight: cause.level === 0 ? 600 : 500, minWidth: 0, flex: 1, padding: '0.25rem 0.35rem', color: '#1e293b', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 4, outline: 'none', boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)' }} />
+              <button title={`Thêm nhánh con (tối đa ${MAX_CAUSES_PER_BRANCH})`} aria-label="Thêm nhánh con" disabled={!canAddCause(branch.id, cause.cause.id)} onClick={() => addCause(branch.id, cause.cause.id)} style={{ border: 'none', color: branch.colour, background: 'transparent', cursor: 'pointer', padding: 1, opacity: canAddCause(branch.id, cause.cause.id) ? 1 : 0.4 }}><CornerDownRight size={13} /></button>
+              <button title="Xóa nguyên nhân" aria-label="Xóa nguyên nhân" onClick={() => removeCause(branch.id, cause.cause.id)} style={{ border: 'none', color: '#94a3b8', background: 'transparent', cursor: 'pointer', padding: 1 }}><Trash2 size={11} /></button>
+            </div>)}
+          </React.Fragment>)}
+
+          <div style={{ position: 'absolute', left: 1274, top: 428, width: 124, textAlign: 'center' }}>
+            <div style={{ color: '#bfdbfe', fontFamily: FONT, fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.04em', marginBottom: 5 }}>HIỆU ỨNG / VẤN ĐỀ</div>
+            <textarea aria-label="Hiệu ứng hoặc vấn đề" spellCheck={false} value={diagram.effect} onChange={(event) => onChange({ ...diagram, effect: event.target.value })} rows={3} style={{ fontFamily: FONT, width: '100%', resize: 'none', color: '#ffffff', background: 'rgba(8, 47, 73, 0.35)', border: '1px solid #7dd3fc', borderRadius: 5, padding: 5, textAlign: 'center', fontSize: '0.73rem', fontWeight: 700, lineHeight: 1.22, outline: 'none' }} />
+          </div>
+        </div>
+        </div>
+      </div>
+    </div>
+  );
+};
