@@ -9,10 +9,10 @@ import {
 import { buildModelVector, getModelTermCount } from './modelTerms';
 import { createSeededRandom } from './random';
 
-const configuredLevels = (factor: Factor): Array<number | string> => {
+export const getConfiguredFactorLevels = (factor: Factor): Array<number | string> => {
   const raw = (factor.categories ?? []).map((level) => level.trim()).filter(Boolean).slice(0, 10);
   if (factor.dataType === 'quantitative_multilevel') {
-    return raw.map(Number).filter(Number.isFinite);
+    return raw.map(Number).filter(Number.isFinite).sort((a, b) => a - b);
   }
   return raw;
 };
@@ -23,11 +23,40 @@ const evenlySpacedCodes = (count: number): number[] => {
 };
 
 export function getConfiguredFactorCodes(factor: Factor): number[] {
-  const levels = configuredLevels(factor);
-  if ((factor.dataType === 'qualitative' || factor.dataType === 'quantitative_multilevel') && levels.length >= 2) {
+  const levels = getConfiguredFactorLevels(factor);
+  if (factor.dataType === 'quantitative_multilevel' && levels.length >= 2) {
+    const numeric = levels.map(Number);
+    const low = numeric[0];
+    const high = numeric[numeric.length - 1];
+    const center = (low + high) / 2;
+    const halfRange = (high - low) / 2;
+    return numeric.map((value) => Number(((value - center) / halfRange).toFixed(6)));
+  }
+  if (factor.dataType === 'qualitative' && levels.length >= 2) {
     return evenlySpacedCodes(levels.length);
   }
   return [-1, 0, 1];
+}
+
+export const isDiscreteFactor = (factor: Factor): boolean =>
+  factor.dataType === 'qualitative' || factor.dataType === 'quantitative_multilevel';
+
+/** Return the nearest legal coded setting for a discrete factor. */
+export function snapFactorCoded(coded: number, factor: Factor): number {
+  if (!isDiscreteFactor(factor)) return coded;
+  const codes = getConfiguredFactorCodes(factor);
+  return codes.reduce((nearest, candidate) =>
+    Math.abs(candidate - coded) < Math.abs(nearest - coded) ? candidate : nearest,
+  codes[0] ?? 0);
+}
+
+/** Legal factor coordinates for grids and discrete optimization. */
+export function getFactorGridCodes(factor: Factor, continuousPoints = 35): number[] {
+  if (isDiscreteFactor(factor)) return getConfiguredFactorCodes(factor);
+  if (factor.role === 'mixture_component' || factor.type === 'Mixture') {
+    return Array.from({ length: continuousPoints }, (_, index) => index / Math.max(1, continuousPoints - 1));
+  }
+  return Array.from({ length: continuousPoints }, (_, index) => -1 + (2 * index) / Math.max(1, continuousPoints - 1));
 }
 
 /**
@@ -41,9 +70,9 @@ export function codedToActual(coded: number, factor: Factor): number | string {
 
   // Categorical and discrete-numeric factors use every configured level.
   if (factor.dataType === 'qualitative' || factor.dataType === 'quantitative_multilevel') {
-    const levels = configuredLevels(factor);
+    const levels = getConfiguredFactorLevels(factor);
     if (levels.length > 0) {
-      const codes = evenlySpacedCodes(levels.length);
+      const codes = getConfiguredFactorCodes(factor);
       let nearestIndex = 0;
       for (let index = 1; index < codes.length; index++) {
         if (Math.abs(codes[index] - coded) < Math.abs(codes[nearestIndex] - coded)) nearestIndex = index;
@@ -73,11 +102,18 @@ export function codedToActual(coded: number, factor: Factor): number | string {
  */
 export function actualToCoded(actual: number | string, factor: Factor): number {
   if (factor.dataType === 'qualitative' || factor.dataType === 'quantitative_multilevel') {
-    const levels = configuredLevels(factor);
+    const levels = getConfiguredFactorLevels(factor);
     const index = factor.dataType === 'quantitative_multilevel'
       ? levels.findIndex((level) => Number(level) === Number(actual))
       : levels.findIndex((level) => String(level) === String(actual));
-    return index >= 0 ? evenlySpacedCodes(levels.length)[index] : 0;
+    if (index >= 0) return getConfiguredFactorCodes(factor)[index];
+    if (factor.dataType === 'quantitative_multilevel' && levels.length >= 2 && Number.isFinite(Number(actual))) {
+      const numeric = levels.map(Number);
+      const center = (numeric[0] + numeric[numeric.length - 1]) / 2;
+      const halfRange = (numeric[numeric.length - 1] - numeric[0]) / 2;
+      return halfRange > 0 ? (Number(actual) - center) / halfRange : 0;
+    }
+    return 0;
   }
   const val = typeof actual === 'number' ? actual : Number(actual);
 
@@ -818,6 +854,9 @@ export function validateDesignSetup(factors: Factor[], config: DoEDesignConfig):
       if (factor.dataType === 'quantitative_multilevel' && levels.some((level) => !Number.isFinite(Number(level)))) {
         errors.push(`${factor.code}: mọi mức định lượng phải là số hợp lệ.`);
       }
+      if (factor.dataType === 'quantitative_multilevel' && new Set(levels.map(Number)).size !== levels.length) {
+        errors.push(`${factor.code}: các mức định lượng không được trùng nhau về giá trị.`);
+      }
     }
     if (factor.dataType !== 'qualitative' && (!Number.isFinite(factor.low) || !Number.isFinite(factor.high) || factor.high <= factor.low)) {
       errors.push(`${factor.code}: cận trên phải lớn hơn cận dưới.`);
@@ -835,6 +874,22 @@ export function validateDesignSetup(factors: Factor[], config: DoEDesignConfig):
   }
 
   const isOptimal = config.designType === 'DOptimal' || config.designType === 'Combined_Mixture_DOptimal';
+  const twoLevelDesigns: DoEDesignConfig['designType'][] = ['FullFactorial2k', 'FractionalFactorial', 'PlackettBurman'];
+  const threeLevelDesigns: DoEDesignConfig['designType'][] = ['BoxBehnken', 'CCD_Full', 'CCD_FaceCentered', 'CCD_Rotatable', 'Doehlert'];
+  active.filter(isDiscreteFactor).forEach((factor) => {
+    const levelCount = getConfiguredFactorLevels(factor).length;
+    const isL9 = config.designType === 'Taguchi' && config.taguchiArray === 'L9';
+    if (!isOptimal && twoLevelDesigns.includes(config.designType) && levelCount !== 2) {
+      errors.push(`${factor.code}: thiết kế ${config.designType} chỉ sử dụng 2 mức; chọn D-optimal để dùng đủ ${levelCount} mức.`);
+    }
+    if (!isOptimal && threeLevelDesigns.includes(config.designType) && levelCount !== 3) {
+      errors.push(`${factor.code}: thiết kế ${config.designType} cần đúng 3 mức; chọn D-optimal để dùng đủ ${levelCount} mức.`);
+    }
+    if (!isOptimal && config.designType === 'Taguchi' && !isL9 && levelCount !== 2) {
+      errors.push(`${factor.code}: ${config.taguchiArray ?? 'ma trận Taguchi đã chọn'} chỉ hỗ trợ factor 2 mức.`);
+    }
+    if (isL9 && levelCount !== 3) errors.push(`${factor.code}: L9 cần đúng 3 mức.`);
+  });
   if (isOptimal && config.numRuns !== undefined && config.numRuns < minimumFittableRuns) {
     errors.push(`Mô hình ${model} cần tối thiểu ${minimumFittableRuns} run (p=${requiredTerms}) để còn bậc tự do dư.`);
   }
@@ -848,9 +903,6 @@ export function validateDesignSetup(factors: Factor[], config: DoEDesignConfig):
     const array = config.taguchiArray ?? (active.length <= 3 ? 'L4' : active.length <= 7 ? 'L8' : active.length <= 11 ? 'L12' : 'L16');
     const capacity = array === 'L4' ? 3 : array === 'L8' ? 7 : array === 'L9' ? 4 : array === 'L12' ? 11 : 15;
     if (active.length > capacity) errors.push(`${array} chỉ hỗ trợ tối đa ${capacity} factor.`);
-    if (array === 'L9' && active.some((factor) => factor.dataType !== 'quantitative_multilevel')) {
-      warnings.push('L9 là ma trận ba mức; mọi factor nên được khai báo quantitative_multilevel với ba mức hợp lệ.');
-    }
   }
   if ((config.replicates || 1) > 1) warnings.push('Số run hiển thị sẽ tăng theo số lặp lại đã chọn.');
   if ((config.blocks ?? 1) > 1) {

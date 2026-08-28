@@ -1,4 +1,5 @@
 import type { Factor, ModelType } from '../types/qbd';
+import { getConfiguredFactorCodes, getConfiguredFactorLevels, snapFactorCoded } from './doeGenerator';
 
 export type PolynomialModelOrder = 'Linear' | '2FI' | 'Quadratic';
 
@@ -7,6 +8,44 @@ export interface ModelTermDefinition {
   factorCodes: string[];
   power: number[];
   evaluator: (coded: Record<string, number>) => number;
+}
+
+export interface FactorFeatureDefinition {
+  name: string;
+  factorCode: string;
+  categorical: boolean;
+  evaluator: (coded: Record<string, number>) => number;
+}
+
+/**
+ * Numerical model features. Nominal factors use treatment contrasts (L-1
+ * columns, first level is reference); numeric factors retain one physical
+ * coded coordinate.
+ */
+export function buildFactorFeatures(factors: Factor[]): FactorFeatureDefinition[] {
+  return factors.flatMap<FactorFeatureDefinition>((factor): FactorFeatureDefinition[] => {
+    if (factor.dataType !== 'qualitative') {
+      return [{
+        name: factor.code,
+        factorCode: factor.code,
+        categorical: false,
+        evaluator: (coded: Record<string, number>) => coded[factor.code] ?? 0,
+      }];
+    }
+    const levels = getConfiguredFactorLevels(factor);
+    const codes = getConfiguredFactorCodes(factor);
+    if (levels.length < 2) return [];
+    return levels.slice(1).map((level, offset) => {
+      const levelIndex = offset + 1;
+      return {
+        name: `${factor.code}[${String(level)}]`,
+        factorCode: factor.code,
+        categorical: true,
+        evaluator: (coded: Record<string, number>) =>
+          Math.abs(snapFactorCoded(coded[factor.code] ?? codes[0], factor) - codes[levelIndex]) < 1e-8 ? 1 : 0,
+      };
+    });
+  });
 }
 
 export const isMixtureFactor = (factor: Factor): boolean =>
@@ -32,16 +71,17 @@ export function buildModelTerms(
     terms.push({ name: 'Intercept', factorCodes: [], power: [], evaluator: () => 1 });
   }
 
+  const factorFeatures = factors.map((factor) => buildFactorFeatures([factor]));
   factors.forEach((factor, index) => {
     if (hasMixture && !mixtureIndexes.includes(index)) return;
     const power = new Array(k).fill(0);
     power[index] = 1;
-    terms.push({
-      name: factor.code,
+    factorFeatures[index].forEach((feature) => terms.push({
+      name: feature.name,
       factorCodes: [factor.code],
-      power,
-      evaluator: (coded) => coded[factor.code] ?? 0,
-    });
+      power: [...power],
+      evaluator: feature.evaluator,
+    }));
   });
 
   // A first-order mixture-process model represents process effects through
@@ -55,12 +95,12 @@ export function buildModelTerms(
         power[processIndex] = 1;
         const mixtureCode = factors[mixtureIndex].code;
         const processCode = factors[processIndex].code;
-        terms.push({
-          name: `${mixtureCode}*${processCode}`,
+        factorFeatures[processIndex].forEach((feature) => terms.push({
+          name: `${mixtureCode}*${feature.name}`,
           factorCodes: [mixtureCode, processCode],
-          power,
-          evaluator: (coded) => (coded[mixtureCode] ?? 0) * (coded[processCode] ?? 0),
-        });
+          power: [...power],
+          evaluator: (coded) => (coded[mixtureCode] ?? 0) * feature.evaluator(coded),
+        }));
       }
     }
   }
@@ -73,19 +113,19 @@ export function buildModelTerms(
         power[j] = 1;
         const firstCode = factors[i].code;
         const secondCode = factors[j].code;
-        terms.push({
-          name: `${firstCode}*${secondCode}`,
+        factorFeatures[i].forEach((firstFeature) => factorFeatures[j].forEach((secondFeature) => terms.push({
+          name: `${firstFeature.name}*${secondFeature.name}`,
           factorCodes: [firstCode, secondCode],
-          power,
-          evaluator: (coded) => (coded[firstCode] ?? 0) * (coded[secondCode] ?? 0),
-        });
+          power: [...power],
+          evaluator: (coded) => firstFeature.evaluator(coded) * secondFeature.evaluator(coded),
+        })));
       }
     }
   }
 
   if (modelType === 'Quadratic' || modelType === 'Reduced') {
     for (let index = 0; index < k; index++) {
-      if (mixtureIndexes.includes(index)) continue;
+      if (mixtureIndexes.includes(index) || factors[index].dataType === 'qualitative') continue;
       const power = new Array(k).fill(0);
       power[index] = 2;
       const code = factors[index].code;

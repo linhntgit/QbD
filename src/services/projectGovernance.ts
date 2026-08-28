@@ -98,8 +98,13 @@ export function validateProjectTemplate(project: QBDProject): ProjectValidationR
     if (factor.controllability !== 'constant' && factor.dataType !== 'qualitative' && factor.high <= factor.low) {
       errors.push(`${factor.code}: cận trên phải lớn hơn cận dưới.`);
     }
-    if (factor.dataType === 'qualitative' && (factor.categories?.length ?? 0) > 2) {
-      errors.push(`${factor.code}: categorical nhiều hơn hai mức chưa có one-hot/effect coding; không thể dùng để tạo mô hình hoặc xuất báo cáo khoa học.`);
+    if ((factor.dataType === 'qualitative' || factor.dataType === 'quantitative_multilevel')) {
+      const levels = (factor.categories ?? []).map((level) => level.trim()).filter(Boolean);
+      if (levels.length < 2 || levels.length > 10) errors.push(`${factor.code}: phải khai báo từ 2 đến 10 mức.`);
+      if (new Set(levels).size !== levels.length) errors.push(`${factor.code}: các mức không được trùng nhau.`);
+      if (factor.dataType === 'quantitative_multilevel' && new Set(levels.map(Number)).size !== levels.length) {
+        errors.push(`${factor.code}: các mức định lượng không được trùng nhau về giá trị.`);
+      }
     }
   });
   const cqaCodes = new Set<string>();
@@ -140,7 +145,9 @@ export function validateProjectTemplate(project: QBDProject): ProjectValidationR
       }
       if (!Number.isFinite(coded)) errors.push(`${runLabel}: ${factor.code} thiếu/không hợp lệ ở coded scale.`);
       if (typeof actual !== 'number' || !Number.isFinite(actual)) errors.push(`${runLabel}: ${factor.code} thiếu/không hợp lệ ở actual scale.`);
-      else if (actual < factor.low - 1e-8 || actual > factor.high + 1e-8) errors.push(`${runLabel}: ${factor.code} nằm ngoài dải khảo sát.`);
+      else if (factor.dataType === 'quantitative_multilevel' && factor.categories?.length && !factor.categories.some((level) => Number(level) === actual)) {
+        errors.push(`${runLabel}: ${factor.code} có mức '${actual}' ngoài các mức định lượng đã khai báo.`);
+      } else if (actual < factor.low - 1e-8 || actual > factor.high + 1e-8) errors.push(`${runLabel}: ${factor.code} nằm ngoài dải khảo sát.`);
     });
 
     if (mixture.length >= 2) {

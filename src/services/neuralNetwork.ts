@@ -16,13 +16,20 @@ import {
   calculateCarpenterArchitecture,
 } from './mathUtils';
 import { projectToBoundedMixture, isWithinSurveyBounds, isFeasibleBoundedMixture } from './statistics';
+import { buildFactorFeatures } from './modelTerms';
+import { getConfiguredFactorCodes, isDiscreteFactor } from './doeGenerator';
 
 /** Draw and perturb points only inside the physically feasible mixture simplex.
  * Non-mixture inputs retain their coded [-1, 1] survey range. */
 function sampleFeasibleSensitivityPoint(factors: Factor[], rng: () => number): number[] {
-  const point = factors.map((factor) =>
-    factor.role === 'mixture_component' || factor.type === 'Mixture' ? 0 : rng() * 2 - 1,
-  );
+  const point = factors.map((factor) => {
+    if (factor.role === 'mixture_component' || factor.type === 'Mixture') return 0;
+    if (isDiscreteFactor(factor)) {
+      const codes = getConfiguredFactorCodes(factor);
+      return codes[Math.min(codes.length - 1, Math.floor(rng() * codes.length))] ?? 0;
+    }
+    return rng() * 2 - 1;
+  });
   const mixtureIndexes = factors
     .map((factor, index) => (factor.role === 'mixture_component' || factor.type === 'Mixture' ? index : -1))
     .filter((index) => index >= 0);
@@ -53,6 +60,14 @@ function perturbFeasibleSensitivityPoint(
   const factor = factors[index];
   const isMixture = factor.role === 'mixture_component' || factor.type === 'Mixture';
   if (!isMixture) {
+    if (isDiscreteFactor(factor)) {
+      const codes = getConfiguredFactorCodes(factor);
+      const currentIndex = codes.reduce((best, code, candidateIndex) =>
+        Math.abs(code - point[index]) < Math.abs(codes[best] - point[index]) ? candidateIndex : best, 0);
+      const nextIndex = currentIndex < codes.length - 1 ? currentIndex + 1 : Math.max(0, currentIndex - 1);
+      perturbed[index] = codes[nextIndex] ?? point[index];
+      return perturbed;
+    }
     perturbed[index] = Math.max(-1, Math.min(1, perturbed[index] + delta));
     return perturbed;
   }
@@ -233,7 +248,8 @@ export function fitNeuralNetModel(
   if (cqa.dataType === 'qualitative_binary' || cqa.objective === 'pass_category') return null;
   const config: NeuralNetConfig = { ...DEFAULT_NEURAL_CONFIG, ...userConfig };
   const activeFactors = factors.filter((f) => f.controllability !== 'constant');
-  const numInputs = activeFactors.length;
+  const inputFeatures = buildFactorFeatures(activeFactors);
+  const numInputs = inputFeatures.length;
 
   if (numInputs === 0) return null;
 
@@ -254,7 +270,7 @@ export function fitNeuralNetModel(
   const validData = runs
     .map((r) => ({
       run: r,
-      x: activeFactors.map((f) => r.factorCoded[f.code] ?? 0),
+      x: inputFeatures.map((feature) => feature.evaluator(r.factorCoded)),
       y: parseResponse(r.responses[cqa.code]),
     }))
     .filter((d): d is { run: DoERun; x: number[]; y: number } => d.y !== null);
@@ -632,7 +648,7 @@ export function fitNeuralNetModel(
 
   // 4. Create Evaluation / Prediction Function using optimal weights
   const { W1, b1, W2, b2, WOut, bOut } = bestGlobalWeights;
-  const inputCodes = activeFactors.map((f) => f.code);
+  const inputCodes = inputFeatures.map((feature) => feature.name);
   const lastHidden = hasLayer2 ? h2 : h1;
 
   const predictNorm = (xVector: number[]): number => {
@@ -663,7 +679,7 @@ export function fitNeuralNetModel(
   };
 
   const predict = (coded: Record<string, number>): number => {
-    const xVec = inputCodes.map((code) => coded[code] ?? 0);
+    const xVec = inputFeatures.map((feature) => feature.evaluator(coded));
     const pNorm = predictNorm(xVec);
     return pNorm * ySd + yMean;
   };
@@ -733,19 +749,28 @@ export function fitNeuralNetModel(
 
   // 6. Independent Variable Importance / Sensitivity Analysis
   // Compute mean absolute gradient or perturbation response across grid
-  const rawSensitivities: number[] = new Array(numInputs).fill(0);
+  const rawSensitivities: number[] = new Array(activeFactors.length).fill(0);
   const numGrid = 200;
   const rngSens = createRNG(12345);
 
   for (let s = 0; s < numGrid; s++) {
     const baseCoded = sampleFeasibleSensitivityPoint(activeFactors, rngSens);
-    const basePred = predictNorm(baseCoded);
+    const basePoint = activeFactors.reduce<Record<string, number>>((point, factor, index) => {
+      point[factor.code] = baseCoded[index];
+      return point;
+    }, {});
+    const basePred = predict(basePoint);
     const delta = 0.01;
 
-    for (let j = 0; j < numInputs; j++) {
+    for (let j = 0; j < activeFactors.length; j++) {
       const perturbed = perturbFeasibleSensitivityPoint(baseCoded, j, activeFactors, delta);
-      const perturbedPred = predictNorm(perturbed);
-      const grad = Math.abs((perturbedPred - basePred) / delta);
+      const perturbedPoint = activeFactors.reduce<Record<string, number>>((point, factor, index) => {
+        point[factor.code] = perturbed[index];
+        return point;
+      }, {});
+      const perturbedPred = predict(perturbedPoint);
+      const effectiveDelta = Math.max(1e-8, Math.abs(perturbed[j] - baseCoded[j]));
+      const grad = Math.abs((perturbedPred - basePred) / effectiveDelta);
       rawSensitivities[j] += grad;
     }
   }
@@ -882,10 +907,11 @@ export function fitMultiOutputNeuralNet(
   runs: DoERun[],
   userConfig: Partial<NeuralNetConfig> = {}
 ): Record<string, NeuralNetModelResult> {
-  if (cqas.some((cqa) => cqa.dataType === 'qualitative_binary' || cqa.objective === 'pass_category')) return {};
+  cqas = cqas.filter((cqa) => cqa.dataType !== 'qualitative_binary' && cqa.objective !== 'pass_category');
   const config: NeuralNetConfig = { ...DEFAULT_NEURAL_CONFIG, ...userConfig };
   const activeFactors = factors.filter((f) => f.controllability !== 'constant');
-  const numInputs = activeFactors.length;
+  const inputFeatures = buildFactorFeatures(activeFactors);
+  const numInputs = inputFeatures.length;
   const numOutputs = cqas.length;
 
   if (numInputs === 0 || numOutputs === 0) return {};
@@ -906,7 +932,7 @@ export function fitMultiOutputNeuralNet(
   // Filter runs where at least one CQA is valid
   const validData = runs
     .map((r) => {
-      const x = activeFactors.map((f) => r.factorCoded[f.code] ?? 0);
+      const x = inputFeatures.map((feature) => feature.evaluator(r.factorCoded));
       const yArr = cqas.map((cqa) => parseResponse(r.responses[cqa.code]));
       return { run: r, x, yArr };
     })
@@ -1334,7 +1360,7 @@ export function fitMultiOutputNeuralNet(
   // Extract individual NeuralNetModelResult for each CQA
   const results: Record<string, NeuralNetModelResult> = {};
   const { W1, b1, W2, b2, WOut, bOut } = bestGlobalWeights;
-  const inputCodes = activeFactors.map((f) => f.code);
+  const inputCodes = inputFeatures.map((feature) => feature.name);
   const valSet = new Set(bestGlobalSplit.valIdx);
 
   cqas.forEach((cqa, cIdx) => {
@@ -1369,7 +1395,7 @@ export function fitMultiOutputNeuralNet(
     };
 
     const predict = (coded: Record<string, number>): number => {
-      const xVec = inputCodes.map((code) => coded[code] ?? 0);
+      const xVec = inputFeatures.map((feature) => feature.evaluator(coded));
       const pNorm = predictNorm(xVec);
       return pNorm * ySd + yMean;
     };
@@ -1441,17 +1467,26 @@ export function fitMultiOutputNeuralNet(
     const maeOverall = overallSAE / Math.max(1, nCqaTotal);
 
     // Variable Sensitivity for this CQA
-    const rawSensitivities: number[] = new Array(numInputs).fill(0);
+    const rawSensitivities: number[] = new Array(activeFactors.length).fill(0);
     const numGrid = 200;
     const rngSens = createRNG(12345 + cIdx * 77);
 
     for (let s = 0; s < numGrid; s++) {
       const baseCoded = sampleFeasibleSensitivityPoint(activeFactors, rngSens);
-      const basePred = predictNorm(baseCoded);
+      const basePoint = activeFactors.reduce<Record<string, number>>((point, factor, index) => {
+        point[factor.code] = baseCoded[index];
+        return point;
+      }, {});
+      const basePred = predict(basePoint);
       const delta = 0.01;
-      for (let k = 0; k < numInputs; k++) {
+      for (let k = 0; k < activeFactors.length; k++) {
         const perturbed = perturbFeasibleSensitivityPoint(baseCoded, k, activeFactors, delta);
-        const diff = Math.abs(predictNorm(perturbed) - basePred) / delta;
+        const perturbedPoint = activeFactors.reduce<Record<string, number>>((point, factor, index) => {
+          point[factor.code] = perturbed[index];
+          return point;
+        }, {});
+        const effectiveDelta = Math.max(1e-8, Math.abs(perturbed[k] - baseCoded[k]));
+        const diff = Math.abs(predict(perturbedPoint) - basePred) / effectiveDelta;
         rawSensitivities[k] += diff;
       }
     }

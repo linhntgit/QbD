@@ -20,7 +20,7 @@ import type {
   Factor,
 } from '../../types/qbd';
 import { PlotlyChart } from '../PlotlyChart';
-import { codedToActual, actualToCoded } from '../../services/doeGenerator';
+import { codedToActual, actualToCoded, getConfiguredFactorCodes, getConfiguredFactorLevels, getFactorGridCodes, isDiscreteFactor } from '../../services/doeGenerator';
 import { formatAxisTitle, extract2DContourSegments, calculateCQAMargin } from '../../services/mathUtils';
 import { optimizeDesirability } from '../../services/statistics';
 import { generateTernaryContour, buildTernaryPlotlyData } from '../../services/ternaryContour';
@@ -83,16 +83,14 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
       setTernaryA(mixtureFactors[0].code);
       setTernaryB(mixtureFactors[1].code);
       setTernaryC(mixtureFactors[2].code);
-    } else if (factors.length >= 3) {
-      setTernaryA(factors[0].code);
-      setTernaryB(factors[1].code);
-      setTernaryC(factors[2].code);
     }
   }, [project.id, factors, mixtureFactors]);
 
   // Ternary Contour Options
   const [ternaryDisplayMode, setTernaryDisplayMode] = useState<'both' | 'lines_only' | 'heatmap'>('both');
   const [ternaryLevels, setTernaryLevels] = useState<number>(12);
+  const [contourLineWidth, setContourLineWidth] = useState<number>(1.5);
+  const [showContourLabels, setShowContourLabels] = useState<boolean>(true);
   const [showDoERuns, setShowDoERuns] = useState<boolean>(true);
   const [showOptimum, setShowOptimum] = useState<boolean>(true);
   const [showConstraints, setShowConstraints] = useState<boolean>(true);
@@ -171,35 +169,37 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
   const surfaceGrid = useMemo(() => {
     if (hasMixture || !model || !factorX || !factorY) return null;
 
-    const N = 35; // 35x35 resolution
-    const xCodedArr: number[] = [];
-    const yCodedArr: number[] = [];
+    const xCodedArr = getFactorGridCodes(factorX, 35);
+    const yCodedArr = getFactorGridCodes(factorY, 35);
     const xActualArr: number[] = [];
     const yActualArr: number[] = [];
+    const xDisplayArr: Array<number | string> = [];
+    const yDisplayArr: Array<number | string> = [];
 
-    for (let i = 0; i < N; i++) {
-      const coded = -1.0 + (2.0 * i) / (N - 1);
-      xCodedArr.push(coded);
-      yCodedArr.push(coded);
-      const xAct = codedToActual(coded, factorX);
-      const yAct = codedToActual(coded, factorY);
-      xActualArr.push(typeof xAct === 'number' ? xAct : Number(xAct) || coded);
-      yActualArr.push(typeof yAct === 'number' ? yAct : Number(yAct) || coded);
-    }
+    xCodedArr.forEach((coded, index) => {
+      const actual = codedToActual(coded, factorX);
+      xDisplayArr.push(actual);
+      xActualArr.push(typeof actual === 'number' ? actual : index);
+    });
+    yCodedArr.forEach((coded, index) => {
+      const actual = codedToActual(coded, factorY);
+      yDisplayArr.push(actual);
+      yActualArr.push(typeof actual === 'number' ? actual : index);
+    });
 
     const zGrid: number[][] = [];
-    const hoverX: number[] = [];
-    const hoverY: number[] = [];
+    const hoverX: Array<number | string> = [];
+    const hoverY: Array<number | string> = [];
     const hoverText: string[] = [];
 
-    for (let j = 0; j < N; j++) {
+    for (let j = 0; j < yCodedArr.length; j++) {
       const row: number[] = [];
       const yCoded = yCodedArr[j];
-      const yAct = yActualArr[j];
+      const yAct = yDisplayArr[j];
 
-      for (let i = 0; i < N; i++) {
+      for (let i = 0; i < xCodedArr.length; i++) {
         const xCoded = xCodedArr[i];
-        const xAct = xActualArr[i];
+        const xAct = xDisplayArr[i];
         const pointCoded: Record<string, number> = { ...fixedFactorCoded };
         pointCoded[factorX.code] = xCoded;
         pointCoded[factorY.code] = yCoded;
@@ -243,6 +243,8 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
       hoverX,
       hoverY,
       hoverText,
+      xDisplayArr,
+      yDisplayArr,
     };
   }, [hasMixture, model, factorX, factorY, fixedFactorCoded, currentCQA]);
 
@@ -307,6 +309,8 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
         showSpecLimits,
         ternaryLevels,
         smoothness: ternarySmoothness,
+        contourLineWidth,
+        showContourLabels,
       }
     );
     plotlyData = ternaryPlotly.traces;
@@ -338,11 +342,12 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
             project: { z: true },
           },
         },
+        line: { width: contourLineWidth },
         hoverinfo: 'x+y+z',
       });
 
       // 3D Spec Limit Horizontal Planes & Intersection Curves
-      if (showSpecLimits) {
+      if (showSpecLimits && !isDiscreteFactor(factorX) && !isDiscreteFactor(factorY)) {
         const xMin = surfaceGrid.xActualArr[0];
         const xMax = surfaceGrid.xActualArr[surfaceGrid.xActualArr.length - 1];
         const yMin = surfaceGrid.yActualArr[0];
@@ -435,7 +440,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
         }
 
         // Target Plane
-        if (currentCQA.target !== undefined && currentCQA.objective === 'target') {
+        if (currentCQA.target !== undefined) {
           const T = currentCQA.target;
           traces.push({
             type: 'surface',
@@ -460,11 +465,12 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
     } else {
       // 2D Contour
       traces.push({
-        type: 'contour',
+        type: isDiscreteFactor(factorX) || isDiscreteFactor(factorY) ? 'heatmap' : 'contour',
         x: surfaceGrid.xActualArr,
         y: surfaceGrid.yActualArr,
         z: surfaceGrid.zGrid,
         colorscale: colorScale,
+        ncontours: ternaryLevels,
         colorbar: {
           title: {
             text: `${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
@@ -476,9 +482,10 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
         },
         contours: {
           coloring: 'heatmap',
-          showlabels: true,
+          showlabels: showContourLabels,
           labelfont: { family: 'Inter', size: 12, color: 'white' },
         },
+        line: { width: contourLineWidth, color: '#334155' },
         hoverinfo: 'none',
       });
 
@@ -502,7 +509,29 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
       }
 
       // 2D Spec Limit Isolines
-      if (showSpecLimits) {
+      if (showSpecLimits && !isDiscreteFactor(factorX) && !isDiscreteFactor(factorY)) {
+        const addSpecLabel = (
+          segments: Array<{ x1: number; x2: number; y1: number; y2: number }>,
+          text: string,
+          color: string
+        ) => {
+          const segment = segments.reduce((longest, candidate) => {
+            const candidateLength = (candidate.x2 - candidate.x1) ** 2 + (candidate.y2 - candidate.y1) ** 2;
+            const longestLength = (longest.x2 - longest.x1) ** 2 + (longest.y2 - longest.y1) ** 2;
+            return candidateLength > longestLength ? candidate : longest;
+          }, segments[0]);
+          traces.push({
+            type: 'scatter',
+            mode: 'text',
+            x: [(segment.x1 + segment.x2) / 2],
+            y: [(segment.y1 + segment.y2) / 2],
+            text: [text],
+            textposition: 'middle center',
+            textfont: { family: 'Inter', size: 11, color },
+            hoverinfo: 'skip',
+            showlegend: false,
+          });
+        };
         if (currentCQA.lowerLimit !== undefined) {
           const LSL = currentCQA.lowerLimit;
           const lslSegs = extract2DContourSegments(
@@ -518,10 +547,11 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
               name: `🔴 Giới Hạn Dưới (LSL = ${LSL} ${currentCQA.unit || ''})`,
               x: lslSegs.flatMap((s) => [s.x1, s.x2, null]),
               y: lslSegs.flatMap((s) => [s.y1, s.y2, null]),
-              line: { color: '#dc2626', width: 3.2, dash: 'dash' },
+              line: { color: '#dc2626', width: contourLineWidth + 1, dash: 'dash' },
               hoverinfo: 'name',
               showlegend: true,
             });
+            if (showContourLabels) addSpecLabel(lslSegs, `LSL: ${LSL}`, '#dc2626');
           }
         }
 
@@ -540,14 +570,15 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
               name: `🔴 Giới Hạn Trên (USL = ${USL} ${currentCQA.unit || ''})`,
               x: uslSegs.flatMap((s) => [s.x1, s.x2, null]),
               y: uslSegs.flatMap((s) => [s.y1, s.y2, null]),
-              line: { color: '#b91c1c', width: 3.2, dash: 'dash' },
+              line: { color: '#b91c1c', width: contourLineWidth + 1, dash: 'dash' },
               hoverinfo: 'name',
               showlegend: true,
             });
+            if (showContourLabels) addSpecLabel(uslSegs, `USL: ${USL}`, '#b91c1c');
           }
         }
 
-        if (currentCQA.target !== undefined && currentCQA.objective === 'target') {
+        if (currentCQA.target !== undefined) {
           const T = currentCQA.target;
           const targetSegs = extract2DContourSegments(
             surfaceGrid.xActualArr,
@@ -562,10 +593,11 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
               name: `🟢 Mục Tiêu (Target = ${T} ${currentCQA.unit || ''})`,
               x: targetSegs.flatMap((s) => [s.x1, s.x2, null]),
               y: targetSegs.flatMap((s) => [s.y1, s.y2, null]),
-              line: { color: '#059669', width: 2.6, dash: 'solid' },
+              line: { color: '#059669', width: contourLineWidth + 1, dash: 'solid' },
               hoverinfo: 'name',
               showlegend: true,
             });
+            if (showContourLabels) addSpecLabel(targetSegs, `Target: ${T}`, '#059669');
           }
         }
       }
@@ -587,6 +619,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
             font: { size: 12, color: '#1e293b' },
           },
           tickfont: { size: 10 },
+          ...(factorX.dataType === 'qualitative' ? { tickmode: 'array', tickvals: surfaceGrid.xActualArr, ticktext: surfaceGrid.xDisplayArr.map(String) } : {}),
         },
         yaxis: {
           title: {
@@ -594,6 +627,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
             font: { size: 12, color: '#1e293b' },
           },
           tickfont: { size: 10 },
+          ...(factorY.dataType === 'qualitative' ? { tickmode: 'array', tickvals: surfaceGrid.yActualArr, ticktext: surfaceGrid.yDisplayArr.map(String) } : {}),
         },
         zaxis: {
           title: {
@@ -613,6 +647,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
           standoff: 12,
         },
         tickfont: { size: 11 },
+        ...(factorX.dataType === 'qualitative' ? { tickmode: 'array', tickvals: surfaceGrid.xActualArr, ticktext: surfaceGrid.xDisplayArr.map(String) } : {}),
         automargin: true,
       },
       yaxis: {
@@ -622,6 +657,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
           standoff: 12,
         },
         tickfont: { size: 11 },
+        ...(factorY.dataType === 'qualitative' ? { tickmode: 'array', tickvals: surfaceGrid.yActualArr, ticktext: surfaceGrid.yDisplayArr.map(String) } : {}),
         automargin: true,
       },
     };
@@ -756,6 +792,16 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
               <option value="Turbo">Turbo</option>
             </select>
 
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.72rem', color: '#475569', fontWeight: '600' }}>
+              Độ dày
+              <input type="range" min={0.5} max={4} step={0.5} value={contourLineWidth} onChange={(e) => setContourLineWidth(Number(e.target.value))} style={{ width: '64px', cursor: 'pointer' }} />
+              <span className="font-mono" style={{ color: '#0f766e' }}>{contourLineWidth.toFixed(1)}px</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.72rem', color: '#475569', cursor: 'pointer' }}>
+              <input type="checkbox" checked={showContourLabels} onChange={(e) => setShowContourLabels(e.target.checked)} />
+              Nhãn đường mức
+            </label>
+
             <button
               onClick={onNavigateToDesignSpace}
               className="btn btn-teal"
@@ -798,7 +844,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                     value={ternaryA}
                     onChange={(e) => setTernaryA(e.target.value)}
                   >
-                    {factors.map((f) => (
+                    {mixtureFactors.map((f) => (
                       <option key={f.code} value={f.code} disabled={f.code === ternaryB || f.code === ternaryC}>
                         {f.name} ({f.code}){f.role === 'mixture_component' ? ' [Hỗn hợp]' : ''}
                       </option>
@@ -817,7 +863,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                     value={ternaryB}
                     onChange={(e) => setTernaryB(e.target.value)}
                   >
-                    {factors.map((f) => (
+                    {mixtureFactors.map((f) => (
                       <option key={f.code} value={f.code} disabled={f.code === ternaryA || f.code === ternaryC}>
                         {f.name} ({f.code}){f.role === 'mixture_component' ? ' [Hỗn hợp]' : ''}
                       </option>
@@ -836,7 +882,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                     value={ternaryC}
                     onChange={(e) => setTernaryC(e.target.value)}
                   >
-                    {factors.map((f) => (
+                    {mixtureFactors.map((f) => (
                       <option key={f.code} value={f.code} disabled={f.code === ternaryA || f.code === ternaryB}>
                         {f.name} ({f.code}){f.role === 'mixture_component' ? ' [Hỗn hợp]' : ''}
                       </option>
@@ -1142,6 +1188,22 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                   const isMixture = f.role === 'mixture_component' || f.type === 'Mixture';
 
                   const stepSize = Math.max(0.01, Number(((f.high - f.low) / 100).toFixed(2)));
+
+                  if (isDiscreteFactor(f)) {
+                    const levels = getConfiguredFactorLevels(f);
+                    const codes = getConfiguredFactorCodes(f);
+                    return (
+                      <div key={f.code} style={{ padding: '0.65rem', backgroundColor: '#f8fafc', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
+                        <div style={{ fontWeight: '700', fontSize: '0.8rem', color: '#1e293b', marginBottom: '0.4rem' }}>{f.name} ({f.code})</div>
+                        <select className="input-field" style={{ width: '100%' }} value={String(actual)} onChange={(event) => {
+                          const index = levels.findIndex((level) => String(level) === event.target.value);
+                          handleCodedValueChange(f.code, codes[index] ?? codes[0] ?? 0);
+                        }}>
+                          {levels.map((level) => <option key={String(level)} value={String(level)}>{String(level)} {f.unit}</option>)}
+                        </select>
+                      </div>
+                    );
+                  }
 
                   return (
                     <div

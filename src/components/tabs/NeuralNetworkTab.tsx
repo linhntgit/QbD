@@ -36,7 +36,7 @@ import type {
 } from '../../types/qbd';
 import { PlotlyChart } from '../PlotlyChart';
 import { NeuralNetworkTopologyDiagram } from '../NeuralNetworkTopologyDiagram';
-import { codedToActual } from '../../services/doeGenerator';
+import { codedToActual, getConfiguredFactorCodes, getConfiguredFactorLevels, getFactorGridCodes, isDiscreteFactor } from '../../services/doeGenerator';
 import {
   optimizeNeuralDesirability,
   calculateNeuralArchitectureMetrics,
@@ -196,16 +196,14 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
       setTernaryA(mixtureFactors[0].code);
       setTernaryB(mixtureFactors[1].code);
       setTernaryC(mixtureFactors[2].code);
-    } else if (project.factors.length >= 3) {
-      setTernaryA(project.factors[0].code);
-      setTernaryB(project.factors[1].code);
-      setTernaryC(project.factors[2].code);
     }
   }, [project.id, project.factors, mixtureFactors]);
 
   // Ternary Contour Options
   const [ternaryDisplayMode, setTernaryDisplayMode] = useState<'both' | 'lines_only' | 'heatmap'>('both');
   const [ternaryLevels, setTernaryLevels] = useState<number>(12);
+  const [contourLineWidth, setContourLineWidth] = useState<number>(1.5);
+  const [showContourLabels, setShowContourLabels] = useState<boolean>(true);
   const [showDoERuns, setShowDoERuns] = useState<boolean>(true);
   const [showOptimum, setShowOptimum] = useState<boolean>(true);
   const [showConstraints, setShowConstraints] = useState<boolean>(true);
@@ -231,35 +229,37 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
     // compositions.  Mixture projects are rendered only on the simplex.
     if (hasMixture || !neuralModel || !factorX || !factorY) return null;
 
-    const N = 35;
     const xActualArr: number[] = [];
     const yActualArr: number[] = [];
-    const xCodedArr: number[] = [];
-    const yCodedArr: number[] = [];
+    const xCodedArr = getFactorGridCodes(factorX, 35);
+    const yCodedArr = getFactorGridCodes(factorY, 35);
+    const xDisplayArr: Array<number | string> = [];
+    const yDisplayArr: Array<number | string> = [];
 
-    for (let i = 0; i < N; i++) {
-      const coded = -1.0 + (2.0 * i) / (N - 1);
-      xCodedArr.push(coded);
-      yCodedArr.push(coded);
-      const xAct = codedToActual(coded, factorX);
-      const yAct = codedToActual(coded, factorY);
-      xActualArr.push(typeof xAct === 'number' ? xAct : Number(xAct) || coded);
-      yActualArr.push(typeof yAct === 'number' ? yAct : Number(yAct) || coded);
-    }
+    xCodedArr.forEach((coded, index) => {
+      const actual = codedToActual(coded, factorX);
+      xDisplayArr.push(actual);
+      xActualArr.push(typeof actual === 'number' ? actual : index);
+    });
+    yCodedArr.forEach((coded, index) => {
+      const actual = codedToActual(coded, factorY);
+      yDisplayArr.push(actual);
+      yActualArr.push(typeof actual === 'number' ? actual : index);
+    });
 
     const zGrid: number[][] = [];
-    const hoverX: number[] = [];
-    const hoverY: number[] = [];
+    const hoverX: Array<number | string> = [];
+    const hoverY: Array<number | string> = [];
     const hoverText: string[] = [];
 
-    for (let j = 0; j < N; j++) {
+    for (let j = 0; j < yCodedArr.length; j++) {
       const row: number[] = [];
       const yCoded = yCodedArr[j];
-      const yAct = yActualArr[j];
+      const yAct = yDisplayArr[j];
 
-      for (let i = 0; i < N; i++) {
+      for (let i = 0; i < xCodedArr.length; i++) {
         const xCoded = xCodedArr[i];
-        const xAct = xActualArr[i];
+        const xAct = xDisplayArr[i];
         const pointCoded: Record<string, number> = { ...profilerCoded };
         pointCoded[factorX.code] = xCoded;
         pointCoded[factorY.code] = yCoded;
@@ -296,7 +296,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
       zGrid.push(row);
     }
 
-    return { xActualArr, yActualArr, zGrid, hoverX, hoverY, hoverText };
+    return { xActualArr, yActualArr, zGrid, hoverX, hoverY, hoverText, xDisplayArr, yDisplayArr };
   }, [hasMixture, neuralModel, factorX, factorY, profilerCoded, currentCQA]);
 
   // Ternary Mesh & Contour Calculation for Neural Model
@@ -350,6 +350,8 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           showSpecLimits,
           ternaryLevels,
           smoothness: ternarySmoothness,
+          contourLineWidth,
+          showContourLabels,
         }
       );
       return traces;
@@ -381,7 +383,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
       });
 
       // 3D Spec Limit Horizontal Planes & Intersection Curves
-      if (showSpecLimits) {
+      if (showSpecLimits && !isDiscreteFactor(factorX) && !isDiscreteFactor(factorY)) {
         const xMin = surfaceGrid.xActualArr[0];
         const xMax = surfaceGrid.xActualArr[surfaceGrid.xActualArr.length - 1];
         const yMin = surfaceGrid.yActualArr[0];
@@ -474,7 +476,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
         }
 
         // Target Plane
-        if (currentCQA.target !== undefined && currentCQA.objective === 'target') {
+        if (currentCQA.target !== undefined) {
           const T = currentCQA.target;
           traces.push({
             type: 'surface',
@@ -499,11 +501,12 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
     } else {
       // 2D Contour
       traces.push({
-        type: 'contour',
+        type: isDiscreteFactor(factorX) || isDiscreteFactor(factorY) ? 'heatmap' : 'contour',
         x: surfaceGrid.xActualArr,
         y: surfaceGrid.yActualArr,
         z: surfaceGrid.zGrid,
         colorscale: colorScale,
+        ncontours: ternaryLevels,
         colorbar: {
           title: {
             text: `${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
@@ -513,7 +516,8 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           len: 0.85,
           thickness: 18,
         },
-        contours: { coloring: 'heatmap', showlabels: true },
+        contours: { coloring: 'heatmap', showlabels: showContourLabels },
+        line: { width: contourLineWidth, color: '#334155' },
         hoverinfo: 'none',
       });
 
@@ -537,7 +541,29 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
       }
 
       // 2D Spec Limit Isolines
-      if (showSpecLimits) {
+      if (showSpecLimits && !isDiscreteFactor(factorX) && !isDiscreteFactor(factorY)) {
+        const addSpecLabel = (
+          segments: Array<{ x1: number; x2: number; y1: number; y2: number }>,
+          text: string,
+          color: string
+        ) => {
+          const segment = segments.reduce((longest, candidate) => {
+            const candidateLength = (candidate.x2 - candidate.x1) ** 2 + (candidate.y2 - candidate.y1) ** 2;
+            const longestLength = (longest.x2 - longest.x1) ** 2 + (longest.y2 - longest.y1) ** 2;
+            return candidateLength > longestLength ? candidate : longest;
+          }, segments[0]);
+          traces.push({
+            type: 'scatter',
+            mode: 'text',
+            x: [(segment.x1 + segment.x2) / 2],
+            y: [(segment.y1 + segment.y2) / 2],
+            text: [text],
+            textposition: 'middle center',
+            textfont: { family: 'Inter', size: 11, color },
+            hoverinfo: 'skip',
+            showlegend: false,
+          });
+        };
         if (currentCQA.lowerLimit !== undefined) {
           const LSL = currentCQA.lowerLimit;
           const lslSegs = extract2DContourSegments(
@@ -553,10 +579,11 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               name: `🔴 Giới Hạn Dưới (LSL = ${LSL} ${currentCQA.unit || ''})`,
               x: lslSegs.flatMap((s) => [s.x1, s.x2, null]),
               y: lslSegs.flatMap((s) => [s.y1, s.y2, null]),
-              line: { color: '#dc2626', width: 3.2, dash: 'dash' },
+              line: { color: '#dc2626', width: contourLineWidth + 1, dash: 'dash' },
               hoverinfo: 'name',
               showlegend: true,
             });
+            if (showContourLabels) addSpecLabel(lslSegs, `LSL: ${LSL}`, '#dc2626');
           }
         }
 
@@ -575,14 +602,15 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               name: `🔴 Giới Hạn Trên (USL = ${USL} ${currentCQA.unit || ''})`,
               x: uslSegs.flatMap((s) => [s.x1, s.x2, null]),
               y: uslSegs.flatMap((s) => [s.y1, s.y2, null]),
-              line: { color: '#b91c1c', width: 3.2, dash: 'dash' },
+              line: { color: '#b91c1c', width: contourLineWidth + 1, dash: 'dash' },
               hoverinfo: 'name',
               showlegend: true,
             });
+            if (showContourLabels) addSpecLabel(uslSegs, `USL: ${USL}`, '#b91c1c');
           }
         }
 
-        if (currentCQA.target !== undefined && currentCQA.objective === 'target') {
+        if (currentCQA.target !== undefined) {
           const T = currentCQA.target;
           const targetSegs = extract2DContourSegments(
             surfaceGrid.xActualArr,
@@ -597,10 +625,11 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               name: `🟢 Mục Tiêu (Target = ${T} ${currentCQA.unit || ''})`,
               x: targetSegs.flatMap((s) => [s.x1, s.x2, null]),
               y: targetSegs.flatMap((s) => [s.y1, s.y2, null]),
-              line: { color: '#059669', width: 2.6, dash: 'solid' },
+              line: { color: '#059669', width: contourLineWidth + 1, dash: 'solid' },
               hoverinfo: 'name',
               showlegend: true,
             });
+            if (showContourLabels) addSpecLabel(targetSegs, `Target: ${T}`, '#059669');
           }
         }
       }
@@ -628,6 +657,8 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
     factorY,
     ternaryLevels,
     ternarySmoothness,
+    contourLineWidth,
+    showContourLabels,
   ]);
 
   const surfaceLayout = useMemo(() => {
@@ -670,6 +701,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             font: { size: 12, color: '#1e293b' },
           },
           tickfont: { size: 10 },
+          ...(factorX?.dataType === 'qualitative' && surfaceGrid ? { tickmode: 'array', tickvals: surfaceGrid.xActualArr, ticktext: surfaceGrid.xDisplayArr.map(String) } : {}),
         },
         yaxis: {
           title: {
@@ -677,6 +709,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             font: { size: 12, color: '#1e293b' },
           },
           tickfont: { size: 10 },
+          ...(factorY?.dataType === 'qualitative' && surfaceGrid ? { tickmode: 'array', tickvals: surfaceGrid.yActualArr, ticktext: surfaceGrid.yDisplayArr.map(String) } : {}),
         },
         zaxis: {
           title: {
@@ -694,6 +727,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           standoff: 12,
         },
         tickfont: { size: 11 },
+        ...(factorX?.dataType === 'qualitative' && surfaceGrid ? { tickmode: 'array', tickvals: surfaceGrid.xActualArr, ticktext: surfaceGrid.xDisplayArr.map(String) } : {}),
         automargin: true,
       },
       yaxis: {
@@ -703,6 +737,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           standoff: 12,
         },
         tickfont: { size: 11 },
+        ...(factorY?.dataType === 'qualitative' && surfaceGrid ? { tickmode: 'array', tickvals: surfaceGrid.yActualArr, ticktext: surfaceGrid.yDisplayArr.map(String) } : {}),
         automargin: true,
       },
     };
@@ -723,6 +758,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
     showRegionPolygon,
     factorX,
     factorY,
+    surfaceGrid,
   ]);
 
   // Keep local config in sync when switching CQA or training mode
@@ -2113,22 +2149,25 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                 const mixtureRange = isMixtureFactor ? getFeasibleMixtureComponentRange(project.factors, f.code) : null;
                 const traceLow = isMixtureFactor ? (mixtureRange?.low ?? 0) : -1;
                 const traceHigh = isMixtureFactor ? (mixtureRange?.high ?? 1) : 1;
+                const traceCodes = isDiscreteFactor(f)
+                  ? getFactorGridCodes(f, 21)
+                  : Array.from({ length: 21 }, (_, step) => traceLow + ((traceHigh - traceLow) * step) / 20);
 
                 // Compute 1D sensitivity trace curve for this factor
-                const traceSteps = 21;
                 const xTraceActual: number[] = [];
+                const xTraceDisplay: Array<number | string> = [];
                 const yTracePred: number[] = [];
 
-                for (let step = 0; step < traceSteps; step++) {
-                  const c = traceLow + ((traceHigh - traceLow) * step) / (traceSteps - 1);
+                traceCodes.forEach((c, step) => {
                   const actVal = codedToActual(c, f);
-                  xTraceActual.push(typeof actVal === 'number' ? actVal : Number(actVal) || c);
+                  xTraceDisplay.push(actVal);
+                  xTraceActual.push(typeof actVal === 'number' ? actVal : step);
 
                   const tempCoded = isMixtureFactor
                     ? setBoundedMixtureComponent(profilerCoded, project.factors, f.code, c)
                     : { ...profilerCoded, [f.code]: c };
                   yTracePred.push(neuralModel.predict(tempCoded));
-                }
+                });
 
                 const tracePlotData: any[] = [
                   {
@@ -2166,6 +2205,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                       standoff: 6,
                     },
                     tickfont: { size: 9 },
+                    ...(f.dataType === 'qualitative' ? { tickmode: 'array', tickvals: xTraceActual, ticktext: xTraceDisplay.map(String) } : {}),
                     showgrid: true,
                     gridcolor: '#f1f5f9',
                   },
@@ -2218,7 +2258,16 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                         </span>
                       </div>
 
-                      <input
+                      {isDiscreteFactor(f) ? (
+                        <select className="input-field" style={{ width: '100%' }} value={String(actual)} onChange={(event) => {
+                          const levels = getConfiguredFactorLevels(f);
+                          const codes = getConfiguredFactorCodes(f);
+                          const index = levels.findIndex((level) => String(level) === event.target.value);
+                          setProfilerCoded({ ...profilerCoded, [f.code]: codes[index] ?? codes[0] ?? 0 });
+                        }}>
+                          {getConfiguredFactorLevels(f).map((level) => <option key={String(level)} value={String(level)}>{String(level)} {f.unit}</option>)}
+                        </select>
+                      ) : <input
                         type="range"
                         min={traceLow}
                         max={traceHigh}
@@ -2231,7 +2280,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                             : { ...profilerCoded, [f.code]: nextValue });
                         }}
                         style={{ width: '100%', cursor: 'pointer' }}
-                      />
+                      />}
 
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#94a3b8' }}>
                         <span>{codedToActual(traceLow, f)} {f.unit}</span>
@@ -2304,6 +2353,16 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                   <option value="Jet">Jet</option>
                   <option value="Hot">Hot</option>
                 </select>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.72rem', color: '#475569', fontWeight: '600' }}>
+                  Độ dày
+                  <input type="range" min={0.5} max={4} step={0.5} value={contourLineWidth} onChange={(e) => setContourLineWidth(Number(e.target.value))} style={{ width: '64px', cursor: 'pointer' }} />
+                  <span className="font-mono" style={{ color: '#0f766e' }}>{contourLineWidth.toFixed(1)}px</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.72rem', color: '#475569', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={showContourLabels} onChange={(e) => setShowContourLabels(e.target.checked)} />
+                  Nhãn đường mức
+                </label>
               </div>
             </div>
 
@@ -2332,7 +2391,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                         value={ternaryA}
                         onChange={(e) => setTernaryA(e.target.value)}
                       >
-                        {project.factors.map((f) => (
+                        {mixtureFactors.map((f) => (
                           <option key={f.code} value={f.code} disabled={f.code === ternaryB || f.code === ternaryC}>
                             {f.name} ({f.code})
                           </option>
@@ -2348,7 +2407,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                         value={ternaryB}
                         onChange={(e) => setTernaryB(e.target.value)}
                       >
-                        {project.factors.map((f) => (
+                        {mixtureFactors.map((f) => (
                           <option key={f.code} value={f.code} disabled={f.code === ternaryA || f.code === ternaryC}>
                             {f.name} ({f.code})
                           </option>
@@ -2364,7 +2423,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                         value={ternaryC}
                         onChange={(e) => setTernaryC(e.target.value)}
                       >
-                        {project.factors.map((f) => (
+                        {mixtureFactors.map((f) => (
                           <option key={f.code} value={f.code} disabled={f.code === ternaryA || f.code === ternaryB}>
                             {f.name} ({f.code})
                           </option>
@@ -2443,6 +2502,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                         {ternarySmoothness.toFixed(2)}
                       </span>
                     </div>
+
                   </div>
                 </div>
 

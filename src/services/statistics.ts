@@ -25,7 +25,7 @@ import {
 } from './mathUtils';
 import { buildModelTerms, getModelBlockCounts, type ModelTermDefinition } from './modelTerms';
 import { createSeededRandom } from './random';
-import { codedToActual } from './doeGenerator';
+import { actualToCoded, codedToActual, getConfiguredFactorCodes, isDiscreteFactor, snapFactorCoded } from './doeGenerator';
 
 type TermDef = ModelTermDefinition;
 
@@ -413,6 +413,7 @@ export function fitModel(
   const factorialRuns = validRuns.filter(isFactorialCorner);
   const supportsClassicalCurvature =
     !activeFactors.some((factor) => factor.role === 'mixture_component' || factor.type === 'Mixture') &&
+    !activeFactors.some(isDiscreteFactor) &&
     validRuns.every((item) => isCenterPoint(item) || isFactorialCorner(item));
 
   const nC = centerPointRuns.length;
@@ -802,6 +803,7 @@ export function isWithinSurveyBounds(
       if (c < -1.05 || c > 1.05) {
         return false;
       }
+      if (isDiscreteFactor(f) && Math.abs(snapFactorCoded(c, f) - c) > 1e-6) return false;
     }
   }
   return mixtureCount < 2 || Math.abs(mixtureTotal - 1) <= 1e-6;
@@ -818,8 +820,8 @@ export function optimizeDesirability(
   lockedFactors?: Record<string, number>,
   seed: number = 20260827,
 ): DesirabilitySolution | null {
-  if (cqas.some((c) => !models[c.code])) return null;
-  const validCQAs = cqas;
+  const validCQAs = cqas.filter((cqa) => models[cqa.code]);
+  if (validCQAs.length === 0) return null;
 
   const totalWeight = validCQAs.reduce((sum, c) => sum + (c.weight || 1), 0);
   const random = createSeededRandom(seed);
@@ -876,7 +878,8 @@ export function optimizeDesirability(
     .filter((f) => f.controllability === 'uncontrollable_noise')
     .forEach((f) => { initialCandidate[f.code] = 0; });
   procFactors.forEach((f) => {
-    initialCandidate[f.code] = lockedFactors && lockedFactors[f.code] !== undefined ? lockedFactors[f.code] : 0.0;
+    const requested = lockedFactors && lockedFactors[f.code] !== undefined ? lockedFactors[f.code] : 0.0;
+    initialCandidate[f.code] = isDiscreteFactor(f) ? snapFactorCoded(requested, f) : requested;
   });
 
   if (hasMixture) {
@@ -898,9 +901,13 @@ export function optimizeDesirability(
 
   // 2. High-Density Grid Exploration inside the Survey Bounds [L_i, U_i]
   const gridSteps = k <= 3 ? 18 : (k <= 4 ? 12 : 7);
+  const maxGridEvaluations = 100_000;
+  let gridEvaluations = 0;
 
   const exploreGrid = (factorIdx: number, currentCoded: Record<string, number>) => {
+    if (gridEvaluations >= maxGridEvaluations) return;
     if (factorIdx >= k) {
+      gridEvaluations++;
       let evalCoded = { ...currentCoded };
       if (hasMixture) {
         const rawVals = mixFactors.map((f) => evalCoded[f.code] ?? 0);
@@ -927,10 +934,19 @@ export function optimizeDesirability(
       exploreGrid(factorIdx + 1, currentCoded);
     } else {
       const isMix = factor.role === 'mixture_component' || factor.type === 'Mixture';
+      if (isDiscreteFactor(factor)) {
+        for (const val of getConfiguredFactorCodes(factor)) {
+          if (gridEvaluations >= maxGridEvaluations) break;
+          currentCoded[factor.code] = val;
+          exploreGrid(factorIdx + 1, currentCoded);
+        }
+        return;
+      }
       const lowVal = isMix ? (factor.high <= 1.0 && factor.unit !== '%' ? factor.low : factor.low / 100) : -1.0;
       const highVal = isMix ? (factor.high <= 1.0 && factor.unit !== '%' ? factor.high : factor.high / 100) : 1.0;
 
       for (let step = 0; step < gridSteps; step++) {
+        if (gridEvaluations >= maxGridEvaluations) break;
         const val = lowVal + (step / (gridSteps - 1)) * (highVal - lowVal);
         currentCoded[factor.code] = Number(val.toFixed(4));
         exploreGrid(factorIdx + 1, currentCoded);
@@ -946,7 +962,10 @@ export function optimizeDesirability(
     const candidateCoded: Record<string, number> = {};
     procFactors.forEach((f) => {
       if (lockedFactors && lockedFactors[f.code] !== undefined) {
-        candidateCoded[f.code] = lockedFactors[f.code];
+        candidateCoded[f.code] = isDiscreteFactor(f) ? snapFactorCoded(lockedFactors[f.code], f) : lockedFactors[f.code];
+      } else if (isDiscreteFactor(f)) {
+        const codes = getConfiguredFactorCodes(f);
+        candidateCoded[f.code] = codes[Math.min(codes.length - 1, Math.floor(random() * codes.length))] ?? 0;
       } else {
         const current = bestCoded[f.code] ?? 0;
         const jitter = (random() - 0.5) * 0.25;
@@ -1006,7 +1025,11 @@ export function optimizeDesirability(
     const model = models[cqa.code];
     const val = model.predict(bestCoded);
     const statisticalModel = 'predictStandardError' in model ? model : undefined;
-    const se = statisticalModel?.predictStandardError?.(bestCoded) ?? (model.diagnostics as any).rmseVal ?? (model.diagnostics as any).rmseOverall;
+    const se = statisticalModel?.predictStandardError?.(bestCoded)
+      ?? (model.diagnostics as any).stdDev
+      ?? (model.diagnostics as any).rmseVal
+      ?? (model.diagnostics as any).rmseOverall
+      ?? 0;
     const df = statisticalModel?.residualDegreesOfFreedom;
     const critical = df && df > 0 ? tDistributionCritical(0.05, df) : Number.NaN;
     // Neural-network residual RMSE is not a parameter-estimation CI.  Preserve
@@ -1131,6 +1154,12 @@ export function runMonteCarloSimulation(
 
       if (f.role === 'mixture_component' || f.type === 'Mixture') {
         // Will handle collectively below
+        return;
+      }
+
+      if (isDiscreteFactor(f)) {
+        const selected = setpointActual[f.code] ?? codedToActual(0, f);
+        sampleCoded[f.code] = snapFactorCoded(actualToCoded(selected, f), f);
         return;
       }
 

@@ -102,6 +102,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
   const [activeCell, setActiveCell] = useState<CellCoord | null>(null);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [toastMsg, setToastMsg] = useState<{ text: string; type: 'success' | 'info' } | null>(null);
+  const [isSimulating, setIsSimulating] = useState<boolean>(false);
   const [augmentationRuns, setAugmentationRuns] = useState<number>(4);
 
   const showToast = (text: string, type: 'success' | 'info' = 'success') => {
@@ -856,15 +857,23 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
 
   // Simulate plausible measurements with scientific response-specific constraints.
   const handleAutoSimulateData = () => {
-    if (project.runs.length === 0) return;
-    const seed = project.analysisProvenance?.demoDataSeed ?? stableSeedFromText(project.id, 'demo-data');
-    const random = createSeededRandom(seed);
-    const simulatedRuns = project.runs.map((run) => ({
-      ...run,
-      responses: simulateDemoResponses(project, run, random),
-    }));
-
-    onUpdateProject({ runs: simulatedRuns });
+    if (project.runs.length === 0 || isSimulating) return;
+    setIsSimulating(true);
+    // Give React one paint frame before generating data so the user sees an
+    // immediate busy state even for large multi-level designs.
+    window.setTimeout(() => {
+      try {
+        const seed = project.analysisProvenance?.demoDataSeed ?? stableSeedFromText(project.id, 'demo-data');
+        const random = createSeededRandom(seed);
+        const simulatedRuns = project.runs.map((run) => ({
+          ...run,
+          responses: simulateDemoResponses(project, run, random),
+        }));
+        onUpdateProject({ runs: simulatedRuns });
+      } finally {
+        setIsSimulating(false);
+      }
+    }, 0);
   };
 
   // Parse clipboard text from Textarea
@@ -1647,12 +1656,13 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
             {/* Auto-fill Simulation Demo */}
             <button
               onClick={handleAutoSimulateData}
+              disabled={isSimulating}
               className="btn btn-teal"
               style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem' }}
               title="Tự động sinh số liệu thực nghiệm mô phỏng dựa trên mô hình hóa dược phẩm để test nhanh"
             >
               <Sparkles size={13} />
-              <span>Điền Mô Phỏng</span>
+              <span>{isSimulating ? 'Đang mô phỏng…' : 'Điền Mô Phỏng'}</span>
             </button>
 
             {/* Export Dropdown Menu */}

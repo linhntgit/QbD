@@ -303,8 +303,9 @@ export async function exportQBDWordReport(
       ],
     }),
     ...project.cqas.map((cqa, idx) => {
-      const spec =
-        cqa.lowerLimit !== undefined && cqa.upperLimit !== undefined
+      const spec = cqa.categories?.length
+        ? `Mức: ${cqa.categories.join(', ')}${cqa.targetCategory ? `; đạt: ${cqa.targetCategory}` : ''}`
+        : cqa.lowerLimit !== undefined && cqa.upperLimit !== undefined
           ? `[${cqa.lowerLimit} - ${cqa.upperLimit}]`
           : cqa.lowerLimit !== undefined
           ? `≥ ${cqa.lowerLimit}`
@@ -375,9 +376,9 @@ export async function exportQBDWordReport(
             createDataCell(f.name, idx % 2 === 1, 25),
             createDataCell(`${f.type} • ${roleLabel}`, idx % 2 === 1, 22),
             createDataCell(f.unit || '-', idx % 2 === 1, 8),
-            createDataCell(String(f.low), idx % 2 === 1, 11),
-            createDataCell(f.center !== undefined ? String(f.center) : String((f.low + f.high) / 2), idx % 2 === 1, 12),
-            createDataCell(String(f.high), idx % 2 === 1, 12),
+            createDataCell(f.categories?.length ? f.categories.join(', ') : String(f.low), idx % 2 === 1, 11),
+            createDataCell(f.categories?.length ? '—' : (f.center !== undefined ? String(f.center) : String((f.low + f.high) / 2)), idx % 2 === 1, 12),
+            createDataCell(f.categories?.length ? '—' : String(f.high), idx % 2 === 1, 12),
           ],
         });
       }

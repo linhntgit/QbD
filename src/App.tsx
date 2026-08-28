@@ -60,6 +60,10 @@ export function App() {
   const [neuralTrainingMode, setNeuralTrainingMode] = useState<NeuralTrainingMode>(() => project.analysisSettings?.neuralTrainingMode ?? 'independent');
   const [sharedNeuralConfig, setSharedNeuralConfig] = useState<NeuralNetConfig>(() => project.analysisSettings?.sharedNeuralConfig ?? { ...DEFAULT_NEURAL_CONFIG });
   const [neuralConfigs, setNeuralConfigs] = useState<Record<string, NeuralNetConfig>>(() => project.analysisSettings?.neuralConfigs ?? {});
+  // Neural fitting is computationally expensive.  It is intentionally
+  // triggered only by an explicit Train action, never by editing/filling DoE
+  // data in the normal UI flow.
+  const [neuralTrainingVersion, setNeuralTrainingVersion] = useState(0);
   const [modelingEngine, setModelingEngine] = useState<ModelingEngine>(() => project.analysisSettings?.modelingEngine ?? 'polynomial');
   const [storageWarning, setStorageWarning] = useState<string | null>(null);
   const hasPersistedInitialProject = useRef(false);
@@ -99,6 +103,7 @@ export function App() {
 
   // Calculate Neural Network Models dynamically for all CQAs (Unified Multi-Output or Independent Per-CQA)
   const neuralModels = useMemo<Record<string, NeuralNetModelResult>>(() => {
+    if (neuralTrainingVersion === 0) return {};
     if (neuralTrainingMode === 'shared') {
       return fitMultiOutputNeuralNet(project.cqas, project.factors, project.runs, sharedNeuralConfig);
     }
@@ -111,7 +116,7 @@ export function App() {
       }
     });
     return result;
-  }, [project.cqas, project.factors, project.runs, neuralTrainingMode, sharedNeuralConfig, neuralConfigs]);
+  }, [neuralTrainingVersion, project.cqas, project.factors, project.runs, neuralTrainingMode, sharedNeuralConfig, neuralConfigs]);
 
   // Active Models based on selected Modeling Engine (Polynomial or Neural)
   const activeModels = useMemo<Record<string, StatisticalModelResult | NeuralNetModelResult>>(() => {
@@ -122,6 +127,7 @@ export function App() {
   const handleTrainSharedNeuralModel = (config: NeuralNetConfig) => {
     const next = { ...config, seed: config.seed };
     setSharedNeuralConfig(next);
+    setNeuralTrainingVersion((version) => version + 1);
     persistAnalysisSettings({ sharedNeuralConfig: next, appliedOptimum: undefined });
   };
 
@@ -129,6 +135,7 @@ export function App() {
   const handleTrainIndependentNeuralModel = (cqaCode: string, config: NeuralNetConfig) => {
     const next = { ...neuralConfigs, [cqaCode]: { ...config, seed: config.seed } };
     setNeuralConfigs(next);
+    setNeuralTrainingVersion((version) => version + 1);
     persistAnalysisSettings({ neuralConfigs: next, appliedOptimum: undefined });
   };
 
@@ -140,6 +147,7 @@ export function App() {
       next[cqa.code] = { ...existing, seed: existing.seed };
     });
     setNeuralConfigs(next);
+    setNeuralTrainingVersion((version) => version + 1);
     persistAnalysisSettings({ neuralConfigs: next, appliedOptimum: undefined });
   };
 
@@ -180,8 +188,9 @@ export function App() {
   // Update Project Handler
   const handleUpdateProject = (updated: Partial<QBDProject>) => {
     pendingAuditAction.current = `Cập nhật: ${Object.keys(updated).join(', ')}`;
+    const invalidatesModel = Boolean(updated.factors || updated.cqas || updated.runs);
+    if (invalidatesModel) setNeuralTrainingVersion(0);
     setProject((prev) => {
-      const invalidatesModel = Boolean(updated.factors || updated.cqas || updated.runs);
       const analysisSettings = invalidatesModel
         ? { ...createAnalysisSettings(prev), appliedOptimum: undefined }
         : prev.analysisSettings;
@@ -250,6 +259,7 @@ export function App() {
     setNeuralTrainingMode(normalized.analysisSettings?.neuralTrainingMode ?? 'independent');
     setSharedNeuralConfig(normalized.analysisSettings?.sharedNeuralConfig ?? { ...DEFAULT_NEURAL_CONFIG });
     setNeuralConfigs(normalized.analysisSettings?.neuralConfigs ?? {});
+    setNeuralTrainingVersion(0);
     setModelingEngine(normalized.analysisSettings?.modelingEngine ?? 'polynomial');
     if (newProj.cqas.length > 0) {
       setSelectedCQA(newProj.cqas[0].code);
@@ -334,6 +344,7 @@ export function App() {
     setNeuralTrainingMode('independent');
     setSharedNeuralConfig({ ...DEFAULT_NEURAL_CONFIG });
     setNeuralConfigs({});
+    setNeuralTrainingVersion(0);
     setModelingEngine('polynomial');
     setSelectedCQA('Y1');
     setActiveTab('qtpp');
@@ -347,6 +358,7 @@ export function App() {
     setNeuralTrainingMode(normalized.analysisSettings?.neuralTrainingMode ?? 'independent');
     setSharedNeuralConfig(normalized.analysisSettings?.sharedNeuralConfig ?? { ...DEFAULT_NEURAL_CONFIG });
     setNeuralConfigs(normalized.analysisSettings?.neuralConfigs ?? {});
+    setNeuralTrainingVersion(0);
     setModelingEngine(normalized.analysisSettings?.modelingEngine ?? 'polynomial');
     setSelectedCQA(snapshot.cqas[0]?.code || 'Y1');
   };

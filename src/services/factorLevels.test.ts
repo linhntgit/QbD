@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Factor } from '../types/qbd';
-import { actualToCoded, codedToActual, getConfiguredFactorCodes } from './doeGenerator';
+import { actualToCoded, codedToActual, getConfiguredFactorCodes, getFactorGridCodes, snapFactorCoded } from './doeGenerator';
+import { buildFactorFeatures, buildModelTerms } from './modelTerms';
 
 const makeFactor = (overrides: Partial<Factor>): Factor => ({
   id: 'factor-level-test',
@@ -35,9 +36,24 @@ describe('configured factor levels', () => {
       center: 40,
     });
 
-    expect(getConfiguredFactorCodes(factor)).toEqual([-1, -0.3333, 0.3333, 1]);
-    expect(codedToActual(0.3333, factor)).toBe(40);
-    expect(actualToCoded(25, factor)).toBe(-0.3333);
+    expect(getConfiguredFactorCodes(factor)).toEqual([-1, -0.571429, -0.142857, 1]);
+    expect(codedToActual(-0.142857, factor)).toBe(40);
+    expect(actualToCoded(25, factor)).toBeCloseTo(-0.571429, 6);
+  });
+
+  it('uses L-1 treatment indicators and never a fake ordered qualitative slope', () => {
+    const factor = makeFactor({ categories: ['A', 'B', 'C', 'D'] });
+    const features = buildFactorFeatures([factor]);
+    const terms = buildModelTerms([factor], 'Quadratic');
+    expect(features.map((feature) => feature.name)).toEqual(['X1[B]', 'X1[C]', 'X1[D]']);
+    expect(features.map((feature) => feature.evaluator({ X1: actualToCoded('C', factor) }))).toEqual([0, 1, 0]);
+    expect(terms.map((term) => term.name)).toEqual(['Intercept', 'X1[B]', 'X1[C]', 'X1[D]']);
+  });
+
+  it('returns only legal settings for discrete grids and snapping', () => {
+    const factor = makeFactor({ dataType: 'quantitative_multilevel', categories: ['10', '25', '40', '80'] });
+    expect(getFactorGridCodes(factor, 35)).toEqual(getConfiguredFactorCodes(factor));
+    expect(getConfiguredFactorCodes(factor)).toContain(snapFactorCoded(0.2, factor));
   });
 
   it('uses at most the first ten configured levels', () => {

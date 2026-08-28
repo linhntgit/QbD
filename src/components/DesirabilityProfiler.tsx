@@ -24,7 +24,7 @@ import type {
   CQAObjective,
 } from '../types/qbd';
 import { PlotlyChart } from './PlotlyChart';
-import { codedToActual, actualToCoded } from '../services/doeGenerator';
+import { codedToActual, actualToCoded, getConfiguredFactorCodes, getConfiguredFactorLevels, getFactorGridCodes, isDiscreteFactor } from '../services/doeGenerator';
 import {
   getFeasibleMixtureComponentRange,
   normalizeMixtureCoded,
@@ -490,10 +490,9 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
         ? (feasibleMixtureRange?.high ?? (f.high <= 1.0 && f.unit !== '%' ? f.high : f.high / 100))
         : 1.0;
 
-      const xRange: number[] = [];
-      for (let i = 0; i < N_POINTS; i++) {
-        xRange.push(lowVal + (i / (N_POINTS - 1)) * (highVal - lowVal));
-      }
+      const xRange: number[] = isDiscreteFactor(f)
+        ? getFactorGridCodes(f, N_POINTS)
+        : Array.from({ length: N_POINTS }, (_, i) => lowVal + (i / (N_POINTS - 1)) * (highVal - lowVal));
 
       const xActualArr: number[] = [];
       const dOverallArr: number[] = [];
@@ -1114,6 +1113,25 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                 const coded = currentCoded[f.code] ?? 0;
                 const actual = codedToActual(coded, f);
                 const isLocked = lockedFactors[f.code] || false;
+
+                if (isDiscreteFactor(f)) {
+                  const levels = getConfiguredFactorLevels(f);
+                  const codes = getConfiguredFactorCodes(f);
+                  return (
+                    <div key={f.code} style={{ backgroundColor: isLocked ? '#fef2f2' : '#f8fafc', borderRadius: '0.5rem', padding: '0.6rem', border: isLocked ? '1px solid #fecaca' : '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#1e293b' }}>{f.name} ({f.code})</span>
+                        <button onClick={() => handleToggleLock(f.code)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: isLocked ? '#ef4444' : '#94a3b8' }}>{isLocked ? <Lock size={15} /> : <Unlock size={15} />}</button>
+                      </div>
+                      <select className="input-field" style={{ width: '100%' }} value={String(actual)} disabled={f.controllability === 'constant'} onChange={(event) => {
+                        const index = levels.findIndex((level) => String(level) === event.target.value);
+                        setCurrentCoded((prev) => ({ ...prev, [f.code]: codes[index] ?? codes[0] ?? 0 }));
+                      }}>
+                        {levels.map((level) => <option key={String(level)} value={String(level)}>{String(level)} {f.unit}</option>)}
+                      </select>
+                    </div>
+                  );
+                }
 
                 return (
                   <div

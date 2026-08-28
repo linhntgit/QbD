@@ -267,7 +267,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                        cqa.objective === 'range' ? '📏 Range' : 'None'}
                     </span>
                   </td>
-                  <td>{cqa.lowerLimit ?? '-'} / {cqa.target ?? '-'} / {cqa.upperLimit ?? '-'}</td>
+                  <td>{cqa.categories?.length ? `${cqa.categories.join(' · ')}${cqa.targetCategory ? ` (đạt: ${cqa.targetCategory})` : ''}` : `${cqa.lowerLimit ?? '-'} / ${cqa.target ?? '-'} / ${cqa.upperLimit ?? '-'}`}</td>
                   <td className="font-mono" style={{ fontSize: '0.78rem' }}>s={cqa.sShape ?? 1}, t={cqa.tShape ?? 1}</td>
                   <td style={{ fontWeight: '700', color: '#0f766e' }}>{cqa.weight}</td>
                 </tr>

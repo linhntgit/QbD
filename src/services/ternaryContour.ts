@@ -436,8 +436,32 @@ export function generateTernaryContour(
   // Extract CQA Spec Limit Contour Lines (LSL / USL / Target) using 2D Marching Squares
   const contourLines: TernaryContourLine[] = [];
   const zGridClean: number[][] = zGrid.map((row) => row.map((v) => (v === null ? -999999 : v)));
+  const addContourLine = (level: number, specType?: 'LSL' | 'USL' | 'Target') => {
+    if (!Number.isFinite(level) || level < zMin || level > zMax) return;
+    const segs = extract2DContourSegments(xGrid, yGrid, zGridClean, level);
+    if (segs.length === 0) return;
+    contourLines.push({
+      level,
+      isSpecLimit: Boolean(specType),
+      specType,
+      segments: segs.map((s) => {
+        const t1 = cartesianToTernary(s.x1, s.y1);
+        const t2 = cartesianToTernary(s.x2, s.y2);
+        return {
+          p1: { a: t1.a, b: t1.b, c: t1.c, x: s.x1, y: s.y1 },
+          p2: { a: t2.a, b: t2.b, c: t2.c, x: s.x2, y: s.y2 },
+        };
+      }),
+    });
+  };
 
-  if (cqa.lowerLimit !== undefined && cqa.lowerLimit >= zMin && cqa.lowerLimit <= zMax) {
+  // Always create labelled response contours in addition to any specification
+  // references, so a heatmap never hides the response shape.
+  const regularCount = Math.max(3, Math.min(20, numContourLevels));
+  const contourStep = (zMax - zMin) / (regularCount + 1);
+  for (let index = 1; index <= regularCount; index++) addContourLine(zMin + contourStep * index);
+
+  if (cqa.lowerLimit !== undefined) {
     const segs = extract2DContourSegments(xGrid, yGrid, zGridClean, cqa.lowerLimit);
     if (segs.length > 0) {
       contourLines.push({
@@ -456,7 +480,7 @@ export function generateTernaryContour(
     }
   }
 
-  if (cqa.upperLimit !== undefined && cqa.upperLimit >= zMin && cqa.upperLimit <= zMax) {
+  if (cqa.upperLimit !== undefined) {
     const segs = extract2DContourSegments(xGrid, yGrid, zGridClean, cqa.upperLimit);
     if (segs.length > 0) {
       contourLines.push({
@@ -475,7 +499,7 @@ export function generateTernaryContour(
     }
   }
 
-  if (cqa.target !== undefined && cqa.target >= zMin && cqa.target <= zMax && cqa.objective === 'target') {
+  if (cqa.target !== undefined) {
     const segs = extract2DContourSegments(xGrid, yGrid, zGridClean, cqa.target);
     if (segs.length > 0) {
       contourLines.push({
@@ -531,6 +555,8 @@ export function buildTernaryPlotlyData(
     showSpecLimits?: boolean;
     ternaryLevels?: number;
     smoothness?: number;
+    contourLineWidth?: number;
+    showContourLabels?: boolean;
   } = {}
 ) {
   const {
@@ -545,6 +571,8 @@ export function buildTernaryPlotlyData(
     showSpecLimits = true,
     ternaryLevels = 14,
     smoothness = 1.0,
+    contourLineWidth = 1.5,
+    showContourLabels = true,
   } = options;
 
   const traces: any[] = [];
@@ -561,12 +589,12 @@ export function buildTernaryPlotlyData(
     ncontours: ternaryLevels,
     contours: {
       coloring: displayMode === 'lines_only' ? 'none' : 'heatmap',
-      showlabels: displayMode !== 'heatmap',
+      showlabels: showContourLabels && displayMode !== 'heatmap',
       labelfont: { family: 'Inter, sans-serif', size: 11, color: '#ffffff' },
     },
     line: {
       smoothing: smoothness,
-      width: displayMode === 'lines_only' ? 1.2 : 0.75,
+      width: contourLineWidth,
       color: displayMode === 'lines_only' ? '#334155' : 'rgba(255, 255, 255, 0.4)',
     },
     colorbar: {
@@ -739,8 +767,8 @@ export function buildTernaryPlotlyData(
   }
 
   // 7. CQA Specification Limits Lines (LSL / USL / Target)
-  if (showSpecLimits && contourLines.length > 0) {
-    contourLines.forEach((sl) => {
+  if (contourLines.length > 0) {
+    contourLines.filter((line) => showSpecLimits || !line.isSpecLimit).forEach((sl) => {
       const segX: (number | null)[] = [];
       const segY: (number | null)[] = [];
 
@@ -753,14 +781,17 @@ export function buildTernaryPlotlyData(
 
       if (segX.length > 0) {
         const isLSL = sl.specType === 'LSL';
+        const isUSL = sl.specType === 'USL';
         const isTarget = sl.specType === 'Target';
-        const lineColor = isTarget ? '#059669' : isLSL ? '#dc2626' : '#b91c1c';
-        const lineDash = isTarget ? 'solid' : 'dash';
+        const lineColor = isTarget ? '#059669' : isLSL ? '#dc2626' : isUSL ? '#b91c1c' : '#334155';
+        const lineDash = isTarget ? 'solid' : (isLSL || isUSL) ? 'dash' : 'solid';
         const label = isLSL
           ? `🔴 Giới Hạn Dưới (LSL = ${sl.level} ${cqa.unit || ''})`
-          : !isTarget
+          : isUSL
           ? `🔴 Giới Hạn Trên (USL = ${sl.level} ${cqa.unit || ''})`
-          : `🟢 Mục Tiêu (Target = ${sl.level} ${cqa.unit || ''})`;
+          : isTarget
+          ? `🟢 Mục Tiêu (Target = ${sl.level} ${cqa.unit || ''})`
+          : `Y = ${sl.level.toFixed(3)} ${cqa.unit || ''}`;
 
         traces.push({
           type: 'scatter',
@@ -770,12 +801,46 @@ export function buildTernaryPlotlyData(
           y: segY,
           line: {
             color: lineColor,
-            width: 1.8,
+            width: contourLineWidth + (sl.isSpecLimit ? 0.8 : 0),
             dash: lineDash,
           },
           hoverinfo: 'name',
           showlegend: true,
         });
+
+        // Prefer the part of the contour farthest from all three triangle edges.
+        // Using the longest segment can put labels directly on percentage labels
+        // around the perimeter, especially for lines that meet the right edge.
+        const labelSegment = sl.segments.reduce<typeof sl.segments[number] | null>((best, segment) => {
+          const midX = ((segment.p1.x ?? 0) + (segment.p2.x ?? 0)) / 2;
+          const midY = ((segment.p1.y ?? 0) + (segment.p2.y ?? 0)) / 2;
+          const midpoint = cartesianToTernary(midX, midY);
+          const edgeClearance = Math.min(midpoint.a, midpoint.b, midpoint.c);
+          const dx = (segment.p2.x ?? 0) - (segment.p1.x ?? 0);
+          const dy = (segment.p2.y ?? 0) - (segment.p1.y ?? 0);
+          const length = dx * dx + dy * dy;
+          if (!best) return segment;
+          const bestMidX = ((best.p1.x ?? 0) + (best.p2.x ?? 0)) / 2;
+          const bestMidY = ((best.p1.y ?? 0) + (best.p2.y ?? 0)) / 2;
+          const bestMidpoint = cartesianToTernary(bestMidX, bestMidY);
+          const bestClearance = Math.min(bestMidpoint.a, bestMidpoint.b, bestMidpoint.c);
+          const bestDx = (best.p2.x ?? 0) - (best.p1.x ?? 0);
+          const bestDy = (best.p2.y ?? 0) - (best.p1.y ?? 0);
+          const bestLength = bestDx * bestDx + bestDy * bestDy;
+          return edgeClearance > bestClearance || (edgeClearance === bestClearance && length > bestLength)
+            ? segment
+            : best;
+        }, null);
+        if (showContourLabels && labelSegment?.p1.x !== undefined && labelSegment.p1.y !== undefined && labelSegment.p2.x !== undefined && labelSegment.p2.y !== undefined) {
+          const labelText = sl.isSpecLimit ? `${sl.specType}: ${sl.level}` : sl.level.toFixed(3);
+          traces.push({
+            type: 'scatter', mode: 'text', showlegend: false, hoverinfo: 'skip',
+            x: [(labelSegment.p1.x + labelSegment.p2.x) / 2],
+            y: [(labelSegment.p1.y + labelSegment.p2.y) / 2],
+            text: [labelText],
+            textfont: { family: 'Inter, sans-serif', size: 10, color: lineColor },
+          });
+        }
       }
     });
   }

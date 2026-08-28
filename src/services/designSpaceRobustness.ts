@@ -1,5 +1,5 @@
 import type { CQA, Factor, MonteCarloResult, NeuralNetModelResult, StatisticalModelResult } from '../types/qbd';
-import { actualToCoded } from './doeGenerator';
+import { actualToCoded, codedToActual, getConfiguredFactorCodes, isDiscreteFactor, snapFactorCoded } from './doeGenerator';
 import { calculateCQAMargin } from './mathUtils';
 
 type PredictiveModel = StatisticalModelResult | NeuralNetModelResult;
@@ -73,6 +73,36 @@ export function assessDesignSpaceRobustness(
     .map((factor): FactorSensitivity => {
       if (isMixture(factor)) {
         return { factorCode: factor.code, factorName: factor.name, relativeImpact: 0, direction: 'balanced', note: 'Mixture phải đánh giá đồng thời trên simplex; xem ternary overlay.' };
+      }
+      if (isDiscreteFactor(factor)) {
+        const codes = getConfiguredFactorCodes(factor);
+        const currentCode = snapFactorCoded(coded[factor.code] ?? 0, factor);
+        const currentIndex = codes.reduce((best, code, index) =>
+          Math.abs(code - currentCode) < Math.abs(codes[best] - currentCode) ? index : best, 0);
+        const lowCode = codes[Math.max(0, currentIndex - 1)] ?? currentCode;
+        const highCode = codes[Math.min(codes.length - 1, currentIndex + 1)] ?? currentCode;
+        let lowImpact = 0;
+        let highImpact = 0;
+        cqas.filter((cqa) => models[cqa.code]).forEach((cqa) => {
+          const base = models[cqa.code].predict(coded);
+          const scale = Math.max(Math.abs(cqa.upperLimit ?? cqa.lowerLimit ?? cqa.target ?? base), 1e-8);
+          lowImpact = Math.max(lowImpact, Math.abs(models[cqa.code].predict({ ...coded, [factor.code]: lowCode }) - base) / scale);
+          highImpact = Math.max(highImpact, Math.abs(models[cqa.code].predict({ ...coded, [factor.code]: highCode }) - base) / scale);
+        });
+        const acceptedCodes = codes.filter((code) => evaluatesAsAccepted({ ...coded, [factor.code]: code }, cqas, models));
+        const acceptedActual = acceptedCodes.map((code) => codedToActual(code, factor));
+        const numericAccepted = acceptedActual.map(Number).filter(Number.isFinite);
+        return {
+          factorCode: factor.code,
+          factorName: factor.name,
+          relativeImpact: Number((Math.max(lowImpact, highImpact) * 100).toFixed(2)),
+          direction: lowImpact > highImpact * 1.1 ? 'higher-risk-at-low' : highImpact > lowImpact * 1.1 ? 'higher-risk-at-high' : 'balanced',
+          parLow: factor.dataType === 'quantitative_multilevel' && numericAccepted.length ? Math.min(...numericAccepted) : undefined,
+          parHigh: factor.dataType === 'quantitative_multilevel' && numericAccepted.length ? Math.max(...numericAccepted) : undefined,
+          note: factor.dataType === 'qualitative'
+            ? `Các mức đạt: ${acceptedActual.map(String).join(', ') || 'không có'}.`
+            : `Các mức định lượng đạt: ${acceptedActual.map(String).join(', ') || 'không có'}; không nội suy giữa các mức.`,
+        };
       }
       const current = Number(setpointActual[factor.code] ?? factor.center ?? (factor.low + factor.high) / 2);
       const delta = Math.max((factor.high - factor.low) * 0.05, 1e-9);

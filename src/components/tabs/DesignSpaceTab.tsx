@@ -32,7 +32,7 @@ import {
   runMonteCarloSimulation,
   generateControlStrategy,
 } from '../../services/statistics';
-import { codedToActual, actualToCoded } from '../../services/doeGenerator';
+import { codedToActual, actualToCoded, getConfiguredFactorCodes, getConfiguredFactorLevels, getFactorGridCodes, isDiscreteFactor } from '../../services/doeGenerator';
 import { formatAxisTitle, calculateCQAMargin } from '../../services/mathUtils';
 import { generateTernaryDesignSpace } from '../../services/ternaryContour';
 import { assessDesignSpaceRobustness } from '../../services/designSpaceRobustness';
@@ -249,33 +249,36 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
     const N = Math.max(40, Math.min(300, resolution));
     const xActualArr: number[] = [];
     const yActualArr: number[] = [];
-    const xCodedArr: number[] = [];
-    const yCodedArr: number[] = [];
+    const xCodedArr = getFactorGridCodes(factorX, N);
+    const yCodedArr = getFactorGridCodes(factorY, N);
+    const xDisplayArr: Array<number | string> = [];
+    const yDisplayArr: Array<number | string> = [];
 
-    for (let i = 0; i < N; i++) {
-      const coded = -1.0 + (2.0 * i) / (N - 1);
-      xCodedArr.push(coded);
-      yCodedArr.push(coded);
-      const xAct = codedToActual(coded, factorX);
-      const yAct = codedToActual(coded, factorY);
-      xActualArr.push(typeof xAct === 'number' ? xAct : Number(xAct) || coded);
-      yActualArr.push(typeof yAct === 'number' ? yAct : Number(yAct) || coded);
-    }
+    xCodedArr.forEach((coded, index) => {
+      const actual = codedToActual(coded, factorX);
+      xDisplayArr.push(actual);
+      xActualArr.push(typeof actual === 'number' ? actual : index);
+    });
+    yCodedArr.forEach((coded, index) => {
+      const actual = codedToActual(coded, factorY);
+      yDisplayArr.push(actual);
+      yActualArr.push(typeof actual === 'number' ? actual : index);
+    });
 
     const zScoreGrid: number[][] = [];
-    const hoverX: number[] = [];
-    const hoverY: number[] = [];
+    const hoverX: Array<number | string> = [];
+    const hoverY: Array<number | string> = [];
     const hoverText: string[] = [];
     const validCQAs = cqas.filter((c) => models[c.code]);
 
-    for (let j = 0; j < N; j++) {
+    for (let j = 0; j < yCodedArr.length; j++) {
       const row: number[] = [];
       const yCoded = yCodedArr[j];
-      const yAct = yActualArr[j];
+      const yAct = yDisplayArr[j];
 
-      for (let i = 0; i < N; i++) {
+      for (let i = 0; i < xCodedArr.length; i++) {
         const xCoded = xCodedArr[i];
-        const xAct = xActualArr[i];
+        const xAct = xDisplayArr[i];
         const pointCoded: Record<string, number> = {};
         factors.forEach((f) => {
           pointCoded[f.code] = sliceFactorsCoded[f.code] ?? 0;
@@ -330,6 +333,8 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
       hoverX,
       hoverY,
       hoverText,
+      xDisplayArr,
+      yDisplayArr,
     };
   }, [hasMixture, overlayMode, factorX, factorY, models, cqas, factors, sliceFactorsCoded, resolution]);
 
@@ -370,7 +375,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
 
     const data: any[] = [
       {
-        type: 'contour',
+        type: isDiscreteFactor(factorX) || isDiscreteFactor(factorY) ? 'heatmap' : 'contour',
         x: sweetSpotGrid.xActualArr,
         y: sweetSpotGrid.yActualArr,
         z: sweetSpotGrid.zScoreGrid,
@@ -421,8 +426,12 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
     if (optimum && optimum.actualFactors[factorX.code] !== undefined && optimum.actualFactors[factorY.code] !== undefined) {
       const optXVal = optimum.actualFactors[factorX.code];
       const optYVal = optimum.actualFactors[factorY.code];
-      const optX = typeof optXVal === 'number' ? optXVal : Number(optXVal) || 0;
-      const optY = typeof optYVal === 'number' ? optYVal : Number(optYVal) || 0;
+      const optX = typeof optXVal === 'number'
+        ? optXVal
+        : factorX.dataType === 'qualitative' ? Math.max(0, getConfiguredFactorLevels(factorX).findIndex((level) => String(level) === String(optXVal))) : Number(optXVal) || 0;
+      const optY = typeof optYVal === 'number'
+        ? optYVal
+        : factorY.dataType === 'qualitative' ? Math.max(0, getConfiguredFactorLevels(factorY).findIndex((level) => String(level) === String(optYVal))) : Number(optYVal) || 0;
 
       const yMin = sweetSpotGrid.yActualArr[0] ?? 0;
       const yMax = sweetSpotGrid.yActualArr[sweetSpotGrid.yActualArr.length - 1] ?? 100;
@@ -481,6 +490,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
           standoff: 12,
         },
         tickfont: { size: 11 },
+        ...(factorX.dataType === 'qualitative' && sweetSpotGrid ? { tickmode: 'array', tickvals: sweetSpotGrid.xActualArr, ticktext: sweetSpotGrid.xDisplayArr.map(String) } : {}),
         automargin: true,
       },
       yaxis: {
@@ -490,12 +500,13 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
           standoff: 12,
         },
         tickfont: { size: 11 },
+        ...(factorY.dataType === 'qualitative' && sweetSpotGrid ? { tickmode: 'array', tickvals: sweetSpotGrid.yActualArr, ticktext: sweetSpotGrid.yDisplayArr.map(String) } : {}),
         automargin: true,
       },
       annotations: [],
       margin: { l: 85, r: 40, t: 50, b: 75, pad: 4 },
     };
-  }, [overlayMode, ternaryDS, factorX, factorY]);
+  }, [overlayMode, ternaryDS, factorX, factorY, sweetSpotGrid]);
 
   // Determine fixed factors list based on active overlay mode
   const activeAxisCodes =
@@ -505,7 +516,9 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
 
   const fixedFactorsList = factors.filter((f) => !activeAxisCodes.includes(f.code));
 
-  const missingModelCodes = cqas.filter((cqa) => !models[cqa.code]).map((cqa) => cqa.code);
+  const missingModelCodes = cqas
+    .filter((cqa) => !cqa.dataType?.startsWith('qualitative') && cqa.objective !== 'pass_category' && !models[cqa.code])
+    .map((cqa) => cqa.code);
   if (missingModelCodes.length > 0 || !optimum) {
     return (
       <div className="qbd-card" role="alert" style={{ borderLeft: '4px solid #d97706', color: '#92400e' }}>
@@ -805,7 +818,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                 <div>
                   <label style={{ fontSize: '0.75rem', color: '#0f766e', fontWeight: '600' }}>🔺 Đỉnh A (Đỉnh Trên):</label>
                   <select className="input-field" value={ternaryA} onChange={(e) => setTernaryA(e.target.value)}>
-                    {factors.map((f) => (
+                    {mixtureFactors.map((f) => (
                       <option key={f.code} value={f.code} disabled={f.code === ternaryB || f.code === ternaryC}>
                         {f.name} ({f.code})
                       </option>
@@ -815,7 +828,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                 <div>
                   <label style={{ fontSize: '0.75rem', color: '#1e40af', fontWeight: '600' }}>◀️ Đỉnh B (Đỉnh Trái):</label>
                   <select className="input-field" value={ternaryB} onChange={(e) => setTernaryB(e.target.value)}>
-                    {factors.map((f) => (
+                    {mixtureFactors.map((f) => (
                       <option key={f.code} value={f.code} disabled={f.code === ternaryA || f.code === ternaryC}>
                         {f.name} ({f.code})
                       </option>
@@ -825,7 +838,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                 <div>
                   <label style={{ fontSize: '0.75rem', color: '#b45309', fontWeight: '600' }}>▶️ Đỉnh C (Đỉnh Phải):</label>
                   <select className="input-field" value={ternaryC} onChange={(e) => setTernaryC(e.target.value)}>
-                    {factors.map((f) => (
+                    {mixtureFactors.map((f) => (
                       <option key={f.code} value={f.code} disabled={f.code === ternaryA || f.code === ternaryB}>
                         {f.name} ({f.code})
                       </option>
@@ -928,6 +941,22 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                           <Lock size={13} color="#64748b" />
                           <span>{f.name} ({f.code}): <strong>{f.constantValue ?? f.low} {f.unit}</strong> (Hằng số)</span>
                         </div>
+                      </div>
+                    );
+                  }
+
+                  if (isDiscreteFactor(f)) {
+                    const levels = getConfiguredFactorLevels(f);
+                    const codes = getConfiguredFactorCodes(f);
+                    return (
+                      <div key={f.code} style={{ backgroundColor: '#f8fafc', padding: '0.65rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
+                        <div style={{ fontSize: '0.78rem', fontWeight: '700', color: '#1e293b', marginBottom: '0.35rem' }}>{f.name} ({f.code})</div>
+                        <select className="input-field" style={{ width: '100%' }} value={String(actual)} onChange={(event) => {
+                          const index = levels.findIndex((level) => String(level) === event.target.value);
+                          setSliceFactorsCoded((prev) => ({ ...prev, [f.code]: codes[index] ?? codes[0] ?? 0 }));
+                        }}>
+                          {levels.map((level) => <option key={String(level)} value={String(level)}>{String(level)} {f.unit}</option>)}
+                        </select>
                       </div>
                     );
                   }
