@@ -240,81 +240,68 @@ export function calculateMixtureConstraints(
     });
   }
 
-  // Calculate polygon intersection vertices
-  const polygonVertices: { a: number; b: number; c: number; x?: number; y?: number }[] = [];
-  const aVals = Array.from(new Set([0, lA, uA, activeTotal])).filter((v) => v >= 0 && v <= activeTotal);
-  const bVals = Array.from(new Set([0, lB, uB, activeTotal])).filter((v) => v >= 0 && v <= activeTotal);
-  const cVals = Array.from(new Set([0, lC, uC, activeTotal])).filter((v) => v >= 0 && v <= activeTotal);
+  // Start with the whole simplex, then clip it by each of the six bounds.
+  // This is a Sutherland-Hodgman half-plane clip in barycentric coordinates.
+  // It avoids inferring corners from a partial candidate set and preserves the
+  // perimeter order required for a clean closed Plotly trace.
+  type CompositionPoint = { a: number; b: number; c: number };
+  const EPSILON = 1e-8;
+  const clipPolygon = (
+    source: CompositionPoint[],
+    signedDistance: (point: CompositionPoint) => number
+  ): CompositionPoint[] => {
+    if (source.length === 0) return [];
 
-  const candidatePoints: { a: number; b: number; c: number }[] = [];
+    const clipped: CompositionPoint[] = [];
+    for (let index = 0; index < source.length; index += 1) {
+      const start = source[index];
+      const end = source[(index + 1) % source.length];
+      const startDistance = signedDistance(start);
+      const endDistance = signedDistance(end);
+      const startInside = startDistance >= -EPSILON;
+      const endInside = endDistance >= -EPSILON;
 
-  aVals.forEach((a) => {
-    bVals.forEach((b) => {
-      const c = Number((activeTotal - a - b).toFixed(3));
-      if (c >= -1e-4 && c <= activeTotal + 1e-4) {
-        candidatePoints.push({ a, b, c: Math.max(0, c) });
+      if (startInside !== endInside) {
+        const fraction = startDistance / (startDistance - endDistance);
+        clipped.push({
+          a: start.a + (end.a - start.a) * fraction,
+          b: start.b + (end.b - start.b) * fraction,
+          c: start.c + (end.c - start.c) * fraction,
+        });
       }
-    });
-  });
-
-  aVals.forEach((c) => {
-    cVals.forEach((b) => {
-      const a = Number((activeTotal - b - c).toFixed(3));
-      if (a >= -1e-4 && a <= activeTotal + 1e-4) {
-        candidatePoints.push({ a: Math.max(0, a), b, c });
-      }
-    });
-  });
-
-  bVals.forEach((b) => {
-    cVals.forEach((c) => {
-      const a = Number((activeTotal - b - c).toFixed(3));
-      if (a >= -1e-4 && a <= activeTotal + 1e-4) {
-        candidatePoints.push({ a: Math.max(0, a), b, c });
-      }
-    });
-  });
-
-  const validVertices = candidatePoints.filter(
-    (p) =>
-      p.a >= lA - 1e-4 &&
-      p.a <= uA + 1e-4 &&
-      p.b >= lB - 1e-4 &&
-      p.b <= uB + 1e-4 &&
-      p.c >= lC - 1e-4 &&
-      p.c <= uC + 1e-4
-  );
-
-  const uniqueVertices: { a: number; b: number; c: number; x: number; y: number }[] = [];
-  validVertices.forEach((p) => {
-    const isDup = uniqueVertices.some(
-      (u) => Math.abs(u.a - p.a) < 0.05 && Math.abs(u.b - p.b) < 0.05 && Math.abs(u.c - p.c) < 0.05
-    );
-    if (!isDup) {
-      const cart = ternaryToCartesian((p.a / activeTotal) * 100, (p.b / activeTotal) * 100, (p.c / activeTotal) * 100);
-      uniqueVertices.push({
-        a: Number(p.a.toFixed(2)),
-        b: Number(p.b.toFixed(2)),
-        c: Number(p.c.toFixed(2)),
-        ...cart,
-      });
+      if (endInside) clipped.push(end);
     }
+    return clipped;
+  };
+
+  let feasiblePolygon: CompositionPoint[] = [
+    { a: activeTotal, b: 0, c: 0 },
+    { a: 0, b: activeTotal, c: 0 },
+    { a: 0, b: 0, c: activeTotal },
+  ];
+  [
+    (point: CompositionPoint) => point.a - lA,
+    (point: CompositionPoint) => uA - point.a,
+    (point: CompositionPoint) => point.b - lB,
+    (point: CompositionPoint) => uB - point.b,
+    (point: CompositionPoint) => point.c - lC,
+    (point: CompositionPoint) => uC - point.c,
+  ].forEach((signedDistance) => {
+    feasiblePolygon = clipPolygon(feasiblePolygon, signedDistance);
   });
 
-  if (uniqueVertices.length >= 3) {
-    const cA = uniqueVertices.reduce((s, v) => s + v.a, 0) / uniqueVertices.length;
-    const cB = uniqueVertices.reduce((s, v) => s + v.b, 0) / uniqueVertices.length;
-    const cC = uniqueVertices.reduce((s, v) => s + v.c, 0) / uniqueVertices.length;
-    const centerCart = ternaryToCartesian((cA / activeTotal) * 100, (cB / activeTotal) * 100, (cC / activeTotal) * 100);
-
-    uniqueVertices.sort((v1, v2) => {
-      const ang1 = Math.atan2(v1.y - centerCart.y, v1.x - centerCart.x);
-      const ang2 = Math.atan2(v2.y - centerCart.y, v2.x - centerCart.x);
-      return ang1 - ang2;
+  const polygonVertices = feasiblePolygon
+    .filter((point, index, points) => {
+      const previous = points[(index + points.length - 1) % points.length];
+      return Math.abs(point.a - previous.a) > EPSILON || Math.abs(point.b - previous.b) > EPSILON || Math.abs(point.c - previous.c) > EPSILON;
+    })
+    .map((point) => {
+      const a = Number(point.a.toFixed(2));
+      const b = Number(point.b.toFixed(2));
+      const c = Number((activeTotal - a - b).toFixed(2));
+      const cart = ternaryToCartesian((a / activeTotal) * 100, (b / activeTotal) * 100, (c / activeTotal) * 100);
+      return { a, b, c, ...cart };
     });
-
-    polygonVertices.push(...uniqueVertices);
-  }
 
   return { lines, polygonVertices, hasConstraints };
 }
@@ -594,6 +581,41 @@ export function buildTernaryPlotlyData(
     hoverinfo: 'none',
     showscale: displayMode !== 'lines_only',
   });
+
+  // Fade the unconstrained part of the simplex slightly.  The feasible-region
+  // overlay below remains darker, making the two regions easy to distinguish.
+  traces.push({
+    type: 'scatter',
+    mode: 'lines',
+    x: [0, 100, 50, 0],
+    y: [0, 0, H, 0],
+    fill: 'toself',
+    fillcolor: 'rgba(255, 255, 255, 0.16)',
+    line: { width: 0, color: 'rgba(0, 0, 0, 0)' },
+    hoverinfo: 'skip',
+    showlegend: false,
+  });
+
+  // Make the feasible DoE region stand out without replacing the response
+  // gradient: a subtle translucent overlay darkens only the clipped simplex.
+  if (showRegionPolygon && constraints.polygonVertices.length >= 3) {
+    const regionX = constraints.polygonVertices.map((vertex) => vertex.x ?? 0);
+    const regionY = constraints.polygonVertices.map((vertex) => vertex.y ?? 0);
+    regionX.push(regionX[0]);
+    regionY.push(regionY[0]);
+
+    traces.push({
+      type: 'scatter',
+      mode: 'lines',
+      x: regionX,
+      y: regionY,
+      fill: 'toself',
+      fillcolor: 'rgba(15, 23, 42, 0.14)',
+      line: { width: 0, color: 'rgba(0, 0, 0, 0)' },
+      hoverinfo: 'skip',
+      showlegend: false,
+    });
+  }
 
   // 2. Simplex Outer Boundary Frame
   traces.push({
@@ -1158,6 +1180,39 @@ export function generateTernaryDesignSpace(
     },
     hoverinfo: 'none',
   });
+
+  sweetSpotTraces.push({
+    type: 'scatter',
+    mode: 'lines',
+    x: [0, 100, 50, 0],
+    y: [0, 0, H, 0],
+    fill: 'toself',
+    fillcolor: 'rgba(255, 255, 255, 0.16)',
+    line: { width: 0, color: 'rgba(0, 0, 0, 0)' },
+    hoverinfo: 'skip',
+    showlegend: false,
+  });
+
+  // Preserve the margin-gradient while visually emphasizing the feasible
+  // formulation region in the same way as the response-surface ternary plot.
+  if (showRegionPolygon && constraints.polygonVertices.length >= 3) {
+    const regionX = constraints.polygonVertices.map((vertex) => vertex.x ?? 0);
+    const regionY = constraints.polygonVertices.map((vertex) => vertex.y ?? 0);
+    regionX.push(regionX[0]);
+    regionY.push(regionY[0]);
+
+    sweetSpotTraces.push({
+      type: 'scatter',
+      mode: 'lines',
+      x: regionX,
+      y: regionY,
+      fill: 'toself',
+      fillcolor: 'rgba(15, 23, 42, 0.14)',
+      line: { width: 0, color: 'rgba(0, 0, 0, 0)' },
+      hoverinfo: 'skip',
+      showlegend: false,
+    });
+  }
 
   // 2. Simplex Outer Frame
   sweetSpotTraces.push({
