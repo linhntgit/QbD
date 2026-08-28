@@ -1210,7 +1210,14 @@ export function generateDOptimalMatrix(
   // 1. Generate candidate points
   const candidatePool = generateCandidatePool(factors);
   if (candidatePool.length <= N) {
-    return candidatePool;
+    // A discrete candidate space can be smaller than the requested number of
+    // runs (for example, one four-level categorical factor has four unique
+    // settings). Returning only the unique settings saturates an otherwise
+    // estimable model, leaving ANOVA with zero residual degrees of freedom.
+    // Repeat the candidate settings as evenly as possible so N remains the
+    // experimental run count requested by the design and the repeats provide
+    // a pure-error estimate.
+    return Array.from({ length: N }, (_, index) => [...candidatePool[index % candidatePool.length]]);
   }
 
   // 2. Expand candidate pool into model matrix rows

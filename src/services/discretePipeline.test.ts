@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CQA, DoEDesignConfig, DoERun, Factor } from '../types/qbd';
-import { actualToCoded, getConfiguredFactorCodes, validateDesignSetup } from './doeGenerator';
+import { actualToCoded, generateDoERuns, getConfiguredFactorCodes, validateDesignSetup } from './doeGenerator';
 import { fitModel, isWithinSurveyBounds, optimizeDesirability, runMonteCarloSimulation } from './statistics';
 
 const qualitativeFactor: Factor = {
@@ -43,6 +43,22 @@ describe('discrete factor pipeline', () => {
     const base: DoEDesignConfig = { category: 'Screening', designType: 'FullFactorial2k', centerPoints: 0, replicates: 1, randomized: false };
     expect(validateDesignSetup([qualitativeFactor], base).isValid).toBe(false);
     expect(validateDesignSetup([qualitativeFactor], { ...base, category: 'Custom_Optimal', designType: 'DOptimal', numRuns: 8, dOptimalModel: 'Linear' }).isValid).toBe(true);
+  });
+
+  it('keeps the requested D-optimal run count when the discrete candidate pool is exhausted', () => {
+    const config: DoEDesignConfig = {
+      category: 'Custom_Optimal', designType: 'DOptimal', centerPoints: 0,
+      replicates: 1, randomized: false, dOptimalModel: 'Quadratic', numRuns: 8,
+    };
+    const { runs } = generateDoERuns([qualitativeFactor], config);
+    expect(runs).toHaveLength(8);
+    expect(new Set(runs.map((run) => run.factorCoded.X1))).toHaveLength(4);
+
+    const measuredRuns = runs.map((run, index) => ({
+      ...run,
+      responses: { Y1: 10 + run.factorCoded.X1 * 2 + (index % 2 === 0 ? -0.1 : 0.1) },
+    }));
+    expect(fitModel(cqa, [qualitativeFactor], measuredRuns, 'Quadratic')).not.toBeNull();
   });
 
   it('keeps optimizer and Monte Carlo predictions on declared category levels', () => {

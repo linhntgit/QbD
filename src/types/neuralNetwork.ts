@@ -1,5 +1,5 @@
 export type NeuralActivation = 'tanh' | 'linear' | 'gaussian' | 'sigmoid' | 'relu';
-export type NeuralValidationMethod = 'holdout' | 'none';
+export type NeuralValidationMethod = 'holdout' | 'kfold' | 'none';
 export type NeuralTrainingMode = 'shared' | 'independent';
 
 export interface NeuralArchitectureMetrics {
@@ -25,6 +25,7 @@ export interface NeuralNetConfig {
   maxEpochs: number; // default 1000
   validationMethod: NeuralValidationMethod;
   holdoutRatio: number; // default 0.25 (25% validation holdout)
+  kFolds: number; // default 5; each fold reserves approximately N / K runs for validation
   numTours: number; // default 10 (number of random tours/restarts)
   seed: number;
 }

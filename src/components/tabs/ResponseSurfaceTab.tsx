@@ -792,16 +792,6 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
               <option value="Turbo">Turbo</option>
             </select>
 
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.72rem', color: '#475569', fontWeight: '600' }}>
-              Độ dày
-              <input type="range" min={0.5} max={4} step={0.5} value={contourLineWidth} onChange={(e) => setContourLineWidth(Number(e.target.value))} style={{ width: '64px', cursor: 'pointer' }} />
-              <span className="font-mono" style={{ color: '#0f766e' }}>{contourLineWidth.toFixed(1)}px</span>
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.72rem', color: '#475569', cursor: 'pointer' }}>
-              <input type="checkbox" checked={showContourLabels} onChange={(e) => setShowContourLabels(e.target.checked)} />
-              Nhãn đường mức
-            </label>
-
             <button
               onClick={onNavigateToDesignSpace}
               className="btn btn-teal"
@@ -977,6 +967,23 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                 />
               </div>
 
+              {/* Shared contour styling controls: keep them with ternary options. */}
+              <div style={{ marginBottom: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.2rem' }}>
+                  <span style={{ fontWeight: '600', color: '#475569' }}>Độ dày đường đồng mức:</span>
+                  <span className="font-mono font-bold" style={{ color: '#0f766e' }}>{contourLineWidth.toFixed(1)}px</span>
+                </div>
+                <input
+                  type="range"
+                  min={0.5}
+                  max={4}
+                  step={0.5}
+                  value={contourLineWidth}
+                  onChange={(e) => setContourLineWidth(Number(e.target.value))}
+                  style={{ width: '100%', cursor: 'pointer' }}
+                />
+              </div>
+
               {/* Ternary Grid Resolution Selector */}
               <div style={{ marginBottom: '0.75rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.2rem' }}>
@@ -1021,7 +1028,16 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
               </div>
 
               {/* Toggle Checkboxes */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', fontSize: '0.78rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', fontSize: '0.78rem', fontWeight: '500', color: '#1e293b', lineHeight: 1.45 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={showContourLabels}
+                    onChange={(e) => setShowContourLabels(e.target.checked)}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <span>Hiện nhãn đường đồng mức</span>
+                </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
@@ -1029,9 +1045,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                     onChange={(e) => setShowConstraints(e.target.checked)}
                     style={{ cursor: 'pointer' }}
                   />
-                  <span>
-                    📏 <strong>Vạch giới hạn biến X</strong> ({factorA.low} ≤ {factorA.code} ≤ {factorA.high}...)
-                  </span>
+                  <span>📏 Vạch giới hạn biến X ({factorA.low} ≤ {factorA.code} ≤ {factorA.high}...)</span>
                 </label>
 
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer' }}>
@@ -1041,9 +1055,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                     onChange={(e) => setShowRegionPolygon(e.target.checked)}
                     style={{ cursor: 'pointer' }}
                   />
-                  <span>
-                    🔶 <strong>Viền đa giác miền khảo sát DoE</strong> (Viền cam)
-                  </span>
+                  <span>🔶 Viền đa giác miền khảo sát DoE (Viền cam)</span>
                 </label>
 
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer' }}>
@@ -1054,9 +1066,9 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                     style={{ cursor: 'pointer' }}
                   />
                   <span>
-                    🏷️ <strong>Vạch giới hạn CQA ({currentCQA.code})</strong>
+                    🏷️ Vạch giới hạn CQA ({currentCQA.code})
                     {currentCQA.lowerLimit !== undefined || currentCQA.upperLimit !== undefined ? (
-                      <span style={{ color: '#dc2626', marginLeft: '0.25rem', fontWeight: '700' }}>
+                      <span style={{ color: '#dc2626', marginLeft: '0.25rem', fontWeight: '600' }}>
                         ({currentCQA.lowerLimit !== undefined ? `${currentCQA.lowerLimit} ≤ ` : ''}{currentCQA.code}{currentCQA.upperLimit !== undefined ? ` ≤ ${currentCQA.upperLimit}` : ''} {currentCQA.unit || ''})
                       </span>
                     ) : ''}
@@ -1115,6 +1127,34 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                   🔴 <strong>Vạch đường / mặt phẳng giới hạn</strong> (LSL / USL / Target)
                 </span>
               </label>
+              {plotType === 'contour' && (
+                <>
+                  <div style={{ marginTop: '0.7rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.2rem' }}>
+                      <span style={{ fontWeight: '600', color: '#475569' }}>Độ dày đường đồng mức:</span>
+                      <span className="font-mono font-bold" style={{ color: '#dc2626' }}>{contourLineWidth.toFixed(1)}px</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0.5}
+                      max={4}
+                      step={0.5}
+                      value={contourLineWidth}
+                      onChange={(e) => setContourLineWidth(Number(e.target.value))}
+                      style={{ width: '100%', cursor: 'pointer' }}
+                    />
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.78rem', marginTop: '0.55rem' }}>
+                    <input
+                      type="checkbox"
+                      checked={showContourLabels}
+                      onChange={(e) => setShowContourLabels(e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span>Hiện nhãn đường đồng mức</span>
+                  </label>
+                </>
+              )}
             </div>
           )}
 

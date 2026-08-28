@@ -41,6 +41,7 @@ import {
   optimizeNeuralDesirability,
   calculateNeuralArchitectureMetrics,
   DEFAULT_NEURAL_CONFIG,
+  getNeuralTrainingSampleCount,
 } from '../../services/neuralNetwork';
 import { formatAxisTitle, extract2DContourSegments, calculateCQAMargin } from '../../services/mathUtils';
 import {
@@ -106,8 +107,9 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
     weightDecay: 0.01,
     learningRate: 0.03,
     maxEpochs: 1000,
-    validationMethod: 'holdout',
+    validationMethod: 'kfold',
     holdoutRatio: 0.25,
+    kFolds: 5,
     numTours: 10,
     seed: 42,
   };
@@ -126,17 +128,15 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
   const numSamples = project.runs.length;
 
   const archMetrics = useMemo(() => {
-    const validationCount = localConfig.validationMethod === 'holdout' && numSamples >= 6
-      ? Math.max(1, Math.min(Math.floor(numSamples * 0.4), Math.round(numSamples * localConfig.holdoutRatio)))
-      : 0;
+    const trainingSamples = getNeuralTrainingSampleCount(numSamples, localConfig);
     return calculateNeuralArchitectureMetrics(
       numInputs,
       localConfig.hiddenNodes1,
       localConfig.hiddenNodes2,
       numOutputs,
-      numSamples - validationCount
+      trainingSamples
     );
-  }, [numInputs, localConfig.hiddenNodes1, localConfig.hiddenNodes2, localConfig.holdoutRatio, localConfig.validationMethod, numOutputs, numSamples]);
+  }, [numInputs, localConfig.hiddenNodes1, localConfig.hiddenNodes2, localConfig.holdoutRatio, localConfig.kFolds, localConfig.validationMethod, numOutputs, numSamples]);
 
   // Live Training / Fitting State
   const [isTraining, setIsTraining] = useState<boolean>(false);
@@ -1447,6 +1447,54 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                 onChange={(e) => setLocalConfig({ ...localConfig, maxEpochs: Math.max(50, parseInt(e.target.value) || 500) })}
               />
             </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#475569', marginBottom: '0.25rem' }}>
+                PHƯƠNG PHÁP VALIDATION
+              </label>
+              <select
+                className="input-field"
+                value={localConfig.validationMethod}
+                onChange={(e) => setLocalConfig({ ...localConfig, validationMethod: e.target.value as NeuralNetConfig['validationMethod'] })}
+              >
+                <option value="kfold">K-fold cross validation</option>
+                <option value="holdout">Hold-out</option>
+                <option value="none">Không chia validation</option>
+              </select>
+            </div>
+
+            {localConfig.validationMethod === 'kfold' && (
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#475569', marginBottom: '0.25rem' }}>
+                  SỐ NHÓM K-FOLD
+                </label>
+                <input
+                  type="number"
+                  min={2}
+                  max={Math.max(2, Math.min(10, numSamples))}
+                  className="input-field"
+                  value={localConfig.kFolds}
+                  onChange={(e) => setLocalConfig({ ...localConfig, kFolds: Math.max(2, Math.min(Math.max(2, Math.min(10, numSamples)), parseInt(e.target.value) || 5)) })}
+                />
+              </div>
+            )}
+
+            {localConfig.validationMethod === 'holdout' && (
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#475569', marginBottom: '0.25rem' }}>
+                  TỶ LỆ VALIDATION
+                </label>
+                <input
+                  type="number"
+                  min={0.1}
+                  max={0.4}
+                  step={0.05}
+                  className="input-field"
+                  value={localConfig.holdoutRatio}
+                  onChange={(e) => setLocalConfig({ ...localConfig, holdoutRatio: Math.max(0.1, Math.min(0.4, Number(e.target.value) || 0.25)) })}
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -1563,7 +1611,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', color: '#1e40af' }}>
                 <Sparkles size={16} color="#2563eb" />
                 <span>
-                  <strong>Khuyến nghị Carpenter (1995):</strong> Số nơ-ron lớp ẩn tối ưu là <strong>h = {archMetrics.carpenterRecommended}</strong> (đảm bảo tổng liên kết & nơ-ron &lt; N = {numSamples}).
+                  <strong>Khuyến nghị Carpenter (1995):</strong> Số nơ-ron lớp ẩn tối ưu là <strong>h = {archMetrics.carpenterRecommended}</strong> (dùng N huấn luyện = {archMetrics.numSamples}; đã trừ {numSamples - archMetrics.numSamples} run validation).
                 </span>
               </div>
               <button
@@ -1834,14 +1882,16 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               </div>
             </div>
 
-            {/* Hold-out validation R²; it is not comparable to OLS PRESS Q². */}
+            {/* Validation R²; it is not comparable to OLS PRESS Q². */}
             <div className="qbd-card" style={{ padding: '0.85rem', borderLeft: '4px solid #dc2626' }}>
-              <div style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b' }}>VALIDATION R² (HOLD-OUT)</div>
+              <div style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b' }}>
+                VALIDATION R² ({neuralModel.config.validationMethod === 'kfold' ? `${neuralModel.config.kFolds}-FOLD` : neuralModel.config.validationMethod === 'holdout' ? 'HOLD-OUT' : 'TRAINING'})
+              </div>
               <div style={{ fontSize: '1.45rem', fontWeight: '800', color: '#dc2626', margin: '0.15rem 0' }}>
                 {neuralModel.diagnostics.rSquaredVal.toFixed(4)}
               </div>
               <div style={{ fontSize: '0.7rem', color: neuralModel.diagnostics.rSquaredVal > 0.7 ? '#15803d' : '#64748b' }}>
-                {neuralModel.diagnostics.rSquaredVal > 0.7 ? '✓ Hold-out validation tốt (> 0.7)' : `RMSE validation = ${neuralModel.diagnostics.rmseVal.toFixed(3)}`}
+                {neuralModel.diagnostics.rSquaredVal > 0.7 ? '✓ Validation tốt (> 0.7)' : `RMSE validation = ${neuralModel.diagnostics.rmseVal.toFixed(3)}`}
               </div>
             </div>
 
@@ -2354,15 +2404,6 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                   <option value="Hot">Hot</option>
                 </select>
 
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.72rem', color: '#475569', fontWeight: '600' }}>
-                  Độ dày
-                  <input type="range" min={0.5} max={4} step={0.5} value={contourLineWidth} onChange={(e) => setContourLineWidth(Number(e.target.value))} style={{ width: '64px', cursor: 'pointer' }} />
-                  <span className="font-mono" style={{ color: '#0f766e' }}>{contourLineWidth.toFixed(1)}px</span>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.72rem', color: '#475569', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={showContourLabels} onChange={(e) => setShowContourLabels(e.target.checked)} />
-                  Nhãn đường mức
-                </label>
               </div>
             </div>
 
@@ -2503,6 +2544,17 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                       </span>
                     </div>
 
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.7rem', color: '#475569', fontWeight: '600' }}>
+                      Độ dày:
+                      <input type="range" min={0.5} max={4} step={0.5} value={contourLineWidth} onChange={(e) => setContourLineWidth(Number(e.target.value))} style={{ width: '64px', cursor: 'pointer' }} />
+                      <span className="font-mono" style={{ color: '#0f766e' }}>{contourLineWidth.toFixed(1)}px</span>
+                    </label>
+
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', color: '#475569', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={showContourLabels} onChange={(e) => setShowContourLabels(e.target.checked)} />
+                      Nhãn đường mức
+                    </label>
+
                   </div>
                 </div>
 
@@ -2605,6 +2657,18 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                     🔴 <strong>Vạch đường / mặt phẳng giới hạn CQA</strong> ({currentCQA.lowerLimit !== undefined ? `${currentCQA.lowerLimit} ≤ ` : ''}{currentCQA.code}{currentCQA.upperLimit !== undefined ? ` ≤ ${currentCQA.upperLimit}` : ''} {currentCQA.unit || ''})
                   </span>
                 </label>
+
+                {plotType === 'contour' && <>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem', color: '#475569', fontWeight: '600' }}>
+                    Độ dày:
+                    <input type="range" min={0.5} max={4} step={0.5} value={contourLineWidth} onChange={(e) => setContourLineWidth(Number(e.target.value))} style={{ width: '76px', cursor: 'pointer' }} />
+                    <span className="font-mono" style={{ color: '#0f766e' }}>{contourLineWidth.toFixed(1)}px</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', color: '#475569', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={showContourLabels} onChange={(e) => setShowContourLabels(e.target.checked)} />
+                    Nhãn đường mức
+                  </label>
+                </>}
               </div>
             )}
 

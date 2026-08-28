@@ -165,11 +165,52 @@ export const DEFAULT_NEURAL_CONFIG: NeuralNetConfig = {
   weightDecay: 0.01,
   learningRate: 0.03,
   maxEpochs: 1000,
-  validationMethod: 'holdout',
+  validationMethod: 'kfold',
   holdoutRatio: 0.25,
+  kFolds: 5,
   numTours: 10,
   seed: 42,
 };
+
+export interface NeuralValidationSplit {
+  trainIdx: number[];
+  valIdx: number[];
+}
+
+/**
+ * Create deterministic validation partitions.  K-fold rotates every valid
+ * experiment through validation exactly once; its largest validation fold is
+ * used for conservative architecture/sample-size checks.
+ */
+export function getNeuralValidationSplits(sampleCount: number, config: NeuralNetConfig): NeuralValidationSplit[] {
+  const indices = Array.from({ length: sampleCount }, (_, index) => index);
+  const rng = createRNG(config.seed + 7919);
+  for (let index = indices.length - 1; index > 0; index--) {
+    const swapIndex = Math.floor(rng() * (index + 1));
+    [indices[index], indices[swapIndex]] = [indices[swapIndex], indices[index]];
+  }
+
+  if (config.validationMethod === 'kfold' && sampleCount >= 4) {
+    const k = Math.max(2, Math.min(Math.floor(config.kFolds || 5), sampleCount));
+    return Array.from({ length: k }, (_, fold) => {
+      const start = Math.floor((fold * sampleCount) / k);
+      const end = Math.floor(((fold + 1) * sampleCount) / k);
+      const valIdx = indices.slice(start, end);
+      return { trainIdx: indices.filter((_, index) => index < start || index >= end), valIdx };
+    });
+  }
+
+  if (config.validationMethod === 'holdout' && config.holdoutRatio > 0 && sampleCount >= 6) {
+    const validationCount = Math.max(1, Math.min(Math.floor(sampleCount * 0.4), Math.round(sampleCount * config.holdoutRatio)));
+    return [{ trainIdx: indices.slice(validationCount), valIdx: indices.slice(0, validationCount) }];
+  }
+
+  return [{ trainIdx: indices, valIdx: [] }];
+}
+
+export function getNeuralTrainingSampleCount(sampleCount: number, config: NeuralNetConfig): number {
+  return Math.min(...getNeuralValidationSplits(sampleCount, config).map((split) => split.trainIdx.length));
+}
 
 /**
  * Calculate Neural Network Learnable Parameter Count and Overfitting Risk Metrics
@@ -295,19 +336,8 @@ export function fitNeuralNetModel(
   const lambda = config.weightDecay;
   const lr = config.learningRate;
   const parameterCount = calculateNeuralArchitectureMetrics(numInputs, h1, h2, 1, N).totalParameters;
-  const expectedValidationCount = config.validationMethod === 'holdout' && config.holdoutRatio > 0 && N >= 6
-    ? Math.max(1, Math.min(Math.floor(N * 0.4), Math.round(N * config.holdoutRatio)))
-    : 0;
-  if (N - expectedValidationCount <= parameterCount) return null;
-
-  // Keep one final holdout partition across restarts. The holdout is never
-  // used to select an epoch or restart; it is evaluated only after training.
-  const splitRng = createRNG(config.seed + 7919);
-  const validationIndices = Array.from({ length: N }, (_, i) => i);
-  for (let i = N - 1; i > 0; i--) {
-    const j = Math.floor(splitRng() * (i + 1));
-    [validationIndices[i], validationIndices[j]] = [validationIndices[j], validationIndices[i]];
-  }
+  const validationSplits = getNeuralValidationSplits(N, config);
+  if (getNeuralTrainingSampleCount(N, config) <= parameterCount) return null;
 
   let bestGlobalSelectionLoss = Infinity;
   let bestGlobalWeights: NeuralLayerWeights | null = null;
@@ -315,25 +345,13 @@ export function fitNeuralNetModel(
   let bestGlobalLossHistory: { epoch: number; trainLoss: number; valLoss?: number }[] = [];
   let bestGlobalSplit: { trainIdx: number[]; valIdx: number[] } | null = null;
 
-  // 3. Multi-Tour Training loop (Multi-Tour Optimization Restarts)
-  for (let tour = 0; tour < config.numTours; tour++) {
-    const tourSeed = config.seed + tour * 10007;
+  // 3. Every K-fold is trained independently; each observation is held out
+  // once when K-fold validation is selected.
+  for (let fold = 0; fold < validationSplits.length; fold++) {
+    const { trainIdx, valIdx } = validationSplits[fold];
+    for (let tour = 0; tour < config.numTours; tour++) {
+    const tourSeed = config.seed + fold * 1_000_003 + tour * 10007;
     const rng = createRNG(tourSeed);
-
-    // Train/Val Partitioning
-    const indices = [...validationIndices];
-
-    let trainIdx: number[] = [];
-    let valIdx: number[] = [];
-
-    if (config.validationMethod === 'holdout' && config.holdoutRatio > 0 && N >= 6) {
-      const valCount = Math.max(1, Math.min(Math.floor(N * 0.4), Math.round(N * config.holdoutRatio)));
-      valIdx = indices.slice(0, valCount);
-      trainIdx = indices.slice(valCount);
-    } else {
-      trainIdx = indices;
-      valIdx = [];
-    }
 
     const nTrain = trainIdx.length;
 
@@ -600,13 +618,33 @@ export function fitNeuralNetModel(
       }
     }
 
-    // Check if this tour is the best across all tours
-    if (tourBestSelectionLoss < bestGlobalSelectionLoss) {
-      bestGlobalSelectionLoss = tourBestSelectionLoss;
+    // Validation loss selects the candidate whenever a validation partition
+    // exists. For K-fold this makes every fold contribute a held-out model
+    // comparison instead of merely rotating the training rows.
+    const validationSelectionLoss = valIdx.length > 0
+      ? valIdx.reduce((sum, index) => {
+        const x = X_all[index];
+        const weights = tourBestWeights;
+        const a1 = weights.b1.map((bias, hiddenIndex) => activate(
+          bias + x.reduce((inner, value, inputIndex) => inner + value * weights.W1[inputIndex][hiddenIndex], 0), act,
+        ));
+        const aLast = hasLayer2 && weights.W2 && weights.b2
+          ? weights.b2.map((bias, hiddenIndex) => activate(
+            bias + a1.reduce((inner, value, inputIndex) => inner + value * weights.W2![inputIndex][hiddenIndex], 0), act,
+          ))
+          : a1;
+        const prediction = weights.bOut + aLast.reduce((inner, value, hiddenIndex) => inner + value * weights.WOut[hiddenIndex][0], 0);
+        return sum + Math.pow(prediction - Y_norm_all[index], 2);
+      }, 0) / valIdx.length
+      : tourBestSelectionLoss;
+
+    if (validationSelectionLoss < bestGlobalSelectionLoss) {
+      bestGlobalSelectionLoss = validationSelectionLoss;
       bestGlobalWeights = tourBestWeights;
       bestGlobalTourIndex = tour + 1;
       bestGlobalLossHistory = lossHistory;
       bestGlobalSplit = { trainIdx, valIdx };
+    }
     }
   }
 
@@ -939,17 +977,8 @@ export function fitMultiOutputNeuralNet(
   const lr = config.learningRate;
 
   const totalParams = calculateNeuralArchitectureMetrics(numInputs, h1, h2, numOutputs, N).totalParameters;
-  const expectedValidationCount = config.validationMethod === 'holdout' && config.holdoutRatio > 0 && N >= 6
-    ? Math.max(1, Math.min(Math.floor(N * 0.4), Math.round(N * config.holdoutRatio)))
-    : 0;
-  if (N - expectedValidationCount <= totalParams) return {};
-
-  const splitRng = createRNG(config.seed + 7919);
-  const validationIndices = Array.from({ length: N }, (_, i) => i);
-  for (let i = N - 1; i > 0; i--) {
-    const j = Math.floor(splitRng() * (i + 1));
-    [validationIndices[i], validationIndices[j]] = [validationIndices[j], validationIndices[i]];
-  }
+  const validationSplits = getNeuralValidationSplits(N, config);
+  if (getNeuralTrainingSampleCount(N, config) <= totalParams) return {};
 
   // Reserve one fixed final holdout. Epoch and restart selection below use
   // regularized training loss only, preventing optimistic holdout reuse.
@@ -966,24 +995,13 @@ export function fitMultiOutputNeuralNet(
   let bestGlobalLossHistory: { epoch: number; trainLoss: number; valLoss?: number }[] = [];
   let bestGlobalSplit: { trainIdx: number[]; valIdx: number[] } | null = null;
 
-  // Multi-Tour Training loop
-  for (let tour = 0; tour < config.numTours; tour++) {
-    const tourSeed = config.seed + tour * 10007;
+  // Train all folds independently so every observation serves as validation
+  // once under K-fold cross validation.
+  for (let fold = 0; fold < validationSplits.length; fold++) {
+    const { trainIdx, valIdx } = validationSplits[fold];
+    for (let tour = 0; tour < config.numTours; tour++) {
+    const tourSeed = config.seed + fold * 1_000_003 + tour * 10007;
     const rng = createRNG(tourSeed);
-
-    const indices = [...validationIndices];
-
-    let trainIdx: number[] = [];
-    let valIdx: number[] = [];
-
-    if (config.validationMethod === 'holdout' && config.holdoutRatio > 0 && N >= 6) {
-      const valCount = Math.max(1, Math.min(Math.floor(N * 0.4), Math.round(N * config.holdoutRatio)));
-      valIdx = indices.slice(0, valCount);
-      trainIdx = indices.slice(valCount);
-    } else {
-      trainIdx = indices;
-      valIdx = [];
-    }
 
     const nTrain = trainIdx.length;
 
@@ -1257,12 +1275,38 @@ export function fitMultiOutputNeuralNet(
       }
     }
 
-    if (tourBestSelectionLoss < bestGlobalSelectionLoss) {
-      bestGlobalSelectionLoss = tourBestSelectionLoss;
+    const validationSelectionLoss = valIdx.length > 0
+      ? valIdx.reduce((sum, index) => {
+        const x = X_all[index];
+        const weights = tourBestWeights;
+        const a1 = weights.b1.map((bias, hiddenIndex) => activate(
+          bias + x.reduce((inner, value, inputIndex) => inner + value * weights.W1[inputIndex][hiddenIndex], 0), act,
+        ));
+        const aLast = hasLayer2 && weights.W2 && weights.b2
+          ? weights.b2.map((bias, hiddenIndex) => activate(
+            bias + a1.reduce((inner, value, inputIndex) => inner + value * weights.W2![inputIndex][hiddenIndex], 0), act,
+          ))
+          : a1;
+        let loss = 0;
+        let count = 0;
+        for (let outputIndex = 0; outputIndex < numOutputs; outputIndex++) {
+          if (!Y_valid_mask[index][outputIndex]) continue;
+          const prediction = weights.bOut[outputIndex] + aLast.reduce((inner, value, hiddenIndex) =>
+            inner + value * weights.WOut[hiddenIndex][outputIndex], 0);
+          loss += Math.pow(prediction - Y_norm_all[index][outputIndex], 2);
+          count++;
+        }
+        return sum + loss / Math.max(1, count);
+      }, 0) / valIdx.length
+      : tourBestSelectionLoss;
+
+    if (validationSelectionLoss < bestGlobalSelectionLoss) {
+      bestGlobalSelectionLoss = validationSelectionLoss;
       bestGlobalWeights = tourBestWeights;
       bestGlobalTourIndex = tour + 1;
       bestGlobalLossHistory = lossHistory;
       bestGlobalSplit = { trainIdx, valIdx };
+    }
     }
   }
 
