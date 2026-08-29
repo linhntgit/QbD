@@ -18,6 +18,7 @@ import { getReportReadiness, loadPersistedProject, persistProject, recordProject
 import { stableSeedFromText } from './services/random';
 import { Navbar } from './components/Navbar';
 import { TabNavigation, type TabKey } from './components/TabNavigation';
+import { trackTabChange, trackProjectAction, trackModelAction } from './services/analytics';
 
 const QTPPTab = lazy(() => import('./components/tabs/QTPPTab').then((module) => ({ default: module.QTPPTab })));
 const FMEATab = lazy(() => import('./components/tabs/FMEATab').then((module) => ({ default: module.FMEATab })));
@@ -88,6 +89,10 @@ export function App() {
     return () => window.clearTimeout(timer);
   }, [project]);
 
+  useEffect(() => {
+    trackTabChange(activeTab);
+  }, [activeTab]);
+
   // Calculate ANOVA Models dynamically for all CQAs
   const models = useMemo<Record<string, StatisticalModelResult>>(() => {
     const result: Record<string, StatisticalModelResult> = {};
@@ -125,6 +130,11 @@ export function App() {
 
   // Handle Training Shared Neural Network model (fits all CQAs at once)
   const handleTrainSharedNeuralModel = (config: NeuralNetConfig) => {
+    trackModelAction('neural', 'train_shared', {
+      hidden_nodes_1: config.hiddenNodes1,
+      hidden_nodes_2: config.hiddenNodes2,
+      max_epochs: config.maxEpochs,
+    });
     const next = { ...config, seed: config.seed };
     setSharedNeuralConfig(next);
     setNeuralTrainingVersion((version) => version + 1);
@@ -133,6 +143,7 @@ export function App() {
 
   // Handle Training specific Independent Neural Network model with custom hyperparameters
   const handleTrainIndependentNeuralModel = (cqaCode: string, config: NeuralNetConfig) => {
+    trackModelAction('neural', 'train_independent', { cqa: cqaCode });
     const next = { ...neuralConfigs, [cqaCode]: { ...config, seed: config.seed } };
     setNeuralConfigs(next);
     setNeuralTrainingVersion((version) => version + 1);
@@ -141,6 +152,7 @@ export function App() {
 
   // Handle Batch Training all Independent Neural Network models
   const handleTrainAllIndependentNeuralModels = () => {
+    trackModelAction('neural', 'train_all_independent');
     const next: Record<string, NeuralNetConfig> = {};
     project.cqas.forEach((cqa) => {
       const existing = neuralConfigs[cqa.code] || DEFAULT_NEURAL_CONFIG;
@@ -214,6 +226,7 @@ export function App() {
   }
 
   const handleModelingEngineChange = (engine: ModelingEngine) => {
+    trackModelAction(engine, 'switch_engine');
     setModelingEngine(engine);
     persistAnalysisSettings({ modelingEngine: engine, appliedOptimum: undefined });
   };
@@ -252,6 +265,7 @@ export function App() {
       window.alert(`Không thể tải project vì template không hợp lệ:\n${validation.errors.join('\n')}`);
       return;
     }
+    trackProjectAction('load', { project_name: newProj.name, molecule: newProj.moleculeName });
     pendingAuditAction.current = 'Tải project/case study';
     const normalized = normalizeProjectAnalysis(newProj);
     setProject(normalized);
@@ -337,6 +351,7 @@ export function App() {
       designSpace: [],
     };
 
+    trackProjectAction('new');
     pendingAuditAction.current = 'Tạo project mới';
     const normalized = normalizeProjectAnalysis(blankProject);
     setProject(normalized);
@@ -365,6 +380,7 @@ export function App() {
 
   // Save Project JSON
   const handleSaveJSON = () => {
+    trackProjectAction('save_json', { project_name: project.name, molecule: project.moleculeName });
     const jsonStr = JSON.stringify(project, null, 2);
     const blob = new Blob([jsonStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -381,6 +397,7 @@ export function App() {
       window.alert(`Chưa thể xuất báo cáo khoa học cuối cùng.\n${[...reportReadiness.errors, ...reportReadiness.warnings].slice(0, 8).join('\n')}`);
       return;
     }
+    trackProjectAction('export_word', { project_name: project.name, engine: modelingEngine });
     const { exportQBDWordReport } = await import('./services/reportGenerator');
     exportQBDWordReport(project, models, optimum, monteCarlo, neuralModels, modelingEngine);
   };
