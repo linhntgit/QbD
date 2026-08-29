@@ -290,7 +290,10 @@ export function fitNeuralNetModel(
   const config: NeuralNetConfig = { ...DEFAULT_NEURAL_CONFIG, ...userConfig };
   const activeFactors = factors.filter((f) => f.controllability !== 'constant');
   const inputFeatures = buildFactorFeatures(activeFactors);
-  const numInputs = inputFeatures.length;
+  const blockLevels = [...new Set(runs.map((run) => Math.max(1, Math.floor(run.block ?? 1))))].sort((a, b) => a - b);
+  const blockFeatures = blockLevels.slice(1);
+  const blockValues = (block?: number) => blockFeatures.map((level) => Math.max(1, Math.floor(block ?? 1)) === level ? 1 : 0);
+  const numInputs = inputFeatures.length + blockFeatures.length;
 
   if (numInputs === 0) return null;
 
@@ -311,7 +314,7 @@ export function fitNeuralNetModel(
   const validData = runs
     .map((r) => ({
       run: r,
-      x: inputFeatures.map((feature) => feature.evaluator(r.factorCoded)),
+      x: [...inputFeatures.map((feature) => feature.evaluator(r.factorCoded)), ...blockValues(r.block)],
       y: parseResponse(r.responses[cqa.code]),
     }))
     .filter((d): d is { run: DoERun; x: number[]; y: number } => d.y !== null);
@@ -652,7 +655,7 @@ export function fitNeuralNetModel(
 
   // 4. Create Evaluation / Prediction Function using optimal weights
   const { W1, b1, W2, b2, WOut, bOut } = bestGlobalWeights;
-  const inputCodes = inputFeatures.map((feature) => feature.name);
+  const inputCodes = [...inputFeatures.map((feature) => feature.name), ...blockFeatures.map((block) => `Block ${block}`)];
   const lastHidden = hasLayer2 ? h2 : h1;
 
   const predictNorm = (xVector: number[]): number => {
@@ -683,9 +686,13 @@ export function fitNeuralNetModel(
   };
 
   const predict = (coded: Record<string, number>): number => {
-    const xVec = inputFeatures.map((feature) => feature.evaluator(coded));
+    const xVec = [...inputFeatures.map((feature) => feature.evaluator(coded)), ...blockValues()];
     const pNorm = predictNorm(xVec);
     return pNorm * ySd + yMean;
+  };
+  const predictRun = (run: DoERun): number => {
+    const xVec = [...inputFeatures.map((feature) => feature.evaluator(run.factorCoded)), ...blockValues(run.block)];
+    return predictNorm(xVec) * ySd + yMean;
   };
 
   // 5. Diagnostics: Actual vs Predicted, Residuals, R², RMSE, MAE
@@ -704,7 +711,7 @@ export function fitNeuralNetModel(
 
   validData.forEach((d, i) => {
     const isVal = valSet.has(i);
-    const predVal = predict(d.run.factorCoded);
+    const predVal = predictRun(d.run);
     const res = d.y - predVal;
 
     residuals.push({
@@ -915,7 +922,10 @@ export function fitMultiOutputNeuralNet(
   const config: NeuralNetConfig = { ...DEFAULT_NEURAL_CONFIG, ...userConfig };
   const activeFactors = factors.filter((f) => f.controllability !== 'constant');
   const inputFeatures = buildFactorFeatures(activeFactors);
-  const numInputs = inputFeatures.length;
+  const blockLevels = [...new Set(runs.map((run) => Math.max(1, Math.floor(run.block ?? 1))))].sort((a, b) => a - b);
+  const blockFeatures = blockLevels.slice(1);
+  const blockValues = (block?: number) => blockFeatures.map((level) => Math.max(1, Math.floor(block ?? 1)) === level ? 1 : 0);
+  const numInputs = inputFeatures.length + blockFeatures.length;
   const numOutputs = cqas.length;
 
   if (numInputs === 0 || numOutputs === 0) return {};
@@ -936,7 +946,7 @@ export function fitMultiOutputNeuralNet(
   // Filter runs where at least one CQA is valid
   const validData = runs
     .map((r) => {
-      const x = inputFeatures.map((feature) => feature.evaluator(r.factorCoded));
+      const x = [...inputFeatures.map((feature) => feature.evaluator(r.factorCoded)), ...blockValues(r.block)];
       const yArr = cqas.map((cqa) => parseResponse(r.responses[cqa.code]));
       return { run: r, x, yArr };
     })
@@ -1315,7 +1325,7 @@ export function fitMultiOutputNeuralNet(
   // Extract individual NeuralNetModelResult for each CQA
   const results: Record<string, NeuralNetModelResult> = {};
   const { W1, b1, W2, b2, WOut, bOut } = bestGlobalWeights;
-  const inputCodes = inputFeatures.map((feature) => feature.name);
+  const inputCodes = [...inputFeatures.map((feature) => feature.name), ...blockFeatures.map((block) => `Block ${block}`)];
   const valSet = new Set(bestGlobalSplit.valIdx);
 
   cqas.forEach((cqa, cIdx) => {
@@ -1350,10 +1360,14 @@ export function fitMultiOutputNeuralNet(
     };
 
     const predict = (coded: Record<string, number>): number => {
-      const xVec = inputFeatures.map((feature) => feature.evaluator(coded));
+      const xVec = [...inputFeatures.map((feature) => feature.evaluator(coded)), ...blockValues()];
       const pNorm = predictNorm(xVec);
       return pNorm * ySd + yMean;
     };
+    const predictRun = (run: DoERun): number => predictNorm([
+      ...inputFeatures.map((feature) => feature.evaluator(run.factorCoded)),
+      ...blockValues(run.block),
+    ]) * ySd + yMean;
 
     // Diagnostics for this CQA
     const residuals: NeuralResidual[] = [];
@@ -1372,7 +1386,7 @@ export function fitMultiOutputNeuralNet(
       if (actualY === null) return;
 
       const isVal = valSet.has(i);
-      const predVal = predict(d.run.factorCoded);
+      const predVal = predictRun(d.run);
       const res = actualY - predVal;
 
       residuals.push({

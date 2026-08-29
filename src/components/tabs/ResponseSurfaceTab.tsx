@@ -65,6 +65,8 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
   useEffect(() => {
     if (hasMixture && plotType !== 'ternary') {
       setPlotType('ternary');
+    } else if (!hasMixture && plotType === 'ternary') {
+      setPlotType('3d');
     }
   }, [project.id, hasMixture, plotType]);
 
@@ -762,22 +764,24 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                   2D Contour
                 </button>
               </>}
-              <button
-                onClick={() => setPlotType('ternary')}
-                className={`btn ${plotType === 'ternary' ? 'btn-teal' : 'btn-secondary'}`}
-                style={{
-                  padding: '0.35rem 0.65rem',
-                  fontSize: '0.8rem',
-                  border: 'none',
-                  fontWeight: '700',
-                  backgroundColor: plotType === 'ternary' ? '#0f766e' : undefined,
-                  color: plotType === 'ternary' ? '#ffffff' : undefined,
-                }}
-                title="Đồ thị Contour Tam Giác Hỗn Hợp 3 Thành Phần (Ternary 3-Component Mixture Plot)"
-              >
-                <FlaskConical size={14} style={{ display: 'inline', marginRight: '0.2rem' }} />
-                <span>Tam Giác Hỗn Hợp</span>
-              </button>
+              {hasMixture && (
+                <button
+                  onClick={() => setPlotType('ternary')}
+                  className={`btn ${plotType === 'ternary' ? 'btn-teal' : 'btn-secondary'}`}
+                  style={{
+                    padding: '0.35rem 0.65rem',
+                    fontSize: '0.8rem',
+                    border: 'none',
+                    fontWeight: '700',
+                    backgroundColor: plotType === 'ternary' ? '#0f766e' : undefined,
+                    color: plotType === 'ternary' ? '#ffffff' : undefined,
+                  }}
+                  title="Đồ thị Contour Tam Giác Hỗn Hợp 3 Thành Phần (Ternary 3-Component Mixture Plot)"
+                >
+                  <FlaskConical size={14} style={{ display: 'inline', marginRight: '0.2rem' }} />
+                  <span>Tam Giác Hỗn Hợp</span>
+                </button>
+              )}
             </div>
 
             {/* Colorscale */}

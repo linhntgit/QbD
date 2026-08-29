@@ -116,9 +116,6 @@ export function fitModel(
   // A 0/100 surrogate is not a binomial model.  Fail closed until a logistic
   // modelling engine is supplied rather than reporting invalid OLS p-values.
   if (cqa.dataType === 'qualitative_binary' || cqa.objective === 'pass_category') return null;
-  // Block-adjusted inference is not implemented. Fail closed instead of
-  // reporting p-values that confound execution batch with treatment effects.
-  if (new Set(runs.map((run) => run.block ?? 1)).size > 1) return null;
   // Only vary factors that are not constant
   const activeFactors = factors.filter((f) => f.controllability !== 'constant');
 
@@ -143,7 +140,18 @@ export function fitModel(
 
   const n = validRuns.length;
   const terms = buildTerms(activeFactors, modelType);
-  const p = terms.length;
+  // Treat execution block as a fixed nuisance effect.  The lowest numbered
+  // block is the reference; this keeps the treatment surface interpretable
+  // for normal operating conditions while removing between-block shifts from
+  // treatment estimates and residual diagnostics.
+  const blockLevels = [...new Set(validRuns.map(({ run }) => Math.max(1, Math.floor(run.block ?? 1))))].sort((a, b) => a - b);
+  const referenceBlock = blockLevels[0] ?? 1;
+  const adjustedBlocks = blockLevels.slice(1);
+  const blockColumnValues = validRuns.map(({ run }) => {
+    const block = Math.max(1, Math.floor(run.block ?? 1));
+    return adjustedBlocks.map((level) => block === level ? 1 : 0);
+  });
+  const p = terms.length + adjustedBlocks.length;
   const hasExplicitIntercept = terms[0]?.name === 'Intercept';
 
   // A valid OLS ANOVA needs a full-rank model and at least one residual degree
@@ -151,7 +159,10 @@ export function fitModel(
   if (n <= p) return null;
 
   // Build X matrix (n x p) and Y vector (n x 1)
-  const X: number[][] = validRuns.map(({ run }) => terms.map((t) => t.evaluator(run.factorCoded)));
+  const X: number[][] = validRuns.map(({ run }, index) => [
+    ...terms.map((t) => t.evaluator(run.factorCoded)),
+    ...blockColumnValues[index],
+  ]);
   const Y: number[][] = validRuns.map(({ parsedY }) => [parsedY!]);
 
   const XT = matTranspose(X);
@@ -175,17 +186,12 @@ export function fitModel(
   // Sum of Squares
   const ssTotal = yActual.reduce((sum, act) => sum + Math.pow(act - yMean, 2), 0);
   const ssResidual = residuals.reduce((sum, res) => sum + Math.pow(res, 2), 0);
-  const ssModel = Math.max(0, ssTotal - ssResidual);
 
   const dfTotal = n - 1;
-  const dfModel = p - 1;
   const dfResidual = n - p;
-
-  const msModel = dfModel > 0 ? ssModel / dfModel : 0;
+  const treatmentDF = terms.length - (hasExplicitIntercept ? 1 : 0);
   const msResidual = dfResidual > 0 ? ssResidual / dfResidual : 0;
 
-  const fModel = msResidual > 0 ? msModel / msResidual : 0;
-  const pModel = fDistributionPValue(fModel, dfModel, dfResidual);
 
   // Hat matrix H = X * (X^T X)^-1 * X^T for leverage & studentized residuals
   const H = matMul(matMul(X, invXTX), XT);
@@ -194,7 +200,9 @@ export function fitModel(
   // Pure Error & Lack of Fit calculation (group duplicate factor combinations)
   const pointGroups: { [key: string]: number[] } = {};
   validRuns.forEach(({ run }, idx) => {
-    const key = activeFactors.map((f) => run.factorCoded[f.code]?.toFixed(3) ?? '0').join('|');
+    // Replicates in different execution blocks are not pure-error replicates:
+    // their fixed block effect is explicitly estimated in the fitted model.
+    const key = `${Math.max(1, Math.floor(run.block ?? 1))}|${activeFactors.map((f) => run.factorCoded[f.code]?.toFixed(3) ?? '0').join('|')}`;
     if (!pointGroups[key]) pointGroups[key] = [];
     pointGroups[key].push(yActual[idx]);
   });
@@ -230,7 +238,7 @@ export function fitModel(
   const vifs = calculateVIFs(X, hasExplicitIntercept ? 1 : 0);
 
   // Compute Term Statistics (SE, t-value, p-value)
-  const regressionTerms: RegressionTerm[] = terms.map((t, idx) => {
+  const regressionTerms: RegressionTerm[] = [...terms.map((t, idx) => {
     const coeff = Beta[idx][0];
     const c_jj = Math.max(0, invXTX[idx][idx]);
     const se = Math.sqrt(msResidual * c_jj);
@@ -248,7 +256,18 @@ export function fitModel(
       vif: hasExplicitIntercept && idx === 0 ? 1 : vifs[idx],
       significant: pVal < 0.05,
     };
-  });
+  }), ...adjustedBlocks.map((block, offset) => {
+    const idx = terms.length + offset;
+    const coeff = Beta[idx][0];
+    const se = Math.sqrt(msResidual * Math.max(0, invXTX[idx][idx]));
+    const tVal = se > 0 ? coeff / se : 0;
+    return {
+      name: `Block ${block} (so với Block ${referenceBlock})`,
+      factorCodes: [], power: [], coefficient: coeff, stdError: se, tValue: tVal,
+      pValue: tDistributionPValue(tVal, dfResidual), vif: vifs[idx],
+      significant: tDistributionPValue(tVal, dfResidual) < 0.05,
+    };
+  })];
 
   // Diagnostic Metrics
   let press = 0;
@@ -303,31 +322,36 @@ export function fitModel(
   const cvPercent = yMean !== 0 ? (stdDev / yMean) * 100 : 0;
 
   // Build ANOVA Table
-  const anova: ANOVASource[] = [
-    {
-      source: 'Model',
-      ss: ssModel,
-      df: dfModel,
-      ms: msModel,
-      fValue: fModel,
-      pValue: pModel,
-    },
-  ];
-
   // Mixture bases omit an explicit intercept, but their components sum to one.
   // Use a constant-only baseline for sequential sums of squares rather than
   // treating the first mixture component as an intercept.
   const interceptX = hasExplicitIntercept ? X.map((row) => [row[0]]) : X.map(() => [1]);
-  const linearEnd = (hasExplicitIntercept ? 1 : 0) + linearCount;
-  const linearX = X.map((row) => row.slice(0, linearEnd));
-  const interactionEnd = linearEnd + interactionCount;
-  const interactionX = X.map((row) => row.slice(0, interactionEnd));
+  const blockX = interceptX.map((row, index) => [...row, ...blockColumnValues[index]]);
   const sseIntercept = calculateSSE(interceptX, Y);
+  const sseBlock = adjustedBlocks.length > 0 ? calculateSSE(blockX, Y) : sseIntercept;
+  const ssBlock = Math.max(0, sseIntercept - sseBlock);
+  const dfBlock = adjustedBlocks.length;
+  const ssModel = Math.max(0, sseBlock - ssResidual);
+  const msModel = treatmentDF > 0 ? ssModel / treatmentDF : 0;
+  const fModel = msResidual > 0 ? msModel / msResidual : 0;
+  const pModel = treatmentDF > 0 ? fDistributionPValue(fModel, treatmentDF, dfResidual) : undefined;
+  const anova: ANOVASource[] = [];
+  if (dfBlock > 0) {
+    const msBlock = ssBlock / dfBlock;
+    anova.push({ source: 'Block (fixed effect)', ss: ssBlock, df: dfBlock, ms: msBlock,
+      fValue: msResidual > 0 ? msBlock / msResidual : undefined,
+      pValue: msResidual > 0 ? fDistributionPValue(msBlock / msResidual, dfBlock, dfResidual) : undefined });
+  }
+  anova.push({ source: 'Model (đã hiệu chỉnh block)', ss: ssModel, df: treatmentDF, ms: msModel, fValue: fModel, pValue: pModel });
+  const linearEnd = (hasExplicitIntercept ? 1 : 0) + linearCount;
+  const linearX = X.map((row, index) => [...blockX[index], ...row.slice(hasExplicitIntercept ? 1 : 0, linearEnd)]);
+  const interactionEnd = linearEnd + interactionCount;
+  const interactionX = X.map((row, index) => [...blockX[index], ...row.slice(hasExplicitIntercept ? 1 : 0, interactionEnd)]);
   const sseLinear = calculateSSE(linearX, Y);
   const sse2FI = interactionCount > 0 ? calculateSSE(interactionX, Y) : sseLinear;
 
   if (linearDF > 0) {
-    const ssLinear = Math.max(0, sseIntercept - sseLinear);
+    const ssLinear = Math.max(0, sseBlock - sseLinear);
     const msLinear = ssLinear / linearDF;
     const fLinear = msResidual > 0 ? msLinear / msResidual : undefined;
     const pLinear = fLinear !== undefined && dfResidual > 0 ? fDistributionPValue(fLinear, linearDF, dfResidual) : undefined;
@@ -474,7 +498,7 @@ export function fitModel(
   };
 
   const predictStandardError = (coded: Record<string, number>): number => {
-    const x0 = terms.map((term) => term.evaluator(coded));
+    const x0 = [...terms.map((term) => term.evaluator(coded)), ...adjustedBlocks.map(() => 0)];
     const varianceMultiplier = x0.reduce(
       (sum, value, i) => sum + value * x0.reduce((inner, other, j) => inner + invXTX[i][j] * other, 0),
       0

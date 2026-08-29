@@ -100,8 +100,12 @@ describe('fail-closed statistical inference', () => {
     }));
   };
 
-  it('does not report unadjusted OLS when execution uses multiple blocks', () => {
-    expect(fitModel(cqa, [factor('X1')], makeRuns(2), 'Linear')).toBeNull();
+  it('fits a fixed block-adjusted OLS model when execution uses multiple blocks', () => {
+    const model = fitModel(cqa, [factor('X1')], makeRuns(2), 'Linear');
+    expect(model).not.toBeNull();
+    expect(model?.anova.some((row) => row.source === 'Block (fixed effect)')).toBe(true);
+    expect(model?.anova.find((row) => row.source.startsWith('Model'))?.df).toBe(1);
+    expect(model?.terms.some((term) => term.name.startsWith('Block 2'))).toBe(true);
   });
 
   it('only emits the classical curvature test for corner-plus-center designs', () => {

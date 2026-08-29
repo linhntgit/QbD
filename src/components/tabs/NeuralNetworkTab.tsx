@@ -49,6 +49,7 @@ import {
   normalizeMixtureCoded,
   setBoundedMixtureComponent,
 } from '../../services/statistics';
+import { buildFactorFeatures } from '../../services/modelTerms';
 import {
   generateTernaryContour,
   buildTernaryPlotlyTraces,
@@ -124,7 +125,11 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
     () => project.factors.filter((f) => f.controllability !== 'constant'),
     [project.factors]
   );
-  const numInputs = activeFactors.length;
+  const numInputs = useMemo(() => {
+    const treatmentInputs = buildFactorFeatures(activeFactors).length;
+    const blockCount = new Set(project.runs.map((run) => Math.max(1, Math.floor(run.block ?? 1)))).size;
+    return treatmentInputs + Math.max(0, blockCount - 1);
+  }, [activeFactors, project.runs]);
   const numOutputs = neuralTrainingMode === 'shared' ? project.cqas.length : 1;
   const numSamples = project.runs.length;
 
@@ -183,6 +188,8 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
   useEffect(() => {
     if (hasMixture && plotType !== 'ternary') {
       setPlotType('ternary');
+    } else if (!hasMixture && plotType === 'ternary') {
+      setPlotType('3d');
     }
   }, [project.id, hasMixture, plotType]);
 
@@ -1643,6 +1650,12 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             </div>
           )}
 
+          {new Set(project.runs.map((run) => Math.max(1, Math.floor(run.block ?? 1)))).size > 1 && (
+            <div style={{ marginTop: '0.65rem', padding: '0.6rem 0.8rem', borderRadius: '0.45rem', background: '#f0fdfa', border: '1px solid #99f6e4', color: '#115e59', fontSize: '0.76rem' }}>
+              Mô hình đã thêm biến giả cho block khi huấn luyện và đánh giá phần dư. Block không được xem là biến vận hành; đồ thị và tối ưu hóa dùng Block 1 làm mốc tham chiếu.
+            </div>
+          )}
+
           {/* SVG Neural Network Topology Diagram (Lớp vào, Lớp ẩn 1, Lớp ẩn 2, Lớp ra Hợp nhất / Độc lập) */}
           <div style={{ marginTop: '0.85rem' }}>
             <NeuralNetworkTopologyDiagram
@@ -2381,7 +2394,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                       2D
                     </button>
                   </>}
-                  {(hasMixture || project.factors.length >= 3) && (
+                  {hasMixture && (
                     <button
                       onClick={() => setPlotType('ternary')}
                       className={`btn ${plotType === 'ternary' ? 'btn-teal' : 'btn-secondary'}`}

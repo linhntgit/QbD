@@ -134,7 +134,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
       letter: string;
       title: string;
       subTitle?: string;
-      type: 'std' | 'run' | 'factor' | 'mixture_sum' | 'coded' | 'cqa';
+      type: 'std' | 'run' | 'block' | 'factor' | 'mixture_sum' | 'coded' | 'cqa';
       code: string;
       factor?: typeof project.factors[0];
       cqa?: typeof project.cqas[0];
@@ -163,6 +163,20 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
       isEditable: false,
       headerBg: '#f8fafc',
       headerColor: '#64748b',
+    });
+
+    // Execution block is editable per run so a practical run plan can be
+    // corrected after generation (or pasted in from a manufacturing schedule).
+    cols.push({
+      id: 'col-block',
+      letter: getLetter(colIdx++),
+      title: 'Block',
+      subTitle: '(Sửa)',
+      type: 'block',
+      code: 'block',
+      isEditable: true,
+      headerBg: '#f5f3ff',
+      headerColor: '#6d28d9',
     });
 
     // 2. Run Order
@@ -251,6 +265,8 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
         return run.stdOrder;
       case 'run':
         return run.runOrder;
+      case 'block':
+        return run.block ?? 1;
       case 'factor':
         return run.factorActual[col.code] ?? '';
       case 'mixture_sum': {
@@ -547,6 +563,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
       const factorCoded = { ...run.factorCoded };
       const responses = { ...run.responses };
       let runOrder = run.runOrder;
+      let block = run.block ?? 1;
 
       line.forEach((cellVal, cOffset) => {
         const targetC = startC + cOffset;
@@ -562,6 +579,12 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
           const num = parseInt(trimmed);
           if (!isNaN(num)) {
             runOrder = num;
+            pastedCount++;
+          }
+        } else if (col.type === 'block') {
+          const num = parseInt(trimmed);
+          if (!isNaN(num) && num >= 1) {
+            block = num;
             pastedCount++;
           }
         } else if (col.type === 'factor' && col.factor) {
@@ -599,6 +622,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
       updatedRuns[targetR] = {
         ...run,
         runOrder,
+        block,
         factorActual,
         factorCoded,
         responses,
@@ -765,6 +789,11 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
       return { ...r, runOrder: newOrder };
     });
     onUpdateProject({ runs: updatedRuns });
+  };
+
+  const handleBlockChange = (runId: string, block: number) => {
+    const safeBlock = Math.max(1, Math.floor(block) || 1);
+    onUpdateProject({ runs: project.runs.map((run) => run.id === runId ? { ...run, block: safeBlock } : run) });
   };
 
   // Re-randomize Run Order (Fisher-Yates)
@@ -1232,7 +1261,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               <input type="number" min={1} max={10} className="input-field" style={{ width: '64px', padding: '0.25rem 0.35rem' }} value={designConfig.blocks ?? 1} onChange={(e) => setDesignConfig({ ...designConfig, blocks: Math.max(1, Math.min(10, Number(e.target.value))) })} />
               block
             </label>
-            <span style={{ fontSize: '0.7rem', color: '#b45309' }}>Khi block &gt; 1, app khóa OLS/ANOVA vì chưa có block-adjusted model; dùng phần mềm thống kê chuyên dụng hoặc đưa block về 1.</span>
+            <span style={{ fontSize: '0.7rem', color: '#0f766e' }}>Khi có nhiều block, ANOVA và mạng nơ-ron sẽ hiệu chỉnh hiệu ứng block; bạn có thể sửa Block của từng run trong bảng bên dưới.</span>
           </div>
         </div>
       </div>
@@ -2186,7 +2215,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                               borderLeft: isEdgeLeft ? '2px solid #2563eb' : '1px solid #cbd5e1',
                               borderRight: isEdgeRight ? '2px solid #2563eb' : '1px solid #cbd5e1',
                               boxShadow: isActive ? 'inset 0 0 0 2px #1d4ed8' : undefined,
-                              textAlign: col.type === 'std' || col.type === 'run' || col.type === 'mixture_sum' || col.type === 'coded' ? 'center' : 'left',
+                              textAlign: col.type === 'std' || col.type === 'run' || col.type === 'block' || col.type === 'mixture_sum' || col.type === 'coded' ? 'center' : 'left',
                               position: 'relative',
                             }}
                           >
@@ -2228,6 +2257,20 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                                     handlePasteMatrix(text, runIdx, colIdx);
                                   }
                                 }}
+                              />
+                            )}
+
+                            {col.type === 'block' && (
+                              <input
+                                type="number"
+                                min={1}
+                                max={999}
+                                aria-label={`Block của run ${run.runOrder}`}
+                                style={{ width: '100%', height: '32px', border: 'none', outline: 'none', textAlign: 'center', fontWeight: '700', color: '#6d28d9', backgroundColor: 'transparent', fontSize: '0.82rem', padding: '0.2rem' }}
+                                value={run.block ?? 1}
+                                onFocus={() => { setActiveCell({ r: runIdx, c: colIdx }); setSelection({ start: { r: runIdx, c: colIdx }, end: { r: runIdx, c: colIdx } }); }}
+                                onChange={(e) => handleBlockChange(run.id, parseInt(e.target.value) || 1)}
+                                onPaste={(e) => { const text = e.clipboardData.getData('text'); if (text && (text.includes('\t') || text.includes('\n'))) { e.preventDefault(); handlePasteMatrix(text, runIdx, colIdx); } }}
                               />
                             )}
 
