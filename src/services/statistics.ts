@@ -61,10 +61,16 @@ export interface ConfirmationPlan {
   acceptanceCriterion: string;
 }
 
-function calculateSSE(X: number[][], Y: number[][]): number {
-  const beta = matMul(matMul(matInverse(matMul(matTranspose(X), X)), matTranspose(X)), Y);
-  const predicted = matMul(X, beta);
-  return Y.reduce((sum, row, i) => sum + Math.pow(row[0] - predicted[i][0], 2), 0);
+function calculateSSE(X: number[][], Y: number[][]): number | null {
+  try {
+    const beta = matMul(matMul(matInverse(matMul(matTranspose(X), X)), matTranspose(X)), Y);
+    const predicted = matMul(X, beta);
+    return Y.reduce((sum, row, i) => sum + Math.pow(row[0] - predicted[i][0], 2), 0);
+  } catch {
+    // A sequential ANOVA submodel can be aliased (for example, an intercept
+    // plus all mixture components). It must not bring down the whole UI.
+    return null;
+  }
 }
 
 /** Variance inflation factors for non-intercept columns. */
@@ -329,6 +335,7 @@ export function fitModel(
   const blockX = interceptX.map((row, index) => [...row, ...blockColumnValues[index]]);
   const sseIntercept = calculateSSE(interceptX, Y);
   const sseBlock = adjustedBlocks.length > 0 ? calculateSSE(blockX, Y) : sseIntercept;
+  if (sseIntercept === null || sseBlock === null) return null;
   const ssBlock = Math.max(0, sseIntercept - sseBlock);
   const dfBlock = adjustedBlocks.length;
   const ssModel = Math.max(0, sseBlock - ssResidual);
@@ -344,13 +351,16 @@ export function fitModel(
   }
   anova.push({ source: 'Model (đã hiệu chỉnh block)', ss: ssModel, df: treatmentDF, ms: msModel, fValue: fModel, pValue: pModel });
   const linearEnd = (hasExplicitIntercept ? 1 : 0) + linearCount;
-  const linearX = X.map((row, index) => [...blockX[index], ...row.slice(hasExplicitIntercept ? 1 : 0, linearEnd)]);
+  // Mixture bases already contain the constant direction (components sum to
+  // one), so adding the baseline intercept again creates an aliased matrix.
+  const sequentialBaseline = hasExplicitIntercept ? blockX : blockColumnValues;
+  const linearX = X.map((row, index) => [...sequentialBaseline[index], ...row.slice(hasExplicitIntercept ? 1 : 0, linearEnd)]);
   const interactionEnd = linearEnd + interactionCount;
-  const interactionX = X.map((row, index) => [...blockX[index], ...row.slice(hasExplicitIntercept ? 1 : 0, interactionEnd)]);
+  const interactionX = X.map((row, index) => [...sequentialBaseline[index], ...row.slice(hasExplicitIntercept ? 1 : 0, interactionEnd)]);
   const sseLinear = calculateSSE(linearX, Y);
   const sse2FI = interactionCount > 0 ? calculateSSE(interactionX, Y) : sseLinear;
 
-  if (linearDF > 0) {
+  if (linearDF > 0 && sseLinear !== null) {
     const ssLinear = Math.max(0, sseBlock - sseLinear);
     const msLinear = ssLinear / linearDF;
     const fLinear = msResidual > 0 ? msLinear / msResidual : undefined;
@@ -364,7 +374,7 @@ export function fitModel(
       pValue: pLinear,
     });
   }
-  if (interactionCount > 0) {
+  if (interactionCount > 0 && sseLinear !== null && sse2FI !== null) {
     const ss2FIBlock = Math.max(0, sseLinear - sse2FI);
     const ms2FI = ss2FIBlock / interactionCount;
     const f2FI = msResidual > 0 ? ms2FI / msResidual : undefined;
@@ -378,7 +388,7 @@ export function fitModel(
       pValue: p2FI,
     });
   }
-  if (quadraticCount > 0) {
+  if (quadraticCount > 0 && sse2FI !== null) {
     const ssQuad = Math.max(0, sse2FI - ssResidual);
     const msQuad = ssQuad / quadraticCount;
     const fQuad = msResidual > 0 ? msQuad / msResidual : undefined;
