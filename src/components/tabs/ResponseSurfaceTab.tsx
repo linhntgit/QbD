@@ -23,7 +23,7 @@ import { PlotlyChart } from '../PlotlyChart';
 import { codedToActual, actualToCoded, getConfiguredFactorCodes, getConfiguredFactorLevels, getFactorGridCodes, isDiscreteFactor } from '../../services/doeGenerator';
 import { formatAxisTitle, extract2DContourSegments, calculateCQAMargin } from '../../services/mathUtils';
 import { optimizeDesirability } from '../../services/statistics';
-import { generateTernaryContour, buildTernaryPlotlyData } from '../../services/ternaryContour';
+import { generateTernaryContour, buildTernaryPlotlyData, getEvenContourSettings } from '../../services/ternaryContour';
 
 interface ResponseSurfaceTabProps {
   project: QBDProject;
@@ -464,12 +464,15 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
       }
     } else {
       // 2D Contour
+      const zValues = surfaceGrid.zGrid.flat().filter(Number.isFinite);
+      const evenContours = getEvenContourSettings(Math.min(...zValues), Math.max(...zValues), ternaryLevels);
       traces.push({
         type: isDiscreteFactor(factorX) || isDiscreteFactor(factorY) ? 'heatmap' : 'contour',
         x: surfaceGrid.xActualArr,
         y: surfaceGrid.yActualArr,
         z: surfaceGrid.zGrid,
         colorscale: colorScale,
+        autocontour: !evenContours,
         ncontours: ternaryLevels,
         colorbar: {
           title: {
@@ -484,6 +487,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
           coloring: 'heatmap',
           showlabels: showContourLabels,
           labelfont: { family: 'Inter', size: 12, color: 'white' },
+          ...evenContours,
         },
         line: { width: contourLineWidth, color: '#334155' },
         hoverinfo: 'none',

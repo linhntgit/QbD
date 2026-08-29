@@ -52,6 +52,7 @@ import {
 import {
   generateTernaryContour,
   buildTernaryPlotlyTraces,
+  getEvenContourSettings,
 } from '../../services/ternaryContour';
 
 interface NeuralNetworkTabProps {
@@ -500,12 +501,15 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
       }
     } else {
       // 2D Contour
+      const zValues = surfaceGrid.zGrid.flat().filter(Number.isFinite);
+      const evenContours = getEvenContourSettings(Math.min(...zValues), Math.max(...zValues), ternaryLevels);
       traces.push({
         type: isDiscreteFactor(factorX) || isDiscreteFactor(factorY) ? 'heatmap' : 'contour',
         x: surfaceGrid.xActualArr,
         y: surfaceGrid.yActualArr,
         z: surfaceGrid.zGrid,
         colorscale: colorScale,
+        autocontour: !evenContours,
         ncontours: ternaryLevels,
         colorbar: {
           title: {
@@ -516,7 +520,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           len: 0.85,
           thickness: 18,
         },
-        contours: { coloring: 'heatmap', showlabels: showContourLabels },
+        contours: { coloring: 'heatmap', showlabels: showContourLabels, ...evenContours },
         line: { width: contourLineWidth, color: '#334155' },
         hoverinfo: 'none',
       });

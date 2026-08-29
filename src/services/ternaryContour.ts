@@ -74,6 +74,16 @@ export interface TernaryContourResult {
 // Equilateral triangle height for base length = 100
 export const TERNARY_HEIGHT = 50 * Math.sqrt(3); // ~86.60254037844386
 
+/** Return an explicit, value-equidistant Plotly contour interval. */
+export function getEvenContourSettings(zMin: number, zMax: number, requestedLevels: number):
+  | { start: number; end: number; size: number }
+  | undefined {
+  const levels = Math.max(2, Math.floor(requestedLevels));
+  const span = zMax - zMin;
+  if (!Number.isFinite(zMin) || !Number.isFinite(zMax) || span <= 1e-12) return undefined;
+  return { start: zMin, end: zMax, size: span / (levels - 1) };
+}
+
 /**
  * Convert mixture percentages (a, b, c summing to 100) to 2D Cartesian coordinates
  * Base BC on y = 0, Vertex A at (50, H)
@@ -436,30 +446,6 @@ export function generateTernaryContour(
   // Extract CQA Spec Limit Contour Lines (LSL / USL / Target) using 2D Marching Squares
   const contourLines: TernaryContourLine[] = [];
   const zGridClean: number[][] = zGrid.map((row) => row.map((v) => (v === null ? -999999 : v)));
-  const addContourLine = (level: number, specType?: 'LSL' | 'USL' | 'Target') => {
-    if (!Number.isFinite(level) || level < zMin || level > zMax) return;
-    const segs = extract2DContourSegments(xGrid, yGrid, zGridClean, level);
-    if (segs.length === 0) return;
-    contourLines.push({
-      level,
-      isSpecLimit: Boolean(specType),
-      specType,
-      segments: segs.map((s) => {
-        const t1 = cartesianToTernary(s.x1, s.y1);
-        const t2 = cartesianToTernary(s.x2, s.y2);
-        return {
-          p1: { a: t1.a, b: t1.b, c: t1.c, x: s.x1, y: s.y1 },
-          p2: { a: t2.a, b: t2.b, c: t2.c, x: s.x2, y: s.y2 },
-        };
-      }),
-    });
-  };
-
-  // Always create labelled response contours in addition to any specification
-  // references, so a heatmap never hides the response shape.
-  const regularCount = Math.max(3, Math.min(20, numContourLevels));
-  const contourStep = (zMax - zMin) / (regularCount + 1);
-  for (let index = 1; index <= regularCount; index++) addContourLine(zMin + contourStep * index);
 
   if (cqa.lowerLimit !== undefined) {
     const segs = extract2DContourSegments(xGrid, yGrid, zGridClean, cqa.lowerLimit);
@@ -576,8 +562,9 @@ export function buildTernaryPlotlyData(
   } = options;
 
   const traces: any[] = [];
-  const { xGrid, yGrid, zGrid, meshPoints, contourLines, constraints } = contourResult;
+  const { xGrid, yGrid, zGrid, meshPoints, contourLines, constraints, zMin, zMax } = contourResult;
   const H = TERNARY_HEIGHT;
+  const evenContours = getEvenContourSettings(zMin, zMax, ternaryLevels);
 
   // 1. Native Plotly 2D Contour (Continuous Bicubic Vector Gradient - 100% Smooth identical to 2D Contour!)
   traces.push({
@@ -586,11 +573,13 @@ export function buildTernaryPlotlyData(
     y: yGrid,
     z: zGrid,
     colorscale: colorScale,
+    autocontour: !evenContours,
     ncontours: ternaryLevels,
     contours: {
       coloring: displayMode === 'lines_only' ? 'none' : 'heatmap',
       showlabels: showContourLabels && displayMode !== 'heatmap',
       labelfont: { family: 'Inter, sans-serif', size: 11, color: '#ffffff' },
+      ...evenContours,
     },
     line: {
       smoothing: smoothness,
