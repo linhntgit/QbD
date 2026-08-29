@@ -453,6 +453,11 @@ export const ReportTab: React.FC<ReportTabProps> = ({
           <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
             5. Phương Trình Hồi Quy & Kết Quả Phân Tích Phương Sai (ANOVA - Lack of Fit)
           </h2>
+          {new Set(project.runs.map((run) => Math.max(1, Math.floor(run.block ?? 1)))).size > 1 && (
+            <p style={{ fontSize: '0.78rem', color: '#0f766e', marginBottom: '0.75rem' }}>
+              Thiết kế nhiều block: ANOVA dùng hiệu ứng block cố định; các dòng Model và hiệu ứng xử lý đã được hiệu chỉnh theo block.
+            </p>
+          )}
           {Object.values(models).map((m) => {
             const cqa = project.cqas.find((c) => c.code === m.cqaCode);
             return (
@@ -559,6 +564,10 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                   </div>
                   <div style={{ fontSize: '0.8rem', color: '#475569', marginBottom: '0.4rem' }}>
                     Train R² = <strong style={{ color: '#1e3a8a' }}>{nm.diagnostics.rSquaredTrain}</strong> | Val R² = <strong style={{ color: '#dc2626' }}>{nm.diagnostics.rSquaredVal}</strong> | Overall R² = <strong style={{ color: '#7c3aed' }}>{nm.diagnostics.rSquaredOverall}</strong> | RMSE = <strong>{nm.diagnostics.rmseOverall}</strong> (Tour #{nm.diagnostics.bestTourIndex})
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#6b21a8', marginBottom: '0.4rem' }}>
+                    <strong>Validation:</strong> {nm.config.validationMethod === 'kfold' ? `K-fold (K=${nm.config.kFolds ?? 5})` : `Holdout ${Math.round(nm.config.holdoutRatio * 100)}%`}; số run dùng Carpenter đã trừ tập validation.
+                    {new Set(project.runs.map((run) => Math.max(1, Math.floor(run.block ?? 1)))).size > 1 && ' Block là biến nuisance khi huấn luyện; dự báo/tối ưu hóa dùng Block 1 làm mốc.'}
                   </div>
                   <div style={{ fontSize: '0.75rem', color: '#6b21a8' }}>
                     <strong>Độ quan trọng yếu tố (Variable Importance): </strong>

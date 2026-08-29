@@ -68,6 +68,11 @@ export async function exportQBDWordReport(
   const sections: any[] = [];
   const reportModels: Record<string, StatisticalModelResult | NeuralNetModelResult> =
     modelingEngine === 'neural' ? (neuralModels ?? {}) : models;
+  const observedBlocks = [...new Set(project.runs.map((run) => Math.max(1, Math.floor(run.block ?? 1))))].sort((a, b) => a - b);
+  const hasMultipleBlocks = observedBlocks.length > 1;
+  const discreteOrCategoricalFactors = project.factors.filter((factor) =>
+    factor.dataType === 'qualitative' || factor.dataType === 'quantitative_multilevel'
+  );
 
   // Title & Header Information (FDA Module 3 format)
   sections.push(
@@ -489,9 +494,13 @@ export async function exportQBDWordReport(
       spacing: { before: 300, after: 150 },
     }),
     new Paragraph({
-      text: 'Phân tích phương sai (ANOVA) nhằm đánh giá mức độ ý nghĩa của toàn bộ mô hình (Model p < 0.05) và kiểm định độ tương thích Lack of Fit (p > 0.05 là đạt chuẩn không bị thiếu phù hợp theo ICH Q8 & US FDA):',
+      text: `Phân tích phương sai (ANOVA) nhằm đánh giá mức độ ý nghĩa của toàn bộ mô hình (Model p < 0.05) và kiểm định độ tương thích Lack of Fit (p > 0.05 là đạt chuẩn không bị thiếu phù hợp theo ICH Q8 & US FDA).${hasMultipleBlocks ? ` Thiết kế này có ${observedBlocks.length} block; hiệu ứng block được đưa vào mô hình như hiệu ứng cố định, do đó các hiệu ứng xử lý và phần dư được báo cáo sau khi hiệu chỉnh block.` : ''}`,
       spacing: { after: 150 },
-    })
+    }),
+    ...(discreteOrCategoricalFactors.length > 0 ? [new Paragraph({
+      text: `Biến rời rạc/định tính được mã hóa theo mức cấu hình khi khớp mô hình: ${discreteOrCategoricalFactors.map((factor) => `${factor.code} (${factor.name})`).join(', ')}. Diễn giải chỉ áp dụng trong các mức đã khảo sát.`,
+      spacing: { after: 150 },
+    })] : [])
   );
 
   Object.values(models).forEach((model) => {
@@ -598,7 +607,11 @@ export async function exportQBDWordReport(
         spacing: { before: 200, after: 100 },
       }),
       new Paragraph({
-        text: 'Áp dụng kiến trúc Multi-Layer Perceptron (MLP) với thuật toán tối ưu hóa đa vòng lặp (Multi-Tour Optimization) để mô phỏng tương tác phi tuyến tính phức tạp.',
+        text: `Áp dụng kiến trúc Multi-Layer Perceptron (MLP) với thuật toán tối ưu hóa đa vòng lặp (Multi-Tour Optimization) để mô phỏng tương tác phi tuyến tính phức tạp.${hasMultipleBlocks ? ` Hiệu ứng block (${observedBlocks.length} block) được mã hóa như biến nuisance trong huấn luyện và chẩn đoán; đồ thị/tối ưu hóa tham chiếu Block ${observedBlocks[0]}.` : ''}`,
+        spacing: { after: 150 },
+      }),
+      new Paragraph({
+        text: `Validation và kiến trúc: ${Object.values(neuralModels).map((model) => `${model.cqaCode}: ${model.config.validationMethod === 'kfold' ? `K-fold (K=${model.config.kFolds ?? 5})` : `holdout ${(model.config.holdoutRatio * 100).toFixed(0)}%`}; Carpenter dùng N huấn luyện sau khi trừ tập validation`).join(' | ')}.`,
         spacing: { after: 150 },
       })
     );
