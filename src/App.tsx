@@ -13,7 +13,7 @@ import type {
 } from './types/qbd';
 import { CASE_STUDIES } from './data/caseStudies';
 import { fitModel, optimizeDesirability, runMonteCarloSimulation } from './services/statistics';
-import { fitNeuralNetModel, fitMultiOutputNeuralNet, DEFAULT_NEURAL_CONFIG } from './services/neuralNetwork';
+import { fitNeuralNetModel, fitMultiOutputNeuralNet, DEFAULT_NEURAL_CONFIG, getNeuralArtifactFingerprint, hydrateNeuralModels, serializeNeuralModels } from './services/neuralNetwork';
 import { getReportReadiness, loadPersistedProject, persistProject, recordProjectVersion, validateProjectTemplate } from './services/projectGovernance';
 import { stableSeedFromText } from './services/random';
 import { Navbar } from './components/Navbar';
@@ -44,6 +44,7 @@ const createAnalysisSettings = (project?: QBDProject): AnalysisSettings => ({
   sharedNeuralConfig: project?.analysisSettings?.sharedNeuralConfig ?? { ...DEFAULT_NEURAL_CONFIG },
   neuralConfigs: project?.analysisSettings?.neuralConfigs ?? {},
   appliedOptimum: project?.analysisSettings?.appliedOptimum,
+  neuralArtifacts: project?.analysisSettings?.neuralArtifacts,
 });
 
 const normalizeProjectAnalysis = (source: QBDProject): QBDProject => ({
@@ -61,6 +62,12 @@ export function App() {
   const [neuralTrainingMode, setNeuralTrainingMode] = useState<NeuralTrainingMode>(() => project.analysisSettings?.neuralTrainingMode ?? 'independent');
   const [sharedNeuralConfig, setSharedNeuralConfig] = useState<NeuralNetConfig>(() => project.analysisSettings?.sharedNeuralConfig ?? { ...DEFAULT_NEURAL_CONFIG });
   const [neuralConfigs, setNeuralConfigs] = useState<Record<string, NeuralNetConfig>>(() => project.analysisSettings?.neuralConfigs ?? {});
+  const [restoredNeuralModels, setRestoredNeuralModels] = useState<Record<string, NeuralNetModelResult>>(() => {
+    const artifact = project.analysisSettings?.neuralArtifacts;
+    return artifact?.version === 1 && artifact.fingerprint === getNeuralArtifactFingerprint(project.factors, project.cqas, project.runs)
+      ? hydrateNeuralModels(artifact.models, project.factors, project.runs)
+      : {};
+  });
   // Neural fitting is computationally expensive.  It is intentionally
   // triggered only by an explicit Train action, never by editing/filling DoE
   // data in the normal UI flow.
@@ -108,7 +115,7 @@ export function App() {
 
   // Calculate Neural Network Models dynamically for all CQAs (Unified Multi-Output or Independent Per-CQA)
   const neuralModels = useMemo<Record<string, NeuralNetModelResult>>(() => {
-    if (neuralTrainingVersion === 0) return {};
+    if (neuralTrainingVersion === 0) return restoredNeuralModels;
     if (neuralTrainingMode === 'shared') {
       return fitMultiOutputNeuralNet(project.cqas, project.factors, project.runs, sharedNeuralConfig);
     }
@@ -122,6 +129,12 @@ export function App() {
     });
     return result;
   }, [neuralTrainingVersion, project.cqas, project.factors, project.runs, neuralTrainingMode, sharedNeuralConfig, neuralConfigs]);
+
+  useEffect(() => {
+    if (neuralTrainingVersion === 0 || Object.keys(neuralModels).length === 0) return;
+    const artifact = { version: 1 as const, fingerprint: getNeuralArtifactFingerprint(project.factors, project.cqas, project.runs), models: serializeNeuralModels(neuralModels) };
+    setProject((previous) => ({ ...previous, analysisSettings: { ...createAnalysisSettings(previous), neuralArtifacts: artifact } }));
+  }, [neuralTrainingVersion, neuralModels, project.factors, project.cqas, project.runs]);
 
   // Active Models based on selected Modeling Engine (Polynomial or Neural)
   const activeModels = useMemo<Record<string, StatisticalModelResult | NeuralNetModelResult>>(() => {
@@ -201,10 +214,13 @@ export function App() {
   const handleUpdateProject = (updated: Partial<QBDProject>) => {
     pendingAuditAction.current = `Cập nhật: ${Object.keys(updated).join(', ')}`;
     const invalidatesModel = Boolean(updated.factors || updated.cqas || updated.runs);
-    if (invalidatesModel) setNeuralTrainingVersion(0);
+    if (invalidatesModel) {
+      setNeuralTrainingVersion(0);
+      setRestoredNeuralModels({});
+    }
     setProject((prev) => {
       const analysisSettings = invalidatesModel
-        ? { ...createAnalysisSettings(prev), appliedOptimum: undefined }
+        ? { ...createAnalysisSettings(prev), appliedOptimum: undefined, neuralArtifacts: undefined }
         : prev.analysisSettings;
       return {
         ...prev,
@@ -279,6 +295,12 @@ export function App() {
     setNeuralTrainingMode(normalized.analysisSettings?.neuralTrainingMode ?? 'independent');
     setSharedNeuralConfig(normalized.analysisSettings?.sharedNeuralConfig ?? { ...DEFAULT_NEURAL_CONFIG });
     setNeuralConfigs(normalized.analysisSettings?.neuralConfigs ?? {});
+    const artifact = normalized.analysisSettings?.neuralArtifacts;
+    const canRestoreANN = artifact?.version === 1 && artifact.fingerprint === getNeuralArtifactFingerprint(normalized.factors, normalized.cqas, normalized.runs);
+    setRestoredNeuralModels(canRestoreANN ? hydrateNeuralModels(artifact!.models, normalized.factors, normalized.runs) : {});
+    if (artifact && !canRestoreANN) {
+      window.alert('ANN đã bị vô hiệu vì dữ liệu hoặc cấu trúc project thay đổi. Hãy train lại ANN.');
+    }
     setNeuralTrainingVersion(0);
     setModelingEngine(normalized.analysisSettings?.modelingEngine ?? 'polynomial');
     if (newProj.cqas.length > 0) {

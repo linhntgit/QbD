@@ -8,6 +8,7 @@ import type {
   FactorSensitivity,
   NeuralResidual,
   NeuralActivation,
+  SerializedNeuralNetModel,
   DesirabilitySolution,
 } from '../types/qbd';
 import {
@@ -17,6 +18,46 @@ import {
 } from './mathUtils';
 import { projectToBoundedMixture, isWithinSurveyBounds, isFeasibleBoundedMixture } from './statistics';
 import { buildFactorFeatures } from './modelTerms';
+
+export const getNeuralArtifactFingerprint = (factors: Factor[], cqas: CQA[], runs: DoERun[]): string => {
+  const source = JSON.stringify({ factors, cqas, runs });
+  let hash = 2166136261;
+  for (let index = 0; index < source.length; index++) {
+    hash ^= source.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `ann-v1-${(hash >>> 0).toString(16)}`;
+};
+
+export const serializeNeuralModels = (models: Record<string, NeuralNetModelResult>): Record<string, SerializedNeuralNetModel> =>
+  Object.fromEntries(Object.entries(models).map(([code, model]) => {
+    const { predict: _predict, ...artifact } = model;
+    return [code, artifact];
+  }));
+
+export const hydrateNeuralModels = (
+  artifacts: Record<string, SerializedNeuralNetModel>,
+  factors: Factor[],
+  runs: DoERun[],
+): Record<string, NeuralNetModelResult> => {
+  const active = factors.filter((factor) => factor.controllability !== 'constant');
+  const features = buildFactorFeatures(active);
+  const blockLevels = [...new Set(runs.map((run) => Math.max(1, Math.floor(run.block ?? 1))))].sort((a, b) => a - b);
+  const blockFeatures = blockLevels.slice(1);
+  const expectedInputs = [...features.map((feature) => feature.name), ...blockFeatures.map((block) => `Block ${block}`)];
+  return Object.fromEntries(Object.entries(artifacts).flatMap(([code, artifact]) => {
+    if (artifact.inputFactorCodes.join('|') !== expectedInputs.join('|')) return [];
+    const { W1, b1, W2, b2, WOut, bOut } = artifact.weights;
+    const activation = artifact.config.activation;
+    const predict = (coded: Record<string, number>): number => {
+      const input = [...features.map((feature) => feature.evaluator(coded)), ...blockFeatures.map(() => 0)];
+      const layer1 = b1.map((bias, j) => activate(bias + input.reduce((sum, value, k) => sum + value * W1[k][j], 0), activation));
+      const last = W2 && b2 ? b2.map((bias, j) => activate(bias + layer1.reduce((sum, value, k) => sum + value * W2[k][j], 0), activation)) : layer1;
+      return (bOut + last.reduce((sum, value, k) => sum + value * WOut[k][0], 0)) * artifact.normParams.ySd + artifact.normParams.yMean;
+    };
+    return [[code, { ...artifact, predict }]];
+  }));
+};
 import { getConfiguredFactorCodes, isDiscreteFactor } from './doeGenerator';
 
 /** Draw and perturb points only inside the physically feasible mixture simplex.

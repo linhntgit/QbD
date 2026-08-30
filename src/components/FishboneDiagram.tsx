@@ -62,6 +62,11 @@ const findCause = (causes: FishboneCause[], causeId: string): FishboneCause | un
 
 /** A clean, editable Ishikawa canvas. Labels are connected to real bones, not cards. */
 export const FishboneDiagram: React.FC<FishboneDiagramProps> = ({ diagram, onChange }) => {
+  const fontScale = Math.min(1.35, Math.max(0.8, diagram.fontScale ?? 1));
+  const changeFontScale = (delta: number) => onChange({
+    ...diagram,
+    fontScale: Number(Math.min(1.35, Math.max(0.8, fontScale + delta)).toFixed(2)),
+  });
   const geometry = useMemo<CategoryGeometry[]>(() => {
     const categoriesBySide = {
       top: diagram.categories.filter((_, index) => index % 2 === 0),
@@ -148,7 +153,13 @@ export const FishboneDiagram: React.FC<FishboneDiagramProps> = ({ diagram, onCha
           <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Sơ đồ Ishikawa</h3>
           <p style={{ margin: '0.2rem 0 0', color: '#64748b', fontSize: '0.76rem' }}>Nhấp vào chữ để sửa; <strong>↳</strong> tạo nhánh con của một nguyên nhân.</p>
         </div>
-        <button className="btn btn-secondary" onClick={addCategory} disabled={diagram.categories.length >= 8} style={{ fontSize: '0.76rem', padding: '0.35rem 0.65rem' }}><Plus size={14} /> Thêm nhánh chính</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 700 }}>Cỡ chữ</span>
+          <button type="button" className="btn btn-secondary" onClick={() => changeFontScale(-0.1)} disabled={fontScale <= 0.8} title="Giảm cỡ chữ" style={{ minWidth: 30, padding: '0.3rem 0.45rem' }}>A−</button>
+          <span className="font-mono" style={{ minWidth: 38, textAlign: 'center', fontSize: '0.72rem', color: '#334155' }}>{Math.round(fontScale * 100)}%</span>
+          <button type="button" className="btn btn-secondary" onClick={() => changeFontScale(0.1)} disabled={fontScale >= 1.35} title="Tăng cỡ chữ" style={{ minWidth: 30, padding: '0.3rem 0.45rem' }}>A+</button>
+          <button className="btn btn-secondary" onClick={addCategory} disabled={diagram.categories.length >= 8} style={{ fontSize: '0.76rem', padding: '0.35rem 0.65rem' }}><Plus size={14} /> Thêm nhánh chính</button>
+        </div>
       </div>
 
       <div style={{ border: '1px solid #dbe4ef', borderRadius: '0.75rem', background: '#fcfdff', overflow: 'hidden' }}>
@@ -163,27 +174,26 @@ export const FishboneDiagram: React.FC<FishboneDiagramProps> = ({ diagram, onCha
               <circle cx={branch.attachment.x} cy={branch.attachment.y} r="5.5" fill={branch.colour} />
               {branch.causes.map((cause) => <path key={cause.cause.id} d={`M${cause.source.x} ${cause.source.y} L${cause.end.x} ${cause.end.y}`} stroke={branch.colour} strokeWidth={cause.level === 0 ? '2.2' : '1.7'} strokeLinecap="round" opacity={cause.level === 0 ? 0.85 : 0.65} />)}
             </g>)}
-            <path d="M1250 400 Q1355 400 1438 480 Q1355 560 1250 560 Z" fill="#103f67" stroke="#082f49" strokeWidth="2.5" />
-            <circle cx="1396" cy="450" r="6.5" fill="#ffffff" /><circle cx="1398" cy="450" r="2.7" fill="#0f172a" />
+            <path d="M1210 360 Q1350 360 1472 480 Q1350 600 1210 600 Z" fill="#103f67" stroke="#082f49" strokeWidth="2.5" />
+            <circle cx="1422" cy="435" r="6.5" fill="#ffffff" /><circle cx="1424" cy="435" r="2.7" fill="#0f172a" />
           </svg>
 
           {geometry.map((branch) => <React.Fragment key={branch.id}>
             <div style={{ position: 'absolute', left: branch.title.x, top: branch.title.y, width: 220, display: 'flex', alignItems: 'center', gap: 3 }}>
-              <input aria-label="Tên nhánh chính" spellCheck={false} value={branch.name} onChange={(event) => updateCategory(branch.id, { name: event.target.value })} style={{ fontFamily: FONT, fontSize: '0.76rem', fontWeight: 800, letterSpacing: '0.02em', flex: 1, minWidth: 0, padding: '0.34rem 0.45rem', color: branch.colour, background: '#ffffff', border: `1px solid ${branch.colour}55`, borderBottom: `3px solid ${branch.colour}`, borderRadius: 5, outline: 'none' }} />
+              <textarea aria-label="Tên nhánh chính" spellCheck={false} value={branch.name} onChange={(event) => updateCategory(branch.id, { name: event.target.value })} rows={2} style={{ fontFamily: FONT, fontSize: `${0.76 * fontScale}rem`, fontWeight: 800, letterSpacing: '0.02em', flex: 1, minWidth: 0, minHeight: 42, padding: '0.34rem 0.45rem', color: branch.colour, background: '#ffffff', border: `1px solid ${branch.colour}55`, borderBottom: `3px solid ${branch.colour}`, borderRadius: 5, outline: 'none', resize: 'none', overflowY: 'auto', overflowWrap: 'anywhere', lineHeight: 1.2 }} />
               <button title={`Thêm nguyên nhân (tối đa ${MAX_CAUSES_PER_BRANCH})`} aria-label="Thêm nguyên nhân" disabled={!canAddCause(branch.id)} onClick={() => addCause(branch.id)} style={{ border: `1px solid ${branch.colour}55`, color: branch.colour, background: '#ffffff', borderRadius: 5, cursor: 'pointer', width: 26, height: 26, display: 'grid', placeItems: 'center', opacity: canAddCause(branch.id) ? 1 : 0.4 }}><Plus size={14} /></button>
               <button title="Xóa nhánh" aria-label="Xóa nhánh" onClick={() => onChange({ ...diagram, categories: diagram.categories.filter((category) => category.id !== branch.id) })} disabled={diagram.categories.length <= 1} style={{ border: 'none', color: '#dc2626', background: 'transparent', cursor: 'pointer', padding: 3 }}><Trash2 size={14} /></button>
             </div>
             {branch.causes.map((cause) => <div key={cause.cause.id} style={{ position: 'absolute', left: cause.input.x, top: cause.input.y, width: Math.max(118, 165 - cause.level * 12), display: 'flex', gap: 2, alignItems: 'center' }}>
               {cause.level > 0 && <CornerDownRight size={12} color={branch.colour} strokeWidth={2.2} />}
-              <input aria-label={`Nguyên nhân: ${cause.cause.text}`} spellCheck={false} value={cause.cause.text} onChange={(event) => updateCause(branch.id, cause.cause.id, event.target.value)} style={{ fontFamily: FONT, fontSize: cause.level === 0 ? '0.74rem' : '0.69rem', fontWeight: cause.level === 0 ? 600 : 500, minWidth: 0, flex: 1, padding: '0.25rem 0.35rem', color: '#1e293b', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 4, outline: 'none', boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)' }} />
+              <textarea aria-label={`Nguyên nhân: ${cause.cause.text}`} spellCheck={false} value={cause.cause.text} onChange={(event) => updateCause(branch.id, cause.cause.id, event.target.value)} rows={2} style={{ fontFamily: FONT, fontSize: `${(cause.level === 0 ? 0.74 : 0.69) * fontScale}rem`, fontWeight: cause.level === 0 ? 600 : 500, minWidth: 0, flex: 1, minHeight: 38, padding: '0.25rem 0.35rem', color: '#1e293b', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 4, outline: 'none', boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)', resize: 'none', overflowY: 'auto', overflowWrap: 'anywhere', lineHeight: 1.2 }} />
               <button title={`Thêm nhánh con (tối đa ${MAX_CAUSES_PER_BRANCH})`} aria-label="Thêm nhánh con" disabled={!canAddCause(branch.id, cause.cause.id)} onClick={() => addCause(branch.id, cause.cause.id)} style={{ border: 'none', color: branch.colour, background: 'transparent', cursor: 'pointer', padding: 1, opacity: canAddCause(branch.id, cause.cause.id) ? 1 : 0.4 }}><CornerDownRight size={13} /></button>
               <button title="Xóa nguyên nhân" aria-label="Xóa nguyên nhân" onClick={() => removeCause(branch.id, cause.cause.id)} style={{ border: 'none', color: '#94a3b8', background: 'transparent', cursor: 'pointer', padding: 1 }}><Trash2 size={11} /></button>
             </div>)}
           </React.Fragment>)}
 
-          <div style={{ position: 'absolute', left: 1274, top: 428, width: 124, textAlign: 'center' }}>
-            <div style={{ color: '#bfdbfe', fontFamily: FONT, fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.04em', marginBottom: 5 }}>HIỆU ỨNG / VẤN ĐỀ</div>
-            <textarea aria-label="Hiệu ứng hoặc vấn đề" spellCheck={false} value={diagram.effect} onChange={(event) => onChange({ ...diagram, effect: event.target.value })} rows={3} style={{ fontFamily: FONT, width: '100%', resize: 'none', color: '#ffffff', background: 'rgba(8, 47, 73, 0.35)', border: '1px solid #7dd3fc', borderRadius: 5, padding: 5, textAlign: 'center', fontSize: '0.73rem', fontWeight: 700, lineHeight: 1.22, outline: 'none' }} />
+          <div style={{ position: 'absolute', left: 1238, top: 434, width: 188, textAlign: 'center' }}>
+            <textarea aria-label="Vấn đề" spellCheck={false} value={diagram.effect} onChange={(event) => onChange({ ...diagram, effect: event.target.value })} rows={4} style={{ fontFamily: FONT, width: '100%', resize: 'none', color: '#ffffff', background: 'rgba(8, 47, 73, 0.35)', border: '1px solid #7dd3fc', borderRadius: 5, padding: '6px 7px', textAlign: 'center', fontSize: `${0.76 * fontScale}rem`, fontWeight: 700, lineHeight: 1.25, outline: 'none', overflowY: 'auto', overflowWrap: 'anywhere' }} />
           </div>
         </div>
         </div>

@@ -1,5 +1,7 @@
 import type { NeuralNetConfig, NeuralTrainingMode } from './neuralNetwork';
 
+import type { SerializedNeuralNetModel } from './neuralNetwork';
+
 export type FactorType = 'CMA' | 'CPP' | 'Formulation' | 'Process' | 'Mixture';
 export type FactorDataType = 'quantitative' | 'quantitative_multilevel' | 'qualitative';
 export type FactorControllability = 'controllable' | 'uncontrollable_noise' | 'constant';
@@ -87,6 +89,8 @@ export interface FishboneCategory {
 export interface FishboneDiagram {
   effect: string;
   categories: FishboneCategory[];
+  /** Relative font scale for editable labels in the Ishikawa diagram. */
+  fontScale?: number;
 }
 
 export type DoECategory = 'Screening' | 'RSM' | 'Mixture' | 'Combined_Mixture_Process' | 'Custom_Optimal';
@@ -317,6 +321,7 @@ export interface AnalysisSettings {
   neuralConfigs: Record<string, NeuralNetConfig>;
   /** Last explicitly applied profiler solution, serialized without functions. */
   appliedOptimum?: DesirabilitySolution;
+  neuralArtifacts?: { version: 1; fingerprint: string; models: Record<string, SerializedNeuralNetModel> };
 }
 
 export interface QBDProject {

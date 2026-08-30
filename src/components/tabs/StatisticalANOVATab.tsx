@@ -821,7 +821,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                 </h3>
               </div>
               <span className="badge badge-purple" style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}>
-                Model Comparison (SAS JMP & MODDE Standard)
+                Model Comparison
               </span>
             </div>
 

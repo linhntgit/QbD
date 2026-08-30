@@ -99,3 +99,6 @@ export interface NeuralNetModelResult {
   architectureMode?: NeuralTrainingMode;
   parameterCount?: number;
 }
+
+/** JSON-safe ANN result; the runtime prediction function is rebuilt on load. */
+export type SerializedNeuralNetModel = Omit<NeuralNetModelResult, 'predict'>;
