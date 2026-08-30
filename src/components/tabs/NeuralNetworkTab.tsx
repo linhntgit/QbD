@@ -156,6 +156,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
     phase: string;
   } | null>(null);
   const [lastTrainedNotice, setLastTrainedNotice] = useState<string | null>(null);
+  const [configActionNotice, setConfigActionNotice] = useState<string | null>(null);
 
   // Profiler values always remain on the bounded mixture simplex.
   const [profilerCoded, setProfilerCoded] = useState<Record<string, number>>(() => {
@@ -911,7 +912,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
   const handleCopyConfig = () => {
     if (onCopyConfigToAll) {
       onCopyConfigToAll(localConfig);
-      setLastTrainedNotice(`✓ Đã sao chép cấu hình [${localConfig.hiddenNodes1}, ${localConfig.hiddenNodes2}, ${localConfig.activation}] sang tất cả ${project.cqas.length} CQA!`);
+      setConfigActionNotice(`Đã sao chép cấu hình [${localConfig.hiddenNodes1}, ${localConfig.hiddenNodes2}, ${localConfig.activation}] sang tất cả ${project.cqas.length} CQA.`);
     }
   };
 
@@ -1625,28 +1626,62 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                   <strong>Khuyến nghị Carpenter (1995):</strong> Số nơ-ron lớp ẩn tối ưu là <strong>h = {archMetrics.carpenterRecommended}</strong> (dùng N huấn luyện = {archMetrics.numSamples}; đã trừ {numSamples - archMetrics.numSamples} run validation).
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setLocalConfig((prev) => ({
-                    ...prev,
-                    hiddenNodes1: archMetrics.carpenterRecommended || 3,
-                    hiddenNodes2: 0,
-                  }));
-                }}
-                className="btn btn-outline"
-                style={{
-                  fontSize: '0.75rem',
-                  padding: '0.25rem 0.6rem',
-                  backgroundColor: '#ffffff',
-                  borderColor: '#2563eb',
-                  color: '#2563eb',
-                  fontWeight: '700',
-                }}
-                title="Tự động đặt số nơ-ron ẩn Tầng 1 = h theo công thức Carpenter và tắt Tầng 2"
-              >
-                💡 Áp Dụng Kiến Trúc Carpenter (h = {archMetrics.carpenterRecommended})
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.35rem', maxWidth: '100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  <button
+                  type="button"
+                  onClick={() => {
+                    setLocalConfig((prev) => ({
+                      ...prev,
+                      hiddenNodes1: archMetrics.carpenterRecommended || 3,
+                      hiddenNodes2: 0,
+                    }));
+                    const target = neuralTrainingMode === 'shared'
+                      ? `mạng chung cho tất cả ${project.cqas.length} CQA`
+                      : `CQA ${currentCQA.code} (${currentCQA.name})`;
+                    setConfigActionNotice(`Đã áp dụng kiến trúc Carpenter: ${archMetrics.carpenterRecommended} nơ-ron ở Tầng 1, tắt Tầng 2 cho ${target}.`);
+                  }}
+                  className="btn btn-outline"
+                  style={{
+                    fontSize: '0.75rem',
+                    padding: '0.25rem 0.6rem',
+                    backgroundColor: '#ffffff',
+                    borderColor: '#2563eb',
+                    color: '#2563eb',
+                    fontWeight: '700',
+                  }}
+                  title="Tự động đặt số nơ-ron ẩn Tầng 1 = h theo công thức Carpenter và tắt Tầng 2"
+                  >
+                    💡 Áp Dụng Kiến Trúc Carpenter (h = {archMetrics.carpenterRecommended})
+                  </button>
+                  {neuralTrainingMode === 'independent' && (
+                    <button
+                      onClick={handleCopyConfig}
+                      disabled={isTraining}
+                      className="btn btn-outline"
+                      style={{
+                        fontSize: '0.75rem',
+                        padding: '0.25rem 0.6rem',
+                        backgroundColor: '#ffffff',
+                        borderColor: '#64748b',
+                        color: '#334155',
+                        fontWeight: '700',
+                      }}
+                      title="Sao chép cấu hình hiện tại sang toàn bộ các CQA khác"
+                    >
+                      <Share2 size={15} />
+                      <span>Áp Dụng Cho Tất Cả CQA</span>
+                    </button>
+                  )}
+                </div>
+                {configActionNotice && (
+                  <div role="status" className="animate-fade-in" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', maxWidth: '100%', padding: '0.3rem 0.45rem', borderRadius: '0.35rem', backgroundColor: '#f0fdf4', border: '1px solid #86efac', color: '#15803d', fontSize: '0.72rem', fontWeight: '600' }}>
+                    <CheckCircle2 size={14} />
+                    <span>{configActionNotice}</span>
+                    <button type="button" onClick={() => setConfigActionNotice(null)} aria-label="Đóng thông báo" style={{ color: '#15803d', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>✕</button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -1729,22 +1764,6 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                 >
                   <Zap size={15} />
                   <span>⚡ Fit All CQAs</span>
-                </button>
-
-                <button
-                  onClick={handleCopyConfig}
-                  disabled={isTraining}
-                  className="btn btn-outline"
-                  style={{
-                    fontSize: '0.82rem',
-                    padding: '0.5rem 1rem',
-                    borderColor: '#64748b',
-                    color: '#334155',
-                  }}
-                  title="Sao chép số node và hàm kích hoạt hiện tại cho toàn bộ các CQA khác"
-                >
-                  <Share2 size={15} />
-                  <span>Áp Dụng Cho Tất Cả CQA</span>
                 </button>
               </>
             )}
@@ -2208,7 +2227,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             </div>
 
             {/* Profiler Traces Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(${Math.max(220, Math.floor(1000 / project.factors.length))}px, 1fr))`, gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(${Math.max(220, Math.floor(1000 / project.factors.length))}px, 1fr))`, gap: '1rem', alignItems: 'stretch' }}>
               {project.factors.map((f) => {
                 const coded = profilerCoded[f.code] ?? 0;
                 const actual = codedToActual(coded, f);
@@ -2297,9 +2316,12 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                       borderRadius: '0.5rem',
                       padding: '0.75rem',
                       border: '1px solid #e2e8f0',
+                      display: 'grid',
+                      gridTemplateRows: 'minmax(3.2rem, auto) 160px minmax(5.4rem, 1fr)',
+                      minHeight: '350px',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.3rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.4rem', marginBottom: '0.4rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.3rem', minHeight: '2.5rem' }}>
                       <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#1e3a8a' }}>
                         {f.name} ({f.code})
                       </span>
@@ -2317,7 +2339,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                       />
                     </div>
 
-                    <div style={{ marginTop: '0.5rem' }}>
+                    <div style={{ marginTop: '0.5rem', display: 'grid', gridTemplateRows: '1.4rem 2.15rem 1.35rem', rowGap: '0.2rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.2rem' }}>
                         <span style={{ fontWeight: '600', color: '#334155' }}>Giá trị cài đặt:</span>
                         <span className="font-mono" style={{ fontWeight: '700', color: '#1e3a8a' }}>
@@ -2326,7 +2348,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                       </div>
 
                       {isDiscreteFactor(f) ? (
-                        <select className="input-field" style={{ width: '100%' }} value={String(actual)} onChange={(event) => {
+                        <select className="input-field" style={{ width: '100%', minHeight: '2.15rem' }} value={String(actual)} onChange={(event) => {
                           const levels = getConfiguredFactorLevels(f);
                           const codes = getConfiguredFactorCodes(f);
                           const index = levels.findIndex((level) => String(level) === event.target.value);
@@ -2346,10 +2368,10 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                             ? setBoundedMixtureComponent(profilerCoded, project.factors, f.code, nextValue)
                             : { ...profilerCoded, [f.code]: nextValue });
                         }}
-                        style={{ width: '100%', cursor: 'pointer' }}
+                        style={{ width: '100%', cursor: 'pointer', alignSelf: 'center' }}
                       />}
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#94a3b8' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', fontSize: '0.7rem', color: '#94a3b8' }}>
                         <span>{codedToActual(traceLow, f)} {f.unit}</span>
                         <span>{codedToActual(traceHigh, f)} {f.unit}</span>
                       </div>

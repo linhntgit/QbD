@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CQA, DoEDesignConfig, DoERun, Factor } from '../types/qbd';
-import { actualToCoded, generateDoERuns, getConfiguredFactorCodes, validateDesignSetup } from './doeGenerator';
+import { actualToCoded, assessDesignReadiness, generateDoERuns, getConfiguredFactorCodes, validateDesignSetup } from './doeGenerator';
 import { fitModel, isWithinSurveyBounds, optimizeDesirability, runMonteCarloSimulation } from './statistics';
 
 const qualitativeFactor: Factor = {
@@ -14,6 +14,31 @@ const cqa: CQA = {
 };
 
 describe('discrete factor pipeline', () => {
+  it('starts a five-factor D-optimal design at full model rank before determinant exchange', () => {
+    const factors: Factor[] = Array.from({ length: 5 }, (_, index) => ({
+      id: `x${index + 1}`,
+      code: `X${index + 1}`,
+      name: `Process factor ${index + 1}`,
+      type: 'CPP',
+      dataType: 'quantitative',
+      controllability: 'controllable',
+      unit: '',
+      low: 0,
+      high: 100,
+    }));
+    const config: DoEDesignConfig = {
+      category: 'Custom_Optimal', designType: 'DOptimal', centerPoints: 0,
+      replicates: 1, randomized: false, dOptimalModel: 'Quadratic', numRuns: 25,
+    };
+
+    const { runs } = generateDoERuns(factors, config);
+    const readiness = assessDesignReadiness(factors, runs, 'Quadratic');
+
+    expect(readiness.termCount).toBe(21);
+    expect(readiness.rank).toBe(21);
+    expect(readiness.isEstimable).toBe(true);
+  });
+
   it('fits independent category means without imposing an ordinal slope', () => {
     const means: Record<string, number> = { A: 1, B: 7, C: 2, D: 10 };
     const runs: DoERun[] = qualitativeFactor.categories!.flatMap((level, levelIndex) => [0, 1].map((replicate) => ({

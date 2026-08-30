@@ -1223,19 +1223,37 @@ export function generateDOptimalMatrix(
   // 2. Expand candidate pool into model matrix rows
   const candidateRows = candidatePool.map((pt) => expandModelVectorForFactors(pt, factors, modelOrder));
 
-  // 3. Greedy Initial Selection: Select N points to maximize initial det(X^T X)
+  // 3. Rank-aware initial selection. A singular initial X'X has determinant
+  // zero, so determinant-only point exchange cannot improve it one swap at a
+  // time. First select points which add independent model information; the
+  // subsequent Fedorov loop can then optimise a valid, full-rank design.
   const selectedIndices: number[] = [];
   const used = new Set<number>();
+  const selectedRows: number[][] = [];
+  let selectedRank = 0;
 
-  // Pick extreme corners first
-  for (let i = 0; i < Math.min(N, candidatePool.length); i++) {
+  for (let candidateIndex = 0; candidateIndex < candidatePool.length && selectedRank < numTerms; candidateIndex++) {
+    const candidateRow = candidateRows[candidateIndex];
+    const candidateRank = matrixRank([...selectedRows, candidateRow]);
+    if (candidateRank > selectedRank) {
+      selectedIndices.push(candidateIndex);
+      selectedRows.push(candidateRow);
+      used.add(candidateIndex);
+      selectedRank = candidateRank;
+    }
+  }
+
+  // Fill the remaining slots with spread-out candidates. These additions
+  // cannot reduce rank and retain the former deterministic coverage pattern.
+  for (let i = 0; selectedIndices.length < N && i < candidatePool.length; i++) {
     const step = Math.floor((i * candidatePool.length) / N);
     if (!used.has(step)) {
       selectedIndices.push(step);
       used.add(step);
     }
   }
-  // Fill remaining if needed
+
+  // Fill any gaps left by duplicate rounded steps.
   let ptr = 0;
   while (selectedIndices.length < N && ptr < candidatePool.length) {
     if (!used.has(ptr)) {
@@ -1255,28 +1273,59 @@ export function generateDOptimalMatrix(
   };
 
   let currentLogDet = computeLogDet(selectedIndices);
+  const dot = (left: number[], right: number[]): number =>
+    left.reduce((sum, value, index) => sum + value * right[index], 0);
+  const transformCandidates = (inverse: number[][]): number[][] =>
+    candidateRows.map((row) => inverse.map((inverseRow) => dot(inverseRow, row)));
+  const buildInformationMatrix = (): number[][] => {
+    const X = selectedIndices.map((idx) => candidateRows[idx]);
+    return matMul(matTranspose(X), X);
+  };
+
+  // The rank-aware seed above should make X'X invertible. If the candidate
+  // space itself cannot support the requested model, retain the existing
+  // rank-deficient result so the readiness check can report that fact.
+  let informationInverse: number[][] | null = null;
+  let transformedCandidates: number[][] | null = null;
+  if (currentLogDet > -999) {
+    informationInverse = matInverse(buildInformationMatrix());
+    transformedCandidates = transformCandidates(informationInverse);
+  }
 
   // 4. Fedorov Point Exchange Iterations
   const maxIterations = 20;
-  for (let iter = 0; iter < maxIterations; iter++) {
+  for (let iter = 0; iter < maxIterations && informationInverse && transformedCandidates; iter++) {
     let improved = false;
 
     for (let i = 0; i < N; i++) {
       const origIdx = selectedIndices[i];
+      const originalRow = candidateRows[origIdx];
+      const inverseOriginal = transformedCandidates[origIdx];
+      const originalLeverage = dot(originalRow, inverseOriginal);
 
       // Try replacing point i with a candidate from pool
       for (let c = 0; c < candidatePool.length; c++) {
-        if (c === origIdx || selectedIndices.some((selected, index) => index !== i && selected === c)) continue;
+        if (c === origIdx || used.has(c)) continue;
 
-        selectedIndices[i] = c;
-        const newLogDet = computeLogDet(selectedIndices);
+        const candidateRow = candidateRows[c];
+        const inverseCandidate = transformedCandidates[c];
+        const candidateLeverage = dot(candidateRow, inverseCandidate);
+        const crossLeverage = dot(originalRow, inverseCandidate);
+        // Matrix determinant lemma for X'X - xx' + zz'. This is algebraically
+        // identical to recomputing det(X'X) for every proposed swap, while
+        // avoiding repeated cubic-time determinant calculations.
+        const determinantRatio = (1 - originalLeverage) * (1 + candidateLeverage)
+          + crossLeverage * crossLeverage;
 
-        if (newLogDet > currentLogDet + 1e-4) {
-          currentLogDet = newLogDet;
+        if (determinantRatio > Math.exp(1e-4) && Number.isFinite(determinantRatio)) {
+          selectedIndices[i] = c;
+          used.delete(origIdx);
+          used.add(c);
+          currentLogDet += Math.log(determinantRatio);
+          informationInverse = matInverse(buildInformationMatrix());
+          transformedCandidates = transformCandidates(informationInverse);
           improved = true;
           break; // move to next design point
-        } else {
-          selectedIndices[i] = origIdx; // revert swap
         }
       }
     }

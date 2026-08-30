@@ -706,7 +706,19 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
   const runBudget = Math.max(1, designConfig.runBudget || recommendedOptimalRuns);
   const designValidation = useMemo(
     () => validateDesignSetup(project.factors, designConfig),
-    [project.factors, designConfig]
+    // Validation does not use presentation-only wizard fields (goal, budget)
+    // or randomisation settings. Keeping the dependency list precise avoids
+    // rerunning validation while a user is entering a budget.
+    [
+      project.factors,
+      designConfig.category,
+      designConfig.designType,
+      designConfig.dOptimalModel,
+      designConfig.numRuns,
+      designConfig.taguchiArray,
+      designConfig.replicates,
+      designConfig.blocks,
+    ]
   );
   const currentReadiness = useMemo(
     () => assessDesignReadiness(project.factors, project.runs, selectedOptimalModel),
@@ -723,23 +735,25 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
     return definitions.map((definition) => {
       const numRuns = recommendRunCount(activeFactors, definition.model);
       const config: DoEDesignConfig = {
-        ...designConfig,
         category,
         designType,
         dOptimalModel: definition.model,
         numRuns,
         centerPoints: 0,
         replicates: 1,
-        randomized: true,
+        // The preview must be deterministic. Randomisation and execution
+        // blocks affect run order only, not the D-optimal calculation.
+        randomized: false,
         designGoal: definition.goal,
-        runBudget,
       };
       const setup = validateDesignSetup(project.factors, config);
       const runs = setup.isValid ? generateDoERuns(project.factors, { ...config, randomized: false }).runs : [];
       const readiness = assessDesignReadiness(project.factors, runs, definition.model);
-      return { ...definition, config, numRuns, readiness, withinBudget: numRuns <= runBudget };
+      return { ...definition, category, designType, numRuns, readiness };
     });
-  }, [activeFactors, designConfig, hasMixtureProcessFactors, project.factors, runBudget]);
+  // A budget only changes whether an already-computed option is affordable;
+  // it must not regenerate three D-optimal candidate designs per keystroke.
+  }, [activeFactors, hasMixtureProcessFactors, project.factors]);
 
   // Calculate D-Efficiency and Matrix Metrics dynamically
   const designMetrics = useMemo(() => {
@@ -1021,7 +1035,8 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.65rem' }}>
             {wizardOptions.map((option) => {
               const isRecommended = option.goal === designGoal;
-              const canApply = option.withinBudget && option.readiness.isEstimable;
+              const withinBudget = option.numRuns <= runBudget;
+              const canApply = withinBudget && option.readiness.isEstimable;
               return (
                 <div key={option.goal} style={{ background: '#ffffff', border: `1px solid ${isRecommended ? '#0284c7' : '#cbd5e1'}`, borderRadius: '0.5rem', padding: '0.75rem', boxShadow: isRecommended ? '0 1px 4px rgba(2,132,199,0.15)' : 'none' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: 'center' }}>
@@ -1033,9 +1048,26 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                     <div><strong>{option.numRuns} run</strong> · {option.model} · p={option.readiness.termCount}</div>
                     <div>rank {option.readiness.rank}/{option.readiness.termCount} · df dư {option.readiness.residualDegreesOfFreedom}</div>
                   </div>
-                  {!option.withinBudget && <div style={{ fontSize: '0.7rem', color: '#b45309', marginTop: '0.35rem' }}>Vượt ngân sách {runBudget} run.</div>}
+                  {!withinBudget && <div style={{ fontSize: '0.7rem', color: '#b45309', marginTop: '0.35rem' }}>Vượt ngân sách {runBudget} run.</div>}
                   {!option.readiness.isEstimable && <div style={{ fontSize: '0.7rem', color: '#b91c1c', marginTop: '0.35rem' }}>{option.readiness.messages[0]}</div>}
-                  <button type="button" className={canApply ? 'btn btn-primary' : 'btn'} disabled={!canApply} onClick={() => { setDesignConfig(option.config); showToast(`Đã chọn ${option.label}: ${option.numRuns} run, mô hình ${option.model}.`, 'info'); }} style={{ width: '100%', marginTop: '0.55rem', fontSize: '0.74rem', padding: '0.35rem 0.5rem', opacity: canApply ? 1 : 0.5 }}>
+                  <button type="button" className={canApply ? 'btn btn-primary' : 'btn'} disabled={!canApply} onClick={() => {
+                    // Preserve execution settings that do not alter model
+                    // selection (for example, seed and blocks). As before,
+                    // a wizard recommendation enables randomisation.
+                    setDesignConfig({
+                      ...designConfig,
+                      category: option.category,
+                      designType: option.designType,
+                      dOptimalModel: option.model,
+                      numRuns: option.numRuns,
+                      centerPoints: 0,
+                      replicates: 1,
+                      randomized: true,
+                      designGoal: option.goal,
+                      runBudget,
+                    });
+                    showToast(`Đã chọn ${option.label}: ${option.numRuns} run, mô hình ${option.model}.`, 'info');
+                  }} style={{ width: '100%', marginTop: '0.55rem', fontSize: '0.74rem', padding: '0.35rem 0.5rem', opacity: canApply ? 1 : 0.5 }}>
                     Chọn phương án
                   </button>
                 </div>

@@ -1102,10 +1102,12 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                 display: 'grid',
                 gridTemplateColumns: `180px repeat(${factors.length}, minmax(220px, 1fr))`,
                 gap: '0.5rem',
-                alignItems: 'end',
+                // Every factor uses the same card height so a short discrete
+                // selector never drops below the numeric input/slider cards.
+                alignItems: 'stretch',
               }}
             >
-              <div style={{ fontSize: '0.78rem', fontWeight: '700', color: '#475569', paddingBottom: '0.5rem' }}>
+              <div style={{ fontSize: '0.78rem', fontWeight: '700', color: '#475569', paddingBottom: '0.5rem', alignSelf: 'end' }}>
                 ĐÁP ỨNG / YẾU TỐ
               </div>
 
@@ -1118,17 +1120,21 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                   const levels = getConfiguredFactorLevels(f);
                   const codes = getConfiguredFactorCodes(f);
                   return (
-                    <div key={f.code} style={{ backgroundColor: isLocked ? '#fef2f2' : '#f8fafc', borderRadius: '0.5rem', padding: '0.6rem', border: isLocked ? '1px solid #fecaca' : '1px solid #e2e8f0' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                    <div key={f.code} style={{ backgroundColor: isLocked ? '#fef2f2' : '#f8fafc', borderRadius: '0.5rem', padding: '0.6rem', border: isLocked ? '1px solid #fecaca' : '1px solid #e2e8f0', minHeight: '178px', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', minHeight: '2.5rem' }}>
                         <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#1e293b' }}>{f.name} ({f.code})</span>
                         <button onClick={() => handleToggleLock(f.code)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: isLocked ? '#ef4444' : '#94a3b8' }}>{isLocked ? <Lock size={15} /> : <Unlock size={15} />}</button>
                       </div>
-                      <select className="input-field" style={{ width: '100%' }} value={String(actual)} disabled={f.controllability === 'constant'} onChange={(event) => {
+                      <select className="input-field" style={{ width: '100%', minHeight: '2.35rem' }} value={String(actual)} disabled={f.controllability === 'constant'} onChange={(event) => {
                         const index = levels.findIndex((level) => String(level) === event.target.value);
                         setCurrentCoded((prev) => ({ ...prev, [f.code]: codes[index] ?? codes[0] ?? 0 }));
                       }}>
                         {levels.map((level) => <option key={String(level)} value={String(level)}>{String(level)} {f.unit}</option>)}
                       </select>
+                      <div style={{ marginTop: 'auto', minHeight: '2.65rem', display: 'flex', justifyContent: 'space-between', alignItems: 'end', fontSize: '0.65rem', color: '#94a3b8' }}>
+                        <span>{String(levels[0] ?? '')} {f.unit}</span>
+                        <span>{String(levels[levels.length - 1] ?? '')} {f.unit}</span>
+                      </div>
                     </div>
                   );
                 }
@@ -1144,10 +1150,11 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '0.35rem',
+                      minHeight: '178px',
                     }}
                   >
                     {/* Factor Header with Lock button */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', minHeight: '2.5rem' }}>
                       <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#1e293b' }}>
                         {f.name} ({f.code})
                       </span>
@@ -1175,6 +1182,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                         className="input-field font-mono"
                         style={{
                           flex: 1,
+                          minHeight: '2.35rem',
                           padding: '0.2rem 0.4rem',
                           fontSize: '0.8rem',
                           fontWeight: '700',
