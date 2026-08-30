@@ -237,6 +237,12 @@ export function App() {
     persistAnalysisSettings({ modelTypes: next, appliedOptimum: undefined });
   };
 
+  const handleApplyModelTypeToAll = (type: ModelType) => {
+    const next = Object.fromEntries(project.cqas.map((cqa) => [cqa.code, type])) as Record<string, ModelType>;
+    setModelTypes(next);
+    persistAnalysisSettings({ modelTypes: next, appliedOptimum: undefined });
+  };
+
   const handleNeuralTrainingModeChange = (mode: NeuralTrainingMode) => {
     setNeuralTrainingMode(mode);
     persistAnalysisSettings({ neuralTrainingMode: mode, appliedOptimum: undefined });
@@ -454,6 +460,7 @@ export function App() {
             onSelectCQA={setSelectedCQA}
             modelTypes={modelTypes}
             onModelTypeChange={handleModelTypeChange}
+            onApplyModelTypeToAll={handleApplyModelTypeToAll}
             modelingEngine={modelingEngine}
             onSelectEngine={handleModelingEngineChange}
             onNavigateToRSM={() => setActiveTab('rsm')}

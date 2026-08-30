@@ -6,6 +6,7 @@ import {
   ArrowRight,
   BrainCircuit,
   ShieldCheck,
+  Share2,
 } from 'lucide-react';
 import type {
   QBDProject,
@@ -26,6 +27,7 @@ interface StatisticalANOVATabProps {
   onSelectCQA: (cqaCode: string) => void;
   modelTypes: Record<string, ModelType>;
   onModelTypeChange: (cqaCode: string, type: ModelType) => void;
+  onApplyModelTypeToAll: (type: ModelType) => void;
   modelingEngine?: ModelingEngine;
   onSelectEngine?: (engine: ModelingEngine) => void;
   onNavigateToRSM: () => void;
@@ -40,12 +42,14 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
   onSelectCQA,
   modelTypes,
   onModelTypeChange,
+  onApplyModelTypeToAll,
   modelingEngine,
   onSelectEngine,
   onNavigateToRSM,
   onNavigateToNeural,
 }) => {
   const [activeDiagPlot, setActiveDiagPlot] = useState<'pareto' | 'resPred' | 'normProb' | 'cooks'>('pareto');
+  const [bulkModelNotice, setBulkModelNotice] = useState<string | null>(null);
 
   const currentCQA = project.cqas.find((c) => c.code === selectedCQA) || project.cqas[0];
   const model = currentCQA ? models[currentCQA.code] : null;
@@ -413,8 +417,30 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
               <h3 style={{ fontSize: '1rem', fontWeight: '800', color: '#134e4a', margin: 0 }}>Analysis Wizard — chọn mô hình và xác nhận</h3>
               <p style={{ fontSize: '0.76rem', color: '#475569', margin: '0.2rem 0 0' }}>So sánh các mô hình phân cấp hoàn chỉnh; AICc thấp hơn tốt hơn. Nếu chênh lệch ≤ 2, ưu tiên mô hình đơn giản hơn.</p>
             </div>
-            {analysisWizard.recommended && <span className="badge badge-teal" style={{ fontSize: '0.72rem' }}>Đề xuất: {analysisWizard.recommended.modelType}</span>}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.45rem', flexWrap: 'wrap' }}>
+              {analysisWizard.recommended && <span className="badge badge-teal" style={{ fontSize: '0.72rem' }}>Đề xuất: {analysisWizard.recommended.modelType}</span>}
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => {
+                  onApplyModelTypeToAll(appliedModelType);
+                  setBulkModelNotice(`Đã áp dụng mô hình ${appliedModelType} cho toàn bộ ${project.cqas.length} biến đầu ra Y.`);
+                }}
+                style={{ fontSize: '0.72rem', padding: '0.3rem 0.55rem', borderColor: '#0f766e', color: '#0f766e', backgroundColor: '#ffffff' }}
+                title={`Áp dụng mô hình ${appliedModelType} hiện chọn cho tất cả biến đầu ra Y`}
+              >
+                <Share2 size={14} />
+                <span>Áp dụng {appliedModelType} cho tất cả Y</span>
+              </button>
+            </div>
           </div>
+          {bulkModelNotice && (
+            <div role="status" className="animate-fade-in" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.65rem', padding: '0.4rem 0.55rem', borderRadius: '0.35rem', background: '#ecfdf5', border: '1px solid #86efac', color: '#15803d', fontSize: '0.74rem', fontWeight: '600' }}>
+              <ShieldCheck size={15} />
+              <span>{bulkModelNotice}</span>
+              <button type="button" onClick={() => setBulkModelNotice(null)} aria-label="Đóng thông báo" style={{ marginLeft: 'auto', color: '#15803d', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>✕</button>
+            </div>
+          )}
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table" style={{ fontSize: '0.76rem', minWidth: '680px' }}>
               <thead><tr><th>Mô hình</th><th>Phân cấp</th><th>AICc</th><th>Q²</th><th>LOF p</th><th>df dư</th><th>Đánh giá</th><th /></tr></thead>
