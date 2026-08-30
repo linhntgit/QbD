@@ -66,6 +66,27 @@ body {
   background: #94a3b8;
 }
 
+/* Dedicated Help Drawer Scrollbar */
+.help-scroll-container {
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #f1f5f9;
+  -webkit-overflow-scrolling: touch;
+}
+.help-scroll-container::-webkit-scrollbar {
+  width: 8px;
+}
+.help-scroll-container::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-left: 1px solid #e2e8f0;
+}
+.help-scroll-container::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 4px;
+}
+.help-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
 /* Typography & Badges */
 .font-mono {
   font-family: var(--font-mono);

@@ -18,6 +18,7 @@ import { getReportReadiness, loadPersistedProject, persistProject, recordProject
 import { stableSeedFromText } from './services/random';
 import { Navbar } from './components/Navbar';
 import { TabNavigation, type TabKey } from './components/TabNavigation';
+import { HelpDrawer } from './components/HelpDrawer';
 import { trackTabChange, trackProjectAction, trackModelAction } from './services/analytics';
 
 const QTPPTab = lazy(() => import('./components/tabs/QTPPTab').then((module) => ({ default: module.QTPPTab })));
@@ -73,12 +74,29 @@ export function App() {
   // data in the normal UI flow.
   const [neuralTrainingVersion, setNeuralTrainingVersion] = useState(0);
   const [modelingEngine, setModelingEngine] = useState<ModelingEngine>(() => project.analysisSettings?.modelingEngine ?? 'polynomial');
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isHelpPinned, setIsHelpPinned] = useState(true);
   const [storageWarning, setStorageWarning] = useState<string | null>(null);
   const hasPersistedInitialProject = useRef(false);
   const pendingAuditAction = useRef('Khởi tạo project');
   const lastSnapshot = useRef({ action: '', timestamp: 0 });
 
   const analysisProvenance = project.analysisProvenance ?? createAnalysisProvenance(project.id);
+
+  // Global keyboard shortcut: Press ? or F1 to toggle Help Drawer
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        (e.key === '?' || e.key === 'F1') &&
+        !['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)
+      ) {
+        e.preventDefault();
+        setIsHelpOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -431,7 +449,16 @@ export function App() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#f8fafc' }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        backgroundColor: '#f8fafc',
+        marginRight: isHelpOpen && isHelpPinned ? '500px' : '0px',
+        transition: 'margin-right 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
+      }}
+    >
       {/* Top Navbar */}
       <Navbar
         project={project}
@@ -444,6 +471,8 @@ export function App() {
         onSaveJSON={handleSaveJSON}
         onNewProject={handleNewProject}
         canExportWord={reportReadiness.readyForScientificReport}
+        onToggleHelp={() => setIsHelpOpen((prev) => !prev)}
+        isHelpOpen={isHelpOpen}
       />
 
       {/* QbD Workflow Step Navigation */}
@@ -557,6 +586,19 @@ export function App() {
         )}
         </Suspense>
       </main>
+
+      {/* Contextual Help Drawer (Right Sidebar Companion) */}
+      <HelpDrawer
+        isOpen={isHelpOpen}
+        onClose={() => setIsHelpOpen(false)}
+        activeTab={activeTab}
+        project={project}
+        modelingEngine={modelingEngine}
+        selectedCQA={selectedCQA}
+        onNavigateToTab={setActiveTab}
+        isPinned={isHelpPinned}
+        onTogglePin={() => setIsHelpPinned((prev) => !prev)}
+      />
 
       {/* Scientific Footer */}
       <footer style={{ borderTop: '1px solid #e2e8f0', backgroundColor: '#ffffff', padding: '1rem', marginTop: 'auto', textAlign: 'center', fontSize: '0.78rem', color: '#64748b' }}>

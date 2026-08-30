@@ -9,6 +9,7 @@ import {
   FileCheck2,
   Calculator,
   BrainCircuit,
+  HelpCircle,
 } from 'lucide-react';
 import type { QBDProject, ModelingEngine } from '../types/qbd';
 import { CASE_STUDIES } from '../data/caseStudies';
@@ -24,6 +25,8 @@ interface NavbarProps {
   onSaveJSON: () => void;
   onNewProject: () => void;
   canExportWord?: boolean;
+  onToggleHelp?: () => void;
+  isHelpOpen?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -37,6 +40,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSaveJSON,
   onNewProject,
   canExportWord = false,
+  onToggleHelp,
+  isHelpOpen = false,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -263,6 +268,27 @@ export const Navbar: React.FC<NavbarProps> = ({
               <PlusCircle size={15} />
               <span>Mới</span>
             </button>
+
+            {/* Help / Contextual Guide Button */}
+            {onToggleHelp && (
+              <button
+                onClick={onToggleHelp}
+                className={`btn ${isHelpOpen ? 'btn-primary' : 'btn-secondary'}`}
+                style={{
+                  fontSize: '0.82rem',
+                  padding: '0.4rem 0.75rem',
+                  gap: '0.35rem',
+                  fontWeight: '700',
+                  backgroundColor: isHelpOpen ? '#1e3a8a' : '#f8fafc',
+                  color: isHelpOpen ? '#ffffff' : '#1e3a8a',
+                  border: isHelpOpen ? '1px solid #1e3a8a' : '1px solid #bfdbfe',
+                }}
+                title="Mở thanh trợ giúp & hướng dẫn chi tiết theo ngữ cảnh hiện tại"
+              >
+                <HelpCircle size={16} color={isHelpOpen ? '#ffffff' : '#2563eb'} />
+                <span>Trợ Giúp</span>
+              </button>
+            )}
           </div>
 
         </div>

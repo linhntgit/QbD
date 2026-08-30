@@ -11,10 +11,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@types/katex": "^0.16.8",
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
     "docx": "^9.7.1",
     "file-saver": "^2.0.5",
+    "katex": "^0.18.4",
     "lucide-react": "^1.31.0",
     "mathjs": "^15.2.0",
     "plotly.js-dist-min": "^3.7.0",
