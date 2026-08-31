@@ -8,6 +8,14 @@ interface NeuralNetworkTopologyDiagramProps {
   config: NeuralNetConfig;
   trainingMode?: NeuralTrainingMode;
   archMetrics?: NeuralArchitectureMetrics;
+  isTraining?: boolean;
+  trainingProgress?: {
+    tour: number;
+    totalTours: number;
+    epoch: number;
+    maxEpochs: number;
+    phase?: string;
+  } | null;
 }
 
 function getNodeYs(count: number, topPadding: number, usableHeight: number): number[] {
@@ -30,6 +38,8 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
   config,
   trainingMode = 'independent',
   archMetrics,
+  isTraining = false,
+  trainingProgress,
 }) => {
   const activeFactors = useMemo(
     () => factors.filter((f) => f.controllability !== 'constant'),
@@ -133,6 +143,22 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
           >
             [{numInputs} Inputs] ➔ [{numH1} H1]{hasH2 ? ` ➔ [${numH2} H2]` : ''} ➔ [{numOutputs} Output{numOutputs > 1 ? 's' : ''}]
           </span>
+          {isTraining && trainingProgress && (
+            <span
+              className="badge"
+              style={{
+                backgroundColor: '#7c3aed',
+                color: '#ffffff',
+                fontSize: '0.72rem',
+                fontWeight: '700',
+                padding: '0.2rem 0.55rem',
+                borderRadius: '4px',
+                animation: 'pulse 1.5s infinite',
+              }}
+            >
+              ⚡ Đang huấn luyện: Tour #{trainingProgress.tour}/{trainingProgress.totalTours} · Epoch {trainingProgress.epoch}
+            </span>
+          )}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.76rem' }}>
@@ -249,7 +275,8 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
                   d={`M ${xInput} ${yIn} C ${xInput + dx * 0.45} ${yIn}, ${xH1 - dx * 0.45} ${yH1}, ${xH1} ${yH1}`}
                   fill="none"
                   stroke="url(#synapseGrad1)"
-                  strokeWidth="1.1"
+                  strokeWidth={isTraining ? '1.8' : '1.1'}
+                  className={isTraining ? 'neural-synapse-pulsing' : undefined}
                 />
               );
             })
@@ -266,7 +293,8 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
                     d={`M ${xH1} ${yH1} C ${xH1 + dx * 0.45} ${yH1}, ${xH2 - dx * 0.45} ${yH2}, ${xH2} ${yH2}`}
                     fill="none"
                     stroke="url(#synapseGrad2)"
-                    strokeWidth="1.1"
+                    strokeWidth={isTraining ? '1.8' : '1.1'}
+                    className={isTraining ? 'neural-synapse-pulsing' : undefined}
                   />
                 );
               })
@@ -283,7 +311,8 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
                       d={`M ${xH2} ${yH2} C ${xH2 + dx * 0.45} ${yH2}, ${xOutput - dx * 0.45} ${yOut}, ${xOutput} ${yOut}`}
                       fill="none"
                       stroke="url(#synapseGradOut)"
-                      strokeWidth="1.2"
+                      strokeWidth={isTraining ? '1.9' : '1.2'}
+                      className={isTraining ? 'neural-synapse-pulsing' : undefined}
                     />
                   );
                 })
@@ -297,7 +326,8 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
                       d={`M ${xH1} ${yH1} C ${xH1 + dx * 0.45} ${yH1}, ${xOutput - dx * 0.45} ${yOut}, ${xOutput} ${yOut}`}
                       fill="none"
                       stroke="url(#synapseGradOut)"
-                      strokeWidth="1.2"
+                      strokeWidth={isTraining ? '1.9' : '1.2'}
+                      className={isTraining ? 'neural-synapse-pulsing' : undefined}
                     />
                   );
                 })
@@ -334,6 +364,19 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
                   [{factor.unit || '-'}] • <tspan fill={color} fontWeight="600">{roleBadge}</tspan>
                 </text>
 
+                {/* Animated Pulsing Ring when Training */}
+                {isTraining && (
+                  <circle
+                    cx={xInput}
+                    cy={y}
+                    r="14"
+                    fill="none"
+                    stroke={color}
+                    strokeWidth="2"
+                    className="neural-node-ring"
+                  />
+                )}
+
                 {/* Outer Glow */}
                 <circle cx={xInput} cy={y} r="16" fill={color} fillOpacity="0.15" />
                 {/* Circle Node */}
@@ -357,6 +400,18 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
           {/* 2. HIDDEN LAYER 1 NODES */}
           {h1Ys.map((y, idx) => (
             <g key={`h1-node-${idx}`}>
+              {/* Animated Pulsing Ring when Training */}
+              {isTraining && (
+                <circle
+                  cx={xH1}
+                  cy={y}
+                  r="14"
+                  fill="none"
+                  stroke="#a855f7"
+                  strokeWidth="2"
+                  className="neural-node-ring"
+                />
+              )}
               {/* Outer Glow */}
               <circle cx={xH1} cy={y} r="17" fill="#7c3aed" fillOpacity="0.15" />
               {/* Circle Node */}
@@ -391,6 +446,18 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
           {hasH2 &&
             h2Ys.map((y, idx) => (
               <g key={`h2-node-${idx}`}>
+                {/* Animated Pulsing Ring when Training */}
+                {isTraining && (
+                  <circle
+                    cx={xH2}
+                    cy={y}
+                    r="14"
+                    fill="none"
+                    stroke="#c084fc"
+                    strokeWidth="2"
+                    className="neural-node-ring"
+                  />
+                )}
                 {/* Outer Glow */}
                 <circle cx={xH2} cy={y} r="17" fill="#6b21a8" fillOpacity="0.15" />
                 {/* Circle Node */}
@@ -427,6 +494,18 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
 
             return (
               <g key={`out-node-${cqa.code}`}>
+                {/* Animated Pulsing Ring when Training */}
+                {isTraining && (
+                  <circle
+                    cx={xOutput}
+                    cy={y}
+                    r="14"
+                    fill="none"
+                    stroke="#0d9488"
+                    strokeWidth="2"
+                    className="neural-node-ring"
+                  />
+                )}
                 {/* Outer Glow */}
                 <circle cx={xOutput} cy={y} r="17" fill="#0f766e" fillOpacity="0.18" />
                 {/* Circle Node */}
@@ -443,6 +522,7 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
                 >
                   {cqa.code}
                 </text>
+
 
                 {/* Node Label on Right */}
                 <text

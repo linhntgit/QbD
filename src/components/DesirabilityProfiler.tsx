@@ -579,9 +579,55 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
       });
     });
 
+    // Tính toán dải trục tung đồng bộ (Uniform Y-Range) cho từng hàng CQA để mọi yếu tố dùng chung tỷ lệ scale trực quan
+    const cqaRowRanges: Record<string, [number, number]> = {};
+    validCQAs.forEach((cqa) => {
+      const allVals: number[] = [];
+      factors.forEach((f) => {
+        const t = responseTraces[cqa.code]?.[f.code];
+        if (t) {
+          t.yPred.forEach((v) => { if (Number.isFinite(v)) allVals.push(v); });
+          t.ciUpper.forEach((v) => { if (Number.isFinite(v)) allVals.push(v); });
+          t.ciLower.forEach((v) => { if (Number.isFinite(v)) allVals.push(v); });
+          if (Number.isFinite(t.currentYPred)) allVals.push(t.currentYPred);
+        }
+      });
+      if (allVals.length > 0) {
+        const minY = Math.min(...allVals);
+        const maxY = Math.max(...allVals);
+        const spanY = maxY - minY;
+        const padY = spanY > 1e-6 ? spanY * 0.12 : Math.max(0.1, Math.abs(maxY) * 0.1);
+        cqaRowRanges[cqa.code] = [minY - padY, maxY + padY];
+      } else {
+        cqaRowRanges[cqa.code] = [0, 100];
+      }
+    });
+
+    // Tính toán dải trục tung cho hàng Overall Desirability (D)
+    const allDVals: number[] = [];
+    factors.forEach((f) => {
+      const d = dTraces[f.code];
+      if (d) {
+        d.dOverall.forEach((v) => { if (Number.isFinite(v)) allDVals.push(v); });
+        if (Number.isFinite(d.currentD)) allDVals.push(d.currentD);
+      }
+    });
+    let dRowRange: [number, number] = [0, 1.05];
+    if (allDVals.length > 0) {
+      const minD = Math.min(...allDVals);
+      const maxD = Math.max(...allDVals);
+      const spanD = maxD - minD;
+      const padD = Math.max(0.04, spanD * 0.15);
+      const dLow = Math.max(0, minD - padD);
+      const dHigh = Math.min(1.05, maxD + padD);
+      dRowRange = dHigh - dLow >= 0.15 ? [dLow, dHigh] : [Math.max(0, dLow - 0.1), Math.min(1.05, dHigh + 0.1)];
+    }
+
     return {
       responseTraces,
       dTraces,
+      cqaRowRanges,
+      dRowRange,
     };
   }, [factors, validCQAs, models, currentCoded, currentEvaluation]);
 
@@ -1364,7 +1410,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                       // A matrix uses shared outer axes: the left column carries Y,
                       // and the bottom row carries X. This preserves names/units
                       // without repeating them in every cell.
-                      margin: { l: factorIndex === 0 ? 62 : 42, r: 12, t: 8, b: 28, pad: 1 },
+                      margin: { l: factorIndex === 0 ? 54 : 10, r: 8, t: 6, b: 20, pad: 1 },
                       height: 145,
                       showlegend: false,
                       xaxis: {
@@ -1377,6 +1423,9 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                       yaxis: {
                         title: factorIndex === 0 ? { text: `${cqa.code} [${cqa.unit || '—'}]`, font: { size: 10, color: '#334155' }, standoff: 4 } : undefined,
                         showticklabels: factorIndex === 0,
+                        range: profilerGridData.cqaRowRanges[cqa.code],
+                        nticks: 4,
+                        tickformat: '~g',
                         showgrid: true,
                         gridcolor: '#f1f5f9',
                         zeroline: false,
@@ -1479,7 +1528,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                 ];
 
                 const layout: any = {
-                  margin: { l: factorIndex === 0 ? 62 : 42, r: 12, t: 8, b: 42, pad: 1 },
+                  margin: { l: factorIndex === 0 ? 54 : 10, r: 8, t: 6, b: 36, pad: 1 },
                   height: 145,
                   showlegend: false,
                   xaxis: {
@@ -1492,7 +1541,9 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                   yaxis: {
                     title: factorIndex === 0 ? { text: 'D [—]', font: { size: 10, color: '#334155' }, standoff: 4 } : undefined,
                     showticklabels: factorIndex === 0,
-                    range: [0, 1.05],
+                    range: profilerGridData.dRowRange,
+                    nticks: 4,
+                    tickformat: '.2f',
                     showgrid: true,
                     gridcolor: '#e2e8f0',
                     zeroline: false,

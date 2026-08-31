@@ -122,6 +122,42 @@ export function formatFactorApexName(f: { name: string; code: string }): string 
 }
 
 /**
+ * Format factor apex annotation into elegant multi-line structure:
+ * Tự động ngắt dòng thông minh tên thành phần và mã biến (X1, X2, X3)
+ * để tuyệt đối không bị chồng đè chữ lên nhau kể cả khi bật Right Sidebar hoặc trên màn hình nhỏ.
+ */
+export function formatFactorApexAnnotation(
+  f: { name: string; code: string },
+  arrowPos: 'top' | 'left' | 'right'
+): string {
+  const cleanName = f.name.replace(new RegExp(`\\s*\\(${f.code}\\)`, 'gi'), '').trim();
+
+  // Tách dòng nếu tên thành phần dài (> 16 ký tự)
+  let nameWrapped = cleanName;
+  if (cleanName.length > 16) {
+    const words = cleanName.split(/\s+/);
+    let line1 = '';
+    let line2 = '';
+    words.forEach((word) => {
+      if (!line1 || line1.length + word.length + 1 <= 15) {
+        line1 = line1 ? `${line1} ${word}` : word;
+      } else {
+        line2 = line2 ? `${line2} ${word}` : word;
+      }
+    });
+    nameWrapped = line2 ? `${line1}<br>${line2}` : cleanName;
+  }
+
+  if (arrowPos === 'top') {
+    return `▲ ${nameWrapped}<br>(${f.code})`;
+  }
+  if (arrowPos === 'left') {
+    return `◀ ${nameWrapped}<br>(${f.code})`;
+  }
+  return `${nameWrapped} ▶<br>(${f.code})`;
+}
+
+/**
  * Calculate constraint boundary lines and experimental polygon for 3 mixture components (L_i <= X_i <= U_i)
  */
 export function calculateMixtureConstraints(
@@ -982,7 +1018,7 @@ export function buildTernaryPlotlyData(
       font: { size: 13, color: '#0f172a', family: 'Inter, sans-serif' },
     },
     autosize: true,
-    margin: { l: 35, r: 35, b: 55, t: 78, pad: 2 },
+    margin: { l: 35, r: 35, b: 65, t: 78, pad: 2 },
     xaxis: {
       range: [-6, 106],
       fixedrange: true,
@@ -990,14 +1026,16 @@ export function buildTernaryPlotlyData(
       showgrid: false,
       showline: false,
       showticklabels: false,
+      ticks: '',
     },
     yaxis: {
-      range: [-7, 94],
+      range: [-16, 96],
       fixedrange: true,
       zeroline: false,
       showgrid: false,
       showline: false,
       showticklabels: false,
+      ticks: '',
       scaleanchor: 'x',
       scaleratio: 1,
     },
@@ -1005,26 +1043,32 @@ export function buildTernaryPlotlyData(
       // Apex A (Top)
       {
         x: 50,
-        y: H + 4.2,
-        text: `<b>▲ ${formatFactorApexName(factorA)}</b>`,
+        y: H + 3.8,
+        text: `<b>${formatFactorApexAnnotation(factorA, 'top')}</b>`,
         showarrow: false,
-        font: { size: 12, color: '#0f172a', family: 'Inter, sans-serif' },
+        xanchor: 'center',
+        yanchor: 'bottom',
+        font: { size: 11.5, color: '#0f172a', family: 'Arial, Helvetica, sans-serif' },
       },
       // Apex B (Bottom-Left)
       {
-        x: -2,
-        y: -4.8,
-        text: `<b>◀ ${formatFactorApexName(factorB)}</b>`,
+        x: 0,
+        y: -4.5,
+        text: `<b>${formatFactorApexAnnotation(factorB, 'left')}</b>`,
         showarrow: false,
-        font: { size: 12, color: '#0f172a', family: 'Inter, sans-serif' },
+        xanchor: 'left',
+        yanchor: 'top',
+        font: { size: 11, color: '#0f172a', family: 'Arial, Helvetica, sans-serif' },
       },
       // Apex C (Bottom-Right)
       {
-        x: 102,
-        y: -4.8,
-        text: `<b>▶ ${formatFactorApexName(factorC)}</b>`,
+        x: 100,
+        y: -4.5,
+        text: `<b>${formatFactorApexAnnotation(factorC, 'right')}</b>`,
         showarrow: false,
-        font: { size: 12, color: '#0f172a', family: 'Inter, sans-serif' },
+        xanchor: 'right',
+        yanchor: 'top',
+        font: { size: 11, color: '#0f172a', family: 'Arial, Helvetica, sans-serif' },
       },
     ],
     // The app presents the semantic legend outside the chart. Hiding the long
@@ -1422,7 +1466,7 @@ export function generateTernaryDesignSpace(
   sweetSpotTraces.push({
     type: 'scatter',
     mode: 'lines',
-    name: `Vùng Đạt Chuẩn 100% CQAs (${(sweetSpotFraction * 100).toFixed(1)}% Simplex)`,
+    name: `Vùng đạt chuẩn cho các CQA đã mô hình hóa (${(sweetSpotFraction * 100).toFixed(1)}% Simplex)`,
     x: [null],
     y: [null],
     line: { color: '#22c55e', width: 2.5 },
@@ -1575,11 +1619,11 @@ export function generateTernaryDesignSpace(
   // 12. Complete 2D Cartesian Simplex Projection Layout
   const layout = {
     title: {
-      text: `Vùng Thiết Kế Tam Giác Hỗn Hợp (Ternary Sweet Spot) - 100% CQAs Đạt Chuẩn`,
+      text: `Miền dự báo hỗn hợp (Ternary Sweet Spot) - các CQA đã mô hình hóa đạt chuẩn`,
       font: { size: 13, color: '#0f172a', family: 'Inter, sans-serif' },
     },
     autosize: true,
-    margin: { l: 35, r: 35, b: 55, t: 78, pad: 2 },
+    margin: { l: 35, r: 35, b: 65, t: 78, pad: 2 },
     xaxis: {
       range: [-6, 106],
       fixedrange: true,
@@ -1587,14 +1631,16 @@ export function generateTernaryDesignSpace(
       showgrid: false,
       showline: false,
       showticklabels: false,
+      ticks: '',
     },
     yaxis: {
-      range: [-7, 94],
+      range: [-16, 96],
       fixedrange: true,
       zeroline: false,
       showgrid: false,
       showline: false,
       showticklabels: false,
+      ticks: '',
       scaleanchor: 'x',
       scaleratio: 1,
     },
@@ -1602,26 +1648,32 @@ export function generateTernaryDesignSpace(
       // Apex A (Top)
       {
         x: 50,
-        y: H + 4.2,
-        text: `<b>▲ ${formatFactorApexName(factorA)}</b>`,
+        y: H + 3.8,
+        text: `<b>${formatFactorApexAnnotation(factorA, 'top')}</b>`,
         showarrow: false,
-        font: { size: 12, color: '#0f172a', family: 'Inter, sans-serif' },
+        xanchor: 'center',
+        yanchor: 'bottom',
+        font: { size: 11.5, color: '#0f172a', family: 'Arial, Helvetica, sans-serif' },
       },
       // Apex B (Bottom-Left)
       {
-        x: -2,
-        y: -4.8,
-        text: `<b>◀ ${formatFactorApexName(factorB)}</b>`,
+        x: 0,
+        y: -4.5,
+        text: `<b>${formatFactorApexAnnotation(factorB, 'left')}</b>`,
         showarrow: false,
-        font: { size: 12, color: '#0f172a', family: 'Inter, sans-serif' },
+        xanchor: 'left',
+        yanchor: 'top',
+        font: { size: 11, color: '#0f172a', family: 'Arial, Helvetica, sans-serif' },
       },
       // Apex C (Bottom-Right)
       {
-        x: 102,
-        y: -4.8,
-        text: `<b>▶ ${formatFactorApexName(factorC)}</b>`,
+        x: 100,
+        y: -4.5,
+        text: `<b>${formatFactorApexAnnotation(factorC, 'right')}</b>`,
         showarrow: false,
-        font: { size: 12, color: '#0f172a', family: 'Inter, sans-serif' },
+        xanchor: 'right',
+        yanchor: 'top',
+        font: { size: 11, color: '#0f172a', family: 'Arial, Helvetica, sans-serif' },
       },
     ],
     showlegend: false,

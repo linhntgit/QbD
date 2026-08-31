@@ -142,7 +142,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
       numOutputs,
       trainingSamples
     );
-  }, [numInputs, localConfig.hiddenNodes1, localConfig.hiddenNodes2, localConfig.holdoutRatio, localConfig.kFolds, localConfig.validationMethod, numOutputs, numSamples]);
+  }, [numInputs, localConfig, numOutputs, numSamples]);
 
   // Live Training / Fitting State
   const [isTraining, setIsTraining] = useState<boolean>(false);
@@ -1700,9 +1700,12 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               config={localConfig}
               trainingMode={neuralTrainingMode}
               archMetrics={archMetrics}
+              isTraining={isTraining}
+              trainingProgress={trainingProgress}
             />
           </div>
         </div>
+
 
         {/* 4. Action Buttons Toolbar (Các Nút Fit, Áp Dụng...) */}
         <div
@@ -1815,14 +1818,15 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           </div>
 
           {/* Animated Progress Bar */}
-          <div style={{ width: '100%', height: '8px', backgroundColor: '#1e293b', borderRadius: '4px', overflow: 'hidden', marginBottom: '1rem' }}>
+          <div style={{ width: '100%', height: '10px', backgroundColor: '#1e293b', borderRadius: '5px', overflow: 'hidden', marginBottom: '1rem', border: '1px solid #334155' }}>
             <div
+              className="hud-shimmer-bar"
               style={{
                 width: `${(trainingProgress.tour / trainingProgress.totalTours) * 100}%`,
                 height: '100%',
-                background: 'linear-gradient(90deg, #38bdf8, #818cf8, #c084fc)',
-                transition: 'width 0.15s ease-in-out',
-                boxShadow: '0 0 10px rgba(56, 189, 248, 0.8)',
+                transition: 'width 0.2s ease-in-out',
+                boxShadow: '0 0 12px rgba(168, 85, 247, 0.9)',
+                borderRadius: '5px',
               }}
             />
           </div>
@@ -2008,7 +2012,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                       {anovaModel?.diagnostics.aicc !== undefined ? anovaModel.diagnostics.aicc.toFixed(1) : '-'}
                     </td>
                     <td style={{ fontSize: '0.78rem' }}>
-                      Mô hình tường minh, dễ giải thích hiệu ứng chính và tương tác theo tiêu chuẩn ICH Q8.
+                      Mô hình tường minh, hỗ trợ diễn giải hiệu ứng chính và tương tác trong quy trình phát triển tham chiếu ICH Q8.
                     </td>
                   </tr>
 
@@ -2227,10 +2231,10 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             </div>
 
             {/* Profiler Traces Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(${Math.max(220, Math.floor(1000 / project.factors.length))}px, 1fr))`, gap: '1rem', alignItems: 'stretch' }}>
-              {project.factors.map((f) => {
-                const coded = profilerCoded[f.code] ?? 0;
-                const actual = codedToActual(coded, f);
+            {(() => {
+              // Tính toán dải trục tung đồng bộ (Uniform Y-Range) trên tất cả các yếu tố X để so sánh trực quan độ dốc/độ nhạy
+              const allYValues: number[] = [];
+              project.factors.forEach((f) => {
                 const isMixtureFactor = f.role === 'mixture_component' || f.type === 'Mixture';
                 const mixtureRange = isMixtureFactor ? getFeasibleMixtureComponentRange(project.factors, f.code) : null;
                 const traceLow = isMixtureFactor ? (mixtureRange?.low ?? 0) : -1;
@@ -2238,148 +2242,179 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                 const traceCodes = isDiscreteFactor(f)
                   ? getFactorGridCodes(f, 21)
                   : Array.from({ length: 21 }, (_, step) => traceLow + ((traceHigh - traceLow) * step) / 20);
-
-                // Compute 1D sensitivity trace curve for this factor
-                const xTraceActual: number[] = [];
-                const xTraceDisplay: Array<number | string> = [];
-                const yTracePred: number[] = [];
-
-                traceCodes.forEach((c, step) => {
-                  const actVal = codedToActual(c, f);
-                  xTraceDisplay.push(actVal);
-                  xTraceActual.push(typeof actVal === 'number' ? actVal : step);
-
+                traceCodes.forEach((c) => {
                   const tempCoded = isMixtureFactor
                     ? setBoundedMixtureComponent(profilerCoded, project.factors, f.code, c)
                     : { ...profilerCoded, [f.code]: c };
-                  yTracePred.push(neuralModel.predict(tempCoded));
+                  allYValues.push(neuralModel.predict(tempCoded));
                 });
+              });
+              allYValues.push(neuralModel.predict(profilerCoded));
+              const minY = Math.min(...allYValues);
+              const maxY = Math.max(...allYValues);
+              const spanY = maxY - minY;
+              const padY = spanY > 1e-6 ? spanY * 0.12 : Math.max(0.1, Math.abs(maxY) * 0.1);
+              const yRangeShared: [number, number] = [minY - padY, maxY + padY];
 
-                const tracePlotData: any[] = [
-                  {
-                    type: 'scatter',
-                    mode: 'lines',
-                    x: xTraceActual,
-                    y: yTracePred,
-                    line: { color: '#7c3aed', width: 2.5 },
-                    name: `${f.name} (${f.code}) vs ${currentCQA.name} (${currentCQA.code})`,
-                    text: xTraceActual.map(
-                      (x, i) =>
-                        `${f.name} (${f.code}): ${x} ${f.unit || ''}<br>${currentCQA.name} (${currentCQA.code}): ${yTracePred[i].toFixed(2)} ${currentCQA.unit || ''}`
-                    ),
-                    hoverinfo: 'text',
-                  },
-                  {
-                    type: 'scatter',
-                    mode: 'markers',
-                    x: [typeof actual === 'number' ? actual : Number(actual) || coded],
-                    y: [neuralModel.predict(profilerCoded)],
-                    marker: { size: 9, color: '#dc2626' },
-                    name: `Hiện tại: ${actual} ${f.unit || ''} → ${neuralModel.predict(profilerCoded).toFixed(2)} ${currentCQA.unit || ''}`,
-                    hoverinfo: 'name',
-                  },
-                ];
+              return (
+                <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(${Math.max(220, Math.floor(1000 / project.factors.length))}px, 1fr))`, gap: '1rem', alignItems: 'stretch' }}>
+                  {project.factors.map((f) => {
+                    const coded = profilerCoded[f.code] ?? 0;
+                    const actual = codedToActual(coded, f);
+                    const isMixtureFactor = f.role === 'mixture_component' || f.type === 'Mixture';
+                    const mixtureRange = isMixtureFactor ? getFeasibleMixtureComponentRange(project.factors, f.code) : null;
+                    const traceLow = isMixtureFactor ? (mixtureRange?.low ?? 0) : -1;
+                    const traceHigh = isMixtureFactor ? (mixtureRange?.high ?? 1) : 1;
+                    const traceCodes = isDiscreteFactor(f)
+                      ? getFactorGridCodes(f, 21)
+                      : Array.from({ length: 21 }, (_, step) => traceLow + ((traceHigh - traceLow) * step) / 20);
 
-                const traceLayout = {
-                  autosize: true,
-                  height: 160,
-                  margin: { l: 55, r: 15, t: 10, b: 45, pad: 2 },
-                  xaxis: {
-                    title: {
-                      text: `${f.code} [${f.unit || ''}]`,
-                      font: { size: 10, color: '#475569' },
-                      standoff: 6,
-                    },
-                    tickfont: { size: 9 },
-                    ...(f.dataType === 'qualitative' ? { tickmode: 'array', tickvals: xTraceActual, ticktext: xTraceDisplay.map(String) } : {}),
-                    showgrid: true,
-                    gridcolor: '#f1f5f9',
-                  },
-                  yaxis: {
-                    title: {
-                      text: `${currentCQA.code} [${currentCQA.unit || ''}]`,
-                      font: { size: 10, color: '#475569' },
-                      standoff: 6,
-                    },
-                    tickfont: { size: 9 },
-                    showgrid: true,
-                    gridcolor: '#f1f5f9',
-                  },
-                  showlegend: false,
-                };
+                    // Compute 1D sensitivity trace curve for this factor
+                    const xTraceActual: number[] = [];
+                    const xTraceDisplay: Array<number | string> = [];
+                    const yTracePred: number[] = [];
 
-                return (
-                  <div
-                    key={f.code}
-                    style={{
-                      backgroundColor: '#f8fafc',
-                      borderRadius: '0.5rem',
-                      padding: '0.75rem',
-                      border: '1px solid #e2e8f0',
-                      display: 'grid',
-                      gridTemplateRows: 'minmax(3.2rem, auto) 160px minmax(5.4rem, 1fr)',
-                      minHeight: '350px',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.4rem', marginBottom: '0.4rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.3rem', minHeight: '2.5rem' }}>
-                      <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#1e3a8a' }}>
-                        {f.name} ({f.code})
-                      </span>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600' }}>
-                        [{f.unit || '-'}]
-                      </span>
-                    </div>
+                    traceCodes.forEach((c, step) => {
+                      const actVal = codedToActual(c, f);
+                      xTraceDisplay.push(actVal);
+                      xTraceActual.push(typeof actVal === 'number' ? actVal : step);
 
-                    <div style={{ height: '160px' }}>
-                      <PlotlyChart
-                        data={tracePlotData}
-                        layout={traceLayout}
-                        config={{ responsive: true, displayModeBar: false, compact: true }}
-                        style={{ width: '100%', height: '100%' }}
-                      />
-                    </div>
+                      const tempCoded = isMixtureFactor
+                        ? setBoundedMixtureComponent(profilerCoded, project.factors, f.code, c)
+                        : { ...profilerCoded, [f.code]: c };
+                      yTracePred.push(neuralModel.predict(tempCoded));
+                    });
 
-                    <div style={{ marginTop: '0.5rem', display: 'grid', gridTemplateRows: '1.4rem 2.15rem 1.35rem', rowGap: '0.2rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.2rem' }}>
-                        <span style={{ fontWeight: '600', color: '#334155' }}>Giá trị cài đặt:</span>
-                        <span className="font-mono" style={{ fontWeight: '700', color: '#1e3a8a' }}>
-                          {actual} {f.unit}
-                        </span>
-                      </div>
+                    const tracePlotData: any[] = [
+                      {
+                        type: 'scatter',
+                        mode: 'lines',
+                        x: xTraceActual,
+                        y: yTracePred,
+                        line: { color: '#7c3aed', width: 2.5 },
+                        name: `${f.name} (${f.code}) vs ${currentCQA.name} (${currentCQA.code})`,
+                        text: xTraceActual.map(
+                          (x, i) =>
+                            `${f.name} (${f.code}): ${x} ${f.unit || ''}<br>${currentCQA.name} (${currentCQA.code}): ${yTracePred[i].toFixed(2)} ${currentCQA.unit || ''}`
+                        ),
+                        hoverinfo: 'text',
+                      },
+                      {
+                        type: 'scatter',
+                        mode: 'markers',
+                        x: [typeof actual === 'number' ? actual : Number(actual) || coded],
+                        y: [neuralModel.predict(profilerCoded)],
+                        marker: { size: 9, color: '#dc2626' },
+                        name: `Hiện tại: ${actual} ${f.unit || ''} → ${neuralModel.predict(profilerCoded).toFixed(2)} ${currentCQA.unit || ''}`,
+                        hoverinfo: 'name',
+                      },
+                    ];
 
-                      {isDiscreteFactor(f) ? (
-                        <select className="input-field" style={{ width: '100%', minHeight: '2.15rem' }} value={String(actual)} onChange={(event) => {
-                          const levels = getConfiguredFactorLevels(f);
-                          const codes = getConfiguredFactorCodes(f);
-                          const index = levels.findIndex((level) => String(level) === event.target.value);
-                          setProfilerCoded({ ...profilerCoded, [f.code]: codes[index] ?? codes[0] ?? 0 });
-                        }}>
-                          {getConfiguredFactorLevels(f).map((level) => <option key={String(level)} value={String(level)}>{String(level)} {f.unit}</option>)}
-                        </select>
-                      ) : <input
-                        type="range"
-                        min={traceLow}
-                        max={traceHigh}
-                        step={isMixtureFactor ? 0.001 : 0.05}
-                        value={coded}
-                        onChange={(e) => {
-                          const nextValue = Number(e.target.value);
-                          setProfilerCoded(isMixtureFactor
-                            ? setBoundedMixtureComponent(profilerCoded, project.factors, f.code, nextValue)
-                            : { ...profilerCoded, [f.code]: nextValue });
+                    const traceLayout = {
+                      autosize: true,
+                      height: 160,
+                      margin: { l: 50, r: 10, t: 8, b: 34, pad: 1 },
+                      xaxis: {
+                        title: {
+                          text: `${f.code} [${f.unit || ''}]`,
+                          font: { size: 10, color: '#475569' },
+                          standoff: 4,
+                        },
+                        tickfont: { size: 9 },
+                        ...(f.dataType === 'qualitative' ? { tickmode: 'array', tickvals: xTraceActual, ticktext: xTraceDisplay.map(String) } : {}),
+                        showgrid: true,
+                        gridcolor: '#f1f5f9',
+                      },
+                      yaxis: {
+                        title: {
+                          text: `${currentCQA.code} [${currentCQA.unit || ''}]`,
+                          font: { size: 10, color: '#475569' },
+                          standoff: 4,
+                        },
+                        range: yRangeShared,
+                        nticks: 4,
+                        tickformat: '~g',
+                        tickfont: { size: 9 },
+                        showgrid: true,
+                        gridcolor: '#f1f5f9',
+                      },
+                      showlegend: false,
+                    };
+
+                    return (
+                      <div
+                        key={f.code}
+                        style={{
+                          backgroundColor: '#f8fafc',
+                          borderRadius: '0.5rem',
+                          padding: '0.75rem',
+                          border: '1px solid #e2e8f0',
+                          display: 'grid',
+                          gridTemplateRows: 'minmax(3.2rem, auto) 160px minmax(5.4rem, 1fr)',
+                          minHeight: '350px',
                         }}
-                        style={{ width: '100%', cursor: 'pointer', alignSelf: 'center' }}
-                      />}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.4rem', marginBottom: '0.4rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.3rem', minHeight: '2.5rem' }}>
+                          <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#1e3a8a' }}>
+                            {f.name} ({f.code})
+                          </span>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600' }}>
+                            [{f.unit || '-'}]
+                          </span>
+                        </div>
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', fontSize: '0.7rem', color: '#94a3b8' }}>
-                        <span>{codedToActual(traceLow, f)} {f.unit}</span>
-                        <span>{codedToActual(traceHigh, f)} {f.unit}</span>
+                        <div style={{ height: '160px' }}>
+                          <PlotlyChart
+                            data={tracePlotData}
+                            layout={traceLayout}
+                            config={{ responsive: true, displayModeBar: false, compact: true }}
+                            style={{ width: '100%', height: '100%' }}
+                          />
+                        </div>
+
+                        <div style={{ marginTop: '0.5rem', display: 'grid', gridTemplateRows: '1.4rem 2.15rem 1.35rem', rowGap: '0.2rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.2rem' }}>
+                            <span style={{ fontWeight: '600', color: '#334155' }}>Giá trị cài đặt:</span>
+                            <span className="font-mono" style={{ fontWeight: '700', color: '#1e3a8a' }}>
+                              {actual} {f.unit}
+                            </span>
+                          </div>
+
+                          {isDiscreteFactor(f) ? (
+                            <select className="input-field" style={{ width: '100%', minHeight: '2.15rem' }} value={String(actual)} onChange={(event) => {
+                              const levels = getConfiguredFactorLevels(f);
+                              const codes = getConfiguredFactorCodes(f);
+                              const index = levels.findIndex((level) => String(level) === event.target.value);
+                              setProfilerCoded({ ...profilerCoded, [f.code]: codes[index] ?? codes[0] ?? 0 });
+                            }}>
+                              {getConfiguredFactorLevels(f).map((level) => <option key={String(level)} value={String(level)}>{String(level)} {f.unit}</option>)}
+                            </select>
+                          ) : <input
+                            type="range"
+                            min={traceLow}
+                            max={traceHigh}
+                            step={isMixtureFactor ? 0.001 : 0.05}
+                            value={coded}
+                            onChange={(e) => {
+                              const nextValue = Number(e.target.value);
+                              setProfilerCoded(isMixtureFactor
+                                ? setBoundedMixtureComponent(profilerCoded, project.factors, f.code, nextValue)
+                                : { ...profilerCoded, [f.code]: nextValue });
+                            }}
+                            style={{ width: '100%', cursor: 'pointer', alignSelf: 'center' }}
+                          />}
+
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', fontSize: '0.7rem', color: '#94a3b8' }}>
+                            <span>{codedToActual(traceLow, f)} {f.unit}</span>
+                            <span>{codedToActual(traceHigh, f)} {f.unit}</span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
 
           {/* 3D Response Surface, 2D Contour & Ternary Mixture (Neural Net Engine) */}

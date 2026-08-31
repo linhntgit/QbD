@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { CornerDownRight, Plus, Trash2 } from 'lucide-react';
+import { CornerDownRight, Plus, Trash2, Image, FileCode } from 'lucide-react';
+import { saveAs } from 'file-saver';
 import type { FishboneCause, FishboneDiagram as FishboneDiagramData } from '../types/qbd';
 
 interface FishboneDiagramProps {
@@ -146,6 +147,139 @@ export const FishboneDiagram: React.FC<FishboneDiagramProps> = ({ diagram, onCha
     onChange({ ...diagram, categories: [...diagram.categories, { id: makeId('category'), name: 'NHÓM NGUYÊN NHÂN', causes: [{ id: makeId('cause'), text: 'Nguyên nhân cần xem xét' }] }] });
   };
 
+  // Helper to generate a standalone, self-contained SVG XML string for export
+  const generateExportSVG = () => {
+    const escapeXML = (str: string) =>
+      str.replace(/[<>&'"]/g, (c) => {
+        switch (c) {
+          case '<': return '&lt;';
+          case '>': return '&gt;';
+          case '&': return '&amp;';
+          case "'": return '&apos;';
+          case '"': return '&quot;';
+          default: return c;
+        }
+      });
+
+    const categoryBoxes = geometry.map((branch) => {
+      const titleX = branch.title.x;
+      const titleY = branch.title.y;
+      const boxW = 220;
+      const boxH = 46;
+      const fontSize = Math.round(13 * fontScale);
+      const lines = branch.name.split('\n');
+
+      const branchBox = `
+        <g>
+          <rect x="${titleX}" y="${titleY}" width="${boxW}" height="${boxH}" rx="5" fill="#ffffff" stroke="${branch.colour}" stroke-width="1.5" />
+          <rect x="${titleX}" y="${titleY + boxH - 4}" width="${boxW}" height="4" rx="2" fill="${branch.colour}" />
+          <text x="${titleX + boxW / 2}" y="${titleY + (lines.length > 1 ? 18 : 28)}" text-anchor="middle" font-family="${FONT}" font-size="${fontSize}" font-weight="800" fill="${branch.colour}">
+            ${lines.map((l, i) => `<tspan x="${titleX + boxW / 2}" dy="${i === 0 ? 0 : 16}">${escapeXML(l)}</tspan>`).join('')}
+          </text>
+        </g>
+      `;
+
+      const causeBoxes = branch.causes.map((c) => {
+        const boxW = Math.max(118, 165 - c.level * 12);
+        const boxH = 38;
+        const fontSize = Math.round((c.level === 0 ? 12 : 11) * fontScale);
+        const textLines = c.cause.text.split('\n');
+
+        return `
+          <g>
+            <rect x="${c.input.x}" y="${c.input.y}" width="${boxW}" height="${boxH}" rx="4" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+            <text x="${c.input.x + 8}" y="${c.input.y + (textLines.length > 1 ? 15 : 23)}" font-family="${FONT}" font-size="${fontSize}" font-weight="${c.level === 0 ? '600' : '500'}" fill="#1e293b">
+              ${textLines.map((l, i) => `<tspan x="${c.input.x + 8}" dy="${i === 0 ? 0 : 14}">${escapeXML(l)}</tspan>`).join('')}
+            </text>
+          </g>
+        `;
+      }).join('\n');
+
+      return branchBox + '\n' + causeBoxes;
+    }).join('\n');
+
+    const effectFontSize = Math.round(14 * fontScale);
+    const effectLines = diagram.effect.split('\n');
+
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1000" viewBox="0 0 1500 1000">
+  <defs>
+    <marker id="ishikawa-arrow" markerWidth="12" markerHeight="12" refX="10" refY="4" orient="auto">
+      <path d="M0,0 L0,8 L11,4 z" fill="#334155" />
+    </marker>
+  </defs>
+  <rect width="1500" height="1000" fill="#ffffff" />
+  
+  <!-- Header / Title -->
+  <text x="50" y="55" font-family="${FONT}" font-size="20" font-weight="800" fill="#0f172a">SƠ ĐỒ NGUYÊN NHÂN - KẾT QUẢ ISHIKAWA (FISHBONE DIAGRAM)</text>
+  <text x="50" y="82" font-family="${FONT}" font-size="13" font-weight="500" fill="#64748b">Phân tích rủi ro tiền định và sàng lọc nguyên nhân chất lượng (ICH Q9 Quality Risk Management)</text>
+  
+  <!-- Spine & Main Skeleton -->
+  <path d="M95 ${SPINE_Y} L1220 ${SPINE_Y}" stroke="#334155" stroke-width="5" stroke-linecap="round" marker-end="url(#ishikawa-arrow)" />
+  <path d="M95 ${SPINE_Y} L146 431 M95 ${SPINE_Y} L146 529 M95 ${SPINE_Y} L37 ${SPINE_Y}" stroke="#64748b" stroke-width="3.5" stroke-linecap="round" />
+  
+  <!-- Category Bones & Cause Connectors -->
+  ${geometry.map((branch) => `
+    <g>
+      <path d="M${branch.endpoint.x} ${branch.endpoint.y} L${branch.attachment.x} ${branch.attachment.y}" stroke="${branch.colour}" stroke-width="3.5" stroke-linecap="round" />
+      <circle cx="${branch.attachment.x}" cy="${branch.attachment.y}" r="5.5" fill="${branch.colour}" />
+      ${branch.causes.map((cause) => `<path d="M${cause.source.x} ${cause.source.y} L${cause.end.x} ${cause.end.y}" stroke="${branch.colour}" stroke-width="${cause.level === 0 ? '2.2' : '1.7'}" stroke-linecap="round" opacity="${cause.level === 0 ? 0.85 : 0.65}" />`).join('\n')}
+    </g>
+  `).join('\n')}
+  
+  <!-- Fish Head -->
+  <path d="M1210 360 Q1350 360 1472 480 Q1350 600 1210 600 Z" fill="#103f67" stroke="#082f49" stroke-width="2.5" />
+  <circle cx="1422" cy="435" r="6.5" fill="#ffffff" />
+  <circle cx="1424" cy="435" r="2.7" fill="#0f172a" />
+  
+  <!-- Effect Text in Head -->
+  <g>
+    <rect x="1225" y="420" width="200" height="120" rx="6" fill="#082f49" fill-opacity="0.4" stroke="#7dd3fc" stroke-width="1.2" />
+    <text x="1325" y="${420 + (effectLines.length > 2 ? 35 : 45)}" text-anchor="middle" font-family="${FONT}" font-size="${effectFontSize}" font-weight="700" fill="#ffffff">
+      ${effectLines.map((l, i) => `<tspan x="1325" dy="${i === 0 ? 0 : 20}">${escapeXML(l)}</tspan>`).join('')}
+    </text>
+  </g>
+
+  <!-- Branch & Cause Labels -->
+  ${categoryBoxes}
+
+  <!-- Footer Watermark -->
+  <text x="750" y="975" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="600" fill="#94a3b8">© QbD Studio™ — Tran Linh Nguyen • ICH Q8/Q9 Ishikawa Risk Assessment</text>
+</svg>`;
+  };
+
+  const handleExportSVG = () => {
+    const svgStr = generateExportSVG();
+    const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+    saveAs(blob, `Ishikawa_Diagram_${Date.now()}.svg`);
+  };
+
+  const handleExportPNG = () => {
+    const svgStr = generateExportSVG();
+    const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+    const img = new globalThis.Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const scale = 2; // 2x Retina resolution (3000 x 2000 px)
+      canvas.width = 1500 * scale;
+      canvas.height = 1000 * scale;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => {
+          if (blob) {
+            saveAs(blob, `Ishikawa_Diagram_${Date.now()}.png`);
+          }
+          URL.revokeObjectURL(url);
+        }, 'image/png');
+      }
+    };
+    img.src = url;
+  };
+
   return (
     <div style={{ fontFamily: FONT }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -159,6 +293,28 @@ export const FishboneDiagram: React.FC<FishboneDiagramProps> = ({ diagram, onCha
           <span className="font-mono" style={{ minWidth: 38, textAlign: 'center', fontSize: '0.72rem', color: '#334155' }}>{Math.round(fontScale * 100)}%</span>
           <button type="button" className="btn btn-secondary" onClick={() => changeFontScale(0.1)} disabled={fontScale >= 1.35} title="Tăng cỡ chữ" style={{ minWidth: 30, padding: '0.3rem 0.45rem' }}>A+</button>
           <button className="btn btn-secondary" onClick={addCategory} disabled={diagram.categories.length >= 8} style={{ fontSize: '0.76rem', padding: '0.35rem 0.65rem' }}><Plus size={14} /> Thêm nhánh chính</button>
+          
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={handleExportSVG}
+            title="Xuất sơ đồ ra file vector SVG sắc nét vô hạn"
+            style={{ fontSize: '0.76rem', padding: '0.35rem 0.65rem', color: '#0f766e', borderColor: '#99f6e4' }}
+          >
+            <FileCode size={14} />
+            <span>Xuất SVG</span>
+          </button>
+          
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={handleExportPNG}
+            title="Xuất sơ đồ ra file ảnh PNG độ nét cao 3000x2000px"
+            style={{ fontSize: '0.76rem', padding: '0.35rem 0.65rem', color: '#1e3a8a', borderColor: '#bfdbfe' }}
+          >
+            <Image size={14} />
+            <span>Xuất PNG</span>
+          </button>
         </div>
       </div>
 

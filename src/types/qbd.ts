@@ -191,6 +191,7 @@ export interface ModelDiagnostics {
   bic?: number;         // Bayesian Information Criterion (Slide 12)
   logLikelihood?: number;
   twoLL?: number;       // -2 x LogLikelihood (-2LL) (Slide 12)
+  conditionEstimate?: number;
   fLOF?: number;        // Lack of Fit F-ratio (Slide 11, 16, 20)
   pLOF?: number;        // Lack of Fit P-value (> 0.05 indicates good fit)
   ssLOF?: number;
@@ -285,6 +286,10 @@ export interface MonteCarloResult {
   simulations: number;
   seed?: number;
   variabilityPercent?: number;
+  modeledCqaCodes: string[];
+  unmodeledCqaCodes: string[];
+  excursionCount: number;
+  excursionRatePercent: number;
   passCount: number;
   failCount: number;
   defectRatePPM: number;

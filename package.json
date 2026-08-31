@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -19,7 +22,7 @@
     "katex": "^0.18.4",
     "lucide-react": "^1.31.0",
     "mathjs": "^15.2.0",
-    "plotly.js-dist-min": "^3.7.0",
+    "plotly.js": "^3.7.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },

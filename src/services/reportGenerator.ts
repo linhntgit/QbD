@@ -54,8 +54,8 @@ function createDataCell(text: string, isEven: boolean = false, widthPercent?: nu
 }
 
 /**
- * Generate Gold-Standard CTD Module 3 (3.2.P.2 Pharmaceutical Development) Report (.docx)
- * Following US FDA ANDA QbD Reference Standard (ICH Q8, Q9, Q10, Q11)
+ * Generate a review draft using the CTD 3.2.P.2 Pharmaceutical Development structure (.docx).
+ * Output is not a validated submission dossier and requires independent scientific/QA review.
  */
 export async function exportQBDWordReport(
   project: QBDProject,
@@ -74,16 +74,16 @@ export async function exportQBDWordReport(
     factor.dataType === 'qualitative' || factor.dataType === 'quantitative_multilevel'
   );
 
-  // Title & Header Information (FDA Module 3 format)
+  // Title & Header Information (draft using a CTD 3.2.P.2 reference structure)
   sections.push(
     new Paragraph({
-      text: 'MODULE 3 QUALITY - 3.2.P.2 PHARMACEUTICAL DEVELOPMENT',
+      text: 'DEVELOPMENT REPORT DRAFT - CTD 3.2.P.2 REFERENCE STRUCTURE',
       heading: HeadingLevel.HEADING_2,
       alignment: AlignmentType.CENTER,
       spacing: { before: 100, after: 100 },
     }),
     new Paragraph({
-      text: 'BÁO CÁO PHÁT TRIỂN DƯỢC PHẨM THEO QUALITY BY DESIGN (QbD)',
+      text: 'BẢN THẢO BÁO CÁO PHÁT TRIỂN DƯỢC PHẨM THEO QUALITY BY DESIGN (QbD)',
       heading: HeadingLevel.TITLE,
       alignment: AlignmentType.CENTER,
       spacing: { after: 200, before: 50 },
@@ -92,7 +92,7 @@ export async function exportQBDWordReport(
       alignment: AlignmentType.CENTER,
       children: [
         new TextRun({
-          text: `Tuân thủ cấu trúc hướng dẫn US FDA & ICH Q8(R2), ICH Q9, ICH Q10, ICH Q11`,
+          text: 'Tài liệu làm việc — cần rà soát khoa học, QA và regulatory độc lập trước khi sử dụng',
           italics: true,
           color: ACCENT_COLOR,
           size: 22,
@@ -186,7 +186,7 @@ export async function exportQBDWordReport(
       spacing: { before: 300, after: 150 },
     }),
     new Paragraph({
-      text: `Báo cáo phát triển dược phẩm này tóm tắt toàn bộ quá trình nghiên cứu và tối ưu hóa sản phẩm ${project.moleculeName} (${project.dosageForm}) theo triết lý Quality by Design (QbD). Thông qua đánh giá rủi ro có hệ thống và Thiết kế thực nghiệm (DoE), các Thuộc tính vật liệu then chốt (CMAs) và Thông số quy trình then chốt (CPPs) đã được xác định, thiết lập Vùng thiết kế (Design Space) và Chiến lược kiểm soát (Control Strategy) đảm bảo chất lượng thuốc đồng nhất và đạt chuẩn.`,
+      text: `Bản thảo này tổng hợp dữ liệu phát triển hiện có cho ${project.moleculeName} (${project.dosageForm}) theo cách tiếp cận Quality by Design. Các CMA/CPP, vùng vận hành và chiến lược kiểm soát trong tài liệu là kết quả sàng lọc dựa trên dữ liệu/model hiện có; chúng chưa phải Design Space được phê duyệt và không thay thế confirmation run, process validation hoặc phê duyệt của QA/cơ quan quản lý.`,
       spacing: { after: 150 },
     })
   );
@@ -779,7 +779,7 @@ export async function exportQBDWordReport(
   if (monteCarlo) {
     sections.push(
       new Paragraph({
-        text: 'Xác Minh Độ Tin Cậy Vùng Thiết Kế Bằng Mô Phỏng Monte Carlo (ICH Q9)',
+        text: 'Đánh Giá Độ Bền Vững Miền Dự Báo Bằng Mô Phỏng Monte Carlo (tham chiếu ICH Q9)',
         heading: HeadingLevel.HEADING_2,
         spacing: { before: 200, after: 100 },
       }),
@@ -790,11 +790,15 @@ export async function exportQBDWordReport(
             bold: true,
           }),
           new TextRun({
-            text: `Độ tin cậy quy trình (Reliability) = ${monteCarlo.reliabilityPercent}% | Tỷ lệ lỗi dự kiến (Defect Rate) = ${monteCarlo.defectRatePPM.toLocaleString()} PPM`,
+            text: `Tỷ lệ đạt tiêu chí của CQA đã mô hình hóa = ${monteCarlo.reliabilityPercent}% | Tỷ lệ lỗi trong điều kiện mô phỏng = ${monteCarlo.defectRatePPM.toLocaleString()} PPM`,
             color: monteCarlo.reliabilityPercent >= 99 ? '15803D' : 'B91C1C',
             bold: true,
           }),
         ],
+        spacing: { after: 80 },
+      }),
+      new Paragraph({
+        text: `Phạm vi mô hình: ${monteCarlo.modeledCqaCodes.join(', ') || 'Không có'} | CQA chưa được bao phủ: ${monteCarlo.unmodeledCqaCodes.join(', ') || 'Không có'} | Mẫu vượt miền khảo sát: ${monteCarlo.excursionCount.toLocaleString()} (${monteCarlo.excursionRatePercent}%).`,
         spacing: { after: 200 },
       })
     );
@@ -897,5 +901,5 @@ export async function exportQBDWordReport(
   });
 
   const blob = await Packer.toBlob(doc);
-  saveAs(blob, `FDA_QbD_3.2.P.2_Report_${project.moleculeName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.docx`);
+  saveAs(blob, `QbD_Development_Report_DRAFT_${project.moleculeName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.docx`);
 }

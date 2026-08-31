@@ -349,7 +349,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
             </p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', minWidth: 0, maxWidth: '100%' }}>
             {/* CQA Selector */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#475569' }}>Đáp ứng CQA:</label>
@@ -592,7 +592,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
           </div>
 
           {/* ANOVA Table & Term Estimates Side-by-Side */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(480px, 1fr))', gap: '1.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(480px, 100%), 1fr))', gap: '1.5rem' }}>
             
             {/* ANOVA Table */}
             <div className="qbd-card">

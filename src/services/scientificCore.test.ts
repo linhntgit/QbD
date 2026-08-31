@@ -127,6 +127,13 @@ describe('reproducible analysis and report release gate', () => {
     expect(readiness.errors).toContain('Chưa có đánh giá Monte Carlo dùng chung với báo cáo.');
   });
 
+  it('does not release a report before a provisional operating region is saved', () => {
+    const projectWithoutRegion = { ...CASE_STUDIES[0], designSpace: [] };
+    const readiness = getReportReadiness(projectWithoutRegion, {}, null, null);
+    expect(readiness.readyForScientificReport).toBe(false);
+    expect(readiness.errors).toContain('Chưa lưu vùng vận hành provisional screening vào project.');
+  });
+
   it('does not silently downgrade risk when model or confirmation evidence is absent', () => {
     const updated = generateUpdatedRiskAssessment(CASE_STUDIES[2], {});
     expect(updated.length).toBeGreaterThan(0);
@@ -149,5 +156,37 @@ describe('reproducible analysis and report release gate', () => {
     const { executionTimeMs: _firstTime, ...firstScientificResult } = first;
     const { executionTimeMs: _secondTime, ...secondScientificResult } = second;
     expect(secondScientificResult).toEqual(firstScientificResult);
+  });
+
+  it('reports CQA coverage and counts process excursions as failed batches', () => {
+    const modeled: CQA = {
+      id: 'Y1', code: 'Y1', name: 'Modeled', unit: '', objective: 'range', weight: 1,
+      lowerLimit: -100, target: 0, upperLimit: 100,
+    };
+    const descriptive: CQA = {
+      id: 'Y2', code: 'Y2', name: 'Descriptive', unit: '', objective: 'pass_category', weight: 1,
+      dataType: 'qualitative_binary', categories: ['Không đạt', 'Đạt'],
+    };
+    const model = {
+      predict: () => 0,
+      diagnostics: { stdDev: 0, residuals: [] },
+    } as any;
+    const result = runMonteCarloSimulation({ X1: 10 }, [factor('X1')], [modeled, descriptive], { Y1: model }, 15, 500, 123);
+    expect(result.modeledCqaCodes).toEqual(['Y1']);
+    expect(result.unmodeledCqaCodes).toEqual(['Y2']);
+    expect(result.excursionCount).toBeGreaterThan(0);
+    expect(result.failCount).toBeGreaterThanOrEqual(result.excursionCount);
+    expect(result.reliabilityPercent).toBeLessThan(100);
+  });
+
+  it('clamps unsafe Monte Carlo configuration at the service boundary', () => {
+    const cqa: CQA = {
+      id: 'Y1', code: 'Y1', name: 'Response', unit: '', objective: 'range', weight: 1,
+      lowerLimit: 0, target: 5, upperLimit: 10,
+    };
+    const model = { predict: () => 5, diagnostics: { stdDev: 0, residuals: [] } } as any;
+    const result = runMonteCarloSimulation({ X1: 5 }, [factor('X1')], [cqa], { Y1: model }, -2, 10, 99);
+    expect(result.simulations).toBe(100);
+    expect(result.variabilityPercent).toBe(0.1);
   });
 });

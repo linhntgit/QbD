@@ -99,6 +99,76 @@ export function matInverse(A: number[][], ridgeLambda: number = 0): number[][] {
   return I;
 }
 
+export interface LeastSquaresQRResult {
+  coefficients: number[];
+  inverseXtX: number[][];
+  conditionEstimate: number;
+}
+
+/**
+ * Solve an overdetermined least-squares problem with Householder QR.
+ * This avoids forming X'X for coefficient estimation, which squares the
+ * condition number and can make a marginal DoE appear numerically valid.
+ */
+export function solveLeastSquaresQR(X: number[][], y: number[]): LeastSquaresQRResult {
+  const rows = X.length;
+  const cols = X[0]?.length ?? 0;
+  if (rows < cols || cols === 0 || y.length !== rows || X.some((row) => row.length !== cols)) {
+    throw new Error('Least-squares QR requires a rectangular matrix with rows >= columns.');
+  }
+
+  const R = X.map((row) => [...row]);
+  const qty = [...y];
+  const scale = Math.max(1, ...R.flat().map(Math.abs));
+  const tolerance = Number.EPSILON * Math.max(rows, cols) * scale * 100;
+
+  for (let k = 0; k < cols; k++) {
+    const norm = Math.hypot(...R.slice(k).map((row) => row[k]));
+    if (!Number.isFinite(norm) || norm <= tolerance) {
+      throw new Error('Design matrix is singular or numerically rank deficient.');
+    }
+    const alpha = R[k][k] >= 0 ? -norm : norm;
+    const v = R.slice(k).map((row) => row[k]);
+    v[0] -= alpha;
+    const vNormSquared = v.reduce((sum, value) => sum + value * value, 0);
+    if (vNormSquared <= tolerance * tolerance) throw new Error('Unstable Householder transformation.');
+
+    for (let j = k; j < cols; j++) {
+      const projection = 2 * v.reduce((sum, value, index) => sum + value * R[k + index][j], 0) / vNormSquared;
+      for (let i = k; i < rows; i++) R[i][j] -= projection * v[i - k];
+    }
+    const yProjection = 2 * v.reduce((sum, value, index) => sum + value * qty[k + index], 0) / vNormSquared;
+    for (let i = k; i < rows; i++) qty[i] -= yProjection * v[i - k];
+    R[k][k] = alpha;
+    for (let i = k + 1; i < rows; i++) R[i][k] = 0;
+  }
+
+  const diagonal = Array.from({ length: cols }, (_, i) => Math.abs(R[i][i]));
+  const conditionEstimate = Math.max(...diagonal) / Math.min(...diagonal);
+  if (!Number.isFinite(conditionEstimate) || conditionEstimate > 1e10) {
+    throw new Error('Design matrix is too ill-conditioned for reliable OLS inference.');
+  }
+
+  const solveUpper = (rhs: number[]) => {
+    const solution = new Array(cols).fill(0);
+    for (let i = cols - 1; i >= 0; i--) {
+      const remainder = R[i].slice(i + 1, cols).reduce((sum, value, offset) => sum + value * solution[i + 1 + offset], 0);
+      solution[i] = (rhs[i] - remainder) / R[i][i];
+    }
+    return solution;
+  };
+
+  const coefficients = solveUpper(qty.slice(0, cols));
+  const inverseRColumns = Array.from({ length: cols }, (_, column) => {
+    const rhs = new Array(cols).fill(0);
+    rhs[column] = 1;
+    return solveUpper(rhs);
+  });
+  const inverseR = Array.from({ length: cols }, (_, row) => inverseRColumns.map((column) => column[row]));
+  const inverseXtX = matMul(inverseR, matTranspose(inverseR));
+  return { coefficients, inverseXtX, conditionEstimate };
+}
+
 // -------------------------------------------------------------
 // Statistical Distribution Functions (Gamma, Beta, F, Student-t, Normal)
 // -------------------------------------------------------------
@@ -724,4 +794,3 @@ export function calculateCarpenterArchitecture(
     recommendation,
   };
 }
-

@@ -10,9 +10,10 @@ import type {
   ModelingEngine,
   AnalysisSettings,
   DesirabilitySolution,
+  MonteCarloResult,
 } from './types/qbd';
 import { CASE_STUDIES } from './data/caseStudies';
-import { fitModel, optimizeDesirability, runMonteCarloSimulation } from './services/statistics';
+import { fitModel, optimizeDesirability } from './services/statistics';
 import { fitNeuralNetModel, fitMultiOutputNeuralNet, DEFAULT_NEURAL_CONFIG, getNeuralArtifactFingerprint, hydrateNeuralModels, serializeNeuralModels } from './services/neuralNetwork';
 import { getReportReadiness, loadPersistedProject, persistProject, recordProjectVersion, validateProjectTemplate } from './services/projectGovernance';
 import { stableSeedFromText } from './services/random';
@@ -146,7 +147,7 @@ export function App() {
       }
     });
     return result;
-  }, [neuralTrainingVersion, project.cqas, project.factors, project.runs, neuralTrainingMode, sharedNeuralConfig, neuralConfigs]);
+  }, [neuralTrainingVersion, project.cqas, project.factors, project.runs, neuralTrainingMode, sharedNeuralConfig, neuralConfigs, restoredNeuralModels]);
 
   useEffect(() => {
     if (neuralTrainingVersion === 0 || Object.keys(neuralModels).length === 0) return;
@@ -210,19 +211,13 @@ export function App() {
   }, [project.factors, project.cqas, activeModels, analysisProvenance.optimizerSeed]);
   const optimum = project.analysisSettings?.appliedOptimum ?? calculatedOptimum;
 
-  // Calculate Monte Carlo Simulation from active modeling engine
-  const monteCarlo = useMemo(() => {
-    if (!optimum) return null;
-    return runMonteCarloSimulation(
-      optimum.actualFactors,
-      project.factors,
-      project.cqas,
-      activeModels,
-      analysisProvenance.monteCarloVariabilityPercent,
-      analysisProvenance.monteCarloSimulations,
-      analysisProvenance.monteCarloSeed,
-    );
-  }, [optimum, project.factors, project.cqas, activeModels, analysisProvenance]);
+  // Monte Carlo is intentionally explicit: changing project fields or models
+  // invalidates the previous result instead of synchronously rerunning a large
+  // simulation on every keystroke.
+  const [monteCarlo, setMonteCarlo] = useState<MonteCarloResult | null>(null);
+  useEffect(() => {
+    setMonteCarlo(null);
+  }, [optimum, project.factors, project.cqas, activeModels]);
   const reportReadiness = useMemo(
     () => getReportReadiness(project, activeModels, optimum, monteCarlo),
     [project, activeModels, optimum, monteCarlo],
@@ -305,7 +300,7 @@ export function App() {
       window.alert(`Không thể tải project vì template không hợp lệ:\n${validation.errors.join('\n')}`);
       return;
     }
-    trackProjectAction('load', { project_name: newProj.name, molecule: newProj.moleculeName });
+    trackProjectAction('load');
     pendingAuditAction.current = 'Tải project/case study';
     const normalized = normalizeProjectAnalysis(newProj);
     setProject(normalized);
@@ -426,7 +421,7 @@ export function App() {
 
   // Save Project JSON
   const handleSaveJSON = () => {
-    trackProjectAction('save_json', { project_name: project.name, molecule: project.moleculeName });
+    trackProjectAction('save_json');
     const jsonStr = JSON.stringify(project, null, 2);
     const blob = new Blob([jsonStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -440,23 +435,22 @@ export function App() {
   // Export Word Report
   const handleExportWord = async () => {
     if (!reportReadiness.readyForScientificReport) {
-      window.alert(`Chưa thể xuất báo cáo khoa học cuối cùng.\n${[...reportReadiness.errors, ...reportReadiness.warnings].slice(0, 8).join('\n')}`);
+      window.alert(`Chưa thể xuất bản thảo báo cáo phát triển.\n${[...reportReadiness.errors, ...reportReadiness.warnings].slice(0, 8).join('\n')}`);
       return;
     }
-    trackProjectAction('export_word', { project_name: project.name, engine: modelingEngine });
+    trackProjectAction('export_word');
     const { exportQBDWordReport } = await import('./services/reportGenerator');
     exportQBDWordReport(project, models, optimum, monteCarlo, neuralModels, modelingEngine);
   };
 
   return (
     <div
+      className={`app-shell${isHelpOpen && isHelpPinned ? ' app-shell--help-pinned' : ''}`}
       style={{
         minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
         backgroundColor: '#f8fafc',
-        marginRight: isHelpOpen && isHelpPinned ? '500px' : '0px',
-        transition: 'margin-right 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
       }}
     >
       {/* Top Navbar */}
@@ -479,7 +473,13 @@ export function App() {
       <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* Main Tab Content */}
-      <main style={{ flex: 1, maxWidth: '1440px', width: '100%', margin: '0 auto', padding: '1.5rem 1.25rem' }}>
+      <main
+        role="tabpanel"
+        id={`panel-${activeTab}`}
+        aria-labelledby={`tab-${activeTab}`}
+        tabIndex={0}
+        style={{ flex: 1, maxWidth: '1440px', width: '100%', margin: '0 auto', padding: '1.5rem 1.25rem' }}
+      >
         {storageWarning && <div className="qbd-card" role="alert" style={{ borderLeft: '4px solid #d97706', color: '#92400e', marginBottom: '1rem' }}>{storageWarning}</div>}
         <Suspense fallback={<div className="qbd-card" role="status" aria-live="polite">Đang tải mô-đun phân tích…</div>}>
         {activeTab === 'qtpp' && (
@@ -567,6 +567,7 @@ export function App() {
             optimizerSeed={analysisProvenance.optimizerSeed}
             onApplyOptimum={handleApplyOptimum}
             onMonteCarloConfigChange={handleMonteCarloConfigChange}
+            onMonteCarloResult={setMonteCarlo}
             onUpdateProject={handleUpdateProject}
             onNavigateToReport={() => setActiveTab('report')}
           />
@@ -607,7 +608,7 @@ export function App() {
             <strong>QbD Studio™ Pharma DoE Suite</strong> — © 2026 <strong>Tran Linh Nguyen</strong>. All rights reserved.
           </div>
           <div>
-            Tuân thủ chuẩn mực ICH Q8(R2), ICH Q9, ICH Q10, ICH Q11 • Nền tảng DoE & Prediction Profiler.
+            Hỗ trợ quy trình phát triển tham chiếu ICH Q8(R2), ICH Q9, ICH Q10, ICH Q11 • Nền tảng DoE & Prediction Profiler.
           </div>
         </div>
       </footer>

@@ -1,10 +1,20 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Download,
   Printer,
   FileCheck2,
   Calculator,
   BrainCircuit,
+  ListOrdered,
+  ArrowUp,
+  BookOpen,
+  Layers,
+  ShieldAlert,
+  Sliders,
+  Boxes,
+  Activity,
+  FileSpreadsheet,
+  CheckCircle2,
 } from 'lucide-react';
 import type {
   QBDProject,
@@ -45,9 +55,84 @@ export const ReportTab: React.FC<ReportTabProps> = ({
   const traceability = getTraceabilitySummary(project);
   const reportModels = modelingEngine === 'neural' ? (neuralModels ?? {}) : models;
   const reportReadiness = getReportReadiness(project, reportModels, optimum, monteCarlo);
+
+  const [activeSection, setActiveSection] = useState<string>('sec-metadata');
+
+  // Define Table of Contents Sections dynamically based on project content
+  const tocSections = useMemo(() => {
+    const list: Array<{ id: string; title: string; subtitle: string; icon: any; badge?: string }> = [
+      { id: 'sec-metadata', title: 'Thông tin Dự Án', subtitle: 'Tổng quan & Phương pháp', icon: BookOpen, badge: 'Info' },
+      { id: 'sec-0', title: '0. Protocol & Traceability', subtitle: 'Lịch sử & Phê duyệt', icon: CheckCircle2, badge: 'Trace' },
+      { id: 'sec-1', title: '1. Hồ Sơ QTPP', subtitle: 'Mục tiêu chất lượng', icon: Layers, badge: 'ICH Q8' },
+      { id: 'sec-2', title: '2. Thuộc Tính CQAs', subtitle: 'Chỉ tiêu & Desirability', icon: Sliders, badge: 'CQAs' },
+      { id: 'sec-3', title: '3. Rủi Ro Ban Đầu (FMEA)', subtitle: 'Sàng lọc biến số', icon: ShieldAlert, badge: 'ICH Q9' },
+      { id: 'sec-4', title: '4. Thiết Kế DoE', subtitle: `${project.doeConfig.designType} (${project.runs.length} runs)`, icon: FileSpreadsheet, badge: 'DoE' },
+      { id: 'sec-5', title: '5. ANOVA & Hồi Quy', subtitle: 'Đa thức & Lack of Fit', icon: Calculator, badge: 'Models' },
+    ];
+
+    if (neuralModels && Object.keys(neuralModels).length > 0) {
+      list.push({ id: 'sec-5b', title: '5b. Mạng Nơ-ron AI', subtitle: 'MLP Architecture & Metrics', icon: BrainCircuit, badge: 'ANN' });
+    }
+
+    if (optimum) {
+      list.push({ id: 'sec-6', title: '6. Tối Ưu Desirability', subtitle: `Overall D = ${optimum.overallDesirability}`, icon: Activity, badge: 'Optimum' });
+    }
+
+    list.push(
+      { id: 'sec-6b', title: '6b. Rủi Ro Sau DoE', subtitle: 'Đánh giá cập nhật', icon: ShieldAlert, badge: 'ICH Q9' },
+      { id: 'sec-7', title: '7. Chiến Lược Kiểm Soát', subtitle: 'ICH Q10 Comprehensive', icon: Boxes, badge: 'ICH Q10' }
+    );
+
+    if (monteCarlo) {
+      list.push({ id: 'sec-8', title: '8. Độ Bền Vững Monte Carlo', subtitle: `Đạt ${monteCarlo.reliabilityPercent}%`, icon: Activity, badge: 'Risk' });
+    }
+
+    list.push(
+      { id: 'sec-9', title: '9. Ký Duyệt & Phê Chuẩn', subtitle: 'Sign-off & Approval', icon: FileCheck2, badge: 'Sign' },
+      { id: 'sec-governance', title: 'Quản Trị & Audit Trail', subtitle: 'Snapshots & Kiểm tra', icon: BookOpen, badge: 'Audit' }
+    );
+
+    return list;
+  }, [project.doeConfig.designType, project.runs.length, neuralModels, optimum, monteCarlo]);
+
+  // Scroll Spy logic to highlight active TOC item
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollPos = window.scrollY + 120;
+      const elements = tocSections
+        .map((sec) => document.getElementById(sec.id))
+        .filter((el): el is HTMLElement => el !== null);
+
+      for (let i = elements.length - 1; i >= 0; i--) {
+        const el = elements[i];
+        if (el.offsetTop <= scrollPos) {
+          setActiveSection(el.id);
+          break;
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [tocSections]);
+
+  const scrollToSection = (id: string) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setActiveSection(id);
+    }
+  };
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setActiveSection('sec-metadata');
+  };
+
   const handleDownloadWord = () => {
     if (!reportReadiness.readyForScientificReport) {
-      window.alert(`Chưa thể xuất báo cáo khoa học cuối cùng.\n${[...reportReadiness.errors, ...reportReadiness.warnings].slice(0, 8).join('\n')}`);
+      window.alert(`Chưa thể xuất bản thảo báo cáo phát triển.\n${[...reportReadiness.errors, ...reportReadiness.warnings].slice(0, 8).join('\n')}`);
       return;
     }
     exportQBDWordReport(project, models, optimum, monteCarlo, neuralModels, modelingEngine);
@@ -61,16 +146,16 @@ export const ReportTab: React.FC<ReportTabProps> = ({
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       
       {/* Header Actions Bar */}
-      <div className="qbd-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+      <div className="qbd-card no-print" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <FileCheck2 size={22} color="#0f766e" />
             <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#0f172a' }}>
-              Báo Cáo Hồ Sơ Phát Triển Dược Phẩm (ICH CTD Module 3.2.P.2)
+              Bản Thảo Báo Cáo Phát Triển Dược Phẩm (tham khảo CTD 3.2.P.2)
             </h2>
           </div>
           <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.2rem' }}>
-            Tổng hợp toàn diện dữ liệu QTPP, FMEA, DoE, ANOVA, Design Space và Chiến lược kiểm soát chất lượng.
+            Tài liệu làm việc cần được chuyên gia khoa học và QA rà soát; không phải hồ sơ đã được cơ quan quản lý phê duyệt.
           </p>
         </div>
 
@@ -118,47 +203,122 @@ export const ReportTab: React.FC<ReportTabProps> = ({
             className={`btn ${reportReadiness.readyForScientificReport ? 'btn-teal' : 'btn-secondary'}`}
             disabled={!reportReadiness.readyForScientificReport}
             style={{ fontSize: '0.82rem', padding: '0.4rem 1rem' }}
-            title={reportReadiness.readyForScientificReport ? 'Xuất báo cáo khoa học cuối cùng' : 'Cần hoàn tất và kiểm tra dữ liệu trước khi xuất'}
+            title={reportReadiness.readyForScientificReport ? 'Xuất bản thảo để rà soát khoa học/QA' : 'Cần hoàn tất và kiểm tra dữ liệu trước khi xuất'}
           >
             <Download size={16} />
-            <span>Tải Báo Cáo Word (.docx)</span>
+            <span>Tải Bản Thảo Word (.docx)</span>
           </button>
         </div>
       </div>
 
       {!reportReadiness.readyForScientificReport && (
-        <div className="qbd-card" style={{ borderLeft: '4px solid #d97706', color: '#92400e', fontSize: '0.82rem' }}>
-          <strong>Báo cáo khoa học cuối cùng đang bị khóa.</strong> Hoàn tất dữ liệu và sửa các lỗi kiểm tra trước khi xuất Word.
+        <div className="qbd-card no-print" style={{ borderLeft: '4px solid #d97706', color: '#92400e', fontSize: '0.82rem' }}>
+          <strong>Bản thảo báo cáo đang bị khóa.</strong> Hoàn tất dữ liệu và sửa các lỗi kiểm tra trước khi xuất Word.
         </div>
       )}
 
-      {/* Live Scientific Report Document View */}
-      <div
-        className="qbd-card"
-        style={{
-          backgroundColor: '#ffffff',
-          padding: '2.5rem',
-          maxWidth: '1000px',
-          margin: '0 auto',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
-          border: '1px solid #cbd5e1',
-        }}
-      >
-        {/* Document Header */}
-        <div style={{ textAlign: 'center', borderBottom: '2px solid #1e3a8a', paddingBottom: '1.5rem', marginBottom: '2rem' }}>
-          <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#0f766e', letterSpacing: '0.05em' }}>
-            COMMON TECHNICAL DOCUMENT (ICH CTD MODULE 3.2.P.2)
+      {/* Main Report Layout with Side-by-Side Interactive Table of Contents */}
+      <div className="report-workspace-container">
+        
+        {/* Sticky Table of Contents Sidebar */}
+        <aside className="report-toc-sidebar no-print" aria-label="Mục lục báo cáo">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem', paddingBottom: '0.45rem', borderBottom: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#1e3a8a', fontWeight: '700', fontSize: '0.82rem' }}>
+              <ListOrdered size={16} color="#1e3a8a" />
+              <span>MỤC LỤC BÁO CÁO</span>
+            </div>
+            <span style={{ fontSize: '0.68rem', backgroundColor: '#f1f5f9', color: '#64748b', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '600' }}>
+              {tocSections.length} mục
+            </span>
           </div>
-          <h1 style={{ fontSize: '1.6rem', fontWeight: '800', color: '#1e3a8a', margin: '0.5rem 0' }}>
-            BÁO CÁO PHÁT TRIỂN DƯỢC PHẨM THEO QUALITY BY DESIGN (QbD)
-          </h1>
-          <div style={{ fontSize: '0.9rem', color: '#475569', fontStyle: 'italic' }}>
-            Tuân thủ hướng dẫn ICH Q8 (R2), ICH Q9, ICH Q10 và ICH Q11
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+            {tocSections.map((sec) => {
+              const Icon = sec.icon;
+              const isActive = activeSection === sec.id;
+              return (
+                <button
+                  key={sec.id}
+                  type="button"
+                  onClick={() => scrollToSection(sec.id)}
+                  className={`report-toc-item ${isActive ? 'active' : ''}`}
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    background: isActive ? '#eff6ff' : 'transparent',
+                    border: 'none',
+                  }}
+                  title={sec.subtitle}
+                >
+                  <Icon size={14} style={{ color: isActive ? '#1e40af' : '#64748b', flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div style={{ fontWeight: isActive ? '700' : '500', color: isActive ? '#1e3a8a' : '#334155' }}>
+                      {sec.title}
+                    </div>
+                  </div>
+                  {sec.badge && (
+                    <span
+                      style={{
+                        fontSize: '0.65rem',
+                        padding: '0.1rem 0.35rem',
+                        borderRadius: '3px',
+                        backgroundColor: isActive ? '#dbeafe' : '#f1f5f9',
+                        color: isActive ? '#1e40af' : '#64748b',
+                        fontWeight: '600',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {sec.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
-        </div>
+
+          <div style={{ marginTop: '0.75rem', paddingTop: '0.55rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={scrollToTop}
+              className="btn btn-secondary"
+              style={{ width: '100%', fontSize: '0.72rem', padding: '0.35rem', gap: '0.3rem', justifyContent: 'center' }}
+            >
+              <ArrowUp size={13} />
+              <span>Lên đầu trang</span>
+            </button>
+          </div>
+        </aside>
+
+        {/* Live Scientific Report Document View */}
+        <div
+          className="qbd-card report-draft"
+          style={{
+            backgroundColor: '#ffffff',
+            padding: 'clamp(1rem, 5vw, 2.5rem)',
+            width: '100%',
+            boxSizing: 'border-box',
+            maxWidth: '1000px',
+            margin: '0 auto',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
+            border: '1px solid #cbd5e1',
+          }}
+        >
+          {/* Document Header */}
+          <div style={{ textAlign: 'center', borderBottom: '2px solid #1e3a8a', paddingBottom: '1.5rem', marginBottom: '2rem' }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#0f766e', letterSpacing: '0.05em' }}>
+              DEVELOPMENT REPORT DRAFT — CTD 3.2.P.2 REFERENCE STRUCTURE
+            </div>
+            <h1 style={{ fontSize: '1.6rem', fontWeight: '800', color: '#1e3a8a', margin: '0.5rem 0' }}>
+              BẢN THẢO BÁO CÁO PHÁT TRIỂN DƯỢC PHẨM THEO QbD
+            </h1>
+            <div style={{ fontSize: '0.9rem', color: '#475569', fontStyle: 'italic' }}>
+              Cần rà soát độc lập trước mọi sử dụng GxP hoặc regulatory
+            </div>
+          </div>
+
 
         {/* Project Metadata Table */}
-        <div style={{ marginBottom: '2rem' }}>
+        <div id="sec-metadata" className="report-section" style={{ marginBottom: '2rem' }}>
           <table className="qbd-table" style={{ border: '1px solid #cbd5e1' }}>
             <tbody>
               <tr>
@@ -193,7 +353,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
           </table>
         </div>
 
-        <div style={{ marginBottom: '2rem' }}>
+        <div id="sec-0" className="report-section" style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
             0. Protocol trước chạy & traceability sau chạy
           </h2>
@@ -206,7 +366,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
         </div>
 
         {/* 1. QTPP */}
-        <div style={{ marginBottom: '2rem' }}>
+        <div id="sec-1" className="report-section" style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
             1. Hồ Sơ Chất Lượng Sản Phẩm Mục Tiêu (QTPP - ICH Q8)
           </h2>
@@ -231,7 +391,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
         </div>
 
         {/* 2. CQAs & Desirability Configuration */}
-        <div style={{ marginBottom: '2rem' }}>
+        <div id="sec-2" className="report-section" style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
             2. Thuộc Tính Chất Lượng Trọng Yếu (CQAs) & Cấu Hình Hàm Thỏa Dụng
           </h2>
@@ -277,7 +437,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
         </div>
 
         {/* 3. FMEA Risk Assessment */}
-        <div style={{ marginBottom: '2rem' }}>
+        <div id="sec-3" className="report-section" style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
             3. Đánh Giá Quản Lý Rủi Ro Ban Đầu (FMEA - ICH Q9)
           </h2>
@@ -320,7 +480,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
         </div>
 
         {/* 4. DoE Matrix */}
-        <div style={{ marginBottom: '2rem' }}>
+        <div id="sec-4" className="report-section" style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
             4. Thiết Kế Thí Nghiệm (DoE: {project.doeConfig.designType})
           </h2>
@@ -449,7 +609,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
         </div>
 
         {/* 5. Statistical Models & ANOVA */}
-        <div style={{ marginBottom: '2rem' }}>
+        <div id="sec-5" className="report-section" style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
             5. Phương Trình Hồi Quy & Kết Quả Phân Tích Phương Sai (ANOVA - Lack of Fit)
           </h2>
@@ -533,7 +693,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
 
         {/* 5b. Neural Network Models */}
         {neuralModels && Object.keys(neuralModels).length > 0 && (
-          <div style={{ marginBottom: '2rem' }}>
+          <div id="sec-5b" className="report-section" style={{ marginBottom: '2rem' }}>
             <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#7c3aed', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
               5b. Mô hình Mạng Nơ-ron AI (Neural Network Platform)
             </h2>
@@ -581,7 +741,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
 
         {/* 6. Optimum & Prediction Profiler */}
         {optimum && (
-          <div style={{ marginBottom: '2rem' }}>
+          <div id="sec-6" className="report-section" style={{ marginBottom: '2rem' }}>
             <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
               6. Tối Ưu Hóa Đa Mục Tiêu (Desirability Profiler: Overall D = {optimum.overallDesirability})
             </h2>
@@ -630,7 +790,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
         )}
 
         {/* 6. Updated Risk Assessment Table (ICH Q9 & FDA ANDA) */}
-        <div style={{ marginBottom: '2rem' }}>
+        <div id="sec-6b" className="report-section" style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
             6. Đánh Giá Rủi Ro Cập Nhật Sau DoE (Updated Risk Assessment - ICH Q9 & FDA)
           </h2>
@@ -675,7 +835,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
         </div>
 
         {/* 7. Comprehensive Control Strategy (ICH Q10) */}
-        <div style={{ marginBottom: '2rem' }}>
+        <div id="sec-7" className="report-section" style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
             7. Bảng Chiến Lược Kiểm Soát Toàn Diện (ICH Q10 Comprehensive Control Strategy)
           </h2>
@@ -713,24 +873,27 @@ export const ReportTab: React.FC<ReportTabProps> = ({
 
         {/* 8. Monte Carlo Reliability */}
         {monteCarlo && (
-          <div style={{ marginBottom: '2rem' }}>
+          <div id="sec-8" className="report-section" style={{ marginBottom: '2rem' }}>
             <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
-              8. Xác Minh Độ Tin Cậy Vùng Thiết Kế (Mô Phỏng Monte Carlo - ICH Q9)
+              8. Đánh Giá Độ Bền Vững Miền Dự Báo (Mô Phỏng Monte Carlo, tham chiếu ICH Q9)
             </h2>
             <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '0.5rem', padding: '1rem', fontSize: '0.85rem', color: '#14532d' }}>
               <div style={{ marginBottom: '0.3rem' }}>• Tổng số lô mô phỏng ảo: <strong>{monteCarlo.simulations.toLocaleString()} lô</strong></div>
-              <div style={{ marginBottom: '0.3rem' }}>• Tỷ lệ độ tin cậy đạt chuẩn 100% CQAs: <strong style={{ color: '#15803d', fontSize: '0.95rem' }}>{monteCarlo.reliabilityPercent}%</strong></div>
-              <div>• Tỷ lệ lỗi dự kiến (Defect Rate): <strong>{monteCarlo.defectRatePPM.toLocaleString()} PPM</strong></div>
+              <div style={{ marginBottom: '0.3rem' }}>• Tỷ lệ mẫu đạt tiêu chí của các CQA đã mô hình hóa: <strong style={{ color: '#15803d', fontSize: '0.95rem' }}>{monteCarlo.reliabilityPercent}%</strong></div>
+              <div style={{ marginBottom: '0.3rem' }}>• CQA đã mô hình hóa: <strong>{monteCarlo.modeledCqaCodes.join(', ') || 'Không có'}</strong></div>
+              <div style={{ marginBottom: '0.3rem', color: monteCarlo.unmodeledCqaCodes.length ? '#b45309' : 'inherit' }}>• CQA chưa được bao phủ: <strong>{monteCarlo.unmodeledCqaCodes.join(', ') || 'Không có'}</strong></div>
+              <div style={{ marginBottom: '0.3rem' }}>• Mẫu vượt miền khảo sát: <strong>{monteCarlo.excursionCount.toLocaleString()} ({monteCarlo.excursionRatePercent}%)</strong></div>
+              <div>• Tỷ lệ lỗi dự kiến trong điều kiện mô phỏng (Defect Rate): <strong>{monteCarlo.defectRatePPM.toLocaleString()} PPM</strong></div>
             </div>
           </div>
         )}
 
         {/* 9. Sign-off & Regulatory Approval Block */}
-        <div>
+        <div id="sec-9" className="report-section">
           <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
             9. Ký Duyệt & Phê Chuẩn Hồ Sơ Phát Triển Dược Phẩm (Sign-off & Approval)
           </h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginTop: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(180px, 100%), 1fr))', gap: '1rem', marginTop: '1rem' }}>
             <div style={{ border: '1px solid #cbd5e1', borderRadius: '0.375rem', padding: '1rem', textAlign: 'center', backgroundColor: '#f8fafc' }}>
               <div style={{ fontWeight: '700', fontSize: '0.82rem', color: '#1e3a8a', marginBottom: '3rem' }}>
                 NGƯỜI LẬP BÁO CÁO (Scientist)
@@ -757,12 +920,14 @@ export const ReportTab: React.FC<ReportTabProps> = ({
           </div>
         </div>
 
-        <div style={{ marginTop: '2rem' }}>
+        <div id="sec-governance" className="report-section" style={{ marginTop: '2rem' }}>
           <ProjectGovernancePanel project={project} onRestoreSnapshot={onRestoreSnapshot} />
         </div>
 
       </div>
 
     </div>
-  );
+
+  </div>
+);
 };

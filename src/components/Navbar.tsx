@@ -91,7 +91,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <h1 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#0f172a', letterSpacing: '-0.01em' }}>
                   QbD Studio™
                 </h1>
-                <span className="badge badge-primary">v2.5 ICH Standard</span>
+                <span className="badge badge-primary">v2.5 ICH-aligned workflow</span>
               </div>
               <p style={{ fontSize: '0.8rem', color: '#64748b' }}>
                 Thiết kế Thí nghiệm & Tối ưu hóa Đáp ứng Dược phẩm (ICH Q8, Q9, Q10, Q11)
@@ -222,10 +222,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               disabled={!canExportWord}
               className="btn btn-secondary"
               style={{ fontSize: '0.82rem', padding: '0.4rem 0.75rem' }}
-              title={canExportWord ? 'Xuất hồ sơ phát triển thuốc ICH CTD Module 3.2.P.2 sang định dạng MS Word' : 'Báo cáo đang bị khóa bởi scientific readiness gate'}
+              title={canExportWord ? 'Xuất bản thảo báo cáo phát triển theo cấu trúc tham khảo CTD 3.2.P.2' : 'Bản thảo đang bị khóa bởi readiness gate kỹ thuật'}
             >
               <FileText size={16} color="#0f766e" />
-              <span>Xuất Word (.docx)</span>
+              <span>Xuất Bản Thảo Word</span>
             </button>
 
             {/* Save JSON */}

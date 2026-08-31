@@ -16,7 +16,7 @@ import type {
 import {
   matMul,
   matTranspose,
-  matInverse,
+  solveLeastSquaresQR,
   fDistributionPValue,
   tDistributionPValue,
   tDistributionCritical,
@@ -63,9 +63,9 @@ export interface ConfirmationPlan {
 
 function calculateSSE(X: number[][], Y: number[][]): number | null {
   try {
-    const beta = matMul(matMul(matInverse(matMul(matTranspose(X), X)), matTranspose(X)), Y);
-    const predicted = matMul(X, beta);
-    return Y.reduce((sum, row, i) => sum + Math.pow(row[0] - predicted[i][0], 2), 0);
+    const fit = solveLeastSquaresQR(X, Y.map((row) => row[0]));
+    const predicted = X.map((row) => row.reduce((sum, value, index) => sum + value * fit.coefficients[index], 0));
+    return Y.reduce((sum, row, i) => sum + Math.pow(row[0] - predicted[i], 2), 0);
   } catch {
     // A sequential ANOVA submodel can be aliased (for example, an intercept
     // plus all mixture components). It must not bring down the whole UI.
@@ -89,9 +89,9 @@ function calculateVIFs(X: number[][], firstPredictorIndex: number = 1): number[]
     }
     const others = X.map((row) => row.filter((_, index) => index !== target));
     try {
-      const beta = matMul(matMul(matInverse(matMul(matTranspose(others), others)), matTranspose(others)), y.map((value) => [value]));
+      const beta = solveLeastSquaresQR(others, y).coefficients;
       const sse = others.reduce((sum, row, index) => {
-        const predicted = row.reduce((acc, value, col) => acc + value * beta[col][0], 0);
+        const predicted = row.reduce((acc, value, col) => acc + value * beta[col], 0);
         return sum + Math.pow(y[index] - predicted, 2);
       }, 0);
       const r2 = Math.min(1, Math.max(0, 1 - sse / sst));
@@ -172,15 +172,18 @@ export function fitModel(
   const Y: number[][] = validRuns.map(({ parsedY }) => [parsedY!]);
 
   const XT = matTranspose(X);
-  const XTX = matMul(XT, X);
   let invXTX: number[][];
+  let conditionEstimate: number;
+  let betaValues: number[];
   try {
-    invXTX = matInverse(XTX);
+    const fit = solveLeastSquaresQR(X, Y.map((row) => row[0]));
+    invXTX = fit.inverseXtX;
+    conditionEstimate = fit.conditionEstimate;
+    betaValues = fit.coefficients;
   } catch {
     return null;
   }
-  const XTY = matMul(XT, Y);
-  const Beta = matMul(invXTX, XTY); // (p x 1)
+  const Beta = betaValues.map((value) => [value]); // (p x 1)
 
   // Compute Predictions and Residuals
   const yPred = matMul(X, Beta).map((row) => row[0]);
@@ -208,7 +211,7 @@ export function fitModel(
   validRuns.forEach(({ run }, idx) => {
     // Replicates in different execution blocks are not pure-error replicates:
     // their fixed block effect is explicitly estimated in the fitted model.
-    const key = `${Math.max(1, Math.floor(run.block ?? 1))}|${activeFactors.map((f) => run.factorCoded[f.code]?.toFixed(3) ?? '0').join('|')}`;
+    const key = `${Math.max(1, Math.floor(run.block ?? 1))}|${activeFactors.map((f) => run.factorCoded[f.code]?.toPrecision(12) ?? '0').join('|')}`;
     if (!pointGroups[key]) pointGroups[key] = [];
     pointGroups[key].push(yActual[idx]);
   });
@@ -282,7 +285,7 @@ export function fitModel(
     const pred = yPred[i];
     const res = residuals[i];
     const h_ii = leverages[i];
-    const press_i = 1 - h_ii > 1e-6 ? res / (1 - h_ii) : res;
+    const press_i = 1 - h_ii > 1e-6 ? res / (1 - h_ii) : Number.POSITIVE_INFINITY;
     press += Math.pow(press_i, 2);
 
     const stdRes = msResidual > 0 ? res / Math.sqrt(msResidual) : 0;
@@ -536,6 +539,7 @@ export function fitModel(
       bic: infoCrit.bic,
       logLikelihood: infoCrit.logLikelihood,
       twoLL: infoCrit.twoLL,
+      conditionEstimate,
       fLOF: fLackOfFit,
       pLOF: pLackOfFit,
       ssLOF: ssLackOfFit,
@@ -1099,10 +1103,15 @@ export function runMonteCarloSimulation(
   simulations: number = 10000,
   seed: number = 20260827,
 ): MonteCarloResult {
+  simulations = Math.max(100, Math.min(100_000, Math.round(Number.isFinite(simulations) ? simulations : 10_000)));
+  variabilityPercent = Math.max(0.1, Math.min(15, Number.isFinite(variabilityPercent) ? variabilityPercent : 2));
   const startTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
   const validCQAs = cqas.filter((c) => models[c.code]);
+  const modeledCqaCodes = validCQAs.map((cqa) => cqa.code);
+  const unmodeledCqaCodes = cqas.filter((cqa) => !models[cqa.code]).map((cqa) => cqa.code);
   let passCount = 0;
   let failCount = 0;
+  let excursionCount = 0;
 
   const cqaValues: Record<string, number[]> = {};
   validCQAs.forEach((c) => {
@@ -1177,6 +1186,7 @@ export function runMonteCarloSimulation(
   for (let s = 0; s < simulations; s++) {
     // Generate randomized factor actuals and convert to coded/proportion
     const sampleCoded: Record<string, number> = {};
+    let batchOutsideSurveyRegion = false;
 
     // 1. Process factors
     factors.forEach((f) => {
@@ -1203,14 +1213,12 @@ export function runMonteCarloSimulation(
       const sd = Math.max(1e-5, scale * (variabilityPercent / 100.0));
 
       // Box-Muller standard normal transform
-      // Truncated normal sampling prevents extrapolation outside the proven
-      // operating range while retaining stochastic process variation.
-      let actualVal = mean;
-      for (let attempt = 0; attempt < 100; attempt++) {
-        actualVal = mean + standardNormal() * sd;
-        if (actualVal >= f.low && actualVal <= f.high) break;
-      }
-      actualVal = Math.max(f.low, Math.min(f.high, actualVal));
+      // Draw the physical process without truncation. An excursion outside the
+      // studied region is a failed virtual batch; clamp only the value supplied
+      // to the model so the model is never extrapolated beyond its evidence.
+      const rawActualVal = mean + standardNormal() * sd;
+      if (rawActualVal < f.low || rawActualVal > f.high) batchOutsideSurveyRegion = true;
+      const actualVal = Math.max(f.low, Math.min(f.high, rawActualVal));
 
       const center = f.center !== undefined ? f.center : (f.low + f.high) / 2;
       const half = (f.high - f.low) / 2;
@@ -1235,7 +1243,14 @@ export function runMonteCarloSimulation(
       });
 
       if (hasMixture) {
-        const boundedProps = projectToBoundedMixture(sampledProps, mixLowProps, mixHighProps, 1.0);
+        const sampledTotal = sampledProps.reduce((sum, value) => sum + value, 0);
+        const normalizedProps = sampledTotal > 0
+          ? sampledProps.map((value) => value / sampledTotal)
+          : sampledProps;
+        if (normalizedProps.some((value, index) => value < mixLowProps[index] - 1e-10 || value > mixHighProps[index] + 1e-10)) {
+          batchOutsideSurveyRegion = true;
+        }
+        const boundedProps = projectToBoundedMixture(normalizedProps, mixLowProps, mixHighProps, 1.0);
         mixFactors.forEach((f, idx) => {
           sampleCoded[f.code] = boundedProps[idx];
         });
@@ -1247,7 +1262,8 @@ export function runMonteCarloSimulation(
     }
 
     // 3. Evaluate each CQA with True Gaussian Model Residual Noise
-    let batchPass = true;
+    if (batchOutsideSurveyRegion) excursionCount++;
+    let batchPass = !batchOutsideSurveyRegion;
     const correlatedZ = new Array(validCQAs.length).fill(0);
     const independentZ = validCQAs.map(() => standardNormal());
     for (let i = 0; i < cholesky.length; i++) {
@@ -1281,6 +1297,7 @@ export function runMonteCarloSimulation(
 
   const defectRatePPM = Math.round((failCount / simulations) * 1_000_000);
   const reliabilityPercent = Number(((passCount / simulations) * 100).toFixed(2));
+  const excursionRatePercent = Number(((excursionCount / simulations) * 100).toFixed(3));
 
   const cqaStats: Record<string, any> = {};
   validCQAs.forEach((cqa) => {
@@ -1327,6 +1344,10 @@ export function runMonteCarloSimulation(
     simulations,
     seed,
     variabilityPercent,
+    modeledCqaCodes,
+    unmodeledCqaCodes,
+    excursionCount,
+    excursionRatePercent,
     passCount,
     failCount,
     defectRatePPM,

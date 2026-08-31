@@ -24,10 +24,9 @@ export function trackTabChange(tabKey: string) {
   });
 }
 
-export function trackProjectAction(action: 'new' | 'load' | 'save_json' | 'export_word', details?: Record<string, any>) {
+export function trackProjectAction(action: 'new' | 'load' | 'save_json' | 'export_word') {
   trackEvent(`qbd_project_${action}`, {
     event_category: 'Project Management',
-    ...details,
   });
 }
 

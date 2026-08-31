@@ -52,6 +52,7 @@ interface DesignSpaceTabProps {
   optimizerSeed: number;
   onApplyOptimum: (solution: DesirabilitySolution) => void;
   onMonteCarloConfigChange: (variabilityPercent: number, simulations: number) => void;
+  onMonteCarloResult: (result: MonteCarloResult) => void;
 }
 
 export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
@@ -69,6 +70,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
   optimizerSeed: _optimizerSeed,
   onApplyOptimum,
   onMonteCarloConfigChange,
+  onMonteCarloResult,
 }) => {
   const factors = project.factors;
   const cqas = project.cqas;
@@ -183,6 +185,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
             monteCarloSeed,
           );
           setMcResult(mc);
+          onMonteCarloResult(mc);
           setSimProgress(100);
           setIsSimulating(false);
           try {
@@ -236,8 +239,10 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
   // Run Monte Carlo simulation manually
   const handleRunMonteCarlo = (customBatches?: number, customRsd?: number) => {
     if (!optimum) return;
-    const batches = customBatches ?? mcSimulations;
-    const rsd = customRsd ?? mcVariability;
+    const batches = Math.max(100, Math.min(100_000, Math.round(customBatches ?? mcSimulations)));
+    const rsd = Math.max(0.1, Math.min(15, customRsd ?? mcVariability));
+    setMcSimulations(batches);
+    setMcVariability(rsd);
     onMonteCarloConfigChange(rsd, batches);
     executeSimulation(optimum.actualFactors, batches, rsd);
   };
@@ -614,7 +619,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
       />
 
       {/* 2. Sweet Spot / Design Space Overlay Plot */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '1.5rem' }}>
+      <div className="design-space-workspace-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(340px, 100%), 1fr))', gap: '1.5rem' }}>
         
         {/* Main Plot Area */}
         <div className="qbd-card">
@@ -736,7 +741,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                 }}
               />
               <span style={{ fontWeight: '600', color: '#166534' }}>
-                Vùng Xanh: Design Space (100% CQAs Đạt Chuẩn)
+                Vùng Xanh: miền dự báo đạt chuẩn cho các CQA đã mô hình hóa
               </span>
             </div>
 
@@ -1094,7 +1099,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
               RSD hiện chọn: ±{mcVariability}% · {mcResult?.simulations.toLocaleString() ?? 0} lô ảo.
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 0.9fr) minmax(340px, 1.1fr)', gap: '0.85rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(340px, 100%), 1fr))', gap: '0.85rem' }}>
             <div style={{ minHeight: '250px' }}>
               <PlotlyChart
                 data={[{ type: 'bar', orientation: 'h', y: robustness.sensitivities.map((item) => item.factorCode).reverse(), x: robustness.sensitivities.map((item) => item.relativeImpact).reverse(), marker: { color: '#0284c7' }, hovertemplate: '%{y}: %{x:.2f}%<extra></extra>' }]}
@@ -1136,9 +1141,9 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                 {[
                   { label: '1k', val: 1000, desc: '1,000 lô (⚡ Nhanh)' },
                   { label: '5k', val: 5000, desc: '5,000 lô' },
-                  { label: '10k', val: 10000, desc: '10,000 lô (🎯 Chuẩn ICH Q9)' },
+                  { label: '10k', val: 10000, desc: '10,000 lô (mức phân tích thường dùng)' },
                   { label: '50k', val: 50000, desc: '50,000 lô (💎 Độ chính xác cao)' },
-                  { label: '100k', val: 100000, desc: '100,000 lô (🚀 Siêu lớn)' },
+                  { label: '100k', val: 100000, desc: '100,000 lô (giới hạn an toàn)' },
                 ].map((preset) => (
                   <button
                     key={preset.val}
@@ -1167,14 +1172,14 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
               <input
                 type="number"
                 min={500}
-                max={500000}
+                max={100000}
                 step={1000}
                 disabled={isSimulating}
                 className="input-field font-mono"
                 style={{ width: '80px', padding: '0.25rem 0.4rem', fontSize: '0.78rem', textAlign: 'center' }}
                 value={mcSimulations}
-                onChange={(e) => setMcSimulations(Math.max(100, Number(e.target.value)))}
-                title="Nhập số lô tùy chỉnh (100 - 500,000 lô)"
+                onChange={(e) => setMcSimulations(Math.max(100, Math.min(100_000, Number(e.target.value) || 100)))}
+                title="Nhập số lô tùy chỉnh (100 - 100.000 lô)"
               />
               <span style={{ fontSize: '0.73rem', color: '#64748b' }}>lô</span>
             </div>
@@ -1191,7 +1196,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                 className="input-field font-mono"
                 style={{ width: '65px', padding: '0.25rem 0.4rem', fontSize: '0.78rem', textAlign: 'center' }}
                 value={mcVariability}
-                onChange={(e) => setMcVariability(Number(e.target.value))}
+                onChange={(e) => setMcVariability(Math.max(0.1, Math.min(15, Number(e.target.value) || 0.1)))}
                 title="Độ lệch chuẩn tương đối (% RSD) của các thông số quy trình"
               />
               <span style={{ fontSize: '0.73rem', color: '#64748b' }}>%</span>
@@ -1314,7 +1319,11 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                   {mcResult.reliabilityPercent}%
                 </div>
                 <div style={{ fontSize: '0.72rem', color: '#334155' }}>
-                  {mcResult.passCount.toLocaleString()} / {mcResult.simulations.toLocaleString()} lô đạt chuẩn 100% CQAs
+                  {mcResult.passCount.toLocaleString()} / {mcResult.simulations.toLocaleString()} lô đạt tất cả CQA đã mô hình hóa
+                </div>
+                <div style={{ fontSize: '0.68rem', color: '#475569', marginTop: '0.2rem' }}>
+                  Bao phủ: {mcResult.modeledCqaCodes.join(', ') || 'không có'}
+                  {mcResult.unmodeledCqaCodes.length > 0 && ` · Chưa mô hình hóa: ${mcResult.unmodeledCqaCodes.join(', ')}`}
                 </div>
               </div>
 
@@ -1325,6 +1334,16 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                 </div>
                 <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
                   {((mcResult.failCount / mcResult.simulations) * 100).toFixed(3)}% ngoài tiêu chuẩn (OOS)
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: mcResult.excursionCount > 0 ? '#fff7ed' : '#f0fdf4', borderRadius: '0.5rem', padding: '0.85rem', border: '1px solid #cbd5e1' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#475569' }}>EXCURSION NGOÀI VÙNG KHẢO SÁT</div>
+                <div style={{ fontSize: '1.35rem', fontWeight: '800', color: mcResult.excursionCount > 0 ? '#c2410c' : '#15803d', margin: '0.2rem 0' }}>
+                  {mcResult.excursionRatePercent}%
+                </div>
+                <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                  {mcResult.excursionCount.toLocaleString()} lô được tính là thất bại; model không ngoại suy ngoài vùng đã khảo sát.
                 </div>
               </div>
 
@@ -1372,7 +1391,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
             </h3>
           </div>
           <span className="badge badge-success" style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}>
-            Chuẩn FDA Module 3 (3.2.P.2)
+            Cấu trúc tham khảo CTD 3.2.P.2
           </span>
         </div>
 

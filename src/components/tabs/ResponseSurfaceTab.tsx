@@ -813,7 +813,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
       </div>
 
       {/* Main Layout Grid: Left Sidebar Controls + Right Plotly Viewer */}
-      <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: '1.5rem' }}>
+      <div className="rsm-workspace-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(340px, 100%), 1fr))', gap: '1.5rem' }}>
         
         {/* Left Control Panel */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>

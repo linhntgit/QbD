@@ -215,8 +215,16 @@ export function getReportReadiness(
 
   if (!optimum) errors.push('Chưa có nghiệm tối ưu đa đáp ứng có thể tái lập.');
   if (!monteCarlo) errors.push('Chưa có đánh giá Monte Carlo dùng chung với báo cáo.');
-  else if (monteCarlo.reliabilityPercent < 99) warnings.push(`Monte Carlo reliability chỉ đạt ${monteCarlo.reliabilityPercent}%.`);
-  if (project.designSpace.length === 0) warnings.push('Chưa lưu vùng vận hành provisional/PAR screening vào project.');
+  else {
+    if (monteCarlo.reliabilityPercent < 99) warnings.push(`Monte Carlo reliability chỉ đạt ${monteCarlo.reliabilityPercent}%.`);
+    if (monteCarlo.unmodeledCqaCodes.length > 0) {
+      warnings.push(`Monte Carlo chưa bao phủ CQA: ${monteCarlo.unmodeledCqaCodes.join(', ')}; chỉ được diễn giải cho CQA đã mô hình hóa.`);
+    }
+    if (monteCarlo.excursionCount > 0) {
+      warnings.push(`${monteCarlo.excursionRatePercent}% lô ảo vượt ngoài vùng khảo sát và đã được tính là thất bại.`);
+    }
+  }
+  if (project.designSpace.length === 0) errors.push('Chưa lưu vùng vận hành provisional screening vào project.');
   warnings.push('Confirmation run độc lập chưa được quản lý như một trạng thái phê duyệt; cần xác nhận ngoài app trước quyết định đăng ký.');
 
   return {

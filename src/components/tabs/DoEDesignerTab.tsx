@@ -706,19 +706,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
   const runBudget = Math.max(1, designConfig.runBudget || recommendedOptimalRuns);
   const designValidation = useMemo(
     () => validateDesignSetup(project.factors, designConfig),
-    // Validation does not use presentation-only wizard fields (goal, budget)
-    // or randomisation settings. Keeping the dependency list precise avoids
-    // rerunning validation while a user is entering a budget.
-    [
-      project.factors,
-      designConfig.category,
-      designConfig.designType,
-      designConfig.dOptimalModel,
-      designConfig.numRuns,
-      designConfig.taguchiArray,
-      designConfig.replicates,
-      designConfig.blocks,
-    ]
+    [project.factors, designConfig]
   );
   const currentReadiness = useMemo(
     () => assessDesignReadiness(project.factors, project.runs, selectedOptimalModel),

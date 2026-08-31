@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   X,
   Search,
@@ -58,6 +58,10 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
 }) => {
   const [viewingTab, setViewingTab] = useState<TabKey>(activeTab);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isCompactViewport, setIsCompactViewport] = useState(false);
+  const drawerRef = useRef<HTMLElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const effectivePinned = isPinned && !isCompactViewport;
   
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     workflow: true,
@@ -84,14 +88,46 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
   }, [viewingTab]);
 
   useEffect(() => {
+    const media = window.matchMedia('(max-width: 900px)');
+    const updateViewport = () => setIsCompactViewport(media.matches);
+    updateViewport();
+    media.addEventListener('change', updateViewport);
+    return () => media.removeEventListener('change', updateViewport);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      window.requestAnimationFrame(() => drawerRef.current?.focus());
+    } else {
+      previousFocusRef.current?.focus();
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
         onClose();
+        return;
+      }
+      if (e.key === 'Tab' && isOpen && !effectivePinned && drawerRef.current) {
+        const focusable = [...drawerRef.current.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [href], [tabindex]:not([tabindex="-1"])')]
+          .filter((element) => element.offsetParent !== null);
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [effectivePinned, isOpen, onClose]);
 
   const toggleSection = (id: string) => {
     setExpandedSections((prev) => {
@@ -334,7 +370,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
           },
           {
             id: 'algorithms',
-            title: 'Công Thức Tính RPN & Ngưỡng Quyết Định Theo ICH Q9',
+            title: 'Công Thức RPN & Cách Dùng Điểm Rủi Ro Trong Ứng Dụng',
             icon: Calculator,
             content: (
               <div style={{ fontSize: '0.78rem', color: '#334155', lineHeight: 1.6 }}>
@@ -342,13 +378,13 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 
                 <div style={{ marginTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                   <div style={{ padding: '0.45rem 0.65rem', borderRadius: '0.35rem', backgroundColor: '#fee2e2', color: '#991b1b' }}>
-                    🔴 <strong>RỦI RO CAO (<InlineMath math="\text{RPN} \ge 100" />):</strong> Bắt buộc đưa vào khảo sát thực nghiệm DoE để xác định biên an toàn Design Space.
+                    🔴 <strong>RỦI RO CAO (<InlineMath math="\text{RPN} \ge 100" />):</strong> Đây là ngưỡng cấu hình của ứng dụng; ô “Khảo sát DoE” được đề xuất. Hãy xác nhận bằng cơ chế tác động, kiến thức sẵn có và nguồn lực trước khi đưa biến vào DoE.
                   </div>
                   <div style={{ padding: '0.45rem 0.65rem', borderRadius: '0.35rem', backgroundColor: '#fef3c7', color: '#92400e' }}>
-                    🟡 <strong>RỦI RO TRUNG BÌNH (<InlineMath math="50 \le \text{RPN} < 100" />):</strong> Đánh giá dựa trên kiến thức tiền định / Kiểm soát.
+                    🟡 <strong>RỦI RO TRUNG BÌNH (<InlineMath math="50 \le \text{RPN} < 100" />):</strong> Cân nhắc khảo sát, đặt kiểm soát bổ sung hoặc lập luận khoa học để loại trừ.
                   </div>
                   <div style={{ padding: '0.45rem 0.65rem', borderRadius: '0.35rem', backgroundColor: '#dcfce7', color: '#166534' }}>
-                    🟢 <strong>RỦI RO THẤP (<InlineMath math="\text{RPN} < 50" />):</strong> Kiểm soát qua SOP &amp; Giám sát thường quy, không cần tốn kinh phí chạy DoE.
+                    🟢 <strong>RỦI RO THẤP (<InlineMath math="\text{RPN} < 50" />):</strong> Có thể kiểm soát bằng SOP/giám sát thường quy nếu lập luận và bằng chứng phù hợp.
                   </div>
                 </div>
               </div>
@@ -361,7 +397,8 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
             content: (
               <ul style={{ paddingLeft: '1.2rem', fontSize: '0.78rem', color: '#334155', lineHeight: 1.6 }}>
                 <li><strong>Sơ đồ xương cá 6M:</strong> Giúp tránh bỏ sót các yếu tố tiềm ẩn từ Môi trường (Environment) và Phương pháp đo lường (Measurement).</li>
-                <li><strong>Đánh giá cập nhật sau DoE (Updated FMEA):</strong> Sau khi có kết quả ANOVA ở Tab 4, hệ thống sẽ tự động cập nhật lại điểm P và D dựa trên biên độ an toàn thực nghiệm (chuẩn FDA).</li>
+                <li><strong>Diễn giải đúng RPN:</strong> ICH Q9(R1) không quy định ngưỡng RPN cố định. RPN là công cụ ưu tiên hóa nội bộ; hai rủi ro có cùng RPN vẫn cần xem riêng mức nghiêm trọng, khả năng phát hiện và biện pháp kiểm soát.</li>
+                <li><strong>Đánh giá cập nhật sau DoE:</strong> Báo cáo có thể tạo bảng đánh giá rủi ro cập nhật từ kết quả mô hình. Bảng FMEA ban đầu không tự sửa điểm S/P/D; hãy rà soát và phê duyệt thay đổi thủ công.</li>
               </ul>
             ),
           },
@@ -383,7 +420,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   <br />1. Chọn <em>Mục tiêu nghiên cứu</em> và <em>Ngân sách run</em> trong <strong>Design Wizard</strong> &rarr; Bấm <strong>"Chọn phương án"</strong> (hoặc tự chọn dạng thiết kế).
                   <br />2. Bấm <strong>"Tạo Ma Trận Thí Nghiệm"</strong> để tạo bảng chạy thực nghiệm.
                   <br />3. (Tùy chọn) Bấm <strong>"+ Thêm run thông tin nhất"</strong> nếu cần bổ sung tuần tự (Sequential DoE).
-                  <br />4. Xem bảng chẩn đoán ma trận <strong>D-Efficiency &ge; 70–85%</strong>.
+                  <br />4. Xem chẩn đoán ma trận: tính khả định (rank/term), bậc tự do phần dư và D-efficiency. Các mức 70%/85% là thang xếp hạng nội bộ của app, không phải tiêu chuẩn đạt/không đạt phổ quát.
                   <br />5. Nhập số liệu thực nghiệm vào các cột CQA màu xanh ngọc (hoặc bấm <strong>"Điền Mô Phỏng"</strong> / dán từ Excel bằng <strong>"📥 Dán Dữ Liệu (Ctrl+V)"</strong>).
                   <br />6. Bấm <strong>"Phân Tích ANOVA"</strong> để chuyển sang bước tính toán thống kê.
                 </div>
@@ -422,7 +459,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                     <li><strong>Nút "📤 Tải Lên":</strong> Nạp file dữ liệu thực nghiệm định dạng `.csv`.</li>
                     <li><strong>Nút "🎲 Xáo Run":</strong> Xáo ngẫu nhiên thứ tự thực hiện thí nghiệm (Randomized Run Order).</li>
                     <li><strong>Nút "Sắp (Run)" / "Sắp (Std)":</strong> Sắp xếp bảng hiển thị theo Run Order hoặc Standard Order.</li>
-                    <li><strong>Nút "Điền Mô Phỏng":</strong> Tự động sinh dữ liệu thực nghiệm giả lập dựa trên vật lý/dược động học để kiểm thử nhanh toàn bộ quy trình.</li>
+                    <li><strong>Nút "Điền Mô Phỏng":</strong> Sinh dữ liệu minh họa để kiểm tra luồng giao diện/phân tích; không dùng dữ liệu này để kết luận khoa học, lập hồ sơ hay xác nhận mô hình.</li>
                     <li><strong>Nút "Xuất File":</strong> Tải bảng số liệu về máy tính định dạng `.csv`.</li>
                   </ul>
                 </div>
@@ -437,12 +474,12 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
               <div style={{ fontSize: '0.78rem', color: '#334155', lineHeight: 1.6 }}>
                 <p><strong>1. Chỉ số Hiệu Suất Định Thức D-Efficiency:</strong></p>
                 <BlockMath math="\text{D-Efficiency} = 100 \times \left[ \frac{|\mathbf{X}^T \mathbf{X}|^{1/p}}{N} \right]" />
-                <p>Đo lường mức độ cực tiểu hóa thể tích elipsoid sai số của các ước lượng hệ số hồi quy <InlineMath math="\boldsymbol{\beta}" />. Đạt <strong>&gt; 85%</strong> là Xuất sắc, <strong>70–85%</strong> là Tốt.</p>
+                <p>Đo lường độ tập trung của thông tin để ước lượng các hệ số hồi quy <InlineMath math="\boldsymbol{\beta}" />; giá trị cao hơn thường tốt hơn khi so sánh các thiết kế cùng mô hình và cùng miền khảo sát. App xếp hạng &gt;85% “Xuất sắc”, 70–85% “Tốt”, 50–70% “Chấp nhận được”; đây là hướng dẫn nội bộ, không thay thế kiểm tra rank, bậc tự do hay tính khả thi vận hành.</p>
                 
                 <p style={{ marginTop: '0.5rem' }}><strong>2. Đòn Bẩy (Leverage <InlineMath math="h_{ii}" />) &amp; Condition Number <InlineMath math="\kappa" />:</strong></p>
                 <BlockMath math="h_{ii} = \mathbf{x}_i (\mathbf{X}^T \mathbf{X})^{-1} \mathbf{x}_i^T, \quad \bar{h} = \frac{p}{N}" />
                 <BlockMath math="\kappa = \sqrt{\frac{\lambda_{\max}}{\lambda_{\min}}}" />
-                <p>• Condition Number <InlineMath math="\kappa" />: Kiểm tra hiện tượng đa cộng tuyến giữa các cột trong ma trận thiết kế.</p>
+                <p>• <strong>Leverage</strong> cho biết một run có vị trí “xa tâm” đến mức nào trong ma trận; <strong>Condition number</strong> cảnh báo các cột thiết kế gần phụ thuộc tuyến tính. Giá trị xấu gợi ý ước lượng hệ số kém ổn định, không tự động chứng minh dữ liệu sai.</p>
               </div>
             ),
           },
@@ -452,7 +489,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
             icon: Lightbulb,
             content: (
               <ul style={{ paddingLeft: '1.2rem', fontSize: '0.78rem', color: '#334155', lineHeight: 1.6 }}>
-                <li><strong>Điểm tâm (Center Points):</strong> Luôn nên có ít nhất 3–5 điểm tâm lặp lại để ước lượng phương sai thuần khiết (Pure Error) và kiểm tra độ cong phi tuyến (Curvature).</li>
+                <li><strong>Điểm tâm và run lặp:</strong> Khi thiết kế cho phép, thêm run lặp (thường gồm điểm tâm) để ước lượng <em>pure error</em>—dao động giữa các phép đo cùng điều kiện—và hỗ trợ kiểm định Lack of Fit. Số lần lặp phải dựa trên độ biến thiên và mục tiêu nghiên cứu.</li>
                 <li><strong>Thứ tự ngẫu nhiên hóa (Randomized Run Order):</strong> Thực hiện các mẻ thử theo thứ tự ngẫu nhiên của cột Run Order để triệt tiêu sai số hệ thống theo thời gian.</li>
               </ul>
             ),
@@ -468,15 +505,15 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
             content: (
               <div>
                 <p style={{ marginBottom: '0.6rem' }}>
-                  Xây dựng phương trình hồi quy toán học mô tả mối quan hệ giữa biến đầu vào <InlineMath math="\mathbf{X}" /> và đáp ứng CQA (<InlineMath math="Y" />) theo chuẩn <strong>ICH Q8</strong>.
+                  Xây dựng phương trình hồi quy mô tả mối quan hệ giữa biến đầu vào <InlineMath math="\mathbf{X}" /> và đáp ứng CQA (<InlineMath math="Y" />). Kết quả là bằng chứng phát triển theo cách tiếp cận ICH Q8, không phải bằng chứng xác nhận quy trình thay thế cho các thí nghiệm xác nhận.
                 </p>
                 <div style={{ backgroundColor: '#f0fdf4', padding: '0.6rem 0.8rem', borderRadius: '0.4rem', border: '1px solid #bbf7d0', fontSize: '0.78rem', color: '#166534', lineHeight: 1.6 }}>
                   <strong>Thứ tự thao tác chuẩn:</strong>
                   <br />1. Chọn <strong>Đáp ứng CQA</strong> cần phân tích (<InlineMath math="Y_1, Y_2\dots" />) từ dropdown đầu trang.
                   <br />2. Xem gợi ý của <strong>Analysis Wizard</strong> &rarr; Bấm <strong>"Áp dụng"</strong> mô hình đề xuất (hoặc chọn thủ công từ dropdown <em>Dạng mô hình</em>: Quadratic, 2FI, Linear).
                   <br />3. (Tùy chọn) Bấm <strong>"Áp dụng [Mô hình] cho tất cả Y"</strong> để đồng bộ nhanh dạng mô hình cho các CQA còn lại.
-                  <br />4. Đọc <strong>Bảng ANOVA đầy đủ</strong> (<InlineMath math="R^2, Q^2" />, Lack of Fit, VIF) và kiểm tra <strong>4 Biểu đồ Chẩn đoán Phần dư</strong> (Pareto, Res vs Pred, Normal Plot, Cook's Distance).
-                  <br />5. Bấm nút <strong>"Tiếp Tục Với Đa Thức (Bước 6, 7, 8)"</strong> để khóa mô hình hồi quy đa thức làm phương pháp chính.
+                  <br />4. Đọc <strong>Bảng ANOVA</strong> cùng <InlineMath math="R^2, R^2_{adj}, Q^2" />, Lack of Fit, VIF và 4 biểu đồ chẩn đoán (Pareto, phần dư–dự đoán, Normal Plot, Cook's Distance).
+                  <br />5. Chỉ chọn <strong>"Tiếp Tục Với Đa Thức (Bước 6, 7, 8)"</strong> sau khi mô hình phù hợp mục đích sử dụng, không có dấu hiệu chẩn đoán nghiêm trọng và đã lập kế hoạch run xác nhận.
                 </div>
               </div>
             ),
@@ -502,17 +539,17 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
                     <li><strong>Nút "Áp dụng":</strong> Áp dụng cấu hình mô hình từ bảng so sánh ứng viên (AICc, <InlineMath math="Q^2" />, LOF p, df dư).</li>
                     <li><strong>Nút "Áp dụng [Mô hình] cho tất cả Y":</strong> Áp dụng đồng loạt dạng mô hình hiện chọn cho toàn bộ các CQA.</li>
-                    <li><strong>Khung "Kế hoạch thí nghiệm xác nhận":</strong> Gợi ý số lần lặp thực nghiệm, điều kiện chạy, khoảng tin cậy CI 95% và PI 95% để thẩm định mô hình.</li>
+                    <li><strong>Khung "Kế hoạch thí nghiệm xác nhận":</strong> Gợi ý run xác nhận, điều kiện chạy và khoảng tin cậy 95% (CI) khi mô hình OLS có thể ước lượng. CI là độ không chắc chắn của giá trị trung bình dự đoán; cần xác nhận bằng số liệu mới trước khi dùng để ra quyết định quy trình.</li>
                   </ul>
                 </div>
 
                 <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
                   <strong style={{ color: '#b45309' }}>3. 4 Biểu Đồ Chẩn Đoán Mô Hình (Diagnostic Plots):</strong>
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
-                    <li><strong>Biểu đồ Pareto (<InlineMath math="|t\text{-value}|" />):</strong> So sánh độ lớn tác động của từng yếu tố với vạch đỏ <InlineMath math="p = 0.05" /> (<InlineMath math="t_{\text{crit}}" />).</li>
-                    <li><strong>Phần dư vs Dự đoán (Res vs Pred):</strong> Kiểm tra tính đồng nhất phương sai (Homoscedasticity) trong dải <InlineMath math="[-3, +3]" />.</li>
-                    <li><strong>Xác suất Chuẩn (Normal Plot):</strong> Kiểm tra phân phối chuẩn của phần dư bám sát đường thẳng 45&deg;.</li>
-                    <li><strong>Khoảng cách Cook (Cook's Distance):</strong> Phát hiện điểm ngoại lai gây sai lệch mô hình (<InlineMath math="D_i > 1.0" />).</li>
+                    <li><strong>Biểu đồ Pareto (<InlineMath math="|t\text{-value}|" />):</strong> Xếp hạng độ lớn hiệu ứng chuẩn hóa. Vượt vạch tham chiếu nghĩa là có tín hiệu thống kê theo mô hình; vẫn cần kiểm tra ý nghĩa dược học và khoảng tin cậy.</li>
+                    <li><strong>Phần dư vs Dự đoán:</strong> <em>Phần dư</em> = giá trị quan sát − dự đoán. Một dải ngẫu nhiên quanh 0 ủng hộ phương sai tương đối ổn định; dạng phễu, cong hoặc cụm gợi ý xem lại mô hình/dữ liệu. Dải ±3 chỉ là quy tắc sàng lọc cho phần dư student hóa.</li>
+                    <li><strong>Xác suất Chuẩn (Normal Plot):</strong> Điểm gần đường thẳng ủng hộ giả định phần dư gần chuẩn; một vài lệch nhẹ không tự động làm mô hình vô hiệu, nhưng lệch hệ thống cần được điều tra.</li>
+                    <li><strong>Khoảng cách Cook:</strong> Đo ảnh hưởng của một run lên ước lượng mô hình, không đồng nghĩa với “điểm sai”. <InlineMath math="D_i > 1" /> là cờ sàng lọc mạnh; cần kiểm tra nguyên nhân gốc, không xóa số liệu chỉ vì chỉ số cao.</li>
                   </ul>
                 </div>
               </div>
@@ -520,7 +557,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
           },
           {
             id: 'algorithms',
-            title: 'Thuật Toán OLS, ANOVA & Tiêu Chuẩn Nghiệm Thu Khoa Học',
+            title: 'OLS, ANOVA & Cách Kết Luận Mô Hình',
             icon: Calculator,
             content: (
               <div style={{ fontSize: '0.78rem', color: '#334155', lineHeight: 1.6 }}>
@@ -532,14 +569,14 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 <p>• Đa thức bậc 2 (Quadratic / RSM):</p>
                 <BlockMath math="Y = \beta_0 + \sum_{i=1}^k \beta_i x_i + \sum_{i < j} \beta_{ij} x_i x_j + \sum_{i=1}^k \beta_{ii} x_i^2" />
 
-                <p style={{ marginTop: '0.5rem' }}><strong>2. Ước Lượng OLS &amp; Tiêu Chuẩn Nghiệm Thu:</strong></p>
+                <p style={{ marginTop: '0.5rem' }}><strong>2. Ước lượng OLS và cách đọc các chỉ số:</strong></p>
                 <BlockMath math="\hat{\boldsymbol{\beta}} = (\mathbf{X}^T \mathbf{X})^{-1} \mathbf{X}^T \mathbf{Y}" />
                 <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem' }}>
-                  <li><strong><InlineMath math="R^2 > 0.80" />:</strong> Độ tương thích mô hình với số liệu thực nghiệm.</li>
-                  <li><strong><InlineMath math="Q^2 > 0.70" />:</strong> Khả năng dự báo kiểm định chéo (<InlineMath math="R^2 - Q^2 \le 0.20" /> để tránh Overfitting).</li>
-                  <li><strong>Lack of Fit <InlineMath math="p > 0.05" />:</strong> Mô hình không bị thiếu số hạng cần thiết.</li>
-                  <li><strong>Adequate Precision <InlineMath math="> 4.0" />:</strong> Tỷ số tín hiệu trên nhiễu đạt chuẩn.</li>
-                  <li><strong><InlineMath math="\text{VIF}_i < 5.0" />:</strong> Không xảy ra hiện tượng đa cộng tuyến nghiêm trọng.</li>
+                  <li><strong><InlineMath math="R^2" /> và <InlineMath math="R^2_{adj}" />:</strong> tỷ lệ biến thiên được mô hình giải thích trên dữ liệu đã khớp; <InlineMath math="R^2_{adj}" /> phạt việc thêm số hạng. Giá trị cao không tự nó chứng minh dự báo tốt.</li>
+                  <li><strong><InlineMath math="Q^2" />:</strong> app tính predicted <InlineMath math="R^2" /> theo leave-one-out/PRESS. Giá trị dương và gần <InlineMath math="R^2_{adj}" /> là tín hiệu tốt hơn; chênh lệch lớn gợi ý quá khớp. Không dùng một ngưỡng cứng thay cho thí nghiệm xác nhận.</li>
+                  <li><strong>Lack of Fit (LOF):</strong> so sánh sai số mô hình với <em>pure error</em> từ các run lặp có cùng điều kiện. <InlineMath math="p \ge 0.05" /> nghĩa là chưa có bằng chứng LOF ở mức đã chọn, không phải chứng minh mô hình đúng; LOF không tính được nếu thiếu run lặp hoặc df = 0.</li>
+                  <li><strong>VIF:</strong> đo đa cộng tuyến—các biến/số hạng quá tương quan làm hệ số thiếu ổn định. VIF cao là tín hiệu cần đơn giản hóa mô hình hoặc cải thiện thiết kế; ngưỡng 5 chỉ là quy ước tham khảo.</li>
+                  <li><strong>Quy tắc kết luận:</strong> báo cáo chiều và độ lớn hiệu ứng, độ không chắc chắn, chẩn đoán phần dư và run xác nhận; không kết luận chỉ từ một p-value.</li>
                 </ul>
               </div>
             ),
@@ -575,9 +612,9 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   <strong>Thứ tự thao tác chuẩn:</strong>
                   <br />1. Chọn <strong>Chế độ Huấn luyện</strong> (Độc lập từng CQA hoặc Mạng chung đa đầu ra Shared).
                   <br />2. Điều chỉnh <strong>Số nơ-ron lớp ẩn 1 &amp; 2</strong>, <strong>Hàm kích hoạt</strong> (Tanh/Sigmoid/ReLU) và <strong>Weight Decay (<InlineMath math="\lambda" />)</strong>.
-                  <br />3. Kiểm tra thước đo <strong>Carpenter Heuristic</strong> (<InlineMath math="N/P \ge 2.0" />) để đảm bảo không bị thiếu dữ liệu.
+                  <br />3. Kiểm tra tỷ lệ <strong>N/P</strong> (số mẫu huấn luyện/số tham số). App dùng <InlineMath math="N/P \ge 2" /> như cảnh báo sàng lọc, không phải bằng chứng đủ dữ liệu.
                   <br />4. Bấm nút <strong>"Huấn Luyện Lại (Train Network)"</strong> để tiến hành huấn luyện mạng nơ-ron với thanh tiến trình trực quan.
-                  <br />5. Đọc <strong>Sơ đồ Tôpô Mạng</strong>, biểu đồ <strong>Tầm quan trọng biến Garson</strong> và bảng so sánh hiệu năng trực tiếp với Đa thức ANOVA.
+                  <br />5. Đọc <strong>Sơ đồ tôpô</strong>, tầm quan trọng biến theo <strong>độ nhạy nhiễu loạn</strong> và hiệu năng trên tập validation. So sánh với đa thức chỉ có ý nghĩa khi dùng cùng dữ liệu/miền dự đoán.
                   <br />6. Bấm nút <strong>"Tiếp Tục Với Mạng Nơ-ron (Bước 6, 7, 8)"</strong> để khóa mô hình AI làm phương pháp chính.
                 </div>
               </div>
@@ -603,11 +640,11 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
                   <strong style={{ color: '#0f766e' }}>2. Cấu Hình Siêu Tham Số (Hyperparameters):</strong>
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
-                    <li><strong>Số nơ-ron Lớp ẩn 1 (<InlineMath math="H_1" />) &amp; Lớp ẩn 2 (<InlineMath math="H_2" />):</strong> Đặt từ 2–6 nơ-ron để tránh quá khớp (Overfitting).</li>
-                    <li><strong>Hàm Kích Hoạt (Activation):</strong> Tanh (Khuyến nghị cho Dược phẩm), Sigmoid, ReLU, Linear.</li>
+                    <li><strong>Số nơ-ron Lớp ẩn 1 (<InlineMath math="H_1" />) &amp; Lớp ẩn 2 (<InlineMath math="H_2" />):</strong> Tăng số nơ-ron làm tăng độ linh hoạt nhưng cũng tăng nguy cơ quá khớp. Bắt đầu từ kiến trúc Carpenter do app gợi ý, rồi đánh giá trên validation.</li>
+                    <li><strong>Hàm Kích Hoạt (Activation):</strong> Tanh, Sigmoid, ReLU hoặc Linear. Không có hàm nào mặc định “tốt nhất cho dược phẩm”; chọn bằng hiệu năng validation và tính ổn định.</li>
                     <li><strong>Kiểm Định Chéo (Validation Method):</strong> K-Fold (K=5) hoặc Holdout Split (25%).</li>
                     <li><strong>L2 Weight Decay (<InlineMath math="\lambda" />):</strong> Phạt các trọng số quá lớn, giúp đường cong dự báo mượt mà.</li>
-                    <li><strong>Số Lượt Huấn Luyện (Number of Tours):</strong> Chạy nhiều lần khởi tạo ngẫu nhiên để tìm cực tiểu toàn cục (Global Minimum).</li>
+                    <li><strong>Số Lượt Huấn Luyện (Number of Tours):</strong> Thử nhiều khởi tạo có seed xác định và giữ nghiệm có loss lựa chọn thấp nhất; không bảo đảm tìm được cực tiểu toàn cục.</li>
                   </ul>
                 </div>
               </div>
@@ -615,16 +652,16 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
           },
           {
             id: 'algorithms',
-            title: 'Thuật Toán Carpenter Heuristic, Regularization & Garson Importance',
+            title: 'Kiến Trúc ANN, Regularization & Tầm Quan Trọng Biến',
             icon: Calculator,
             content: (
               <div style={{ fontSize: '0.78rem', color: '#334155', lineHeight: 1.6 }}>
-                <p><strong>1. Quy tắc Carpenter Heuristic:</strong></p>
+                <p><strong>1. Số tham số và cảnh báo cỡ mẫu:</strong></p>
                 <BlockMath math="\text{Weights} = (N_{\text{in}} + 1) H_1 + (H_1 + 1) H_2 + (H_2 + 1) N_{\text{out}}" />
-                <p>Nếu tỷ lệ <InlineMath math="\frac{N_{\text{train}}}{\text{Weights}} < 2.0" />, hệ thống sẽ cảnh báo nguy cơ thiếu dữ liệu và khuyến nghị tăng Weight Decay (<InlineMath math="\lambda" />) hoặc giảm bớt số nơ-ron ẩn.</p>
+                <p>Nếu <InlineMath math="\frac{N_{\text{train}}}{\text{Weights}} < 2.0" />, app cảnh báo nguy cơ quá khớp và gợi ý kiến trúc Carpenter/regularization. Đây là quy tắc thực hành nội bộ; kết luận phải dựa chủ yếu vào kết quả validation và run xác nhận độc lập.</p>
 
-                <p style={{ marginTop: '0.5rem' }}><strong>2. Thuật toán Đánh Giá Tầm Quan Trọng Biến (Garson Method):</strong></p>
-                <BlockMath math="I_j = \frac{\sum_{m=1}^H \left( \frac{|w_{jm}|}{\sum_{k=1}^{N_{\text{in}}} |w_{km}|} \cdot |v_m| \right)}{\sum_{k=1}^{N_{\text{in}}} \sum_{m=1}^H \left( \frac{|w_{km}|}{\sum_{k=1}^{N_{\text{in}}} |w_{km}|} \cdot |v_m| \right)} \times 100\%" />
+                <p style={{ marginTop: '0.5rem' }}><strong>2. Tầm quan trọng biến theo độ nhạy:</strong></p>
+                <p>App lần lượt nhiễu mỗi biến trong miền khảo sát, đo mức thay đổi dự báo trung bình rồi chuẩn hóa để xếp hạng. Đây không phải phương pháp Garson dựa trên trọng số. Tầm quan trọng phản ánh mô hình đã huấn luyện, không chứng minh quan hệ nhân quả và không cho biết chiều tác động.</p>
               </div>
             ),
           },
@@ -634,7 +671,8 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
             icon: Lightbulb,
             content: (
               <ul style={{ paddingLeft: '1.2rem', fontSize: '0.78rem', color: '#334155', lineHeight: 1.6 }}>
-                <li><strong>Cảnh báo Overfitting màu vàng:</strong> Khi tỷ lệ <InlineMath math="N/P < 2.0" />, hãy tăng giá trị Weight Decay (<InlineMath math="\lambda = 0.01" /> hoặc <InlineMath math="0.05" />) và chọn K-Fold Validation để đảm bảo mô hình không bị quá khớp.</li>
+                <li><strong>Cảnh báo Overfitting màu vàng:</strong> Khi <InlineMath math="N/P < 2.0" />, giảm kiến trúc trước; sau đó cân nhắc weight decay và K-fold. Các biện pháp này giảm nguy cơ, không “đảm bảo” mô hình không quá khớp.</li>
+                <li><strong>Cách diễn giải:</strong> Ưu tiên Validation R²/RMSE hơn Train R². Nếu Train tốt nhưng Validation kém, không dùng ANN để mở rộng Design Space; bổ sung run hoặc dùng mô hình đơn giản hơn.</li>
                 <li><strong>Nút "Huấn Luyện Lại (Train Network)":</strong> Mạng Nơ-ron chỉ cập nhật khi bấm nút này, tránh tốn tài nguyên tính toán khi đang nhập dở dữ liệu.</li>
               </ul>
             ),
@@ -650,7 +688,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
             content: (
               <div>
                 <p style={{ marginBottom: '0.6rem' }}>
-                  Trực quan hóa hình thái đáp ứng trong không gian 3 chiều và mặt phẳng 2 chiều. Khảo sát cực trị, điểm yên ngựa, vùng dốc tối ưu, và hiển thị các mặt phẳng giới hạn tiêu chuẩn (LSL, USL, Target) cắt qua bề mặt đáp ứng.
+                  Trực quan hóa giá trị <em>mô hình dự báo</em> trong không gian 3D/2D tại lát cắt đang chọn. Dùng đồ thị để nhận biết chiều tác động, tương tác và vùng gần giới hạn; không suy diễn ngoài miền DoE hoặc xem đồ thị là bằng chứng xác nhận.
                 </p>
                 <div style={{ backgroundColor: '#f0fdf4', padding: '0.6rem 0.8rem', borderRadius: '0.4rem', border: '1px solid #bbf7d0', fontSize: '0.78rem', color: '#166534', lineHeight: 1.6 }}>
                   <strong>Thứ tự thao tác chuẩn:</strong>
@@ -699,7 +737,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 <p><strong>1. Phép Biến Đổi Tọa Độ Tam Giác Barycentric:</strong></p>
                 <BlockMath math="X_{\text{cartesian}} = X_B + 0.5 X_C, \quad Y_{\text{cartesian}} = \frac{\sqrt{3}}{2} X_C" />
                 <p>Với ràng buộc bảo toàn nồng độ hỗn hợp: <InlineMath math="X_A + X_B + X_C = 1.0 \quad (100\%)" />.</p>
-                <p style={{ marginTop: '0.4rem' }}><strong>2. Đường cắt giới hạn LSL/USL/Target:</strong> Hệ thống sử dụng thuật toán dò đoạn thẳng Isoline Contour để vẽ chính xác giao tuyến giữa mặt phẳng chỉ tiêu chất lượng và bề mặt cong dự báo.</p>
+                <p style={{ marginTop: '0.4rem' }}><strong>2. Đường cắt LSL/USL/Target:</strong> Đường đồng mức được nội suy trên lưới dự báo để biểu diễn nơi CQA bằng một ngưỡng. Độ chính xác của đường phụ thuộc mô hình, độ phân giải lưới và các biến đang bị cố định.</p>
               </div>
             ),
           },
@@ -710,7 +748,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
             content: (
               <ul style={{ paddingLeft: '1.2rem', fontSize: '0.78rem', color: '#334155', lineHeight: 1.6 }}>
                 <li><strong>Đổi trục tọa độ X và Y:</strong> Hãy thử đổi vị trí giữa các biến để quan sát góc nhìn trực quan và dễ hiểu nhất của các điểm cực trị.</li>
-                <li><strong>Mặt phẳng cắt LSL/USL:</strong> Giúp bạn xác định ngay lập tức dải vận hành của biến X nào sẽ làm CQA rơi ra ngoài tiêu chuẩn chất lượng.</li>
+                <li><strong>Đường LSL/USL:</strong> Cho biết biên đạt/không đạt <em>theo mô hình</em> trên lát cắt. Thay đổi biến cố định rồi kiểm tra lại, đặc biệt khi có tương tác giữa các factor.</li>
               </ul>
             ),
           },
@@ -725,15 +763,15 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
             content: (
               <div>
                 <p style={{ marginBottom: '0.6rem' }}>
-                  Xác định <strong>Không gian Thiết kế (Design Space / Sweet Spot)</strong> đa chiều, tối ưu hóa thỏa dụng (<strong>Desirability Profiler</strong>), phân định dải vận hành <strong>NOR / PAR</strong> và thẩm định độ bền vững bằng <strong>Mô phỏng Monte Carlo 10.000 lô ảo</strong> theo chuẩn <strong>ICH Q8/Q9/Q10</strong>.
+                  Khảo sát <strong>vùng chấp nhận dự báo</strong> từ mô hình, tối ưu hóa thỏa dụng (<strong>Desirability Profiler</strong>) và ước lượng rủi ro bằng Monte Carlo. Kết quả trong app là bằng chứng mô hình hóa/sàng lọc; Design Space hoặc PAR chính thức cần xác nhận đa biến, run xác nhận và phê duyệt theo hệ thống chất lượng.
                 </p>
                 <div style={{ backgroundColor: '#f0fdf4', padding: '0.6rem 0.8rem', borderRadius: '0.4rem', border: '1px solid #bbf7d0', fontSize: '0.78rem', color: '#166534', lineHeight: 1.6 }}>
                   <strong>Thứ tự thao tác chuẩn:</strong>
                   <br />1. Trong thanh công cụ <strong>Prediction Profiler</strong>: Bấm nút <strong>"✨ Tối Đa Hóa Thỏa Dụng (Max D)"</strong> để tự động tìm điểm cài đặt tối ưu toàn cục.
                   <br />2. (Tùy chọn) Bấm <strong>"💾 Lưu Kịch Bản (n)"</strong> để lưu lại các kịch bản cài đặt ứng viên cần so sánh, hoặc <strong>"🔄 Về Tâm (0)"</strong> để đặt lại điểm tâm, hoặc <strong>"⚙️ Mục Tiêu &amp; Trọng Số ∨"</strong> để sửa nhanh LSL/Target/USL/Trọng số.
-                  <br />3. Xem bản đồ <strong>Không Gian Thiết Kế (Design Space Overlay / Sweet Spot)</strong>: Vùng xanh lá là vùng an toàn 100% đạt chuẩn chất lượng.
+                  <br />3. Xem bản đồ overlay: vùng xanh lá là các điểm <em>dự báo</em> đạt toàn bộ giới hạn CQA trên lát cắt đang chọn. Màu sắc không bao gồm toàn bộ bất định mô hình hay biến thiên sản xuất.
                   <br />4. Nhập <em>Số lô mô phỏng</em> (vd: 10.000) và <em>Độ biến thiên RSD%</em> (vd: &plusmn;2.0%) &rarr; Bấm <strong>"▶ Chạy Mô Phỏng Monte Carlo"</strong> để thẩm định độ bền vững.
-                  <br />5. Đọc các chỉ số năng lực: <strong>Reliability &ge; 99.73%</strong>, <strong>PPM</strong> (Số lỗi phần triệu), <InlineMath math="C_{pk} \ge 1.33" /> và bảng phân định dải <strong>NOR &sube; PAR &sube; Knowledge Space</strong>.
+                  <br />5. Đọc Reliability, PPM và Cpk như các ước lượng theo giả định mô phỏng. So sánh với tiêu chí chấp nhận của sản phẩm; app cảnh báo dưới Cpk 1.33 nhưng không đặt một tiêu chuẩn pháp lý/phổ quát.
                   <br />6. Bấm nút <strong>"Tiếp Tục Sang Báo Cáo Hồ Sơ"</strong> để chuyển sang Tab 8.
                 </div>
               </div>
@@ -748,8 +786,8 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
                   <strong style={{ color: '#1e3a8a' }}>1. Khung "Prediction Profiler &amp; Desirability Optimization" (Thanh màu xanh đậm):</strong>
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
-                    <li><strong>Đồng hồ OVERALL D (Góc trái):</strong> Điểm thỏa dụng tổng thể từ 0.000 đến 1.000 (TỐI ƯU &ge; 0.8, ĐẠT &ge; 0.5, CHƯA ĐẠT &lt; 0.5).</li>
-                    <li><strong>Nút "✨ Tối Đa Hóa Thỏa Dụng (Max D)" (Màu xanh lá):</strong> Thuật toán Nelder-Mead / Multi-Start Grid tự động tìm bộ thông số mang lại thỏa dụng tổng thể cao nhất (<InlineMath math="D \to 1.0" />).</li>
+                    <li><strong>Đồng hồ OVERALL D:</strong> Trung bình nhân có trọng số của các desirability, từ 0 đến 1. D = 0 nếu một CQA có desirability bằng 0. Các mốc 0.5/0.8 chỉ dùng để trao đổi nội bộ, không phải tiêu chuẩn chất lượng.</li>
+                    <li><strong>Nút "✨ Tối Đa Hóa Thỏa Dụng (Max D)":</strong> App quét lưới khả thi rồi tinh chỉnh bằng nhiều điểm khởi đầu ngẫu nhiên tái lập được; vẫn nên so sánh vài kịch bản và kiểm tra khả thi thực tế trước khi chọn setpoint.</li>
                     <li><strong>Nút "💾 Lưu Kịch Bản (n)":</strong> Lưu lại điểm cài đặt hiện tại vào danh sách kịch bản để dễ dàng đối chiếu và khôi phục.</li>
                     <li><strong>Nút "🔄 Về Tâm (0)":</strong> Đặt lại tất cả các yếu tố về mức tâm thực nghiệm.</li>
                     <li><strong>Nút "⚙️ Mục Tiêu &amp; Trọng Số ∨":</strong> Mở bảng accordion để chỉnh sửa nhanh mục tiêu (Target, Max, Min), giới hạn LSL–USL, hàm hình dạng lũy thừa (<InlineMath math="s, t" />) và trọng số (<InlineMath math="w_i" />).</li>
@@ -760,8 +798,8 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
                   <strong style={{ color: '#0f766e' }}>2. Khung "Đồ Thị Vùng Thiết Kế (Design Space Overlay / Sweet Spot)":</strong>
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
-                    <li>🟩 <strong>Vùng Xanh Lá (Sweet Spot / Design Space):</strong> 100% tất cả các CQAs đều thỏa mãn tiêu chuẩn (<InlineMath math="\text{Margin}_i \ge 0 \quad \forall i" />).</li>
-                    <li>🟥 <strong>Vùng Đỏ (Out-of-Spec):</strong> Ít nhất một CQA bị trượt khỏi giới hạn tiêu chuẩn.</li>
+                    <li>🟩 <strong>Vùng Xanh Lá:</strong> trên lưới và lát cắt hiện tại, mọi CQA được <em>mô hình dự báo</em> nằm trong giới hạn (<InlineMath math="\text{Margin}_i \ge 0 \quad \forall i" />).</li>
+                    <li>🟥 <strong>Vùng Đỏ:</strong> ít nhất một CQA được dự báo vượt giới hạn. Hãy rà soát biến cố định, miền ngoại suy và bất định trước khi ra quyết định.</li>
                     <li>★ <strong>Ngôi sao Xanh:</strong> Điểm vận hành mục tiêu tối ưu (Target Setpoint).</li>
                     <li><strong>Các nút tùy chỉnh:</strong> Dropdown chọn 2 trục khảo sát, thanh trượt cắt lớp các biến phụ, Độ phân giải lưới (Resolution), Độ mượt (Smoothness), và Checkbox *Hiển thị đường biên giới hạn*.</li>
                   </ul>
@@ -772,8 +810,8 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
                     <li><strong>Ô "Số lô mô phỏng ảo":</strong> Nhập số lượng lô ảo cần thử nghiệm (vd: 10.000 lô).</li>
                     <li><strong>Ô "Độ biến thiên thiết bị/môi trường (RSD %)":</strong> Mức dao động dự kiến quanh điểm cài đặt (vd: &plusmn;2.0%).</li>
-                    <li><strong>Nút "▶ Chạy Mô Phỏng Monte Carlo":</strong> Kích hoạt thuật toán mô phỏng phân phối ngẫu nhiên Gaussian đa biến.</li>
-                    <li><strong>Kết quả thu được:</strong> Tỷ lệ độ tin cậy (Reliability %) &ge; 99.73%, Tỷ lệ lỗi dự kiến PPM (Parts Per Million), và Chỉ số năng lực quy trình <InlineMath math="C_{pk} > 1.33" />.</li>
+                    <li><strong>Nút "▶ Chạy Mô Phỏng Monte Carlo":</strong> Lấy mẫu Gaussian cho biến liên tục; mẫu vượt miền khảo sát được ghi nhận là excursion và tính là thất bại. Biến rời rạc giữ đúng mức khai báo; thành phần hỗn hợp ngoài simplex khả thi cũng được ghi nhận trước khi chiếu để dự báo. Nhiễu phần dư CQA được mô phỏng có tương quan khi dữ liệu cho phép.</li>
+                    <li><strong>Kết quả thu được:</strong> Reliability là tỷ lệ lô ảo đồng thời đạt tất cả CQA; PPM là số lô ảo không đạt trên một triệu; Cpk được tính riêng cho từng CQA từ phân bố mô phỏng. Đây là ước lượng có điều kiện theo RSD, mô hình và seed đã chọn.</li>
                     <li><strong>Nút "Tiếp Tục Sang Báo Cáo Hồ Sơ":</strong> Chuyển sang Tab 8.</li>
                   </ul>
                 </div>
@@ -790,16 +828,16 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 <BlockMath math="D = \left[ \prod_{i=1}^m (d_i)^{w_i} \right]^{\frac{1}{\sum_{i=1}^m w_i}} \in [0, 1]" />
                 <p>Nếu bất kỳ CQA nào có <InlineMath math="d_i = 0" /> (ngoài tiêu chuẩn) &rarr; <InlineMath math="D = 0" />.</p>
 
-                <p style={{ marginTop: '0.5rem' }}><strong>2. Định nghĩa các dải vận hành (ICH Q8 / Q10):</strong></p>
+                <p style={{ marginTop: '0.5rem' }}><strong>2. Dải vận hành hiển thị trong app:</strong></p>
                 <BlockMath math="\text{NOR} \subseteq \text{PAR} \subseteq \text{Knowledge Space}" />
                 <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem' }}>
                   <li><strong>Knowledge Space:</strong> Toàn bộ dải thông số đã được khảo sát <InlineMath math="[\text{Low}, \text{High}]" />.</li>
-                  <li><strong>Proven Acceptable Range (PAR):</strong> Dải thông số đã được chứng minh thực nghiệm đảm bảo sản phẩm đạt chất lượng.</li>
-                  <li><strong>Normal Operating Range (NOR):</strong> Dải vận hành thường quy chặt chẽ của nhà máy quanh Target Setpoint để bù trừ dao động tự nhiên của thiết bị.</li>
+                  <li><strong>Proven Acceptable Range (PAR):</strong> về nguyên tắc là dải được chứng minh chấp nhận được. App hiện tạo <em>provisional screening range</em> bằng quét từng biến tại setpoint, do đó không phải PAR đa biến đã xác nhận.</li>
+                  <li><strong>Normal Operating Range (NOR):</strong> dải vận hành thường quy hẹp hơn quanh setpoint. Dải này phải được chủ sở hữu quy trình thiết lập/phê duyệt; không nên suy ra chỉ từ một tối ưu mô hình.</li>
                 </ul>
 
                 <p style={{ marginTop: '0.5rem' }}><strong>3. Phân phối Ngẫu nhiên Monte Carlo &amp; Năng Lực Quy Trình:</strong></p>
-                <BlockMath math="X_j \sim \mathcal{N}(\mu_{\text{target}}, \, \sigma_j^2), \quad \sigma_j = \mu_{\text{target}} \times \text{RSD}\%" />
+                <BlockMath math="X_j \sim \mathcal{N}(\mu_{\text{setpoint}}, \, \sigma_j^2), \quad \sigma_j = \max\left(|\mu_j|, \frac{U_j-L_j}{2}\right) \times \text{RSD}\%" />
                 <BlockMath math="C_{pk} = \min\left( \frac{\text{USL} - \mu}{3\sigma}, \, \frac{\mu - \text{LSL}}{3\sigma} \right)" />
               </div>
             ),
@@ -810,8 +848,8 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
             icon: Lightbulb,
             content: (
               <ul style={{ paddingLeft: '1.2rem', fontSize: '0.78rem', color: '#334155', lineHeight: 1.6 }}>
-                <li><strong>Nếu tỷ lệ sai hỏng PPM còn cao:</strong> Hãy điều chỉnh Target Setpoint lùi sâu vào bên trong tâm vùng xanh lá (Sweet Spot), cách xa các mép biên giới hạn đỏ để tăng khoảng đệm an toàn.</li>
-                <li><strong>Chỉ số <InlineMath math="C_{pk} > 1.33" />:</strong> Cho thấy quy trình sản xuất có năng lực kiểm soát tốt và ổn định cao.</li>
+                <li><strong>Nếu tỷ lệ sai hỏng PPM còn cao:</strong> Xem CQA nào chi phối lỗi, độ nhạy với factor nào và giả định RSD. Có thể đặt setpoint xa biên hơn, giảm biến thiên hoặc thu hẹp dải vận hành—sau đó xác nhận bằng run thực nghiệm.</li>
+                <li><strong>Chỉ số <InlineMath math="C_{pk}" />:</strong> đo khoảng cách trung bình tới giới hạn gần nhất theo đơn vị 3 độ lệch chuẩn của <em>phân bố mô phỏng</em>. Cpk ≥1.33 là quy ước năng lực thường dùng, không đồng nghĩa mặc định với “6 sigma” hay phê duyệt quy trình.</li>
               </ul>
             ),
           },
@@ -826,14 +864,14 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
             content: (
               <div>
                 <p style={{ marginBottom: '0.6rem' }}>
-                  Tổng hợp toàn bộ dữ liệu khoa học xuyên suốt từ QTPP, FMEA, DoE, ANOVA, ANN, Design Space đến Chiến lược kiểm soát thành <strong>Báo cáo Phát triển Thuốc hoàn chỉnh</strong> theo cấu trúc <strong>ICH CTD Module 3.2.P.2</strong> để nộp cơ quan quản lý dược và xuất file <strong>MS Word (.docx)</strong>.
+                  Tổng hợp dữ liệu QTPP, FMEA, DoE, mô hình, tối ưu hóa và chiến lược kiểm soát thành <strong>bản thảo báo cáo phát triển</strong> có cấu trúc tham khảo CTD 3.2.P.2 và xuất Word. Nội dung cần được tác giả khoa học/QA rà soát, bổ sung tài liệu nguồn và phê duyệt trước khi dùng trong hồ sơ nộp cơ quan quản lý.
                 </p>
                 <div style={{ backgroundColor: '#f0fdf4', padding: '0.6rem 0.8rem', borderRadius: '0.4rem', border: '1px solid #bbf7d0', fontSize: '0.78rem', color: '#166534', lineHeight: 1.6 }}>
                   <strong>Thứ tự thao tác chuẩn:</strong>
                   <br />1. Kiểm tra thông báo tại <strong>Cổng Kiểm Tra Toàn Vẹn Khoa Học (Scientific Readiness Gate)</strong>.
                   <br />2. Chọn phương pháp mô hình hóa chính: Nút <strong>"Đa Thức (ANOVA)"</strong> hoặc <strong>"Mạng Nơ-ron AI"</strong>.
                   <br />3. Rà soát trực tiếp 10 chương mục tài liệu hiển thị trên màn hình.
-                  <br />4. Bấm nút <strong>"In / Xuất PDF"</strong> để in trực tiếp, hoặc nút <strong>"Tải Báo Cáo Word (.docx)"</strong> để tải file Word chuẩn nộp hồ sơ.
+                  <br />4. Bấm nút <strong>"In / Xuất PDF"</strong> để in trực tiếp, hoặc <strong>"Tải Bản Thảo Word (.docx)"</strong> để tạo tài liệu cho vòng rà soát khoa học/QA.
                   <br />5. Xem lịch sử phiên bản và audit trail trong bảng <strong>Project Governance</strong>.
                 </div>
               </div>
@@ -851,7 +889,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                     <li><strong>Nút "Đa Thức (ANOVA)":</strong> Chọn đưa kết quả phân tích ANOVA cổ điển vào báo cáo.</li>
                     <li><strong>Nút "Mạng Nơ-ron AI":</strong> Chọn đưa kết quả phân tích học sâu AI vào báo cáo.</li>
                     <li><strong>Nút "In / Xuất PDF":</strong> Mở hộp thoại in ấn của trình duyệt hoặc xuất sang file PDF.</li>
-                    <li><strong>Nút "Tải Báo Cáo Word (.docx)":</strong> Xuất toàn bộ hồ sơ ra file MS Word chuyên nghiệp với đầy đủ định dạng bảng biểu, công thức và dữ liệu.</li>
+                    <li><strong>Nút "Tải Bản Thảo Word (.docx)":</strong> Xuất tài liệu làm việc có bảng biểu, công thức và dữ liệu để tiếp tục rà soát.</li>
                   </ul>
                 </div>
 
@@ -866,7 +904,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                     <li>Mô hình hồi quy toán học &amp; Bảng ANOVA đầy đủ / Mạng Nơ-ron AI.</li>
                     <li>Đánh giá rủi ro cập nhật sau DoE (Updated Risk Assessment - chuẩn US FDA).</li>
                     <li>Chiến lược kiểm soát toàn diện (Comprehensive Control Strategy - ICH Q10) với phân loại CMA, CPP, IPC, Release Specs, dải NOR, dải PAR.</li>
-                    <li>Xác minh độ tin cậy bằng mô phỏng Monte Carlo 10.000 lô ảo (<InlineMath math="\text{Reliability} \ge 99.73\%" />, <InlineMath math="C_{pk} \ge 1.33" />).</li>
+                    <li>Ước lượng độ tin cậy bằng mô phỏng Monte Carlo với số lô, RSD và seed đã chọn; diễn giải cùng giả định mô hình, không thay thế xác nhận lô thực.</li>
                     <li>Khung ký duyệt và phê chuẩn hồ sơ (R&amp;D Lead, QA Director).</li>
                   </ol>
                 </div>
@@ -879,12 +917,12 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
             icon: Calculator,
             content: (
               <div style={{ fontSize: '0.78rem', color: '#334155', lineHeight: 1.6 }}>
-                <p>Nút <strong>"Tải Báo Cáo Word (.docx)"</strong> được bảo vệ bởi cổng kiểm duyệt khoa học nghiêm ngặt (Readiness Gate). Báo cáo chỉ được phép xuất khi:</p>
+                <p>Nút <strong>"Tải Báo Cáo Word (.docx)"</strong> được kiểm tra bằng các điều kiện dữ liệu/mô hình trong app. Đây là <em>readiness check</em> kỹ thuật, không phải phê duyệt khoa học, QA hay quy định. Báo cáo chỉ được phép xuất khi:</p>
                 <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem' }}>
                   <li>✓ Đã có đầy đủ số liệu thực nghiệm DoE hợp lệ cho tất cả các CQAs.</li>
-                  <li>✓ Đã khớp thành công mô hình ANOVA hoặc Mạng nơ-ron không bị lỗi bão hòa/thiếu bậc tự do.</li>
+                  <li>✓ Có mô hình cho các CQA và không có lỗi kỹ thuật mà app phát hiện (ví dụ mô hình OLS thiếu bậc tự do hoặc validation không hợp lệ).</li>
                   <li>✓ Đã tối ưu hóa và xác định điểm vận hành Desirability khả thi.</li>
-                  <li>✓ Đã hoàn thành mô phỏng độ bền Monte Carlo.</li>
+                  <li>✓ Đã hoàn thành mô phỏng Monte Carlo dùng chung với báo cáo.</li>
                 </ul>
               </div>
             ),
@@ -895,7 +933,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
             icon: Lightbulb,
             content: (
               <ul style={{ paddingLeft: '1.2rem', fontSize: '0.78rem', color: '#334155', lineHeight: 1.6 }}>
-                <li><strong>Lưu trữ JSON &amp; Autosave:</strong> Dự án tự động lưu trên trình duyệt và cho phép tải file JSON về máy tính bất kỳ lúc nào qua nút <em>Lưu</em> trên thanh Navbar.</li>
+                <li><strong>Lưu trữ JSON &amp; Autosave:</strong> Dự án tự động lưu trên trình duyệt và cho phép tải file JSON về máy tính bất kỳ lúc nào qua nút <em>Lưu</em> trên thanh Navbar. Lưu JSON cùng dữ liệu thô, phiên bản code và căn cứ khoa học để bảo đảm truy xuất nguồn gốc.</li>
                 <li><strong>Khôi phục Snapshot:</strong> Cho phép quay ngược lại các mốc lịch sử chỉnh sửa trước đó nếu cần so sánh các kịch bản tối ưu hóa khác nhau.</li>
               </ul>
             ),
@@ -907,7 +945,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
     }
   };
 
-  const sections = useMemo(() => getHelpContent(viewingTab), [viewingTab, project]);
+  const sections = useMemo(() => getHelpContent(viewingTab), [viewingTab]);
 
   const filteredSections = useMemo(() => {
     if (!searchQuery.trim()) return sections;
@@ -921,7 +959,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
   return (
     <>
       {/* Backdrop overlay (Only active when NOT pinned in floating mode) */}
-      {!isPinned && (
+      {!effectivePinned && (
         <div
           onClick={onClose}
           style={{
@@ -943,9 +981,12 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
 
       {/* Right Drawer / Companion Side Panel */}
       <aside
+        ref={drawerRef}
         role="dialog"
-        aria-modal={!isPinned}
+        aria-modal={!effectivePinned}
+        aria-hidden={!isOpen}
         aria-label="Thanh trợ giúp theo ngữ cảnh"
+        tabIndex={-1}
         style={{
           position: 'fixed',
           top: 0,
@@ -953,11 +994,11 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
           bottom: 0,
           height: '100vh',
           maxHeight: '100vh',
-          width: isPinned ? '500px' : '560px',
-          maxWidth: isPinned ? '50vw' : '94vw',
+          width: effectivePinned ? '500px' : '560px',
+          maxWidth: effectivePinned ? '50vw' : '94vw',
           backgroundColor: '#ffffff',
-          boxShadow: isPinned ? '-2px 0 12px rgba(0, 0, 0, 0.08)' : '-6px 0 28px rgba(0, 0, 0, 0.18)',
-          zIndex: isPinned ? 40 : 101,
+          boxShadow: effectivePinned ? '-2px 0 12px rgba(0, 0, 0, 0.08)' : '-6px 0 28px rgba(0, 0, 0, 0.18)',
+          zIndex: effectivePinned ? 40 : 101,
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -998,14 +1039,14 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 Trợ Giúp Theo Ngữ Cảnh
               </div>
               <div style={{ fontSize: '0.7rem', color: '#93c5fd', marginTop: '0.1rem' }}>
-                Hướng dẫn thao tác, nút bấm &amp; thuật toán chuẩn ICH
+                Hướng dẫn thao tác, nút bấm &amp; thuật toán tham chiếu ICH
               </div>
             </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
             {/* Toggle Pin / Side-by-Side Mode */}
-            {onTogglePin && (
+            {onTogglePin && !isCompactViewport && (
               <button
                 type="button"
                 onClick={onTogglePin}
