@@ -25,6 +25,8 @@ import {
   PlusCircle,
   CopyPlus,
   ListPlus,
+  Sliders,
+  Info,
 } from 'lucide-react';
 import type {
   QBDProject,
@@ -1104,196 +1106,337 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
         )}
 
         {/* Configuration Selectors */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: '#475569', marginBottom: '0.3rem' }}>
-              Nhóm Thiết Kế (Category)
-            </label>
-            <select
-              className="input-field"
-              value={designConfig.category}
-              onChange={(e) => {
-                const cat = e.target.value as DoECategory;
-                let defaultType: DoEDesignType = 'BoxBehnken';
-                if (cat === 'Custom_Optimal') defaultType = 'DOptimal';
-                if (cat === 'Combined_Mixture_Process') defaultType = 'Combined_Mixture_Factorial';
-                if (cat === 'Screening') defaultType = 'FullFactorial2k';
-                if (cat === 'Mixture') defaultType = 'SimplexCentroid';
-                setDesignConfig({ ...designConfig, category: cat, designType: defaultType });
-              }}
-            >
-              <option value="RSM">Mặt Đáp (RSM - Tối ưu hóa)</option>
-              <option value="Custom_Optimal">⚡ D-Optimal Design (D-Tối ưu / Thuật toán Fedorov)</option>
-              <option value="Combined_Mixture_Process">🧪 Hỗn Hợp + Quy Trình (Combined Mixture-Process)</option>
-              <option value="Mixture">Thiết kế Hỗn hợp (Mixture / Tá dược)</option>
-              <option value="Screening">Sàng lọc Yếu tố (Screening)</option>
-            </select>
+        <div style={{
+          backgroundColor: '#ffffff',
+          borderRadius: '0.75rem',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.04)',
+          overflow: 'hidden',
+        }}>
+          {/* Header khu vực cấu hình */}
+          <div style={{
+            padding: '0.7rem 1.1rem',
+            backgroundColor: '#f8fafc',
+            borderBottom: '1px solid #e2e8f0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '0.75rem',
+            flexWrap: 'wrap',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+              <Sliders size={16} color="#0284c7" />
+              <span style={{ fontSize: '0.84rem', fontWeight: '700', color: '#0f172a' }}>
+                Cấu Hình Ma Trận Thiết Kế (Design Matrix Setup)
+              </span>
+            </div>
+            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+              {isOptimalDesign ? '⚡ Thuật toán D-Optimal (Fedorov / Coordinate Exchange)' : 'Thiết kế chuẩn hóa (Classical DoE)'}
+            </span>
           </div>
 
-          <div>
-            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: '#475569', marginBottom: '0.3rem' }}>
-              Kiểu Thiết Kế Cụ Thể (Design Type)
-            </label>
-            <select
-              className="input-field"
-              value={designConfig.designType}
-              onChange={(e) => {
-                const nextType = e.target.value as DoEDesignType;
-                const isCombinedOptimal = nextType === 'Combined_Mixture_DOptimal';
-                setDesignConfig({
-                  ...designConfig,
-                  designType: nextType,
-                  ...(isCombinedOptimal
-                    ? {
-                        dOptimalModel: designConfig.dOptimalModel || '2FI',
-                        numRuns: designConfig.numRuns || 24,
-                      }
-                    : {}),
-                });
-              }}
-            >
-              {designConfig.category === 'Custom_Optimal' && (
-                <option value="DOptimal">D-Optimal Design (Tối đa hóa định thức |X^T X|)</option>
-              )}
-              {designConfig.category === 'Combined_Mixture_Process' && (
-                <>
-                  <option value="Combined_Mixture_Factorial">Combined Simplex x Factorial 2^p (Tích Hỗn hợp - Yếu tố)</option>
-                  <option value="Combined_Mixture_RSM">Combined Simplex x Box-Behnken RSM (Tích Hỗn hợp - Mặt đáp)</option>
-                  <option value="Combined_Mixture_DOptimal">D-Optimal Mixture–Process (Giảm số run, chọn theo mô hình)</option>
-                </>
-              )}
-              {designConfig.category === 'RSM' && (
-                <>
-                  <option value="BoxBehnken">Box-Behnken Design (BBD - Tiết kiệm số lần chạy)</option>
-                  <option value="CCD_FaceCentered">Central Composite Face-Centered (CCF, α = 1.0)</option>
-                  <option value="CCD_Rotatable">Central Composite Rotatable (CCR, α = (2^k)^1/4)</option>
-                  <option value="CCD_Full">Central Composite Full (CCD Spherical)</option>
-                </>
-              )}
-              {designConfig.category === 'Screening' && (
-                <>
-                  <option value="FullFactorial2k">Yếu tố Toàn phần (Full Factorial 2^k)</option>
-                  <option value="FractionalFactorial">Yếu tố Bán phần (Fractional Factorial 2^(k-p))</option>
-                  <option value="PlackettBurman">Plackett-Burman Design (PBD)</option>
-                  <option value="Taguchi">Taguchi Orthogonal Array (L4/L8/L9/L12/L16)</option>
-                </>
-              )}
-              {designConfig.category === 'Mixture' && (
-                <>
-                  <option value="SimplexCentroid">Simplex Centroid Design (Hỗn hợp Đa tâm)</option>
-                  <option value="SimplexLattice">Simplex Lattice Design (Hỗn hợp Mạng lưới)</option>
-                </>
-              )}
-            </select>
-          </div>
-
-          {designConfig.designType === 'Taguchi' && (
+          {/* Grid thông số thiết kế */}
+          <div style={{
+            padding: '1.1rem',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
+            gap: '1.1rem',
+          }}>
+            {/* Nhóm Thiết Kế */}
             <div>
-              <label htmlFor="taguchi-array" style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: '#475569', marginBottom: '0.3rem' }}>
-                Ma trận trực giao Taguchi
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', minHeight: '20px', gap: '0.35rem' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#334155', whiteSpace: 'nowrap' }}>
+                  Nhóm Thiết Kế
+                </label>
+                <span style={{ fontSize: '0.7rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>Category</span>
+              </div>
               <select
-                id="taguchi-array"
                 className="input-field"
-                value={designConfig.taguchiArray ?? (project.factors.filter((factor) => factor.controllability !== 'constant').length <= 3 ? 'L4' : 'L8')}
-                onChange={(event) => setDesignConfig({ ...designConfig, taguchiArray: event.target.value as 'L4' | 'L8' | 'L9' | 'L12' | 'L16' })}
+                style={{ height: '38px', borderRadius: '0.45rem', fontSize: '0.82rem', fontWeight: '500' }}
+                value={designConfig.category}
+                onChange={(e) => {
+                  const cat = e.target.value as DoECategory;
+                  let defaultType: DoEDesignType = 'BoxBehnken';
+                  if (cat === 'Custom_Optimal') defaultType = 'DOptimal';
+                  if (cat === 'Combined_Mixture_Process') defaultType = 'Combined_Mixture_Factorial';
+                  if (cat === 'Screening') defaultType = 'FullFactorial2k';
+                  if (cat === 'Mixture') defaultType = 'SimplexCentroid';
+                  setDesignConfig({ ...designConfig, category: cat, designType: defaultType });
+                }}
               >
-                <option value="L4">L4 · 3 factor hai mức</option>
-                <option value="L8">L8 · 7 factor hai mức</option>
-                <option value="L9">L9 · 4 factor ba mức</option>
-                <option value="L12">L12 · 11 factor hai mức</option>
-                <option value="L16">L16 · 15 factor hai mức</option>
+                <option value="RSM">Mặt Đáp (RSM - Tối ưu hóa)</option>
+                <option value="Custom_Optimal">⚡ D-Optimal Design (D-Tối ưu / Thuật toán Fedorov)</option>
+                <option value="Combined_Mixture_Process">🧪 Hỗn Hợp + Quy Trình (Combined Mixture-Process)</option>
+                <option value="Mixture">Thiết kế Hỗn hợp (Mixture / Tá dược)</option>
+                <option value="Screening">Sàng lọc Yếu tố (Screening)</option>
               </select>
             </div>
-          )}
 
-          {/* D-Optimal Target Model & Run Count */}
-          {isOptimalDesign ? (
-            <>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: '#0369a1', marginBottom: '0.3rem' }}>
-                  Bậc Mô Hình Mục Tiêu (Target Model)
+            {/* Kiểu Thiết Kế Cụ Thể */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', minHeight: '20px', gap: '0.35rem' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#334155', whiteSpace: 'nowrap' }}>
+                  Kiểu Thiết Kế Cụ Thể
                 </label>
+                <span style={{ fontSize: '0.7rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>Design Type</span>
+              </div>
+              <select
+                className="input-field"
+                style={{ height: '38px', borderRadius: '0.45rem', fontSize: '0.82rem', fontWeight: '500' }}
+                value={designConfig.designType}
+                onChange={(e) => {
+                  const nextType = e.target.value as DoEDesignType;
+                  const isCombinedOptimal = nextType === 'Combined_Mixture_DOptimal';
+                  setDesignConfig({
+                    ...designConfig,
+                    designType: nextType,
+                    ...(isCombinedOptimal
+                      ? {
+                          dOptimalModel: designConfig.dOptimalModel || '2FI',
+                          numRuns: designConfig.numRuns || 24,
+                        }
+                      : {}),
+                  });
+                }}
+              >
+                {designConfig.category === 'Custom_Optimal' && (
+                  <option value="DOptimal">D-Optimal Design (Tối đa hóa định thức |X^T X|)</option>
+                )}
+                {designConfig.category === 'Combined_Mixture_Process' && (
+                  <>
+                    <option value="Combined_Mixture_Factorial">Combined Simplex x Factorial 2^p (Tích Hỗn hợp - Yếu tố)</option>
+                    <option value="Combined_Mixture_RSM">Combined Simplex x Box-Behnken RSM (Tích Hỗn hợp - Mặt đáp)</option>
+                    <option value="Combined_Mixture_DOptimal">D-Optimal Mixture–Process (Giảm số run, chọn theo mô hình)</option>
+                  </>
+                )}
+                {designConfig.category === 'RSM' && (
+                  <>
+                    <option value="BoxBehnken">Box-Behnken Design (BBD - Tiết kiệm số lần chạy)</option>
+                    <option value="CCD_FaceCentered">Central Composite Face-Centered (CCF, α = 1.0)</option>
+                    <option value="CCD_Rotatable">Central Composite Rotatable (CCR, α = (2^k)^1/4)</option>
+                    <option value="CCD_Full">Central Composite Full (CCD Spherical)</option>
+                  </>
+                )}
+                {designConfig.category === 'Screening' && (
+                  <>
+                    <option value="FullFactorial2k">Yếu tố Toàn phần (Full Factorial 2^k)</option>
+                    <option value="FractionalFactorial">Yếu tố Bán phần (Fractional Factorial 2^(k-p))</option>
+                    <option value="PlackettBurman">Plackett-Burman Design (PBD)</option>
+                    <option value="Taguchi">Taguchi Orthogonal Array (L4/L8/L9/L12/L16)</option>
+                  </>
+                )}
+                {designConfig.category === 'Mixture' && (
+                  <>
+                    <option value="SimplexCentroid">Simplex Centroid Design (Hỗn hợp Đa tâm)</option>
+                    <option value="SimplexLattice">Simplex Lattice Design (Hỗn hợp Mạng lưới)</option>
+                  </>
+                )}
+              </select>
+            </div>
+
+            {designConfig.designType === 'Taguchi' && (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', minHeight: '20px', gap: '0.35rem' }}>
+                  <label htmlFor="taguchi-array" style={{ fontSize: '0.78rem', fontWeight: '600', color: '#334155', whiteSpace: 'nowrap' }}>
+                    Ma trận trực giao Taguchi
+                  </label>
+                  <span style={{ fontSize: '0.7rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>Orthogonal Array</span>
+                </div>
                 <select
+                  id="taguchi-array"
                   className="input-field"
-                  value={selectedOptimalModel}
-                  onChange={(e) => setDesignConfig({ ...designConfig, dOptimalModel: e.target.value as 'Linear' | '2FI' | 'Quadratic' })}
+                  style={{ height: '38px', borderRadius: '0.45rem', fontSize: '0.82rem', fontWeight: '500' }}
+                  value={designConfig.taguchiArray ?? (project.factors.filter((factor) => factor.controllability !== 'constant').length <= 3 ? 'L4' : 'L8')}
+                  onChange={(event) => setDesignConfig({ ...designConfig, taguchiArray: event.target.value as 'L4' | 'L8' | 'L9' | 'L12' | 'L16' })}
                 >
-                  <option value="Quadratic">Bậc 2 Toàn phần (Quadratic: Linear + 2FI + Quadratic)</option>
-                  <option value="2FI">Tương tác 2 yếu tố (2FI: Linear + Interactions)</option>
-                  <option value="Linear">Tuyến tính bậc 1 (mixture–process: gồm xᵢ·zⱼ)</option>
+                  <option value="L4">L4 · 3 factor hai mức</option>
+                  <option value="L8">L8 · 7 factor hai mức</option>
+                  <option value="L9">L9 · 4 factor ba mức</option>
+                  <option value="L12">L12 · 11 factor hai mức</option>
+                  <option value="L16">L16 · 15 factor hai mức</option>
                 </select>
               </div>
+            )}
 
+            {/* D-Optimal Target Model & Run Count */}
+            {isOptimalDesign ? (
+              <>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', minHeight: '20px', gap: '0.35rem' }}>
+                    <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#0369a1', whiteSpace: 'nowrap' }}>
+                      Bậc Mô Hình Mục Tiêu
+                    </label>
+                    <span style={{ fontSize: '0.7rem', color: '#0284c7', background: '#e0f2fe', padding: '1px 6px', borderRadius: '4px', fontWeight: '600', whiteSpace: 'nowrap' }}>
+                      p = {minRequiredTerms}
+                    </span>
+                  </div>
+                  <select
+                    className="input-field"
+                    style={{ height: '38px', borderRadius: '0.45rem', borderColor: '#7dd3fc', fontSize: '0.82rem', fontWeight: '500' }}
+                    value={selectedOptimalModel}
+                    onChange={(e) => setDesignConfig({ ...designConfig, dOptimalModel: e.target.value as 'Linear' | '2FI' | 'Quadratic' })}
+                  >
+                    <option value="Quadratic">Bậc 2 Toàn phần (Quadratic: Linear + 2FI + Quadratic)</option>
+                    <option value="2FI">Tương tác 2 yếu tố (2FI: Linear + Interactions)</option>
+                    <option value="Linear">Tuyến tính bậc 1 (mixture–process: gồm xᵢ·zⱼ)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', minHeight: '20px', gap: '0.35rem' }}>
+                    <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#0369a1', whiteSpace: 'nowrap' }}>
+                      Số Lần Chạy (N)
+                    </label>
+                    <span
+                      title={`Số run tối thiểu: ${minRequiredTerms + 1}; Khuyến nghị: ${recommendedOptimalRuns}`}
+                      style={{ fontSize: '0.7rem', color: '#0369a1', background: '#e0f2fe', padding: '1px 6px', borderRadius: '4px', fontWeight: '600', whiteSpace: 'nowrap' }}
+                    >
+                      Min: {minRequiredTerms + 1} · Gợi ý: {recommendedOptimalRuns}
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    min={minRequiredTerms + 1}
+                    max={60}
+                    className="input-field"
+                    style={{ height: '38px', borderRadius: '0.45rem', borderColor: '#7dd3fc', fontSize: '0.88rem', fontWeight: '600', color: '#0369a1' }}
+                    value={designConfig.numRuns || recommendedOptimalRuns}
+                    onChange={(e) => setDesignConfig({ ...designConfig, numRuns: Math.max(minRequiredTerms + 1, Number(e.target.value)) })}
+                  />
+                </div>
+                {designConfig.designType === 'Combined_Mixture_DOptimal' && hasMixtureProcessFactors && (
+                  <div style={{ gridColumn: '1 / -1', fontSize: '0.76rem', color: '#0f766e', background: '#f0fdfa', border: '1px solid #99f6e4', borderRadius: '0.5rem', padding: '0.65rem 0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: '600' }}>Chọn nhanh:</span>
+                    <button type="button" className="btn btn-teal" style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderRadius: '0.35rem' }} onClick={() => setDesignConfig({ ...designConfig, dOptimalModel: 'Linear', numRuns: 14 })}>Sàng lọc 14</button>
+                    <button type="button" className="btn btn-teal" style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderRadius: '0.35rem' }} onClick={() => setDesignConfig({ ...designConfig, dOptimalModel: '2FI', numRuns: 24 })}>Cân bằng 24</button>
+                    <button type="button" className="btn btn-teal" style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderRadius: '0.35rem' }} onClick={() => setDesignConfig({ ...designConfig, dOptimalModel: 'Quadratic', numRuns: 30 })}>RSM 30</button>
+                    <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#0f766e', opacity: 0.9 }}>N phải lớn hơn số hệ số p để còn bậc tự do ước lượng sai số.</span>
+                  </div>
+                )}
+              </>
+            ) : (
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: '#0369a1', marginBottom: '0.3rem' }}>
-                  Tổng Số Lần Chạy N (tối thiểu {minRequiredTerms + 1}; khuyến nghị {recommendedOptimalRuns})
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', minHeight: '20px', gap: '0.35rem' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#334155', whiteSpace: 'nowrap' }}>
+                    Số Điểm Tâm
+                  </label>
+                  <span style={{ fontSize: '0.7rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>0 - 10</span>
+                </div>
                 <input
                   type="number"
-                  min={minRequiredTerms + 1}
-                  max={60}
+                  min={0}
+                  max={10}
                   className="input-field"
-                  value={designConfig.numRuns || recommendedOptimalRuns}
-                  onChange={(e) => setDesignConfig({ ...designConfig, numRuns: Math.max(minRequiredTerms + 1, Number(e.target.value)) })}
+                  style={{ height: '38px', borderRadius: '0.45rem', fontSize: '0.85rem' }}
+                  value={designConfig.centerPoints}
+                  onChange={(e) => setDesignConfig({ ...designConfig, centerPoints: Number(e.target.value) })}
                 />
               </div>
-              {designConfig.designType === 'Combined_Mixture_DOptimal' && hasMixtureProcessFactors && (
-                <div style={{ gridColumn: '1 / -1', fontSize: '0.76rem', color: '#0f766e', background: '#f0fdfa', border: '1px solid #99f6e4', borderRadius: '0.4rem', padding: '0.6rem 0.7rem' }}>
-                  Chọn nhanh: <button type="button" className="btn btn-teal" style={{ fontSize: '0.72rem', padding: '0.2rem 0.45rem', marginLeft: '0.4rem' }} onClick={() => setDesignConfig({ ...designConfig, dOptimalModel: 'Linear', numRuns: 14 })}>Sàng lọc 14</button>
-                  <button type="button" className="btn btn-teal" style={{ fontSize: '0.72rem', padding: '0.2rem 0.45rem', marginLeft: '0.35rem' }} onClick={() => setDesignConfig({ ...designConfig, dOptimalModel: '2FI', numRuns: 24 })}>Cân bằng 24</button>
-                  <button type="button" className="btn btn-teal" style={{ fontSize: '0.72rem', padding: '0.2rem 0.45rem', marginLeft: '0.35rem' }} onClick={() => setDesignConfig({ ...designConfig, dOptimalModel: 'Quadratic', numRuns: 30 })}>RSM 30</button>
-                  <span style={{ marginLeft: '0.55rem' }}>N phải lớn hơn số hệ số p để còn bậc tự do ước lượng sai số.</span>
-                </div>
-              )}
-            </>
-          ) : (
-            <div>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: '#475569', marginBottom: '0.3rem' }}>
-                Số Điểm Tâm (Center Points)
-              </label>
-              <input
-                type="number"
-                min={0}
-                max={10}
-                className="input-field"
-                value={designConfig.centerPoints}
-                onChange={(e) => setDesignConfig({ ...designConfig, centerPoints: Number(e.target.value) })}
-              />
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Randomization and balanced execution blocks */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1.2rem', flexWrap: 'wrap' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={designConfig.randomized}
-                onChange={(e) => setDesignConfig({ ...designConfig, randomized: e.target.checked })}
-                style={{ width: '16px', height: '16px' }}
-              />
-              <Shuffle size={15} color="#475569" />
-              <span>Ngẫu nhiên hóa (Randomize)</span>
-            </label>
-            {designConfig.randomized && (
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', color: '#475569' }}>
-                Seed
+          <div style={{
+            borderTop: '1px solid #f1f5f9',
+            backgroundColor: '#f8fafc',
+            padding: '0.75rem 1.1rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '0.85rem',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+              <label style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                fontSize: '0.82rem',
+                fontWeight: 600,
+                color: designConfig.randomized ? '#0f172a' : '#64748b',
+                cursor: 'pointer',
+                padding: '0.25rem 0.55rem',
+                borderRadius: '0.375rem',
+                backgroundColor: designConfig.randomized ? '#eff6ff' : 'transparent',
+                border: `1px solid ${designConfig.randomized ? '#bfdbfe' : 'transparent'}`,
+                transition: 'all 0.15s ease',
+                userSelect: 'none',
+              }}>
                 <input
-                  aria-label="Seed ngẫu nhiên hóa run order"
-                  type="number"
-                  className="input-field"
-                  style={{ width: '110px', padding: '0.25rem 0.35rem' }}
-                  value={designConfig.randomizationSeed ?? 20260828}
-                  onChange={(event) => setDesignConfig({ ...designConfig, randomizationSeed: Number(event.target.value) || 20260828 })}
+                  type="checkbox"
+                  checked={designConfig.randomized}
+                  onChange={(e) => setDesignConfig({ ...designConfig, randomized: e.target.checked })}
+                  style={{ width: '15px', height: '15px', accentColor: '#0284c7', cursor: 'pointer' }}
                 />
+                <Shuffle size={14} color={designConfig.randomized ? '#0284c7' : '#94a3b8'} />
+                <span>Ngẫu nhiên hóa (Randomize)</span>
               </label>
-            )}
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', color: '#475569' }}>
-              Chia lịch thành
-              <input type="number" min={1} max={10} className="input-field" style={{ width: '64px', padding: '0.25rem 0.35rem' }} value={designConfig.blocks ?? 1} onChange={(e) => setDesignConfig({ ...designConfig, blocks: Math.max(1, Math.min(10, Number(e.target.value))) })} />
-              block
-            </label>
-            <span style={{ fontSize: '0.7rem', color: '#0f766e' }}>Khi có nhiều block, ANOVA và mạng nơ-ron sẽ hiệu chỉnh hiệu ứng block; bạn có thể sửa Block của từng run trong bảng bên dưới.</span>
+
+              {designConfig.randomized && (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#475569' }}>Seed:</span>
+                  <input
+                    aria-label="Seed ngẫu nhiên hóa run order"
+                    type="number"
+                    className="input-field font-mono"
+                    style={{
+                      width: '105px',
+                      height: '32px',
+                      padding: '0.2rem 0.45rem',
+                      fontSize: '0.82rem',
+                      textAlign: 'center',
+                      borderRadius: '0.375rem',
+                      backgroundColor: '#ffffff',
+                    }}
+                    value={designConfig.randomizationSeed ?? 20260828}
+                    onChange={(event) => setDesignConfig({ ...designConfig, randomizationSeed: Number(event.target.value) || 20260828 })}
+                  />
+                </div>
+              )}
+
+              <div style={{ width: '1px', height: '18px', backgroundColor: '#cbd5e1' }} />
+
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#475569' }}>Chia lịch thành:</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  className="input-field font-mono"
+                  style={{
+                    width: '54px',
+                    height: '32px',
+                    padding: '0.2rem 0.35rem',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    textAlign: 'center',
+                    borderRadius: '0.375rem',
+                    backgroundColor: '#ffffff',
+                  }}
+                  value={designConfig.blocks ?? 1}
+                  onChange={(e) => setDesignConfig({ ...designConfig, blocks: Math.max(1, Math.min(10, Number(e.target.value))) })}
+                />
+                <span style={{ fontSize: '0.78rem', color: '#64748b' }}>block</span>
+              </div>
+            </div>
+
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              fontSize: '0.72rem',
+              color: '#0f766e',
+              background: '#f0fdf4',
+              border: '1px solid #bbf7d0',
+              padding: '0.3rem 0.65rem',
+              borderRadius: '0.375rem',
+              lineHeight: 1.4,
+            }}>
+              <Info size={13} style={{ flexShrink: 0, color: '#16a34a' }} />
+              <span>
+                Khi có nhiều block, ANOVA và mạng nơ-ron sẽ hiệu chỉnh hiệu ứng block; bạn có thể sửa Block của từng run trong bảng bên dưới.
+              </span>
+            </div>
           </div>
         </div>
       </div>

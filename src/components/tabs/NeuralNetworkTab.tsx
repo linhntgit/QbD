@@ -1614,43 +1614,51 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                 backgroundColor: '#eff6ff',
                 border: '1px solid #bfdbfe',
                 display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: '0.5rem',
+                flexDirection: 'column',
+                gap: '0.4rem',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', color: '#1e40af' }}>
-                <Sparkles size={16} color="#2563eb" />
-                <span>
-                  <strong>Gợi ý ngân sách tham số:</strong> Số nơ-ron lớp ẩn khởi đầu là <strong>h = {archMetrics.carpenterRecommended}</strong> (dùng N huấn luyện = {archMetrics.numSamples}; đã trừ {numSamples - archMetrics.numSamples} run validation).
-                </span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.35rem', maxWidth: '100%' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '0.65rem',
+                  width: '100%',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', color: '#1e40af', flex: '1 1 auto', minWidth: '260px' }}>
+                  <Sparkles size={16} color="#2563eb" style={{ flexShrink: 0 }} />
+                  <span>
+                    <strong>Gợi ý ngân sách tham số:</strong> Số nơ-ron lớp ẩn khởi đầu là <strong>h = {archMetrics.carpenterRecommended}</strong> (dùng N huấn luyện = {archMetrics.numSamples}; đã trừ {numSamples - archMetrics.numSamples} run validation).
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', flexShrink: 0, marginLeft: 'auto' }}>
                   <button
-                  type="button"
-                  onClick={() => {
-                    setLocalConfig((prev) => ({
-                      ...prev,
-                      hiddenNodes1: archMetrics.carpenterRecommended || 3,
-                      hiddenNodes2: 0,
-                    }));
-                    const target = neuralTrainingMode === 'shared'
-                      ? `mạng chung cho tất cả ${project.cqas.length} CQA`
-                      : `CQA ${currentCQA.code} (${currentCQA.name})`;
-                    setConfigActionNotice(`Đã áp dụng kiến trúc theo ngân sách tham số: ${archMetrics.carpenterRecommended} nơ-ron ở Tầng 1, tắt Tầng 2 cho ${target}.`);
-                  }}
-                  className="btn btn-outline"
-                  style={{
-                    fontSize: '0.75rem',
-                    padding: '0.25rem 0.6rem',
-                    backgroundColor: '#ffffff',
-                    borderColor: '#2563eb',
-                    color: '#2563eb',
-                    fontWeight: '700',
-                  }}
-                  title="Tự động đặt số nơ-ron ẩn Tầng 1 = h theo ngân sách tham số và tắt Tầng 2"
+                    type="button"
+                    onClick={() => {
+                      setLocalConfig((prev) => ({
+                        ...prev,
+                        hiddenNodes1: archMetrics.carpenterRecommended || 3,
+                        hiddenNodes2: 0,
+                      }));
+                      const target = neuralTrainingMode === 'shared'
+                        ? `mạng chung cho tất cả ${project.cqas.length} CQA`
+                        : `CQA ${currentCQA.code} (${currentCQA.name})`;
+                      setConfigActionNotice(`Đã áp dụng kiến trúc theo ngân sách tham số: ${archMetrics.carpenterRecommended} nơ-ron ở Tầng 1, tắt Tầng 2 cho ${target}.`);
+                    }}
+                    className="btn btn-outline"
+                    style={{
+                      fontSize: '0.75rem',
+                      padding: '0.25rem 0.6rem',
+                      backgroundColor: '#ffffff',
+                      borderColor: '#2563eb',
+                      color: '#2563eb',
+                      fontWeight: '700',
+                    }}
+                    title="Tự động đặt số nơ-ron ẩn Tầng 1 = h theo ngân sách tham số và tắt Tầng 2"
                   >
                     💡 Áp Dụng Gợi Ý Kiến Trúc (h = {archMetrics.carpenterRecommended})
                   </button>
@@ -1674,14 +1682,50 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                     </button>
                   )}
                 </div>
-                {configActionNotice && (
-                  <div role="status" className="animate-fade-in" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', maxWidth: '100%', padding: '0.3rem 0.45rem', borderRadius: '0.35rem', backgroundColor: '#f0fdf4', border: '1px solid #86efac', color: '#15803d', fontSize: '0.72rem', fontWeight: '600' }}>
-                    <CheckCircle2 size={14} />
-                    <span>{configActionNotice}</span>
-                    <button type="button" onClick={() => setConfigActionNotice(null)} aria-label="Đóng thông báo" style={{ color: '#15803d', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>✕</button>
-                  </div>
-                )}
               </div>
+
+              {configActionNotice && (
+                <div
+                  role="status"
+                  className="animate-fade-in"
+                  style={{
+                    padding: '0.35rem 0.6rem',
+                    borderRadius: '0.35rem',
+                    backgroundColor: '#f0fdf4',
+                    border: '1px solid #86efac',
+                    color: '#15803d',
+                    fontSize: '0.72rem',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '0.5rem',
+                    width: '100%',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0 }}>
+                    <CheckCircle2 size={14} style={{ flexShrink: 0 }} />
+                    <span style={{ wordBreak: 'break-word' }}>{configActionNotice}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setConfigActionNotice(null)}
+                    aria-label="Đóng thông báo"
+                    style={{
+                      color: '#15803d',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '0 0.2rem',
+                      fontSize: '0.8rem',
+                      lineHeight: 1,
+                      flexShrink: 0,
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
