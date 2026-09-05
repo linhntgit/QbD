@@ -63,6 +63,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
 
   // Define Table of Contents Sections dynamically based on project content
   const tocSections = useMemo(() => {
+    const hasNeural = Boolean(neuralModels && Object.keys(neuralModels).length > 0);
     const list: Array<{ id: string; title: string; subtitle: string; icon: any; badge?: string }> = [
       { id: 'sec-metadata', title: 'Thông tin Dự Án', subtitle: 'Tổng quan & Phương pháp', icon: BookOpen, badge: 'Info' },
       { id: 'sec-0', title: '0. Protocol & Traceability', subtitle: 'Lịch sử & Phê duyệt', icon: CheckCircle2, badge: 'Trace' },
@@ -71,29 +72,56 @@ export const ReportTab: React.FC<ReportTabProps> = ({
       { id: 'sec-3', title: '3. Rủi Ro Ban Đầu (FMEA)', subtitle: 'Sàng lọc biến số', icon: ShieldAlert, badge: 'ICH Q9' },
       { id: 'sec-4', title: '4. Thiết Kế DoE', subtitle: `${project.doeConfig.designType} (${project.runs.length} runs)`, icon: FileSpreadsheet, badge: 'DoE' },
       { id: 'sec-5a', title: '5a. ANOVA & Hồi Quy Đa Thức', subtitle: 'Mô hình OLS & Lack of Fit', icon: Calculator, badge: 'ANOVA' },
+      {
+        id: 'sec-5b',
+        title: '5b. Mạng Nơ-ron AI (ANN)',
+        subtitle: hasNeural ? 'MLP Architecture & Metrics' : 'Chưa kích hoạt / huấn luyện',
+        icon: BrainCircuit,
+        badge: hasNeural ? 'ANN' : 'Optional',
+      },
+      {
+        id: 'sec-6',
+        title: '6a. Tối Ưu Desirability',
+        subtitle: optimum ? `Overall D = ${optimum.overallDesirability}` : 'Chưa thiết lập',
+        icon: Activity,
+        badge: optimum ? 'Optimum' : 'Pending',
+      },
+      {
+        id: 'sec-6b',
+        title: '6b. Rủi Ro Sau DoE',
+        subtitle: 'Đánh giá cập nhật',
+        icon: ShieldAlert,
+        badge: 'ICH Q9',
+      },
+      {
+        id: 'sec-7',
+        title: '7. Chiến Lược Kiểm Soát',
+        subtitle: 'ICH Q10 Comprehensive',
+        icon: Boxes,
+        badge: 'ICH Q10',
+      },
+      {
+        id: 'sec-8',
+        title: '8. Độ Bền Vững Monte Carlo',
+        subtitle: monteCarlo ? `Đạt ${monteCarlo.reliabilityPercent}%` : 'Chưa chạy mô phỏng',
+        icon: Activity,
+        badge: monteCarlo ? 'Risk' : 'Pending',
+      },
+      {
+        id: 'sec-9',
+        title: '9. Ký Duyệt & Phê Chuẩn',
+        subtitle: 'Sign-off & Approval',
+        icon: FileCheck2,
+        badge: 'Sign',
+      },
+      {
+        id: 'sec-governance',
+        title: 'Quản Trị & Audit Trail',
+        subtitle: 'Snapshots & Kiểm tra',
+        icon: BookOpen,
+        badge: 'Audit',
+      },
     ];
-
-    if (neuralModels && Object.keys(neuralModels).length > 0) {
-      list.push({ id: 'sec-5b', title: '5b. Mạng Nơ-ron AI (ANN)', subtitle: 'MLP Architecture & Metrics', icon: BrainCircuit, badge: 'ANN' });
-    }
-
-    if (optimum) {
-      list.push({ id: 'sec-6', title: '6. Tối Ưu Desirability', subtitle: `Overall D = ${optimum.overallDesirability}`, icon: Activity, badge: 'Optimum' });
-    }
-
-    list.push(
-      { id: 'sec-6b', title: '6b. Rủi Ro Sau DoE', subtitle: 'Đánh giá cập nhật', icon: ShieldAlert, badge: 'ICH Q9' },
-      { id: 'sec-7', title: '7. Chiến Lược Kiểm Soát', subtitle: 'ICH Q10 Comprehensive', icon: Boxes, badge: 'ICH Q10' }
-    );
-
-    if (monteCarlo) {
-      list.push({ id: 'sec-8', title: '8. Độ Bền Vững Monte Carlo', subtitle: `Đạt ${monteCarlo.reliabilityPercent}%`, icon: Activity, badge: 'Risk' });
-    }
-
-    list.push(
-      { id: 'sec-9', title: '9. Ký Duyệt & Phê Chuẩn', subtitle: 'Sign-off & Approval', icon: FileCheck2, badge: 'Sign' },
-      { id: 'sec-governance', title: 'Quản Trị & Audit Trail', subtitle: 'Snapshots & Kiểm tra', icon: BookOpen, badge: 'Audit' }
-    );
 
     return list;
   }, [project.doeConfig.designType, project.runs.length, neuralModels, optimum, monteCarlo]);
@@ -699,7 +727,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
         </div>
 
         {/* 5b. Neural Network Models */}
-        {neuralModels && Object.keys(neuralModels).length > 0 && (() => {
+        {neuralModels && Object.keys(neuralModels).length > 0 ? (() => {
           const availableCodes = Object.keys(neuralModels);
           const firstNM = Object.values(neuralModels)[0];
           if (!firstNM) return null;
@@ -813,15 +841,34 @@ export const ReportTab: React.FC<ReportTabProps> = ({
               })}
             </div>
           );
-        })()}
+        })() : (
+          <div id="sec-5b" className="report-section" style={{ marginBottom: '2rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#7c3aed', margin: 0 }}>
+                5b. Mô Hình Mạng Nơ-ron Nhân Tạo AI (Artificial Neural Network - ANN)
+              </h2>
+              <span className="badge" style={{ backgroundColor: '#64748b', color: '#ffffff', fontSize: '0.74rem', padding: '0.25rem 0.55rem' }}>
+                Chưa kích hoạt / Chưa huấn luyện
+              </span>
+            </div>
+            <div style={{ backgroundColor: '#faf5ff', border: '1px dashed #d8b4fe', borderRadius: '0.5rem', padding: '1rem', fontSize: '0.85rem', color: '#581c87' }}>
+              <div style={{ fontWeight: '600', marginBottom: '0.3rem' }}>
+                ℹ️ Chưa có mô hình Mạng Nơ-ron AI được huấn luyện trong dự án này.
+              </div>
+              <div>
+                Dự án hiện tại đang áp dụng mô hình hồi quy đa thức cổ điển bậc ≤ 2 kết hợp phân tích ANOVA (mục 5a). Để kích hoạt hoặc xây dựng mô hình học máy phi tuyến tính (Multi-Layer Perceptron - MLP), vui lòng chuyển sang <strong>Tab 5 (Mạng Nơ-ron AI)</strong> để khởi tạo và huấn luyện mạng.
+              </div>
+            </div>
+          </div>
+        )}
 
-        {/* 6. Optimum & Prediction Profiler */}
-        {optimum && (
-          <div id="sec-6" className="report-section" style={{ marginBottom: '2rem' }}>
-            <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
-              6. Tối Ưu Hóa Đa Mục Tiêu (Desirability Profiler: Overall D = {optimum.overallDesirability})
-            </h2>
-            
+        {/* 6a. Optimum & Prediction Profiler */}
+        <div id="sec-6" className="report-section" style={{ marginBottom: '2rem' }}>
+          <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
+            6a. Tối Ưu Hóa Đa Mục Tiêu (Desirability Profiler{optimum ? `: Overall D = ${optimum.overallDesirability}` : ''})
+          </h2>
+          
+          {optimum ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
               {/* Factors setpoints */}
               <div style={{ border: '1px solid #cbd5e1', borderRadius: '0.375rem', padding: '0.75rem', backgroundColor: '#f8fafc' }}>
@@ -862,13 +909,22 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                 })}
               </div>
             </div>
-          </div>
-        )}
+          ) : (
+            <div style={{ backgroundColor: '#f8fafc', border: '1px dashed #94a3b8', borderRadius: '0.5rem', padding: '1rem', fontSize: '0.85rem', color: '#475569' }}>
+              <div style={{ fontWeight: '600', color: '#334155', marginBottom: '0.3rem' }}>
+                ⏳ Chưa thiết lập điểm tối ưu hóa đa mục tiêu.
+              </div>
+              <div>
+                Chuyển sang <strong>Tab 6 (Tối Ưu Hóa & Không Gian Thiết Kế)</strong> để tìm điểm cài đặt tối ưu (Optimal Target Setpoint) thỏa mãn đồng thời các chỉ tiêu CQA theo hàm thỏa dụng Derringer-Suich.
+              </div>
+            </div>
+          )}
+        </div>
 
-        {/* 6. Updated Risk Assessment Table (ICH Q9 & FDA ANDA) */}
+        {/* 6b. Updated Risk Assessment Table (ICH Q9 & FDA ANDA) */}
         <div id="sec-6b" className="report-section" style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
-            6. Đánh Giá Rủi Ro Cập Nhật Sau DoE (Updated Risk Assessment - ICH Q9 & FDA)
+            6b. Đánh Giá Rủi Ro Cập Nhật Sau DoE (Updated Risk Assessment - ICH Q9 & FDA)
           </h2>
           <div className="table-container">
             <table className="qbd-table">
@@ -948,11 +1004,11 @@ export const ReportTab: React.FC<ReportTabProps> = ({
         </div>
 
         {/* 8. Monte Carlo Reliability */}
-        {monteCarlo && (
-          <div id="sec-8" className="report-section" style={{ marginBottom: '2rem' }}>
-            <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
-              8. Đánh Giá Độ Bền Vững Miền Dự Báo (Mô Phỏng Monte Carlo, tham chiếu ICH Q9)
-            </h2>
+        <div id="sec-8" className="report-section" style={{ marginBottom: '2rem' }}>
+          <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
+            8. Đánh Giá Độ Bền Vững Miền Dự Báo (Mô Phỏng Monte Carlo, tham chiếu ICH Q9)
+          </h2>
+          {monteCarlo ? (
             <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '0.5rem', padding: '1rem', fontSize: '0.85rem', color: '#14532d' }}>
               <div style={{ marginBottom: '0.3rem' }}>• Tổng số lô mô phỏng ảo: <strong>{monteCarlo.simulations.toLocaleString()} lô</strong></div>
               <div style={{ marginBottom: '0.3rem' }}>• Tỷ lệ mẫu đạt tiêu chí của các CQA đã mô hình hóa: <strong style={{ color: '#15803d', fontSize: '0.95rem' }}>{monteCarlo.reliabilityPercent}%</strong></div>
@@ -961,8 +1017,17 @@ export const ReportTab: React.FC<ReportTabProps> = ({
               <div style={{ marginBottom: '0.3rem' }}>• Mẫu vượt miền khảo sát: <strong>{monteCarlo.excursionCount.toLocaleString()} ({monteCarlo.excursionRatePercent}%)</strong></div>
               <div>• Tỷ lệ lỗi dự kiến trong điều kiện mô phỏng (Defect Rate): <strong>{monteCarlo.defectRatePPM.toLocaleString()} PPM</strong></div>
             </div>
-          </div>
-        )}
+          ) : (
+            <div style={{ backgroundColor: '#f8fafc', border: '1px dashed #94a3b8', borderRadius: '0.5rem', padding: '1rem', fontSize: '0.85rem', color: '#475569' }}>
+              <div style={{ fontWeight: '600', color: '#334155', marginBottom: '0.3rem' }}>
+                ⏳ Chưa thực hiện mô phỏng Monte Carlo để xác nhận độ bền vững miền dự báo.
+              </div>
+              <div>
+                Theo khuyến cáo ICH Q9 & FDA, cần chuyển sang <strong>Tab 7 (Monte Carlo)</strong> để chạy mô phỏng 5.000 – 10.000 lô ảo với dao động thực tế của thiết bị nhằm ước lượng tỷ lệ lỗi (Defect Rate PPM) và xác nhận ranh giới PAR/Design Space trước khi nộp hồ sơ.
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* 9. Sign-off & Regulatory Approval Block */}
         <div id="sec-9" className="report-section">
