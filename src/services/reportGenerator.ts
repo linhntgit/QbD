@@ -489,9 +489,14 @@ export async function exportQBDWordReport(
   // SECTION 2.3: Statistical Modeling, ANOVA & Curvature Test
   sections.push(
     new Paragraph({
-      text: '2.3 Mô Hình Hóa Thống Kê, Phân Tích Phương Sai (ANOVA) & Kiểm Định Độ Thiếu Phù Hợp (Lack of Fit)',
+      text: '2.3 Mô Hình Hóa Thống Kê (Hồi Quy Đa Thức ANOVA & Mạng Nơ-ron AI)',
       heading: HeadingLevel.HEADING_1,
       spacing: { before: 300, after: 150 },
+    }),
+    new Paragraph({
+      text: '2.3a Mô Hình Hồi Quy Đa Thức OLS & Phân Tích Phương Sai (ANOVA - Lack of Fit)',
+      heading: HeadingLevel.HEADING_2,
+      spacing: { before: 200, after: 100 },
     }),
     new Paragraph({
       text: `Phân tích phương sai (ANOVA) nhằm đánh giá mức độ ý nghĩa của toàn bộ mô hình (Model p < 0.05) và kiểm định độ thiếu phù hợp Lack of Fit (p > 0.05 là đạt chuẩn mô hình không bị thiếu phù hợp theo ICH Q8 & US FDA).${hasMultipleBlocks ? ` Thiết kế này có ${observedBlocks.length} block; hiệu ứng block được đưa vào mô hình như hiệu ứng cố định, do đó các hiệu ứng xử lý và phần dư được báo cáo sau khi hiệu chỉnh block.` : ''}`,
@@ -600,18 +605,22 @@ export async function exportQBDWordReport(
 
   // Neural Network Modeling Summary (if applicable)
   if (neuralModels && Object.keys(neuralModels).length > 0) {
+    const firstNM = Object.values(neuralModels)[0];
+    const actualTrainingMode = firstNM?.architectureMode ?? (project.analysisSettings?.neuralTrainingMode ?? 'independent');
+    const isShared = actualTrainingMode === 'shared';
+
     sections.push(
       new Paragraph({
-        text: 'Mô Hình Hóa Phi Tuyến Bằng Mạng Nơ-ron Nhân Tạo AI (Artificial Neural Network)',
+        text: '2.3b Mô Hình Hóa Phi Tuyến Bằng Mạng Nơ-ron Nhân Tạo AI (Artificial Neural Network - ANN)',
         heading: HeadingLevel.HEADING_2,
         spacing: { before: 200, after: 100 },
       }),
       new Paragraph({
-        text: `Áp dụng kiến trúc Multi-Layer Perceptron (MLP) với thuật toán tối ưu hóa đa vòng lặp (Multi-Tour Optimization) để mô phỏng tương tác phi tuyến tính phức tạp.${hasMultipleBlocks ? ` Hiệu ứng block (${observedBlocks.length} block) được mã hóa như biến nuisance trong huấn luyện và chẩn đoán; đồ thị/tối ưu hóa tham chiếu Block ${observedBlocks[0]}.` : ''}`,
+        text: `Chế độ mô hình hóa: ${isShared ? 'Mạng Nơ-ron Hợp Nhất Đa Đầu Ra (Multi-Output Shared MLP)' : 'Mạng Nơ-ron Độc Lập Cho Từng Biến Y (Independent Per-CQA MLP)'}. Áp dụng kiến trúc Multi-Layer Perceptron (MLP) với thuật toán tối ưu hóa đa vòng lặp (Multi-Tour Optimization) để mô phỏng tương tác phi tuyến tính phức tạp.${hasMultipleBlocks ? ` Hiệu ứng block (${observedBlocks.length} block) được mã hóa như biến nuisance trong huấn luyện và chẩn đoán; đồ thị/tối ưu hóa tham chiếu Block ${observedBlocks[0]}.` : ''}`,
         spacing: { after: 150 },
       }),
       new Paragraph({
-        text: `Validation và kiến trúc: ${Object.values(neuralModels).map((model) => `${model.cqaCode}: ${model.config.validationMethod === 'kfold' ? `K-fold (K=${model.config.kFolds ?? 5})` : `holdout ${(model.config.holdoutRatio * 100).toFixed(0)}%`}; Carpenter dùng N huấn luyện sau khi trừ tập validation`).join(' | ')}.`,
+        text: `Validation và kiến trúc: ${Object.values(neuralModels).map((model) => `${model.cqaCode}: ${model.config.validationMethod === 'kfold' ? `K-fold (K=${model.config.kFolds ?? 5})` : `holdout ${(model.config.holdoutRatio * 100).toFixed(0)}%`}; ${model.architectureMode === 'shared' ? 'Mạng Hợp Nhất' : 'Mạng Độc Lập'}`).join(' | ')}.`,
         spacing: { after: 150 },
       })
     );
@@ -620,11 +629,12 @@ export async function exportQBDWordReport(
       new TableRow({
         children: [
           createHeaderCell('Chỉ tiêu CQA', 20),
-          createHeaderCell('Kiến trúc Lớp ẩn', 20),
-          createHeaderCell('Train R²', 15),
-          createHeaderCell('Val R²', 15),
-          createHeaderCell('Overall R²', 15),
-          createHeaderCell('RMSE', 15),
+          createHeaderCell('Kiến trúc Lớp ẩn', 22),
+          createHeaderCell('Chế độ', 14),
+          createHeaderCell('Train R²', 11),
+          createHeaderCell('Val R²', 11),
+          createHeaderCell('Overall R²', 11),
+          createHeaderCell('RMSE', 11),
         ],
       }),
       ...Object.values(neuralModels).map((nm, idx) => {
@@ -632,11 +642,12 @@ export async function exportQBDWordReport(
         return new TableRow({
           children: [
             createDataCell(cqa ? `${cqa.name} (${nm.cqaCode})` : nm.cqaCode, idx % 2 === 1, 20),
-            createDataCell(`[${nm.config.hiddenNodes1}${nm.config.hiddenNodes2 > 0 ? `, ${nm.config.hiddenNodes2}` : ''}] ${nm.config.activation.toUpperCase()}`, idx % 2 === 1, 20),
-            createDataCell(`${nm.diagnostics.rSquaredTrain}`, idx % 2 === 1, 15),
-            createDataCell(`${nm.diagnostics.rSquaredVal}`, idx % 2 === 1, 15),
-            createDataCell(`${nm.diagnostics.rSquaredOverall}`, idx % 2 === 1, 15),
-            createDataCell(`${nm.diagnostics.rmseOverall}`, idx % 2 === 1, 15),
+            createDataCell(`[${nm.config.hiddenNodes1}${nm.config.hiddenNodes2 > 0 ? `, ${nm.config.hiddenNodes2}` : ''}] ${nm.config.activation.toUpperCase()}`, idx % 2 === 1, 22),
+            createDataCell(nm.architectureMode === 'shared' ? 'Hợp nhất' : 'Độc lập', idx % 2 === 1, 14),
+            createDataCell(`${nm.diagnostics.rSquaredTrain}`, idx % 2 === 1, 11),
+            createDataCell(`${nm.diagnostics.rSquaredVal}`, idx % 2 === 1, 11),
+            createDataCell(`${nm.diagnostics.rSquaredOverall}`, idx % 2 === 1, 11),
+            createDataCell(`${nm.diagnostics.rmseOverall}`, idx % 2 === 1, 11),
           ],
         });
       }),

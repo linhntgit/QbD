@@ -24,9 +24,11 @@ import type {
   NeuralNetModelResult,
   ModelingEngine,
 } from '../../types/qbd';
+import type { NeuralTrainingMode } from '../../types/neuralNetwork';
 import { exportQBDWordReport } from '../../services/reportGenerator';
 import { calculateDesignEfficiency } from '../../services/doeGenerator';
 import { generateUpdatedRiskAssessment, generateControlStrategy } from '../../services/statistics';
+import { calculateNeuralArchitectureMetrics } from '../../services/neuralNetwork';
 import { NeuralNetworkTopologyDiagram } from '../NeuralNetworkTopologyDiagram';
 import { ProjectGovernancePanel } from '../ProjectGovernancePanel';
 import { getReportReadiness, getTraceabilitySummary } from '../../services/projectGovernance';
@@ -57,6 +59,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
   const reportReadiness = getReportReadiness(project, reportModels, optimum, monteCarlo);
 
   const [activeSection, setActiveSection] = useState<string>('sec-metadata');
+  const [selectedNeuralCQA, setSelectedNeuralCQA] = useState<string>(() => project.cqas[0]?.code || '');
 
   // Define Table of Contents Sections dynamically based on project content
   const tocSections = useMemo(() => {
@@ -67,11 +70,11 @@ export const ReportTab: React.FC<ReportTabProps> = ({
       { id: 'sec-2', title: '2. Thuộc Tính CQAs', subtitle: 'Chỉ tiêu & Desirability', icon: Sliders, badge: 'CQAs' },
       { id: 'sec-3', title: '3. Rủi Ro Ban Đầu (FMEA)', subtitle: 'Sàng lọc biến số', icon: ShieldAlert, badge: 'ICH Q9' },
       { id: 'sec-4', title: '4. Thiết Kế DoE', subtitle: `${project.doeConfig.designType} (${project.runs.length} runs)`, icon: FileSpreadsheet, badge: 'DoE' },
-      { id: 'sec-5', title: '5. ANOVA & Hồi Quy', subtitle: 'Đa thức & Lack of Fit', icon: Calculator, badge: 'Models' },
+      { id: 'sec-5a', title: '5a. ANOVA & Hồi Quy Đa Thức', subtitle: 'Mô hình OLS & Lack of Fit', icon: Calculator, badge: 'ANOVA' },
     ];
 
     if (neuralModels && Object.keys(neuralModels).length > 0) {
-      list.push({ id: 'sec-5b', title: '5b. Mạng Nơ-ron AI', subtitle: 'MLP Architecture & Metrics', icon: BrainCircuit, badge: 'ANN' });
+      list.push({ id: 'sec-5b', title: '5b. Mạng Nơ-ron AI (ANN)', subtitle: 'MLP Architecture & Metrics', icon: BrainCircuit, badge: 'ANN' });
     }
 
     if (optimum) {
@@ -612,10 +615,10 @@ export const ReportTab: React.FC<ReportTabProps> = ({
           })()}
         </div>
 
-        {/* 5. Statistical Models & ANOVA */}
-        <div id="sec-5" className="report-section" style={{ marginBottom: '2rem' }}>
+        {/* 5a. Statistical Models & ANOVA */}
+        <div id="sec-5a" className="report-section" style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
-            5. Phương Trình Hồi Quy & Kết Quả Phân Tích Phương Sai (ANOVA - Lack of Fit)
+            5a. Mô Hình Hồi Quy Đa Thức & Phân Tích Phương Sai (ANOVA - Lack of Fit)
           </h2>
           {new Set(project.runs.map((run) => Math.max(1, Math.floor(run.block ?? 1)))).size > 1 && (
             <p style={{ fontSize: '0.78rem', color: '#0f766e', marginBottom: '0.75rem' }}>
@@ -696,52 +699,121 @@ export const ReportTab: React.FC<ReportTabProps> = ({
         </div>
 
         {/* 5b. Neural Network Models */}
-        {neuralModels && Object.keys(neuralModels).length > 0 && (
-          <div id="sec-5b" className="report-section" style={{ marginBottom: '2rem' }}>
-            <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#7c3aed', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
-              5b. Mô hình Mạng Nơ-ron AI (Neural Network Platform)
-            </h2>
+        {neuralModels && Object.keys(neuralModels).length > 0 && (() => {
+          const availableCodes = Object.keys(neuralModels);
+          const firstNM = Object.values(neuralModels)[0];
+          if (!firstNM) return null;
 
-            {/* Neural Network Architecture Diagram */}
-            {(() => {
-              const firstNM = Object.values(neuralModels)[0];
-              if (!firstNM) return null;
-              return (
-                <div style={{ marginBottom: '1.25rem' }}>
-                  <NeuralNetworkTopologyDiagram
-                    factors={project.factors}
-                    cqas={project.cqas}
-                    selectedCQA={firstNM.cqaCode}
-                    config={firstNM.config}
-                    trainingMode={Object.keys(neuralModels).length > 1 ? 'shared' : 'independent'}
-                  />
-                </div>
-              );
-            })()}
+          const currentCQA = (selectedNeuralCQA && availableCodes.includes(selectedNeuralCQA))
+            ? selectedNeuralCQA
+            : availableCodes[0];
+          const displayNM = neuralModels[currentCQA] ?? firstNM;
+          const actualTrainingMode: NeuralTrainingMode =
+            displayNM.architectureMode ??
+            firstNM.architectureMode ??
+            (project.analysisSettings?.neuralTrainingMode ?? 'independent');
 
-            {Object.values(neuralModels).map((nm) => {
-              const cqa = project.cqas.find((c) => c.code === nm.cqaCode);
-              return (
-                <div key={nm.cqaCode} style={{ backgroundColor: '#faf5ff', padding: '1rem', borderRadius: '0.5rem', marginBottom: '1rem', border: '1px solid #e9d5ff' }}>
-                  <div style={{ fontWeight: '700', color: '#6b21a8', marginBottom: '0.3rem' }}>
-                    {cqa?.name} ({nm.cqaCode}) — Kiến trúc MLP [{nm.config.hiddenNodes1}{nm.config.hiddenNodes2 > 0 ? `, ${nm.config.hiddenNodes2}` : ''}] ({nm.config.activation.toUpperCase()})
+          const activeFactors = project.factors.filter((f) => f.controllability !== 'constant');
+          const numInputs = activeFactors.length;
+          const numOutputs = actualTrainingMode === 'shared' ? project.cqas.length : 1;
+          const archMetrics = calculateNeuralArchitectureMetrics(
+            numInputs,
+            displayNM.config.hiddenNodes1 || 3,
+            displayNM.config.hiddenNodes2 || 0,
+            numOutputs,
+            project.runs.length
+          );
+
+          return (
+            <div id="sec-5b" className="report-section" style={{ marginBottom: '2rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#7c3aed', margin: 0 }}>
+                  5b. Mô Hình Mạng Nơ-ron Nhân Tạo AI (Artificial Neural Network - ANN)
+                </h2>
+                <span className="badge" style={{ backgroundColor: actualTrainingMode === 'shared' ? '#0284c7' : '#0f766e', color: '#ffffff', fontSize: '0.74rem', padding: '0.25rem 0.55rem' }}>
+                  {actualTrainingMode === 'shared' ? '🌐 Mạng Hợp Nhất (Multi-Output MLP)' : '🎯 Mạng Độc Lập Từng Biến Y (Per-CQA MLP)'}
+                </span>
+              </div>
+
+              <div style={{ fontSize: '0.8rem', color: '#475569', marginBottom: '1rem', lineHeight: 1.5 }}>
+                {actualTrainingMode === 'shared' ? (
+                  <span>Mô hình áp dụng kiến trúc <strong>Multi-Output Shared MLP</strong>, tối ưu hóa đồng thời toàn bộ các biến đáp ứng CQA trên cùng một mạng nơ-ron chia sẻ các tầng ẩn.</span>
+                ) : (
+                  <span>Mô hình áp dụng kiến trúc <strong>Mạng Nơ-ron Độc Lập Cho Từng Biến Y</strong>, cho phép tối ưu hóa riêng biệt số nơ-ron ẩn và hàm kích hoạt phù hợp nhất với đặc tính phi tuyến của từng CQA.</span>
+                )}
+              </div>
+
+              {/* Neural Network Architecture Diagram */}
+              <div style={{ marginBottom: '1.25rem' }}>
+                {actualTrainingMode === 'independent' && project.cqas.length > 1 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.65rem', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#475569' }}>
+                      Xem kiến trúc CQA:
+                    </span>
+                    {project.cqas.map((cqa) => {
+                      const isSel = cqa.code === currentCQA;
+                      if (!neuralModels[cqa.code]) return null;
+                      return (
+                        <button
+                          key={cqa.code}
+                          type="button"
+                          onClick={() => setSelectedNeuralCQA(cqa.code)}
+                          style={{
+                            padding: '0.25rem 0.65rem',
+                            fontSize: '0.74rem',
+                            fontWeight: isSel ? '700' : '500',
+                            borderRadius: '0.375rem',
+                            border: isSel ? '1.5px solid #7c3aed' : '1px solid #cbd5e1',
+                            backgroundColor: isSel ? '#f5f3ff' : '#ffffff',
+                            color: isSel ? '#6d28d9' : '#475569',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          <span>🎯 {cqa.name} ({cqa.code})</span>
+                        </button>
+                      );
+                    })}
                   </div>
-                  <div style={{ fontSize: '0.8rem', color: '#475569', marginBottom: '0.4rem' }}>
-                    Train R² = <strong style={{ color: '#1e3a8a' }}>{nm.diagnostics.rSquaredTrain}</strong> | Val R² = <strong style={{ color: '#dc2626' }}>{nm.diagnostics.rSquaredVal}</strong> | Overall R² = <strong style={{ color: '#7c3aed' }}>{nm.diagnostics.rSquaredOverall}</strong> | RMSE = <strong>{nm.diagnostics.rmseOverall}</strong> (Tour #{nm.diagnostics.bestTourIndex})
+                )}
+
+                <NeuralNetworkTopologyDiagram
+                  factors={project.factors}
+                  cqas={project.cqas}
+                  selectedCQA={currentCQA}
+                  config={displayNM.config}
+                  trainingMode={actualTrainingMode}
+                  archMetrics={archMetrics}
+                />
+              </div>
+
+              {Object.values(neuralModels).map((nm) => {
+                const cqa = project.cqas.find((c) => c.code === nm.cqaCode);
+                return (
+                  <div key={nm.cqaCode} style={{ backgroundColor: '#faf5ff', padding: '1rem', borderRadius: '0.5rem', marginBottom: '1rem', border: '1px solid #e9d5ff' }}>
+                    <div style={{ fontWeight: '700', color: '#6b21a8', marginBottom: '0.3rem' }}>
+                      {cqa?.name} ({nm.cqaCode}) — Kiến trúc MLP [{nm.config.hiddenNodes1}{nm.config.hiddenNodes2 > 0 ? `, ${nm.config.hiddenNodes2}` : ''}] ({nm.config.activation.toUpperCase()}) {nm.architectureMode === 'shared' ? '(Mạng Hợp Nhất)' : '(Mạng Độc Lập)'}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: '#475569', marginBottom: '0.4rem' }}>
+                      Train R² = <strong style={{ color: '#1e3a8a' }}>{nm.diagnostics.rSquaredTrain}</strong> | Val R² = <strong style={{ color: '#dc2626' }}>{nm.diagnostics.rSquaredVal}</strong> | Overall R² = <strong style={{ color: '#7c3aed' }}>{nm.diagnostics.rSquaredOverall}</strong> | RMSE = <strong>{nm.diagnostics.rmseOverall}</strong> (Tour #{nm.diagnostics.bestTourIndex})
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#6b21a8', marginBottom: '0.4rem' }}>
+                      <strong>Validation:</strong> {nm.config.validationMethod === 'kfold' ? `K-fold (K=${nm.config.kFolds ?? 5})` : `Holdout ${Math.round(nm.config.holdoutRatio * 100)}%`}; số run dùng Carpenter đã trừ tập validation.
+                      {new Set(project.runs.map((run) => Math.max(1, Math.floor(run.block ?? 1)))).size > 1 && ' Block là biến nuisance khi huấn luyện; dự báo/tối ưu hóa dùng Block 1 làm mốc.'}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#6b21a8' }}>
+                      <strong>Độ quan trọng yếu tố (Variable Importance): </strong>
+                      {nm.diagnostics.variableImportance.map((v) => `${v.factorCode}: ${v.relativeImportance}%`).join(' • ')}
+                    </div>
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#6b21a8', marginBottom: '0.4rem' }}>
-                    <strong>Validation:</strong> {nm.config.validationMethod === 'kfold' ? `K-fold (K=${nm.config.kFolds ?? 5})` : `Holdout ${Math.round(nm.config.holdoutRatio * 100)}%`}; số run dùng Carpenter đã trừ tập validation.
-                    {new Set(project.runs.map((run) => Math.max(1, Math.floor(run.block ?? 1)))).size > 1 && ' Block là biến nuisance khi huấn luyện; dự báo/tối ưu hóa dùng Block 1 làm mốc.'}
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: '#6b21a8' }}>
-                    <strong>Độ quan trọng yếu tố (Variable Importance): </strong>
-                    {nm.diagnostics.variableImportance.map((v) => `${v.factorCode}: ${v.relativeImportance}%`).join(' • ')}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                );
+              })}
+            </div>
+          );
+        })()}
 
         {/* 6. Optimum & Prediction Profiler */}
         {optimum && (
