@@ -852,7 +852,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Target size={18} color="#1e40af" />
               <h4 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
-                Cấu Hình Hàm Thỏa Dụng Từng Chỉ Tiêu ($d_i$) & Tham Số Hình Dạng ($s, t$)
+                Cấu Hình Hàm Hài Lòng Từng Phần (dᵢ) & Tham Số Hình Dạng (s, t)
               </h4>
             </div>
             <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
@@ -1027,7 +1027,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                 <TrendingUp size={17} color="#2563eb" />
                 <h5 style={{ fontSize: '0.9rem', fontWeight: '700', color: '#1e3a8a', margin: 0 }}>
-                  Đồ Thị Minh Họa Hàm Thỏa Dụng Riêng Từng Chỉ Tiêu ($d_i(Y)$ vs $Y$ - Slide 25–27)
+                  Đồ Thị Minh Họa Hàm Hài Lòng Từng Phần (dᵢ(Y) theo Y)
                 </h5>
               </div>
               <span className="badge badge-primary" style={{ fontSize: '0.72rem', backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>

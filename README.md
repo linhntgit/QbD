@@ -51,7 +51,7 @@ npm run preview
 
 - React 19 + TypeScript
 - Vite
-- Plotly.js cho biểu đồ và bề mặt đáp ứng
+- Plotly.js cho biểu đồ và mặt đáp
 - Trình đọc/ghi CSV nội bộ, giới hạn import 10 MB; không phụ thuộc parser workbook nhị phân
 - `docx` cho báo cáo Word
 

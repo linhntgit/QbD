@@ -11,7 +11,7 @@ export const CASE_STUDIES: QBDProject[] = [
     createdDate: '2026-08-15',
     updatedDate: '2026-08-15',
     description:
-      'Thiết kế Box-Behnken (BBD) 3 nhân tố kiểm soát chính kèm các biến cố định (Constant) và biến nhiễu môi trường (Noise factor) theo chuẩn ICH Q8 & ICH Q9.',
+      'Thiết kế Box-Behnken (BBD) 3 yếu tố kiểm soát chính kèm các biến cố định (Constant) và biến nhiễu môi trường (Noise factor) theo chuẩn ICH Q8 & ICH Q9.',
     qtpp: [
       {
         id: 'qtpp-1',

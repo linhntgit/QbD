@@ -248,7 +248,7 @@ export interface ControlStrategyItem {
   target: string | number;
   nor: string; // Normal Operating Range (Khoảng vận hành thông thường)
   par: string; // Proven Acceptable Range (Khoảng chấp nhận đã chứng minh)
-  designSpaceLimit: string; // Giới hạn vùng thiết kế
+  designSpaceLimit: string; // Giới hạn không gian thiết kế
   controlMethod: string; // Phương pháp kiểm soát (PAT/IPC/Release)
 }
 

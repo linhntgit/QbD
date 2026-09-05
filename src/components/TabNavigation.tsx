@@ -61,20 +61,20 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({
     {
       key: 'neural' as TabKey,
       label: '5. Mạng Nơ-ron',
-      subtitle: 'Mạng Nơ-ron AI',
+      subtitle: 'Mô hình hóa phi tuyến',
       icon: BrainCircuit,
       tag: 'AI Models',
     },
     {
       key: 'rsm' as TabKey,
-      label: '6. Bề mặt RSM',
+      label: '6. Mặt đáp RSM',
       subtitle: '3D Surface & Contour',
       icon: Compass,
       tag: '3D Plots',
     },
     {
       key: 'design_space' as TabKey,
-      label: '7. Vùng Thiết kế',
+      label: '7. Không gian Thiết kế',
       subtitle: 'Profiler & Tối ưu',
       icon: Boxes,
       tag: 'ICH Q8/Q10',

@@ -283,7 +283,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
   if (!model) {
     return (
       <div className="qbd-card" style={{ textAlign: 'center', padding: '3rem' }}>
-        <p>Vui lòng tạo mô hình ANOVA hoặc Mạng Nơ-ron trước khi xem bề mặt đáp ứng.</p>
+        <p>Vui lòng tạo mô hình ANOVA hoặc Mạng Nơ-ron trước khi xem mặt đáp.</p>
       </div>
     );
   }
@@ -613,7 +613,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
 
     plotlyLayout = {
       title: {
-        text: `${plotType === '3d' ? 'Bề Mặt Đáp Ứng 3D' : 'Đường Đồng Mức 2D'}: ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+        text: `${plotType === '3d' ? 'Mặt Đáp 3D' : 'Đường Đồng Mức 2D'}: ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
         font: { size: 13, color: '#0f172a', family: 'Inter, sans-serif' },
       },
       autosize: true,
@@ -687,7 +687,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <Compass size={22} color="#0f766e" />
               <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#0f172a' }}>
-                Trực Quan Hóa Bề Mặt Đáp Ứng & Contour Plots (Response Surface 3D & 2D Contour)
+                Trực Quan Hóa Mặt Đáp & Contour Plots (Response Surface 3D & 2D Contour)
               </h2>
             </div>
             <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.2rem' }}>
@@ -703,7 +703,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                   onClick={() => onToggleEngine('polynomial')}
                   className={`btn ${modelingEngine === 'polynomial' ? 'btn-teal' : 'btn-secondary'}`}
                   style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', border: 'none', fontWeight: '700' }}
-                  title="Hiển thị bề mặt đáp ứng từ mô hình Hồi quy Đa thức bậc ≤ 2 (ANOVA)"
+                  title="Hiển thị mặt đáp từ mô hình Hồi quy Đa thức bậc ≤ 2 (ANOVA)"
                 >
                   <Calculator size={14} />
                   <span>Đa Thức (ANOVA)</span>
@@ -719,7 +719,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                     backgroundColor: modelingEngine === 'neural' ? '#7c3aed' : undefined,
                     borderColor: modelingEngine === 'neural' ? '#7c3aed' : undefined,
                   }}
-                  title="Hiển thị bề mặt đáp ứng từ mô hình Mạng Nơ-ron Nhân Tạo"
+                  title="Hiển thị mặt đáp từ mô hình Mạng Nơ-ron Nhân Tạo"
                 >
                   <BrainCircuit size={14} />
                   <span>Mạng Nơ-ron AI</span>
@@ -751,7 +751,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                   onClick={() => setPlotType('3d')}
                   className={`btn ${plotType === '3d' ? 'btn-primary' : 'btn-secondary'}`}
                   style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', border: 'none' }}
-                  title="Bề mặt đáp ứng 3 chiều trong không gian"
+                  title="Mặt đáp 3 chiều trong không gian"
                 >
                   3D Surface
                 </button>
@@ -805,7 +805,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
               className="btn btn-teal"
               style={{ fontSize: '0.82rem', padding: '0.4rem 0.85rem' }}
             >
-              <span>Vùng Thiết Kế (Design Space)</span>
+              <span>Không Gian Thiết Kế (Design Space)</span>
               <ArrowRight size={16} />
             </button>
           </div>

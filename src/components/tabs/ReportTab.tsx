@@ -444,10 +444,10 @@ export const ReportTab: React.FC<ReportTabProps> = ({
           <table className="qbd-table">
             <thead>
               <tr style={{ backgroundColor: '#f1f5f9' }}>
-                <th>Nhân Tố</th>
+                <th>Yếu Tố</th>
                 <th>CQA Bị Ảnh Hưởng</th>
                 <th style={{ textAlign: 'center' }}>S</th>
-                <th style={{ textAlign: 'center' }}>P</th>
+                <th style={{ textAlign: 'center' }} title="Occurrence (Khả năng xảy ra)">O</th>
                 <th style={{ textAlign: 'center' }}>D</th>
                 <th style={{ textAlign: 'center' }}>RPN</th>
                 <th style={{ textAlign: 'center' }}>Mức Rủi Ro</th>
@@ -586,7 +586,11 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                           <td style={{ textAlign: 'center' }}>{r.stdOrder}</td>
                           <td style={{ fontWeight: '700', textAlign: 'center' }}>{r.runOrder}</td>
                           {project.factors.map((f) => (
-                            <td key={f.code}>{r.factorActual[f.code]}</td>
+                            <td key={f.code}>
+                              {typeof r.factorActual[f.code] === 'number' && (f.role === 'mixture_component' || f.type === 'Mixture')
+                                ? Number(Number(r.factorActual[f.code]).toFixed(4))
+                                : r.factorActual[f.code]}
+                            </td>
                           ))}
                           {hasMixture && (
                             <td style={{ textAlign: 'center' }}>
@@ -638,9 +642,9 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                     <thead>
                       <tr style={{ backgroundColor: '#f1f5f9' }}>
                         <th>Nguồn (Source)</th>
-                        <th>Tổng BP (SS)</th>
+                        <th>Tổng bình phương (SS)</th>
                         <th style={{ textAlign: 'center' }}>df</th>
-                        <th>TB BP (MS)</th>
+                        <th>Bình phương trung bình (MS)</th>
                         <th style={{ textAlign: 'center' }}>F-value</th>
                         <th style={{ textAlign: 'center' }}>p-value</th>
                       </tr>
@@ -656,7 +660,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                           <tr key={rIdx} style={{ fontWeight: row.source === 'Model' || row.source === 'Residual' ? '600' : 'normal' }}>
                             <td>
                               {row.source}
-                              {isLOF && <span style={{ fontSize: '0.68rem', color: '#64748b', marginLeft: '0.35rem' }}>(Độ tương thích)</span>}
+                              {isLOF && <span style={{ fontSize: '0.68rem', color: '#64748b', marginLeft: '0.35rem' }}>(Độ thiếu phù hợp)</span>}
                             </td>
                             <td>{row.ss.toFixed(3)}</td>
                             <td style={{ textAlign: 'center' }}>{row.df}</td>

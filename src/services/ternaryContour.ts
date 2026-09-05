@@ -1406,7 +1406,7 @@ export function generateTernaryDesignSpace(
     sweetSpotTraces.push({
       type: 'scatter',
       mode: 'lines',
-      name: 'Ranh Giới Vùng Thiết Kế (Design Space Margin = 0)',
+      name: 'Ranh Giới Không Gian Thiết Kế (Design Space Margin = 0)',
       x: boundX,
       y: boundY,
       line: {

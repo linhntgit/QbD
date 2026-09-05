@@ -378,7 +378,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                 onChange={(e) => onModelTypeChange(selectedCQA, e.target.value as ModelType)}
               >
                 <option value="Quadratic">Đa thức Bậc 2 (Quadratic)</option>
-                <option value="2FI">Tương tác 2 Nhân tố (2FI)</option>
+                <option value="2FI">Tương tác 2 Yếu tố (2FI)</option>
                 <option value="Linear">Tuyến tính (Linear)</option>
               </select>
             </div>
@@ -402,7 +402,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
               }}
               className="btn btn-teal"
               style={{ fontSize: '0.82rem', padding: '0.4rem 0.85rem', fontWeight: '700' }}
-              title="Chọn mô hình Hồi quy Đa thức bậc ≤ 2 làm phương pháp chính cho các bước tiếp theo (Bước 6: Bề mặt, Bước 7: Vùng thiết kế, Bước 8: Báo cáo)"
+              title="Chọn mô hình Hồi quy Đa thức bậc ≤ 2 làm phương pháp chính cho các bước tiếp theo (Bước 6: Mặt đáp, Bước 7: Không gian thiết kế, Bước 8: Báo cáo)"
             >
               <span>Tiếp Tục Với Đa Thức (Bước 6, 7, 8)</span>
               <ArrowRight size={16} />
@@ -444,7 +444,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
           )}
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table" style={{ fontSize: '0.76rem', minWidth: '680px' }}>
-              <thead><tr><th>Mô hình</th><th>Phân cấp</th><th>AICc</th><th>Q²</th><th>LOF p</th><th>df dư</th><th>Đánh giá</th><th /></tr></thead>
+              <thead><tr><th>Mô hình</th><th>Phân cấp</th><th>AICc</th><th>Q²</th><th>LOF p</th><th>df phần dư</th><th>Đánh giá</th><th /></tr></thead>
               <tbody>
                 {analysisWizard.candidates.map((candidate) => {
                   const chosen = candidate.modelType === appliedModelType;
@@ -605,9 +605,9 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                   <thead>
                     <tr>
                       <th>Nguồn (Source)</th>
-                      <th>Tổng BP (SS)</th>
+                      <th>Tổng bình phương (SS)</th>
                       <th style={{ textAlign: 'center' }}>df</th>
-                      <th>TB BP (MS)</th>
+                      <th>Bình phương trung bình (MS)</th>
                       <th style={{ textAlign: 'center' }}>F-value</th>
                       <th style={{ textAlign: 'center' }}>p-value</th>
                     </tr>
@@ -625,7 +625,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                             {row.source}
                             {isLOF && (
                               <span style={{ fontSize: '0.7rem', color: '#64748b', marginLeft: '0.4rem' }}>
-                                (Độ tương thích mô hình - Slide 11)
+                                (Độ thiếu phù hợp mô hình - Lack of Fit)
                               </span>
                             )}
                           </td>
@@ -812,7 +812,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
             {renderDiagnosticPlot()}
           </div>
 
-          {/* Model Comparison Dashboard (Đa Thức vs Mạng Nơ-ron - Slide 36) */}
+          {/* Model Comparison Dashboard (Đa Thức vs Mạng Nơ-ron) */}
           <div className="qbd-card" style={{ borderLeft: '4px solid #7c3aed' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

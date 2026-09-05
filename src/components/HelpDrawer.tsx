@@ -165,8 +165,8 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
     { key: 'doe', label: '3. Thiết kế DoE', short: 'Ma trận DoE', icon: LayoutGrid, standard: 'DoE Matrix' },
     { key: 'anova', label: '4. Thống kê ANOVA', short: 'ANOVA Models', icon: Calculator, standard: 'MLR & Diagnostics' },
     { key: 'neural', label: '5. Mạng Nơ-ron', short: 'Neural AI', icon: BrainCircuit, standard: 'ANN Platform' },
-    { key: 'rsm', label: '6. Bề mặt RSM', short: 'RSM & Contour', icon: Compass, standard: '3D/2D/Ternary' },
-    { key: 'design_space', label: '7. Vùng Thiết kế', short: 'Design Space', icon: Boxes, standard: 'ICH Q8/Q9/Q10' },
+    { key: 'rsm', label: '6. Mặt đáp RSM', short: 'RSM & Contour', icon: Compass, standard: '3D/2D/Ternary' },
+    { key: 'design_space', label: '7. Không gian Thiết kế', short: 'Design Space', icon: Boxes, standard: 'ICH Q8/Q9/Q10' },
     { key: 'report', label: '8. Báo Cáo Hồ Sơ', short: 'CTD 3.2.P.2', icon: FileCheck2, standard: 'CTD Dossier' },
   ];
 
@@ -190,7 +190,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   <br />1. Nhập <strong>Thông tin Tổng quan Dự án</strong> (Metadata).
                   <br />2. Bấm <strong>"+ Thêm Yếu tố QTPP"</strong> để khai báo các chỉ tiêu lâm sàng đích.
                   <br />3. Bấm <strong>"+ Thêm CQA (Đáp ứng Y)"</strong> để khai báo các biến đầu ra cần kiểm soát và khoảng chấp nhận LSL–USL.
-                  <br />4. Bấm <strong>"+ Thêm Nhân Tố (X)"</strong> để khai báo các biến công thức/quy trình sẽ đưa vào nghiên cứu thực nghiệm.
+                  <br />4. Bấm <strong>"+ Thêm Yếu Tố (X)"</strong> để khai báo các biến công thức/quy trình sẽ đưa vào nghiên cứu thực nghiệm.
                 </div>
               </div>
             ),
@@ -254,11 +254,11 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
 
                 <div style={{ backgroundColor: '#f8fafc', padding: '0.65rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
-                    <strong style={{ color: '#b45309' }}>4. Khung "3. Các Biến Đầu Vào Khảo Sát (CMA / CPP - Biến Đầu Vào)":</strong>
-                    <span className="badge badge-warning" style={{ fontSize: '0.68rem' }}>Nút: + Thêm Nhân Tố (X)</span>
+                    <strong style={{ color: '#b45309' }}>4. Khung "3. Các Biến Đầu Vào Khảo Sát (CMA & CPP)":</strong>
+                    <span className="badge badge-warning" style={{ fontSize: '0.68rem' }}>Nút: + Thêm Yếu Tố (X)</span>
                   </div>
                   <ul style={{ paddingLeft: '1.2rem', color: '#334155', lineHeight: 1.5 }}>
-                    <li><strong>Nút "+ Thêm Nhân Tố (X)":</strong> Thêm một biến đầu vào mới (<InlineMath math="X_1, X_2\dots" />).</li>
+                    <li><strong>Nút "+ Thêm Yếu Tố (X)":</strong> Thêm một biến đầu vào mới (<InlineMath math="X_1, X_2\dots" />).</li>
                     <li><strong>Vai Trò (Phân Loại X):</strong>
                       <br />• 🧪 <em>Thành phần Hỗn hợp (&Sigma;=100%):</em> Ràng buộc tổng tỷ lệ luôn bằng 100%.
                       <br />• 💊 <em>Biến công thức khác:</em> Lượng chất, tỷ lệ ngoài hỗn hợp.
@@ -326,7 +326,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   <strong>Thứ tự thao tác chuẩn:</strong>
                   <br />1. Bấm nút <strong>"Ma trận FMEA"</strong> để chấm điểm rủi ro số lượng, hoặc <strong>"Sơ đồ Xương cá (Ishikawa)"</strong> để rà soát nguyên nhân gốc rễ (6M).
                   <br />2. Bấm <strong>"+ Thêm Hàng Đánh Giá Rủi Ro"</strong> để bổ sung cặp tương tác [Biến đầu vào &times; CQA].
-                  <br />3. Cho điểm từ 1–10 cho 3 chỉ số <strong>S</strong> (Mức nghiêm trọng), <strong>P</strong> (Xác suất xảy ra), <strong>D</strong> (Khó phát hiện).
+                  <br />3. Cho điểm từ 1–10 cho 3 chỉ số <strong>S</strong> (Mức nghiêm trọng), <strong>O</strong> (Khả năng xảy ra / Tần suất), <strong>D</strong> (Khả năng phát hiện).
                   <br />4. Quan sát hệ thống tự tính <strong>RPN</strong> và phân loại mức độ rủi ro (Cao / Trung bình / Thấp).
                   <br />5. Bấm nút <strong>"Chuyển sang DoE"</strong> ở góc phải để tiến hành thiết kế ma trận thí nghiệm.
                 </div>
@@ -335,14 +335,14 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
           },
           {
             id: 'inputs',
-            title: 'Chi Tiết Từng Nút Bấm, Bảng Điểm S-P-D & Phân Loại Rủi Ro',
+            title: 'Chi Tiết Từng Nút Bấm, Bảng Điểm S-O-D & Phân Loại Rủi Ro',
             icon: Sliders,
             content: (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', fontSize: '0.78rem' }}>
                 <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
                   <strong style={{ color: '#1e3a8a' }}>1. Nút Chuyển Chế Độ &amp; Điều Hướng:</strong>
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
-                    <li><strong>Nút "Ma trận FMEA":</strong> Hiển thị bảng tính chấm điểm S, P, D và tính chỉ số RPN.</li>
+                    <li><strong>Nút "Ma trận FMEA":</strong> Hiển thị bảng tính chấm điểm S, O, D và tính chỉ số RPN.</li>
                     <li><strong>Nút "Sơ đồ Xương cá (Ishikawa)":</strong> Trực quan hóa sơ đồ nguyên nhân - kết quả theo 6 nhóm: <em>Material, Machine, Method, Measurement, Environment, People</em>.</li>
                     <li><strong>Nút "Chuyển sang DoE":</strong> Chuyển nhanh sang Tab 3 (DoE Designer).</li>
                   </ul>
@@ -350,17 +350,17 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
 
                 <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
-                    <strong style={{ color: '#0f766e' }}>2. Bảng Phân Tích Chế Độ Hư Hỏng &amp; Tác Động (FMEA Matrix):</strong>
+                    <strong style={{ color: '#0f766e' }}>2. Bảng Phân Tích Dạng Sai Lỗi &amp; Tác Động (FMEA Matrix):</strong>
                     <span className="badge badge-teal" style={{ fontSize: '0.68rem' }}>Nút: + Thêm Hàng Đánh Giá Rủi Ro</span>
                   </div>
                   <ul style={{ paddingLeft: '1.2rem', color: '#334155', lineHeight: 1.5 }}>
                     <li><strong>Nút "+ Thêm Hàng Đánh Giá Rủi Ro":</strong> Thêm một dòng phân tích rủi ro mới.</li>
-                    <li><strong>Biến Đầu Vào (Factor):</strong> Chọn nhân tố X cần đánh giá.</li>
+                    <li><strong>Biến Đầu Vào (Factor):</strong> Chọn yếu tố X cần đánh giá.</li>
                     <li><strong>CQA Bị Ảnh Hưởng:</strong> Chọn chỉ tiêu chất lượng tương ứng.</li>
-                    <li><strong>Chế độ sai lỗi / Cơ chế ảnh hưởng:</strong> Mô tả cơ chế lý hóa gây nguy cơ sai lệch.</li>
+                    <li><strong>Dạng sai lỗi / Cơ chế ảnh hưởng:</strong> Mô tả cơ chế lý hóa gây nguy cơ sai lệch.</li>
                     <li><strong>S (Severity - Mức nghiêm trọng, 1–10):</strong> 1–3 (Nhẹ), 4–6 (Vừa), 7–10 (Nghiêm trọng, vi phạm Dược điển/mất an toàn).</li>
-                    <li><strong>P (Probability - Xác suất xảy ra, 1–10):</strong> 1–3 (Hiếm gặp), 4–6 (Thỉnh thoảng), 7–10 (Thường xuyên).</li>
-                    <li><strong>D (Detectability - Độ khó phát hiện, 1–10):</strong> 1–3 (Dễ phát hiện ngay qua IPC), 4–6 (Phát hiện qua QC), 7–10 (Rất khó phát hiện).</li>
+                    <li><strong>O (Occurrence - Khả năng xảy ra / Tần suất, 1–10):</strong> 1–3 (Hiếm gặp), 4–6 (Thỉnh thoảng), 7–10 (Thường xuyên).</li>
+                    <li><strong>D (Detection - Khả năng phát hiện, 1–10):</strong> 1–3 (Dễ phát hiện ngay qua IPC), 4–6 (Phát hiện qua QC), 7–10 (Rất khó phát hiện).</li>
                     <li><strong>Biện pháp kiểm soát &amp; Checkbox "Đưa vào DoE":</strong> Đánh dấu các biến cần đưa vào khảo sát thực nghiệm.</li>
                     <li><strong>Nút 🗑️ (Xóa):</strong> Xóa dòng đánh giá rủi ro.</li>
                   </ul>
@@ -374,7 +374,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
             icon: Calculator,
             content: (
               <div style={{ fontSize: '0.78rem', color: '#334155', lineHeight: 1.6 }}>
-                <BlockMath math="\text{RPN} = \text{Severity } (S) \times \text{Probability } (P) \times \text{Detectability } (D) \in [1, 1000]" />
+                <BlockMath math="\text{RPN} = \text{Severity } (S) \times \text{Occurrence } (O) \times \text{Detection } (D) \in [1, 1000]" />
                 
                 <div style={{ marginTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                   <div style={{ padding: '0.45rem 0.65rem', borderRadius: '0.35rem', backgroundColor: '#fee2e2', color: '#991b1b' }}>
@@ -398,7 +398,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
               <ul style={{ paddingLeft: '1.2rem', fontSize: '0.78rem', color: '#334155', lineHeight: 1.6 }}>
                 <li><strong>Sơ đồ xương cá 6M:</strong> Giúp tránh bỏ sót các yếu tố tiềm ẩn từ Môi trường (Environment) và Phương pháp đo lường (Measurement).</li>
                 <li><strong>Diễn giải đúng RPN:</strong> ICH Q9(R1) không quy định ngưỡng RPN cố định. RPN là công cụ ưu tiên hóa nội bộ; hai rủi ro có cùng RPN vẫn cần xem riêng mức nghiêm trọng, khả năng phát hiện và biện pháp kiểm soát.</li>
-                <li><strong>Đánh giá cập nhật sau DoE:</strong> Báo cáo có thể tạo bảng đánh giá rủi ro cập nhật từ kết quả mô hình. Bảng FMEA ban đầu không tự sửa điểm S/P/D; hãy rà soát và phê duyệt thay đổi thủ công.</li>
+                <li><strong>Đánh giá cập nhật sau DoE:</strong> Báo cáo có thể tạo bảng đánh giá rủi ro cập nhật từ kết quả mô hình. Bảng FMEA ban đầu không tự sửa điểm S/O/D; hãy rà soát và phê duyệt thay đổi thủ công.</li>
               </ul>
             ),
           },
@@ -528,7 +528,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   <strong style={{ color: '#1e3a8a' }}>1. Khung Điều Khiển Đầu Trang:</strong>
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
                     <li><strong>Dropdown "Đáp ứng CQA":</strong> Chọn CQA đang phân tích.</li>
-                    <li><strong>Dropdown "Dạng mô hình":</strong> Chọn giữa <em>Đa thức Bậc 2 (Quadratic)</em>, <em>Tương tác 2 Nhân tố (2FI)</em>, <em>Tuyến tính (Linear)</em>.</li>
+                    <li><strong>Dropdown "Dạng mô hình":</strong> Chọn giữa <em>Đa thức Bậc 2 (Quadratic)</em>, <em>Tương tác 2 Yếu tố (2FI)</em>, <em>Tuyến tính (Linear)</em>.</li>
                     <li><strong>Nút "Thử Mạng Nơ-ron":</strong> Chuyển nhanh sang Tab 5 (Neural Network Tab) để so sánh với AI.</li>
                     <li><strong>Nút "Tiếp Tục Với Đa Thức (Bước 6, 7, 8)":</strong> Khóa mô hình Hồi quy Đa thức bậc &le; 2 làm phương pháp chính cho toàn bộ các bước tiếp theo.</li>
                   </ul>
@@ -537,7 +537,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
                   <strong style={{ color: '#0f766e' }}>2. Khung "Analysis Wizard — chọn mô hình và xác nhận":</strong>
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
-                    <li><strong>Nút "Áp dụng":</strong> Áp dụng cấu hình mô hình từ bảng so sánh ứng viên (AICc, <InlineMath math="Q^2" />, LOF p, df dư).</li>
+                    <li><strong>Nút "Áp dụng":</strong> Áp dụng cấu hình mô hình từ bảng so sánh ứng viên (AICc, <InlineMath math="Q^2" />, LOF p, df phần dư).</li>
                     <li><strong>Nút "Áp dụng [Mô hình] cho tất cả Y":</strong> Áp dụng đồng loạt dạng mô hình hiện chọn cho toàn bộ các CQA.</li>
                     <li><strong>Khung "Kế hoạch thí nghiệm xác nhận":</strong> Gợi ý run xác nhận, điều kiện chạy và khoảng tin cậy 95% (CI) khi mô hình OLS có thể ước lượng. CI là độ không chắc chắn của giá trị trung bình dự đoán; cần xác nhận bằng số liệu mới trước khi dùng để ra quyết định quy trình.</li>
                   </ul>
@@ -564,7 +564,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 <p><strong>1. Các Dạng Phương Trình Hồi Quy:</strong></p>
                 <p>• Tuyến tính (Linear):</p>
                 <BlockMath math="Y = \beta_0 + \sum_{i=1}^k \beta_i x_i" />
-                <p>• Tương tác 2 nhân tố (2FI):</p>
+                <p>• Tương tác 2 yếu tố (2FI):</p>
                 <BlockMath math="Y = \beta_0 + \sum_{i=1}^k \beta_i x_i + \sum_{i < j} \beta_{ij} x_i x_j" />
                 <p>• Đa thức bậc 2 (Quadratic / RSM):</p>
                 <BlockMath math="Y = \beta_0 + \sum_{i=1}^k \beta_i x_i + \sum_{i < j} \beta_{ij} x_i x_j + \sum_{i=1}^k \beta_{ii} x_i^2" />
@@ -695,8 +695,8 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   <br />1. Chọn <strong>Đáp ứng CQA</strong> và <strong>Dạng đồ thị</strong> (3D Surface, 2D Contour, hoặc Tam giác Ternary).
                   <br />2. Chọn 2 biến cho <strong>Trục hoành X</strong> và <strong>Trục tung Y</strong> (hoặc 3 đỉnh tam giác <InlineMath math="A, B, C" />).
                   <br />3. Điều chỉnh các biến phụ ở thanh bên phải: Bấm <strong>"🎯 Đặt theo Điểm Tối Ưu"</strong> hoặc <strong>"🔄 Đặt về Tâm (0)"</strong>.
-                  <br />4. Quan sát các đường cắt giới hạn tiêu chuẩn <strong>LSL, USL, Target</strong> trên bề mặt cong.
-                  <br />5. Bấm nút <strong>"Tiếp Tục Sang Vùng Thiết Kế"</strong> để chuyển sang Tab 7.
+                  <br />4. Quan sát các đường cắt giới hạn tiêu chuẩn <strong>LSL, USL, Target</strong> trên mặt đáp cong.
+                  <br />5. Bấm nút <strong>"Tiếp Tục Sang Không Gian Thiết Kế"</strong> để chuyển sang Tab 7.
                 </div>
               </div>
             ),
@@ -710,10 +710,10 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
                   <strong style={{ color: '#1e3a8a' }}>1. Khung Điều Khiển Đầu Trang &amp; Dạng Đồ Thị:</strong>
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
-                    <li><strong>Nút "Bề Mặt 3D (3D Surface)":</strong> Đồ thị 3 chiều có thể xoay chuột, zoom, chiếu đường đồng mức xuống đáy.</li>
+                    <li><strong>Nút "Mặt Đáp 3D (3D Surface)":</strong> Đồ thị 3 chiều có thể xoay chuột, zoom, chiếu đường đồng mức xuống đáy.</li>
                     <li><strong>Nút "Đường Đồng Mức 2D (2D Contour)":</strong> Bản đồ đường đồng mức trên hệ tọa độ Descartes (X–Y) với con trỏ rà soát giá trị (Hover Probe).</li>
                     <li><strong>Nút "Tam Giác Hỗn Hợp (Ternary Contour)":</strong> Đồ thị tọa độ tam giác đều Barycentric chuyên biệt cho 3 thành phần hỗn hợp (<InlineMath math="X_A + X_B + X_C = 100\%" />).</li>
-                    <li><strong>Nút "Tiếp Tục Sang Vùng Thiết Kế":</strong> Chuyển sang Tab 7 (Design Space).</li>
+                    <li><strong>Nút "Tiếp Tục Sang Không Gian Thiết Kế":</strong> Chuyển sang Tab 7 (Design Space).</li>
                   </ul>
                 </div>
 
@@ -743,7 +743,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
           },
           {
             id: 'tips',
-            title: 'Mẹo Quan Sát Bề Mặt Đáp Ứng RSM',
+            title: 'Mẹo Quan Sát Mặt Đáp RSM',
             icon: Lightbulb,
             content: (
               <ul style={{ paddingLeft: '1.2rem', fontSize: '0.78rem', color: '#334155', lineHeight: 1.6 }}>
@@ -796,7 +796,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 </div>
 
                 <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
-                  <strong style={{ color: '#0f766e' }}>2. Khung "Đồ Thị Vùng Thiết Kế (Design Space Overlay / Sweet Spot)":</strong>
+                  <strong style={{ color: '#0f766e' }}>2. Khung "Đồ Thị Không Gian Thiết Kế (Design Space Overlay / Sweet Spot)":</strong>
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
                     <li>🟩 <strong>Vùng Xanh Lá:</strong> trên lưới và lát cắt hiện tại, mọi CQA được <em>mô hình dự báo</em> nằm trong giới hạn (<InlineMath math="\text{Margin}_i \ge 0 \quad \forall i" />).</li>
                     <li>🟥 <strong>Vùng Đỏ:</strong> ít nhất một CQA được dự báo vượt giới hạn. Hãy rà soát biến cố định, miền ngoại suy và bất định trước khi ra quyết định.</li>

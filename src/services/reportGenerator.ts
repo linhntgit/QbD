@@ -130,13 +130,13 @@ export async function exportQBDWordReport(
     }),
     new TableRow({
       children: [
-        createDataCell('Nghiên cứu viên / Tác giả', true, 30),
+        createDataCell('Cán bộ nghiên cứu (Scientist)', true, 30),
         createDataCell(project.author || 'R&D Formulation Scientist', true, 70),
       ],
     }),
     new TableRow({
       children: [
-        createDataCell('Động cơ Mô hình hóa (Engine)', false, 30),
+        createDataCell('Phương pháp mô hình hóa', false, 30),
         createDataCell(
           modelingEngine === 'neural'
             ? 'Mạng Nơ-ron Nhân Tạo AI (Artificial Neural Network - MLP)'
@@ -222,7 +222,7 @@ export async function exportQBDWordReport(
     }),
     new TableRow({
       children: [
-        createDataCell('4. Xây dựng Vùng Thiết Kế (Design Space) & Mô phỏng Monte Carlo', true, 40),
+        createDataCell('4. Xây dựng Không Gian Thiết Kế (Design Space) & Mô phỏng Monte Carlo', true, 40),
         createDataCell('In silico / Pilot scale', true, 25),
         createDataCell(`Xác lập dải PAR, độ tin cậy đạt ${monteCarlo ? monteCarlo.reliabilityPercent : 99}%`, true, 35),
       ],
@@ -489,12 +489,12 @@ export async function exportQBDWordReport(
   // SECTION 2.3: Statistical Modeling, ANOVA & Curvature Test
   sections.push(
     new Paragraph({
-      text: '2.3 Mô Hình Hóa Thống Kê, Phân Tích Phương Sai (ANOVA) & Kiểm Định Độ Tương Thích (Lack of Fit)',
+      text: '2.3 Mô Hình Hóa Thống Kê, Phân Tích Phương Sai (ANOVA) & Kiểm Định Độ Thiếu Phù Hợp (Lack of Fit)',
       heading: HeadingLevel.HEADING_1,
       spacing: { before: 300, after: 150 },
     }),
     new Paragraph({
-      text: `Phân tích phương sai (ANOVA) nhằm đánh giá mức độ ý nghĩa của toàn bộ mô hình (Model p < 0.05) và kiểm định độ tương thích Lack of Fit (p > 0.05 là đạt chuẩn không bị thiếu phù hợp theo ICH Q8 & US FDA).${hasMultipleBlocks ? ` Thiết kế này có ${observedBlocks.length} block; hiệu ứng block được đưa vào mô hình như hiệu ứng cố định, do đó các hiệu ứng xử lý và phần dư được báo cáo sau khi hiệu chỉnh block.` : ''}`,
+      text: `Phân tích phương sai (ANOVA) nhằm đánh giá mức độ ý nghĩa của toàn bộ mô hình (Model p < 0.05) và kiểm định độ thiếu phù hợp Lack of Fit (p > 0.05 là đạt chuẩn mô hình không bị thiếu phù hợp theo ICH Q8 & US FDA).${hasMultipleBlocks ? ` Thiết kế này có ${observedBlocks.length} block; hiệu ứng block được đưa vào mô hình như hiệu ứng cố định, do đó các hiệu ứng xử lý và phần dư được báo cáo sau khi hiệu chỉnh block.` : ''}`,
       spacing: { after: 150 },
     }),
     ...(discreteOrCategoricalFactors.length > 0 ? [new Paragraph({
@@ -557,7 +557,7 @@ export async function exportQBDWordReport(
           createHeaderCell('Nguồn Biến Thiên (Source)', 30),
           createHeaderCell('Tổng Bình Phương (SS)', 22),
           createHeaderCell('Bậc Tự Do (df)', 12),
-          createHeaderCell('Trung Bình Bình Phương (MS)', 22),
+          createHeaderCell('Bình Phương Trung Bình (MS)', 22),
           createHeaderCell('F-value', 14),
           createHeaderCell('p-value', 20),
         ],
@@ -703,7 +703,7 @@ export async function exportQBDWordReport(
   if (optimum) {
     sections.push(
       new Paragraph({
-        text: '2.5 Tối Ưu Hóa Đa Mục Tiêu (Desirability Profiler) & Vùng Thiết Kế (Design Space)',
+        text: '2.5 Tối Ưu Hóa Đa Mục Tiêu (Desirability Profiler) & Không Gian Thiết Kế (Design Space)',
         heading: HeadingLevel.HEADING_1,
         spacing: { before: 300, after: 150 },
       }),
@@ -860,7 +860,7 @@ export async function exportQBDWordReport(
       spacing: { before: 300, after: 150 },
     }),
     new Paragraph({
-      text: 'Sản phẩm sẽ được theo dõi liên tục trong suốt vòng đời thương mại thông qua chương trình Xác thực Quy trình Tiếp diễn (Continued Process Verification - CPV). Báo cáo này xác nhận Vùng Thiết Kế và Chiến Lược Kiểm Soát đã được xây dựng trên nền tảng khoa học vững chắc và quản lý rủi ro chất lượng, đáp ứng đầy đủ yêu cầu đăng ký thuốc theo hướng dẫn ICH CTD Module 3.2.P.2 của US FDA và EMA.',
+      text: 'Sản phẩm sẽ được theo dõi liên tục trong suốt vòng đời thương mại thông qua chương trình Xác thực Quy trình Tiếp diễn (Continued Process Verification - CPV). Báo cáo này xác nhận Không Gian Thiết Kế và Chiến Lược Kiểm Soát đã được xây dựng trên nền tảng khoa học vững chắc và quản lý rủi ro chất lượng, đáp ứng đầy đủ yêu cầu đăng ký thuốc theo hướng dẫn ICH CTD Module 3.2.P.2 của US FDA và EMA.',
       spacing: { after: 250 },
     })
   );
@@ -868,14 +868,14 @@ export async function exportQBDWordReport(
   const signRows = [
     new TableRow({
       children: [
-        createHeaderCell('NGƯỜI LẬP BÁO CÁO (Scientist)', 33),
+        createHeaderCell('NGƯỜI LẬP BÁO CÁO (Cán bộ nghiên cứu)', 33),
         createHeaderCell('TRƯỞNG PHÒNG R&D (Formulation Lead)', 34),
         createHeaderCell('GIÁM ĐỐC ĐẢM BẢO CHẤT LƯỢNG (QA Director)', 33),
       ],
     }),
     new TableRow({
       children: [
-        createDataCell('\n\n\n\nKý tên: .......................................\nHọ tên: ' + (project.author || 'Nghiên cứu viên'), false, 33),
+        createDataCell('\n\n\n\nKý tên: .......................................\nHọ tên: ' + (project.author || 'Cán bộ nghiên cứu'), false, 33),
         createDataCell('\n\n\n\nKý tên: .......................................\nHọ tên: ........................................', false, 34),
         createDataCell('\n\n\n\nKý tên: .......................................\nHọ tên: ........................................', false, 33),
       ],

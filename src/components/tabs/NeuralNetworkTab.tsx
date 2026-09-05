@@ -696,14 +696,14 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
       return {
         ...layout,
         title: {
-          text: `Bề Mặt Tam Giác Mô Phỏng Bởi Mạng Nơ-ron: ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+          text: `Mặt Đáp Tam Giác Mô Phỏng Bởi Mạng Nơ-ron: ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
           font: { size: 13, color: '#0f172a', family: 'Inter, sans-serif' },
         },
       };
     }
 
     return {
-      title: `${plotType === '3d' ? 'Bề Mặt Đáp Ứng Mạng Nơ-ron 3D' : 'Đường Đồng Mức 2D'}: ${currentCQA?.name || ''} (${currentCQA?.code || ''})${currentCQA?.unit ? ` [${currentCQA.unit}]` : ''}`,
+      title: `${plotType === '3d' ? 'Mặt Đáp Mạng Nơ-ron 3D' : 'Đường Đồng Mức 2D'}: ${currentCQA?.name || ''} (${currentCQA?.code || ''})${currentCQA?.unit ? ` [${currentCQA.unit}]` : ''}`,
       autosize: true,
       margin: plotType === '3d' ? { l: 40, r: 40, b: 40, t: 50 } : { l: 85, r: 60, t: 60, b: 75, pad: 4 },
       scene: {
@@ -1202,7 +1202,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                   )}
                 </div>
                 <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.2rem' }}>
-                  Mô phỏng phi tuyến tính cao cấp • Multi-Layer Perceptron (MLP) • Khảo sát bề mặt và tối ưu hóa Desirability.
+                  Mô phỏng phi tuyến tính cao cấp • Multi-Layer Perceptron (MLP) • Khảo sát mặt đáp và tối ưu hóa Desirability.
                 </div>
               </div>
             </div>
@@ -1233,7 +1233,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               title="Tìm bộ thông số cài đặt tối ưu (X*) thỏa mãn đồng thời tất cả các chỉ tiêu chất lượng (CQAs) dựa trên hàm dự đoán của Mạng Nơ-ron AI theo thuật toán độ thỏa dụng Desirability (Derringer-Suich)."
             >
               <Sparkles size={16} />
-              <span>Tối Ưu Điểm Nơ-ron</span>
+              <span>Tìm Điểm Tối Ưu Bằng Mạng Nơ-ron</span>
             </button>
 
             <button
@@ -1243,7 +1243,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               }}
               className="btn btn-primary"
               style={{ fontSize: '0.82rem', padding: '0.4rem 0.95rem', backgroundColor: '#7c3aed', borderColor: '#7c3aed', fontWeight: '700' }}
-              title="Chọn mô hình Mạng Nơ-ron AI làm phương pháp chính cho các bước tiếp theo (Bước 6: Bề mặt, Bước 7: Vùng thiết kế, Bước 8: Báo cáo)"
+              title="Chọn mô hình Mạng Nơ-ron AI làm phương pháp chính cho các bước tiếp theo (Bước 6: Mặt đáp, Bước 7: Không gian thiết kế, Bước 8: Báo cáo)"
             >
               <span>Tiếp Tục Với Mạng Nơ-ron (Bước 6, 7, 8)</span>
               <ArrowRight size={16} />
@@ -1766,7 +1766,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                   title="Huấn luyện đồng loạt tất cả các CQA với cấu hình độc lập của từng CQA"
                 >
                   <Zap size={15} />
-                  <span>⚡ Fit All CQAs</span>
+                  <span>Huấn luyện tất cả CQAs</span>
                 </button>
               </>
             )}
@@ -1799,7 +1799,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                 <div style={{ fontWeight: '800', fontSize: '0.98rem', color: '#38bdf8', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <span>ĐANG HUẤN LUYỆN MẠNG NƠ-RON (RUNNING...)</span>
                   <span className="badge badge-primary" style={{ backgroundColor: '#0284c7', color: '#ffffff', fontSize: '0.7rem' }}>
-                    Động Cơ Nơ-ron AI
+                    Mô Hình Nơ-ron AI
                   </span>
                 </div>
                 <div style={{ fontSize: '0.76rem', color: '#94a3b8', marginTop: '0.15rem' }}>
@@ -1974,7 +1974,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           <div className="qbd-card">
             <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <TrendingUp size={18} color="#1e3a8a" />
-              <span>Bảng So Sánh Hiệu Quả: Hồi Quy Đa Thức ANOVA vs. Mạng Nơ-ron AI (Model Comparison - Slide 36)</span>
+              <span>Bảng So Sánh Hiệu Quả: Hồi Quy Đa Thức ANOVA vs. Mạng Nơ-ron AI (Model Comparison)</span>
             </h3>
 
             <div className="table-container">
@@ -2423,7 +2423,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               <div>
                 <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Compass size={18} color="#0f766e" />
-                  <span>Bề Mặt Đáp Ứng Mô Phỏng Bởi Mạng Nơ-ron (Neural Response Surface & Ternary Mixture)</span>
+                  <span>Mặt Đáp Mô Phỏng Bởi Mạng Nơ-ron (Neural Response Surface & Ternary Mixture)</span>
                 </h3>
                 <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.2rem' }}>
                   {plotType === 'ternary'
@@ -2762,7 +2762,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                   </span>
                 </div>
                 <button onClick={onNavigateToDesignSpace} className="btn btn-teal" style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}>
-                  <span>Áp Dụng Cho Vùng Thiết Kế</span>
+                  <span>Áp Dụng Cho Không Gian Thiết Kế</span>
                   <ArrowRight size={15} />
                 </button>
               </div>

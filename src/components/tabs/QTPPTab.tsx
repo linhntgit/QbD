@@ -404,7 +404,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Sparkles size={19} color="#1e3a8a" />
               <h2 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#0f172a' }}>
-                2. Thuộc tính Chất lượng Trọng yếu (CQAs - Biến Đầu Ra)
+                2. Thuộc Tính Chất Lượng Trọng Yếu (CQAs)
               </h2>
             </div>
             <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.2rem' }}>
@@ -582,7 +582,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Sliders size={19} color="#b45309" />
               <h2 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#0f172a' }}>
-                3. Các Biến Đầu Vào Khảo Sát (CMA / CPP - Biến Đầu Vào)
+                3. Các Biến Đầu Vào Khảo Sát (CMA & CPP)
               </h2>
             </div>
             <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.2rem' }}>
@@ -591,7 +591,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
           </div>
           <button onClick={handleAddFactor} className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}>
             <Plus size={15} />
-            <span>Thêm Nhân Tố (X)</span>
+            <span>Thêm Yếu Tố (X)</span>
           </button>
         </div>
 
@@ -624,7 +624,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                     {mixFactors.length} Biến Thành Phần Hỗn Hợp ({mixFactors.map((f) => f.code).join(', ')}):
                   </span>{' '}
                   <span style={{ color: '#334155' }}>
-                    Tổng mức thấp $\Sigma(L) = {sumLow.toFixed(1)}\%$, Tổng mức cao $\Sigma(U) = {sumHigh.toFixed(1)}\%$. (Bảng thí nghiệm sẽ luôn đảm bảo $\Sigma = 100\%$).
+                    Tổng mức thấp Σ(L) = {sumLow.toFixed(1)}%, Tổng mức cao Σ(U) = {sumHigh.toFixed(1)}%. (Bảng thí nghiệm sẽ luôn đảm bảo Σ = 100%).
                   </span>
                 </div>
               </div>
@@ -649,7 +649,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
             <thead>
               <tr>
                 <th style={{ width: '5%' }}>Mã</th>
-                <th style={{ width: '18%' }}>Tên Biến (Nhân tố X)</th>
+                <th style={{ width: '18%' }}>Tên Biến (Yếu tố X)</th>
                 <th style={{ width: '15%' }}>Vai Trò (Phân Loại X)</th>
                 <th style={{ width: '12%' }}>Bản Chất Dữ Liệu</th>
                 <th style={{ width: '14%' }}>Khả Năng Kiểm Soát</th>
@@ -817,7 +817,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
                     <button
                       onClick={() => handleDeleteFactor(f.id)}
                       style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
-                      title="Xóa nhân tố"
+                      title="Xóa yếu tố"
                     >
                       <Trash2 size={16} />
                     </button>

@@ -496,7 +496,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
 
     return {
       title: {
-        text: `Vùng Thiết Kế (Design Space Overlay) - Giao điểm Tất cả các CQAs`,
+        text: `Không Gian Thiết Kế (Design Space Overlay) - Giao điểm Tất cả các CQAs`,
         font: { size: 13, color: '#0f172a', family: 'Inter' },
       },
       xaxis: {
@@ -574,7 +574,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
             )}
             <div>
               <div style={{ fontWeight: '700', fontSize: '0.9rem', color: '#0f172a' }}>
-                Động Cơ Mô Hình Hóa & Tối Ưu: {modelingEngine === 'neural' ? '🧠 Mạng Nơ-ron Nhân Tạo AI' : '📐 Hồi Quy Đa Thức Bậc ≤ 2 (ANOVA)'}
+                Phương Pháp Mô Hình Hóa & Tối Ưu: {modelingEngine === 'neural' ? '🧠 Mạng Nơ-ron Nhân Tạo AI' : '📐 Hồi Quy Đa Thức Bậc ≤ 2 (ANOVA)'}
               </div>
               <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
                 {modelingEngine === 'neural'
@@ -935,7 +935,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
             </div>
 
             <p style={{ fontSize: '0.72rem', color: '#64748b', marginBottom: '0.75rem', lineHeight: '1.4' }}>
-              Mặt cắt của Vùng thiết kế phụ thuộc vào giá trị cài đặt của các biến X còn lại. Nhập số hoặc kéo thanh trượt để khảo sát:
+              Mặt cắt của Không gian thiết kế phụ thuộc vào giá trị cài đặt của các biến X còn lại. Nhập số hoặc kéo thanh trượt để khảo sát:
             </p>
 
             {fixedFactorsList.length === 0 ? (

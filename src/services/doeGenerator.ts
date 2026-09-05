@@ -588,6 +588,66 @@ export function generateCombinedMixtureProcessMatrix(
 }
 
 /**
+ * Làm tròn thích hợp các biến thành phần hỗn hợp và bảo toàn chính xác 100% tổng tỉ lệ.
+ * Sử dụng thuật toán phần dư lớn nhất (Largest Remainder / Hamilton method) để phân phối
+ * sai số làm tròn vào các thành phần có sai số bù lớn nhất, đảm bảo tổng luôn chính xác = targetSum.
+ */
+export function roundMixtureComponents(
+  values: number[],
+  targetSum: number = 100,
+  decimals: number = 2
+): number[] {
+  if (values.length === 0) return [];
+  if (values.length === 1) return [Number(targetSum.toFixed(decimals))];
+
+  const factor = Math.pow(10, decimals);
+  const targetScaled = Math.round(targetSum * factor);
+
+  // Làm tròn từng thành phần ở mức tỉ lệ nhân factor
+  const safeValues = values.map((v) => (Number.isFinite(v) ? v : 0));
+  const roundedScaled = safeValues.map((v) => Math.round(v * factor));
+  const currentSum = roundedScaled.reduce((sum, val) => sum + val, 0);
+  let discrepancy = targetScaled - currentSum;
+
+  if (discrepancy !== 0) {
+    // Tính phần dư chưa làm tròn: residual = v * factor - roundedScaled[i]
+    // Nếu discrepancy > 0 (tổng thiếu): ưu tiên cộng vào thành phần có residual lớn nhất (bị làm tròn xuống nhiều nhất)
+    // Nếu discrepancy < 0 (tổng thừa): ưu tiên trừ ở thành phần có residual nhỏ nhất (bị làm tròn lên nhiều nhất)
+    const indexedResiduals = safeValues.map((v, i) => ({
+      index: i,
+      residual: v * factor - roundedScaled[i],
+    }));
+
+    if (discrepancy > 0) {
+      indexedResiduals.sort((a, b) => b.residual - a.residual);
+      let i = 0;
+      while (discrepancy > 0) {
+        roundedScaled[indexedResiduals[i % indexedResiduals.length].index] += 1;
+        discrepancy--;
+        i++;
+      }
+    } else {
+      indexedResiduals.sort((a, b) => a.residual - b.residual);
+      let i = 0;
+      while (discrepancy < 0) {
+        const idx = indexedResiduals[i % indexedResiduals.length].index;
+        if (roundedScaled[idx] > 0) {
+          roundedScaled[idx] -= 1;
+          discrepancy++;
+        }
+        i++;
+        if (i >= indexedResiduals.length * 2) {
+          roundedScaled[indexedResiduals[0].index] += discrepancy;
+          break;
+        }
+      }
+    }
+  }
+
+  return roundedScaled.map((scaled) => Number((scaled / factor).toFixed(decimals)));
+}
+
+/**
  * Main function to generate full DoE Runs table according to user configuration
  */
 export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { runs: DoERun[]; alpha?: number } {
@@ -729,20 +789,15 @@ export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { r
   }
 
   // Build standard runs
-  const mixtureMatrixIndexes = matrixFactors
-    .map((factor, index) => (factor.role === 'mixture_component' || factor.type === 'Mixture' ? index : -1))
-    .filter((index) => index >= 0);
+  const mixtureFactorsInDesign = factors.filter(
+    (f) => (f.role === 'mixture_component' || f.type === 'Mixture' || config.category === 'Mixture') && f.controllability !== 'constant'
+  );
+  const isMixturePercentage = mixtureFactorsInDesign.length > 0 && !mixtureFactorsInDesign.every((f) => f.high <= 1.0 && f.unit !== '%');
+  const mixtureTargetSum = isMixturePercentage ? 100 : 1.0;
+  const mixtureDecimals = isMixturePercentage ? 2 : 4;
+
   const runs: DoERun[] = allCodedRows.map((rawRow, index) => {
     const row = [...rawRow];
-    // The candidate set is rounded to four decimals. Put the rounding residue
-    // into one component so displayed mixture proportions sum to exactly 100%.
-    if (mixtureMatrixIndexes.length >= 2) {
-      const total = mixtureMatrixIndexes.reduce((sum, matrixIndex) => sum + row[matrixIndex], 0);
-      if (Math.abs(total - 1) > 1e-10) {
-        const lastIndex = mixtureMatrixIndexes[mixtureMatrixIndexes.length - 1];
-        row[lastIndex] += 1 - total;
-      }
-    }
     const factorCoded: Record<string, number> = {};
     const factorActual: Record<string, number | string> = {};
 
@@ -760,6 +815,22 @@ export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { r
         factorActual[f.code] = codedToActual(codedVal, f);
       }
     });
+
+    // Cleanly round mixture components and preserve exact 100% (or 1.0) sum
+    if (mixtureFactorsInDesign.length >= 2) {
+      const rawMixValues = mixtureFactorsInDesign.map((f) => {
+        const val = factorActual[f.code];
+        return typeof val === 'number' ? val : Number(val) || 0;
+      });
+      const cleanMixValues = roundMixtureComponents(rawMixValues, mixtureTargetSum, mixtureDecimals);
+      mixtureFactorsInDesign.forEach((f, mixIdx) => {
+        const actualVal = cleanMixValues[mixIdx];
+        factorActual[f.code] = actualVal;
+        factorCoded[f.code] = isMixturePercentage
+          ? Number((actualVal / 100).toFixed(mixtureDecimals + 2))
+          : actualVal;
+      });
+    }
 
     return {
       id: `run-${index + 1}`,
@@ -865,8 +936,8 @@ export function validateDesignSetup(factors: Factor[], config: DoEDesignConfig):
   const requiredTerms = calculateNumModelTermsForFactors(active, model);
   const minimumFittableRuns = requiredTerms + 1;
 
-  if (active.length === 0) errors.push('Cần ít nhất một nhân tố không cố định để tạo thiết kế.');
-  if (config.designType === 'BoxBehnken' && active.length < 3) errors.push('Box–Behnken cần ít nhất 3 nhân tố.');
+  if (active.length === 0) errors.push('Cần ít nhất một yếu tố không cố định để tạo thiết kế.');
+  if (config.designType === 'BoxBehnken' && active.length < 3) errors.push('Box–Behnken cần ít nhất 3 yếu tố.');
   active.forEach((factor) => {
     if (factor.dataType === 'qualitative' || factor.dataType === 'quantitative_multilevel') {
       const levels = (factor.categories ?? []).map((level) => level.trim()).filter(Boolean);
@@ -1006,7 +1077,7 @@ export function augmentDOptimalDesign(
   const requested = Math.max(0, Math.floor(additionalRuns));
   const warnings: string[] = [];
   if (requested === 0 || activeFactors.length === 0) {
-    if (requested > 0) warnings.push('Không có nhân tố biến thiên để tăng cường thiết kế.');
+    if (requested > 0) warnings.push('Không có yếu tố biến thiên để tăng cường thiết kế.');
     return { runs: [...existingRuns], addedRuns: [], before, after: before, warnings };
   }
 
@@ -1049,18 +1120,18 @@ export function augmentDOptimalDesign(
   }
 
   if (selected.length < requested) warnings.push(`Chỉ thêm được ${selected.length}/${requested} điểm mới không trùng lặp.`);
-  const mixtureActiveIndexes = activeFactors
-    .map((factor, index) => (factor.role === 'mixture_component' || factor.type === 'Mixture' ? index : -1))
-    .filter((index) => index >= 0);
+  const mixtureFactorsInDesign = factors.filter(
+    (f) => (f.role === 'mixture_component' || f.type === 'Mixture') && f.controllability !== 'constant'
+  );
+  const isMixturePercentage = mixtureFactorsInDesign.length > 0 && !mixtureFactorsInDesign.every((f) => f.high <= 1.0 && f.unit !== '%');
+  const mixtureTargetSum = isMixturePercentage ? 100 : 1.0;
+  const mixtureDecimals = isMixturePercentage ? 2 : 4;
+
   const nextStdOrder = existingRuns.reduce((maximum, run) => Math.max(maximum, run.stdOrder), 0);
   const nextRunOrder = existingRuns.reduce((maximum, run) => Math.max(maximum, run.runOrder), 0);
   const nextBlock = existingRuns.reduce((maximum, run) => Math.max(maximum, run.block || 1), 1) + 1;
   const addedRuns = selected.map((rawPoint, index) => {
     const point = [...rawPoint];
-    if (mixtureActiveIndexes.length >= 2) {
-      const mixtureTotal = mixtureActiveIndexes.reduce((sum, mixtureIndex) => sum + point[mixtureIndex], 0);
-      point[mixtureActiveIndexes[mixtureActiveIndexes.length - 1]] += 1 - mixtureTotal;
-    }
     const factorCoded: Record<string, number> = {};
     const factorActual: Record<string, number | string> = {};
     factors.forEach((factor) => {
@@ -1077,6 +1148,23 @@ export function augmentDOptimalDesign(
         factorActual[factor.code] = codedToActual(coded, factor);
       }
     });
+
+    // Cleanly round mixture components and preserve exact 100% (or 1.0) sum
+    if (mixtureFactorsInDesign.length >= 2) {
+      const rawMixValues = mixtureFactorsInDesign.map((f) => {
+        const val = factorActual[f.code];
+        return typeof val === 'number' ? val : Number(val) || 0;
+      });
+      const cleanMixValues = roundMixtureComponents(rawMixValues, mixtureTargetSum, mixtureDecimals);
+      mixtureFactorsInDesign.forEach((f, mixIdx) => {
+        const actualVal = cleanMixValues[mixIdx];
+        factorActual[f.code] = actualVal;
+        factorCoded[f.code] = isMixturePercentage
+          ? Number((actualVal / 100).toFixed(mixtureDecimals + 2))
+          : actualVal;
+      });
+    }
+
     return {
       id: `augment-${nextStdOrder + index + 1}`,
       stdOrder: nextStdOrder + index + 1,

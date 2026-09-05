@@ -169,7 +169,7 @@ export const FMEATab: React.FC<FMEATabProps> = ({
         <div className="qbd-card">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
             <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a' }}>
-              Bảng Phân Tích Chế Độ Hư Hỏng & Tác Động (FMEA Matrix)
+              Bảng Phân Tích Dạng Sai Lỗi & Tác Động (FMEA Matrix)
             </h3>
             <button onClick={handleAddRiskItem} className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}>
               <Plus size={15} />
@@ -181,13 +181,13 @@ export const FMEATab: React.FC<FMEATabProps> = ({
             <table className="qbd-table">
               <thead>
                 <tr>
-                  <th style={{ width: '15%' }}>Nhân tố (Factor)</th>
+                  <th style={{ width: '15%' }}>Yếu tố (Factor)</th>
                   <th style={{ width: '15%' }}>CQA Bị Ảnh Hưởng</th>
-                  <th style={{ width: '22%' }}>Chế độ sai lỗi / Cơ chế rủi ro</th>
-                  <th style={{ width: '7%', textAlign: 'center' }} title="Severity (1-10)">S (Nghiêm trọng)</th>
-                  <th style={{ width: '7%', textAlign: 'center' }} title="Probability (1-10)">P (Xác suất)</th>
-                  <th style={{ width: '7%', textAlign: 'center' }} title="Detectability (1-10)">D (Phát hiện)</th>
-                  <th style={{ width: '8%', textAlign: 'center' }} title="RPN = S x P x D">RPN</th>
+                  <th style={{ width: '22%' }}>Dạng sai lỗi / Cơ chế rủi ro</th>
+                  <th style={{ width: '7%', textAlign: 'center' }} title="Severity - Mức độ nghiêm trọng (1-10)">S (Mức nghiêm trọng)</th>
+                  <th style={{ width: '7%', textAlign: 'center' }} title="Occurrence - Khả năng xảy ra / Tần suất (1-10)">O (Khả năng xảy ra)</th>
+                  <th style={{ width: '7%', textAlign: 'center' }} title="Detection - Khả năng phát hiện (1-10)">D (Khả năng phát hiện)</th>
+                  <th style={{ width: '8%', textAlign: 'center' }} title="RPN = S x O x D">RPN</th>
                   <th style={{ width: '10%', textAlign: 'center' }}>Mức Rủi Ro</th>
                   <th style={{ width: '9%', textAlign: 'center' }}>Khảo sát DoE</th>
                   <th style={{ width: '5%', textAlign: 'center' }}>Xóa</th>
@@ -334,7 +334,7 @@ export const FMEATab: React.FC<FMEATabProps> = ({
                 </h4>
               </div>
               <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#0f766e', backgroundColor: '#ccfbf1', padding: '0.2rem 0.6rem', borderRadius: '4px', border: '1px solid #99f6e4' }}>
-                Công thức: RPN = S (Nghiêm trọng) × P (Xác suất) × D (Khó phát hiện)
+                Công thức: RPN = S (Mức độ nghiêm trọng) × O (Khả năng xảy ra) × D (Khả năng phát hiện)
               </span>
             </div>
 
@@ -364,7 +364,7 @@ export const FMEATab: React.FC<FMEATabProps> = ({
                   </span>
                 </div>
                 <p style={{ fontSize: '0.78rem', color: '#7f1d1d', margin: 0, lineHeight: 1.4 }}>
-                  <strong>Khi nào là High:</strong> Nhân tố có khả năng gây sai lệch nghiêm trọng lên CQA, tần suất xuất hiện cao hoặc khó phát hiện qua kiểm tra thông thường (hoặc khi điểm nghiêm trọng <code>S ≥ 8</code>).
+                  <strong>Khi nào là High:</strong> Yếu tố có khả năng gây sai lệch nghiêm trọng lên CQA, tần suất xuất hiện cao hoặc khó phát hiện qua kiểm tra thông thường (hoặc khi điểm nghiêm trọng <code>S ≥ 8</code>).
                 </p>
                 <div style={{ fontSize: '0.75rem', color: '#991b1b', backgroundColor: '#ffffff', padding: '0.35rem 0.5rem', borderRadius: '4px', border: '1px solid #fecaca', marginTop: '0.2rem' }}>
                   ⚡ <strong>Hành động:</strong> <strong>BẮT BUỘC</strong> đưa vào ma trận thực nghiệm DoE để xác định Design Space &amp; kiểm soát chặt.
@@ -434,7 +434,7 @@ export const FMEATab: React.FC<FMEATabProps> = ({
               </div>
             </div>
 
-            {/* Explanation of S, P, D parameters */}
+            {/* Explanation of S, O, D parameters */}
             <div
               style={{
                 backgroundColor: '#ffffff',
@@ -455,13 +455,13 @@ export const FMEATab: React.FC<FMEATabProps> = ({
                 </div>
               </div>
               <div>
-                <strong style={{ color: '#0f172a' }}>2. P (Probability - Xác suất xảy ra, 1-10):</strong>
+                <strong style={{ color: '#0f172a' }}>2. O (Occurrence - Khả năng xảy ra / Tần suất, 1-10):</strong>
                 <div style={{ marginTop: '0.2rem', color: '#64748b' }}>
                   Tần suất phát sinh nguyên nhân gây lỗi. <strong>1-3</strong>: Cực hiếm khi xảy ra; <strong>4-6</strong>: Thỉnh thoảng xuất hiện; <strong>7-10</strong>: Thường xuyên xảy ra liên tục nếu không kiểm soát.
                 </div>
               </div>
               <div>
-                <strong style={{ color: '#0f172a' }}>3. D (Detectability - Khó phát hiện, 1-10):</strong>
+                <strong style={{ color: '#0f172a' }}>3. D (Detection - Khả năng phát hiện, 1-10):</strong>
                 <div style={{ marginTop: '0.2rem', color: '#64748b' }}>
                   Khả năng hệ thống kiểm soát phát hiện lỗi. <strong>1-3</strong>: Chắc chắn phát hiện (IPC Online 100%); <strong>4-6</strong>: Kiểm nghiệm mẫu QC; <strong>7-10</strong>: Rất khó/Không thể phát hiện.
                 </div>

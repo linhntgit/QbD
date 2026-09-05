@@ -43,6 +43,7 @@ import {
   augmentDOptimalDesign,
   recommendRunCount,
   validateDesignSetup,
+  roundMixtureComponents,
 } from '../../services/doeGenerator';
 import { simulateDemoResponses } from '../../services/demoDataSimulator';
 import { createSeededRandom, stableSeedFromText } from '../../services/random';
@@ -267,8 +268,13 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
         return run.runOrder;
       case 'block':
         return run.block ?? 1;
-      case 'factor':
-        return run.factorActual[col.code] ?? '';
+      case 'factor': {
+        const v = run.factorActual[col.code];
+        if (typeof v === 'number' && (col.factor?.role === 'mixture_component' || col.factor?.type === 'Mixture')) {
+          return Number(Number(v).toFixed(4));
+        }
+        return v ?? '';
+      }
       case 'mixture_sum': {
         const sum = mixtureFactors.reduce((acc, f) => {
           const v = Number(run.factorActual[f.code]);
@@ -377,13 +383,19 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
     const factorCoded: Record<string, number> = {};
 
     const mixtureCount = mixtureFactors.length;
+    const isMixturePercentage = mixtureCount > 0 && !mixtureFactors.every((f) => f.high <= 1.0 && f.unit !== '%');
+    const targetSum = isMixturePercentage ? 100 : 1.0;
+    const cleanDefaultMix = mixtureCount > 0
+      ? roundMixtureComponents(new Array(mixtureCount).fill(targetSum / mixtureCount), targetSum, isMixturePercentage ? 2 : 4)
+      : [];
+    let mixIdx = 0;
     project.factors.forEach((f) => {
       if (f.dataType === 'qualitative' || f.dataType === 'quantitative_multilevel') {
         const defaultLevel = f.categories?.[0] || (f.dataType === 'qualitative' ? 'Mức 1' : String(f.low));
         factorActual[f.code] = f.dataType === 'quantitative_multilevel' ? Number(defaultLevel) : defaultLevel;
         factorCoded[f.code] = actualToCoded(defaultLevel, f);
       } else if (f.role === 'mixture_component' || f.type === 'Mixture') {
-        const defaultVal = mixtureCount > 0 ? Number((100 / mixtureCount).toFixed(2)) : (f.center ?? f.low);
+        const defaultVal = cleanDefaultMix[mixIdx++] ?? (f.center ?? f.low);
         factorActual[f.code] = defaultVal;
         factorCoded[f.code] = actualToCoded(defaultVal, f);
       } else {
@@ -1007,7 +1019,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
             <div>
               <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', color: '#075985', marginBottom: '0.25rem' }}>Mục tiêu nghiên cứu</label>
               <select className="input-field" value={designGoal} onChange={(e) => setDesignConfig({ ...designConfig, designGoal: e.target.value as DoEDesignGoal })}>
-                <option value="screening">Sàng lọc nhân tố</option>
+                <option value="screening">Sàng lọc yếu tố</option>
                 <option value="optimization">Tối ưu hóa đa đáp ứng</option>
                 <option value="robustness">Robustness / Design Space</option>
               </select>
@@ -1034,7 +1046,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                   <div style={{ fontSize: '0.73rem', color: '#475569', minHeight: '2.2rem', margin: '0.35rem 0' }}>{option.description}</div>
                   <div style={{ fontSize: '0.74rem', color: '#0f172a', lineHeight: 1.5 }}>
                     <div><strong>{option.numRuns} run</strong> · {option.model} · p={option.readiness.termCount}</div>
-                    <div>rank {option.readiness.rank}/{option.readiness.termCount} · df dư {option.readiness.residualDegreesOfFreedom}</div>
+                    <div>rank {option.readiness.rank}/{option.readiness.termCount} · df phần dư {option.readiness.residualDegreesOfFreedom}</div>
                   </div>
                   {!withinBudget && <div style={{ fontSize: '0.7rem', color: '#b45309', marginTop: '0.35rem' }}>Vượt ngân sách {runBudget} run.</div>}
                   {!option.readiness.isEstimable && <div style={{ fontSize: '0.7rem', color: '#b91c1c', marginTop: '0.35rem' }}>{option.readiness.messages[0]}</div>}
@@ -1086,7 +1098,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               <button type="button" className="btn btn-teal" style={{ fontSize: '0.78rem', padding: '0.4rem 0.7rem' }} onClick={handleAugmentDesign}>
                 <PlusCircle size={15} /> Thêm run thông tin nhất
               </button>
-              <span style={{ fontSize: '0.73rem', color: '#475569' }}>Hiện tại: rank {currentReadiness.rank}/{currentReadiness.termCount}, df dư {currentReadiness.residualDegreesOfFreedom}.</span>
+              <span style={{ fontSize: '0.73rem', color: '#475569' }}>Hiện tại: rank {currentReadiness.rank}/{currentReadiness.termCount}, df phần dư {currentReadiness.residualDegreesOfFreedom}.</span>
             </div>
           </div>
         )}
@@ -1110,11 +1122,11 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                 setDesignConfig({ ...designConfig, category: cat, designType: defaultType });
               }}
             >
-              <option value="RSM">Bề mặt Đáp ứng (RSM - Tối ưu hóa)</option>
+              <option value="RSM">Mặt Đáp (RSM - Tối ưu hóa)</option>
               <option value="Custom_Optimal">⚡ D-Optimal Design (D-Tối ưu / Thuật toán Fedorov)</option>
               <option value="Combined_Mixture_Process">🧪 Hỗn Hợp + Quy Trình (Combined Mixture-Process)</option>
               <option value="Mixture">Thiết kế Hỗn hợp (Mixture / Tá dược)</option>
-              <option value="Screening">Sàng lọc Nhân tố (Screening)</option>
+              <option value="Screening">Sàng lọc Yếu tố (Screening)</option>
             </select>
           </div>
 
@@ -1146,7 +1158,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               {designConfig.category === 'Combined_Mixture_Process' && (
                 <>
                   <option value="Combined_Mixture_Factorial">Combined Simplex x Factorial 2^p (Tích Hỗn hợp - Yếu tố)</option>
-                  <option value="Combined_Mixture_RSM">Combined Simplex x Box-Behnken RSM (Tích Hỗn hợp - Bề mặt đáp ứng)</option>
+                  <option value="Combined_Mixture_RSM">Combined Simplex x Box-Behnken RSM (Tích Hỗn hợp - Mặt đáp)</option>
                   <option value="Combined_Mixture_DOptimal">D-Optimal Mixture–Process (Giảm số run, chọn theo mô hình)</option>
                 </>
               )}
@@ -1208,7 +1220,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                   onChange={(e) => setDesignConfig({ ...designConfig, dOptimalModel: e.target.value as 'Linear' | '2FI' | 'Quadratic' })}
                 >
                   <option value="Quadratic">Bậc 2 Toàn phần (Quadratic: Linear + 2FI + Quadratic)</option>
-                  <option value="2FI">Tương tác 2 nhân tố (2FI: Linear + Interactions)</option>
+                  <option value="2FI">Tương tác 2 yếu tố (2FI: Linear + Interactions)</option>
                   <option value="Linear">Tuyến tính bậc 1 (mixture–process: gồm xᵢ·zⱼ)</option>
                 </select>
               </div>
@@ -1366,7 +1378,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
           </div>
           <div style={{ marginTop: '0.75rem', padding: '0.6rem 0.75rem', borderRadius: '0.45rem', background: currentReadiness.isEstimable ? '#f0fdf4' : '#fef2f2', color: currentReadiness.isEstimable ? '#166534' : '#b91c1c', fontSize: '0.78rem' }}>
             <strong>{currentReadiness.isEstimable ? '✓ Mô hình khả định' : '⚠ Mô hình chưa khả định'}</strong>
-            {' '}rank {currentReadiness.rank}/{currentReadiness.termCount}; df dư {currentReadiness.residualDegreesOfFreedom}.
+            {' '}rank {currentReadiness.rank}/{currentReadiness.termCount}; df phần dư {currentReadiness.residualDegreesOfFreedom}.
             {currentReadiness.messages.length > 0 && ` ${currentReadiness.messages.join(' ')}`}
           </div>
         </div>
@@ -2350,7 +2362,13 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                                     padding: '0 0.5rem',
                                     textAlign: 'center',
                                   }}
-                                  value={run.factorActual[col.code] !== undefined && run.factorActual[col.code] !== null ? run.factorActual[col.code] : ''}
+                                  value={
+                                    run.factorActual[col.code] !== undefined && run.factorActual[col.code] !== null
+                                      ? (typeof run.factorActual[col.code] === 'number' && (col.factor.role === 'mixture_component' || col.factor.type === 'Mixture')
+                                          ? Number(Number(run.factorActual[col.code]).toFixed(4))
+                                          : run.factorActual[col.code])
+                                      : ''
+                                  }
                                   placeholder="Nhập..."
                                   onFocus={() => {
                                     setActiveCell({ r: runIdx, c: colIdx });
