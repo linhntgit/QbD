@@ -666,6 +666,41 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
             ),
           },
           {
+            id: 'diagnostics',
+            title: 'Chẩn Đoán Mô Hình: Vì Sao R²adj, AICc, BIC Hiển Thị Dấu "-"',
+            icon: Activity,
+            content: (
+              <div style={{ fontSize: '0.78rem', color: '#334155', lineHeight: 1.6 }}>
+                <div style={{ backgroundColor: '#eff6ff', padding: '0.6rem 0.75rem', borderRadius: '0.375rem', border: '1px solid #bfdbfe', marginBottom: '0.6rem', color: '#1e40af' }}>
+                  <strong>Chuẩn mực thống kê (Statistical Rigor):</strong> Việc các chỉ số <InlineMath math="R^2_{\text{adj}}" />, AICc, BIC hiển thị dấu <strong>"-"</strong> không phải lỗi tính toán, mà là chủ đích thiết kế nhằm bảo đảm tính đúng đắn khoa học trong quy hoạch thực nghiệm (DoE).
+                </div>
+
+                <ul style={{ paddingLeft: '1.2rem', margin: '0.4rem 0', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                  <li>
+                    <strong>Mâu thuẫn bậc tự do và cỡ mẫu DoE (<InlineMath math="N \le p" />):</strong>
+                    <br />
+                    Các chỉ số <InlineMath math="R^2_{\text{adj}}" />, AICc, BIC được xây dựng cho mô hình tuyến tính cổ điển (OLS) khi số mẫu lớn (<InlineMath math="N \gg p" />). Trong DoE dược phẩm, số thí nghiệm thường rất nhỏ (<InlineMath math="N \approx 15 - 20" />), trong khi mạng nơ-ron (MLP) có số lượng trọng số và bias lớn (<InlineMath math="p \ge 16" />). Mẫu số <InlineMath math="N - p \le 0" /> hoặc <InlineMath math="N - p - 1 \le 0" /> dẫn đến phép chia cho 0 hoặc giá trị âm, khiến <InlineMath math="R^2_{\text{adj}}" /> suy biến và AICc tiến tới vô cùng (<InlineMath math="+\infty" />).
+                  </li>
+                  <li>
+                    <strong>Bản chất phi tuyến &amp; phạt điều chuẩn L2 (Weight Decay):</strong>
+                    <br />
+                    Do có hàm kích hoạt phi tuyến và điều chuẩn L2 (<InlineMath math="\lambda" />), số lượng trọng số danh định không đại diện cho <em>bậc tự do hiệu dụng</em> (<InlineMath math="\text{df}_{\text{eff}}" />) của mô hình. Áp dụng công thức OLS cổ điển sẽ cho kết quả sai lệch.
+                  </li>
+                  <li>
+                    <strong>Kiến trúc mạng chia sẻ đa đáp ứng (Shared Multi-Output):</strong>
+                    <br />
+                    Khi huấn luyện đồng thời nhiều CQA, các tầng ẩn dùng chung tham số nên không thể bóc tách độc lập AIC/BIC cho từng CQA riêng lẻ nếu không có mô hình Joint-Likelihood.
+                  </li>
+                  <li>
+                    <strong>Thước đo đánh giá chuẩn mực cho ANN:</strong>
+                    <br />
+                    Để đánh giá năng lực khái quát hóa và tránh quá khớp (overfitting) cho mạng nơ-ron, phần mềm sử dụng <strong>Validation R²</strong> (Hold-out hoặc K-fold out-of-fold) và sai số <strong>RMSE / MAE</strong> làm tiêu chuẩn định lượng thay vì các chỉ số phạt bậc tự do cổ điển.
+                  </li>
+                </ul>
+              </div>
+            ),
+          },
+          {
             id: 'tips',
             title: 'Mẹo Tối Ưu Huấn Luyện Mạng Nơ-ron AI',
             icon: Lightbulb,
