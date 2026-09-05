@@ -84,9 +84,9 @@ export function codedToActual(coded: number, factor: Factor): number | string {
   // Mixture Component Factor (coded is proportion 0..1, actual is percentage 0..100%)
   if (factor.role === 'mixture_component' || factor.type === 'Mixture') {
     if (factor.high <= 1.0 && factor.unit !== '%') {
-      return Number(coded.toFixed(4));
+      return coded;
     }
-    return Number((coded * 100).toFixed(2));
+    return coded * 100;
   }
 
   // Standard Quantitative Continuous Factor
@@ -94,7 +94,7 @@ export function codedToActual(coded: number, factor: Factor): number | string {
   const high = factor.high;
   const center = factor.center !== undefined ? factor.center : (low + high) / 2;
   const halfRange = (high - low) / 2;
-  return Number((center + coded * halfRange).toFixed(4));
+  return center + coded * halfRange;
 }
 
 /**
@@ -120,9 +120,9 @@ export function actualToCoded(actual: number | string, factor: Factor): number {
   // Mixture Component Factor (actual is 0..100%, coded is proportion 0..1)
   if (factor.role === 'mixture_component' || factor.type === 'Mixture') {
     if (factor.high <= 1.0 && factor.unit !== '%') {
-      return Number(val.toFixed(4));
+      return val;
     }
-    return Number((val / 100).toFixed(4));
+    return val / 100;
   }
 
   const low = factor.low;
@@ -130,7 +130,18 @@ export function actualToCoded(actual: number | string, factor: Factor): number {
   const center = factor.center !== undefined ? factor.center : (low + high) / 2;
   const halfRange = (high - low) / 2;
   if (halfRange === 0) return 0;
-  return Number(((val - center) / halfRange).toFixed(4));
+  return (val - center) / halfRange;
+}
+
+/** CCD low/high are factorial levels; circumscribed axial runs extend by alpha. */
+export function getFactorDesignBounds(factor: Factor, config?: DoEDesignConfig): { low: number; high: number } {
+  if (config && ['CCD_Full', 'CCD_Rotatable'].includes(config.designType) && factor.dataType === 'quantitative') {
+    const alpha = config.alpha ?? factor.alpha ?? 1;
+    const center = factor.center ?? (factor.low + factor.high) / 2;
+    const half = (factor.high - factor.low) / 2;
+    return { low: center - alpha * half, high: center + alpha * half };
+  }
+  return { low: factor.low, high: factor.high };
 }
 
 /**
@@ -268,7 +279,7 @@ export function generateTaguchi(k: number, arrayType?: string): number[][] {
     return L9_3level.map(row => row.slice(0, k));
   }
   if (selected === 'L8') return L8.map(row => row.slice(0, k));
-  if (selected === 'L12') return generatePlackettBurman(k);
+  if (selected === 'L12') return generatePlackettBurman(11).map((row) => row.slice(0, k));
   return hadamard(16).map((row) => row.slice(0, k));
 }
 
@@ -311,11 +322,11 @@ export function generateCCD(k: number, type: 'Full' | 'FaceCentered' | 'Rotatabl
   const axial: number[][] = [];
   for (let i = 0; i < k; i++) {
     const rowPlus = new Array(k).fill(0);
-    rowPlus[i] = Number(alpha.toFixed(4));
+    rowPlus[i] = alpha;
     axial.push(rowPlus);
 
     const rowMinus = new Array(k).fill(0);
-    rowMinus[i] = Number((-alpha).toFixed(4));
+    rowMinus[i] = -alpha;
     axial.push(rowMinus);
   }
 
@@ -413,7 +424,7 @@ export function generateConstrainedMixtureDesign(
     const zMatrix = generatePureSimplexDesign(q, type);
     const rem = 1.0 - sumL;
     return zMatrix.map((zRow) =>
-      zRow.map((zi, i) => Number((L[i] + zi * rem).toFixed(4)))
+      zRow.map((zi, i) => L[i] + zi * rem)
     );
   }
 
@@ -447,7 +458,7 @@ export function generateConstrainedMixtureDesign(
 
         // Normalize sum to 1.0
         const total = pt.reduce((a, b) => a + b, 0);
-        const normalized = pt.map((v) => Number((v / total).toFixed(4)));
+        const normalized = pt.map((v) => v / total);
 
         const exists = vertices.some((v) =>
           v.every((val, idx) => Math.abs(val - normalized[idx]) < 1e-3)
@@ -479,7 +490,7 @@ export function generateConstrainedMixtureDesign(
       }
 
       if (sharedConstraints >= Math.max(1, q - 2) || q <= 3) {
-        const edgeMid = v1.map((val, idx) => Number(((val + v2[idx]) / 2).toFixed(4)));
+        const edgeMid = v1.map((val, idx) => (val + v2[idx]) / 2);
         const exists = allPoints.some((p) =>
           p.every((val, idx) => Math.abs(val - edgeMid[idx]) < 1e-3)
         );
@@ -497,7 +508,7 @@ export function generateConstrainedMixtureDesign(
       centroid[idx] += val / vertices.length;
     });
   });
-  const normalizedCentroid = centroid.map((v) => Number(v.toFixed(4)));
+  const normalizedCentroid = centroid;
   const centroidExists = allPoints.some((p) =>
     p.every((val, idx) => Math.abs(val - normalizedCentroid[idx]) < 1e-3)
   );
@@ -507,7 +518,7 @@ export function generateConstrainedMixtureDesign(
 
   // 5. Axial / Interior Blends (Midpoints between Overall Centroid and each Vertex)
   vertices.forEach((v) => {
-    const axial = v.map((val, idx) => Number(((val + normalizedCentroid[idx]) / 2).toFixed(4)));
+    const axial = v.map((val, idx) => (val + normalizedCentroid[idx]) / 2);
     const exists = allPoints.some((p) =>
       p.every((val, idx) => Math.abs(val - axial[idx]) < 1e-3)
     );
@@ -580,6 +591,10 @@ export function generateCombinedMixtureProcessMatrix(
  * Main function to generate full DoE Runs table according to user configuration
  */
 export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { runs: DoERun[]; alpha?: number } {
+  if (config.designType === 'Doehlert') throw new Error('Doehlert chưa được triển khai; hãy chọn CCD hoặc Box–Behnken.');
+  if (factors.some((factor) => factor.controllability === 'constant' && (factor.type === 'Mixture' || factor.role === 'mixture_component'))) {
+    throw new Error('Tạo DoE với thành phần mixture cố định chưa được hỗ trợ.');
+  }
   const designFactors = factors.filter((factor) => factor.controllability !== 'constant');
   const k = designFactors.length;
   if (k === 0) return { runs: [] };
@@ -695,7 +710,9 @@ export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { r
       const centerCount = config.centerPoints > 0 ? config.centerPoints : (config.category === 'RSM' ? 3 : 0);
       for (let c = 0; c < centerCount; c++) {
         if (config.category === 'Mixture' || mixtureFactors.length === k) {
-          const centroidRow = codedMatrix.length > 0 ? codedMatrix[codedMatrix.length - 1] : new Array(k).fill(Number((1 / k).toFixed(4)));
+          const centroidRow = codedMatrix.length > 0
+            ? Array.from({ length: k }, (_, index) => codedMatrix.reduce((sum, row) => sum + row[index], 0) / codedMatrix.length)
+            : new Array(k).fill(1 / k);
           codedMatrix.push([...centroidRow]);
         } else {
           codedMatrix.push(new Array(k).fill(0));
@@ -735,9 +752,9 @@ export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { r
       factorCoded[f.code] = codedVal;
       if (f.role === 'mixture_component' || f.type === 'Mixture' || config.category === 'Mixture') {
         if (f.high <= 1.0 && f.unit !== '%') {
-          factorActual[f.code] = Number(codedVal.toFixed(4));
+          factorActual[f.code] = codedVal;
         } else {
-          factorActual[f.code] = Number((codedVal * 100).toFixed(2));
+          factorActual[f.code] = codedVal * 100;
         }
       } else {
         factorActual[f.code] = codedToActual(codedVal, f);
@@ -839,12 +856,17 @@ export function recommendRunCount(factors: Factor[], model: 'Linear' | '2FI' | '
 export function validateDesignSetup(factors: Factor[], config: DoEDesignConfig): DesignValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
+  if (config.designType === 'Doehlert') errors.push('Doehlert chưa được triển khai; chọn CCD hoặc Box–Behnken.');
+  if (factors.some((factor) => factor.controllability === 'constant' && (factor.type === 'Mixture' || factor.role === 'mixture_component'))) {
+    errors.push('Tạo DoE với thành phần mixture cố định chưa được hỗ trợ.');
+  }
   const active = factors.filter((factor) => factor.controllability !== 'constant');
   const model = resolveOptimalModel(active, config);
   const requiredTerms = calculateNumModelTermsForFactors(active, model);
   const minimumFittableRuns = requiredTerms + 1;
 
   if (active.length === 0) errors.push('Cần ít nhất một nhân tố không cố định để tạo thiết kế.');
+  if (config.designType === 'BoxBehnken' && active.length < 3) errors.push('Box–Behnken cần ít nhất 3 nhân tố.');
   active.forEach((factor) => {
     if (factor.dataType === 'qualitative' || factor.dataType === 'quantitative_multilevel') {
       const levels = (factor.categories ?? []).map((level) => level.trim()).filter(Boolean);
@@ -1415,8 +1437,18 @@ export function calculateDesignEfficiency(
     maxH = Math.max(...H_diag);
   }
 
-  // G-Efficiency: 100 * p / (N * max(h_ii))
-  const gEff = maxH > 0 ? Number(Math.min(100, Math.max(0, (100 * p) / (N * maxH))).toFixed(2)) : 0;
+  // G criterion needs prediction variance over the candidate region, not just
+  // observed runs (which misleadingly gives 100% for every saturated design).
+  let maxPredictionVariance = maxH;
+  if (invXTX.length > 0) {
+    for (const point of generateCandidatePool(activeFactors)) {
+      const x = expandModelVectorForFactors(point, activeFactors, modelOrder);
+      const variance = x.reduce((sum, value, i) => sum + value * x.reduce((inner, other, j) => inner + invXTX[i][j] * other, 0), 0);
+      maxPredictionVariance = Math.max(maxPredictionVariance, variance);
+    }
+  }
+  const gEff = invXTX.length > 0 && maxPredictionVariance > 0
+    ? Number(Math.min(100, Math.max(0, (100 * p) / (N * maxPredictionVariance))).toFixed(2)) : 0;
 
   // A genuine matrix condition number (1-norm), rather than a ratio of only
   // diagonal entries.  It detects non-orthogonality and near singularity.

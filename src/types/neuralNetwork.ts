@@ -46,6 +46,10 @@ export interface FactorSensitivity {
 }
 
 export interface NeuralNetDiagnostics {
+  /** Smallest training partition used for validation; final K-fold model is refit on all rows. */
+  trainingSampleCount?: number;
+  validationSampleCount?: number;
+  validationKind?: 'holdout' | 'out-of-fold' | 'none';
   rSquaredTrain: number;
   rSquaredVal: number;
   rSquaredOverall: number;

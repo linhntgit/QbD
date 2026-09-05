@@ -1623,7 +1623,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', color: '#1e40af' }}>
                 <Sparkles size={16} color="#2563eb" />
                 <span>
-                  <strong>Khuyến nghị Carpenter (1995):</strong> Số nơ-ron lớp ẩn tối ưu là <strong>h = {archMetrics.carpenterRecommended}</strong> (dùng N huấn luyện = {archMetrics.numSamples}; đã trừ {numSamples - archMetrics.numSamples} run validation).
+                  <strong>Gợi ý ngân sách tham số:</strong> Số nơ-ron lớp ẩn khởi đầu là <strong>h = {archMetrics.carpenterRecommended}</strong> (dùng N huấn luyện = {archMetrics.numSamples}; đã trừ {numSamples - archMetrics.numSamples} run validation).
                 </span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.35rem', maxWidth: '100%' }}>
@@ -1639,7 +1639,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                     const target = neuralTrainingMode === 'shared'
                       ? `mạng chung cho tất cả ${project.cqas.length} CQA`
                       : `CQA ${currentCQA.code} (${currentCQA.name})`;
-                    setConfigActionNotice(`Đã áp dụng kiến trúc Carpenter: ${archMetrics.carpenterRecommended} nơ-ron ở Tầng 1, tắt Tầng 2 cho ${target}.`);
+                    setConfigActionNotice(`Đã áp dụng kiến trúc theo ngân sách tham số: ${archMetrics.carpenterRecommended} nơ-ron ở Tầng 1, tắt Tầng 2 cho ${target}.`);
                   }}
                   className="btn btn-outline"
                   style={{
@@ -1650,9 +1650,9 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                     color: '#2563eb',
                     fontWeight: '700',
                   }}
-                  title="Tự động đặt số nơ-ron ẩn Tầng 1 = h theo công thức Carpenter và tắt Tầng 2"
+                  title="Tự động đặt số nơ-ron ẩn Tầng 1 = h theo ngân sách tham số và tắt Tầng 2"
                   >
-                    💡 Áp Dụng Kiến Trúc Carpenter (h = {archMetrics.carpenterRecommended})
+                    💡 Áp Dụng Gợi Ý Kiến Trúc (h = {archMetrics.carpenterRecommended})
                   </button>
                   {neuralTrainingMode === 'independent' && (
                     <button

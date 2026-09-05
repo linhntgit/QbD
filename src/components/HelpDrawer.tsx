@@ -478,7 +478,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 
                 <p style={{ marginTop: '0.5rem' }}><strong>2. Đòn Bẩy (Leverage <InlineMath math="h_{ii}" />) &amp; Condition Number <InlineMath math="\kappa" />:</strong></p>
                 <BlockMath math="h_{ii} = \mathbf{x}_i (\mathbf{X}^T \mathbf{X})^{-1} \mathbf{x}_i^T, \quad \bar{h} = \frac{p}{N}" />
-                <BlockMath math="\kappa = \sqrt{\frac{\lambda_{\max}}{\lambda_{\min}}}" />
+                <BlockMath math="\kappa_1(X^T X) = \|X^T X\|_1 \|(X^T X)^{-1}\|_1" />
                 <p>• <strong>Leverage</strong> cho biết một run có vị trí “xa tâm” đến mức nào trong ma trận; <strong>Condition number</strong> cảnh báo các cột thiết kế gần phụ thuộc tuyến tính. Giá trị xấu gợi ý ước lượng hệ số kém ổn định, không tự động chứng minh dữ liệu sai.</p>
               </div>
             ),

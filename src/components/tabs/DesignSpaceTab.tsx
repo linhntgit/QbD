@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Boxes,
   Play,
@@ -143,6 +143,11 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
   const [simProgress, setSimProgress] = useState<number>(0);
 
   const [mcResult, setMcResult] = useState<MonteCarloResult | null>(sharedMonteCarlo);
+  const simulationTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => {
+    setIsSimulating(false);
+    return () => clearTimeout(simulationTimer.current);
+  }, [project.id, factors, cqas, models, monteCarloSeed]);
 
   const robustness = useMemo(
     () => optimum ? assessDesignSpaceRobustness(optimum.actualFactors, factors, cqas, models, mcResult) : null,
@@ -167,34 +172,40 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
     batches: number,
     variability: number
   ) => {
+    clearTimeout(simulationTimer.current);
     setIsSimulating(true);
     setSimProgress(15);
 
-    setTimeout(() => {
+    simulationTimer.current = setTimeout(() => {
       setSimProgress(50);
-      setTimeout(() => {
+      simulationTimer.current = setTimeout(() => {
         setSimProgress(85);
-        setTimeout(() => {
-          const mc = runMonteCarloSimulation(
-            targetActual,
-            factors,
-            cqas,
-            models,
-            variability,
-            batches,
-            monteCarloSeed,
-          );
-          setMcResult(mc);
-          onMonteCarloResult(mc);
-          setSimProgress(100);
-          setIsSimulating(false);
+        simulationTimer.current = setTimeout(() => {
           try {
-            confetti({
-              particleCount: 50,
-              spread: 60,
-              origin: { y: 0.85 },
-            });
-          } catch {}
+            const mc = runMonteCarloSimulation(
+              targetActual,
+              factors,
+              cqas,
+              models,
+              variability,
+              batches,
+              monteCarloSeed,
+            );
+            setMcResult(mc);
+            onMonteCarloResult(mc);
+            setSimProgress(100);
+            try {
+              confetti({
+                particleCount: 50,
+                spread: 60,
+                origin: { y: 0.85 },
+              });
+            } catch {}
+          } catch (error) {
+            window.alert(`Không thể chạy Monte Carlo: ${error instanceof Error ? error.message : String(error)}`);
+          } finally {
+            setIsSimulating(false);
+          }
         }, 120);
       }, 140);
     }, 100);
@@ -1363,7 +1374,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                           className={`badge ${isCpkGood ? 'badge-success' : isCpkAcceptable ? 'badge-warning' : 'badge-danger'}`}
                           style={{ fontSize: '0.65rem', padding: '0.1rem 0.35rem' }}
                         >
-                          {isCpkGood ? '6-Sigma' : isCpkAcceptable ? 'Capable' : 'Action Req.'}
+                          {isCpkGood ? 'Cpk ≥ 1.33' : isCpkAcceptable ? 'Cpk ≥ 1.00' : 'Cần đánh giá'}
                         </span>
                       )}
                     </div>

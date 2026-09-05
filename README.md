@@ -27,7 +27,7 @@ Dữ liệu mô phỏng áp dụng các ràng buộc vật lý cho từng dạng
 
 ## Khởi chạy cục bộ
 
-Yêu cầu: Node.js 20 trở lên và npm.
+Yêu cầu: Node.js 20.19+ hoặc 22.12+ và npm (theo yêu cầu của Vite).
 
 ```bash
 npm ci
@@ -40,6 +40,7 @@ Mở địa chỉ do Vite hiển thị (thường là `http://localhost:5173`).
 
 ```bash
 npm run lint
+npm test
 npm run build
 npm run preview
 ```
@@ -72,4 +73,4 @@ Kho đã có GitHub Actions để build và triển khai GitHub Pages khi có th
 
 Kết quả thống kê và Design Space phụ thuộc vào chất lượng, cỡ mẫu, thiết kế, phương pháp phân tích và giả định mô hình. Trước khi sử dụng cho mục đích GxP hoặc hồ sơ đăng ký, cần có đánh giá độc lập của chuyên gia phát triển dược phẩm và thống kê.
 
-Các dải được lưu từ Prediction Profiler là **provisional screening ranges**, không phải PAR đã xác nhận. PAR/Design Space chính thức cần đánh giá đa biến, uncertainty phù hợp, confirmation run độc lập và phê duyệt theo hệ thống chất lượng. OLS/ANOVA trong app sẽ khóa khi thiết kế có nhiều block vì phiên bản hiện tại chưa ước lượng hiệu ứng block.
+Các dải được lưu từ Prediction Profiler là **provisional screening ranges**, không phải PAR đã xác nhận. PAR/Design Space chính thức cần đánh giá đa biến, uncertainty phù hợp, confirmation run độc lập và phê duyệt theo hệ thống chất lượng. OLS/ANOVA có biến giả cho hiệu ứng block cố định; đây không phải mô hình random-effects. Xem [báo cáo đối chiếu thống kê](STATISTICAL_AUDIT.md) để biết phạm vi kiểm chứng và giới hạn.

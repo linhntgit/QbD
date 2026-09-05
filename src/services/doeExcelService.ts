@@ -1,5 +1,5 @@
-import type { QBDProject, Factor, CQA, DoERun } from '../types/qbd';
-import { actualToCoded } from './doeGenerator';
+import type { QBDProject, Factor, CQA, DoERun, DoEDesignConfig } from '../types/qbd';
+import { actualToCoded, getFactorDesignBounds } from './doeGenerator';
 
 export interface ColumnMappingInfo {
   headerName: string;
@@ -59,7 +59,7 @@ function parseDelimitedRows(text: string, delimiter: string): string[][] {
   return rows;
 }
 
-function validateImportedRuns(runs: DoERun[], factors: Factor[]): ParseValidationError[] {
+function validateImportedRuns(runs: DoERun[], factors: Factor[], config?: DoEDesignConfig): ParseValidationError[] {
   const errors: ParseValidationError[] = [];
   const runOrders = new Set<number>();
   const stdOrders = new Set<number>();
@@ -77,7 +77,8 @@ function validateImportedRuns(runs: DoERun[], factors: Factor[]): ParseValidatio
     factors.forEach((factor) => {
       if (factor.controllability === 'constant' || factor.dataType === 'qualitative') return;
       const actual = run.factorActual[factor.code];
-      if (typeof actual !== 'number' || !Number.isFinite(actual) || actual < factor.low - 1e-8 || actual > factor.high + 1e-8) {
+      const { low, high } = getFactorDesignBounds(factor, config);
+      if (typeof actual !== 'number' || !Number.isFinite(actual) || actual < low - 1e-8 || actual > high + 1e-8) {
         errors.push({ row, column: factor.code, message: `${factor.code} nằm ngoài giới hạn khảo sát hoặc không hợp lệ.`, severity: 'error' });
       }
     });
@@ -154,7 +155,8 @@ export function processRawTableData(
   rows: any[][],
   factors: Factor[],
   cqas: CQA[],
-  existingRuns: DoERun[] = []
+  existingRuns: DoERun[] = [],
+  config?: DoEDesignConfig
 ): ParsedDoEData {
   const columnMappings: ColumnMappingInfo[] = headers.map((h, idx) => {
     const match = matchHeaderToEntity(h, factors, cqas);
@@ -277,7 +279,7 @@ export function processRawTableData(
     });
   });
 
-  errors.push(...validateImportedRuns(parsedRuns, factors));
+  errors.push(...validateImportedRuns(parsedRuns, factors, config));
   const hasCriticalErrors = errors.some((e) => e.severity === 'error');
 
   return {
@@ -298,7 +300,8 @@ export function parseClipboardExcel(
   clipboardText: string,
   factors: Factor[],
   cqas: CQA[],
-  existingRuns: DoERun[] = []
+  existingRuns: DoERun[] = [],
+  config?: DoEDesignConfig
 ): ParsedDoEData {
   if (!clipboardText || clipboardText.trim() === '') {
     return {
@@ -356,7 +359,7 @@ export function parseClipboardExcel(
     dataRows = lines;
   }
 
-  return processRawTableData(headers, dataRows, factors, cqas, existingRuns);
+  return processRawTableData(headers, dataRows, factors, cqas, existingRuns, config);
 }
 
 /**
@@ -367,7 +370,8 @@ export async function parseExcelFile(
   file: File,
   factors: Factor[],
   cqas: CQA[],
-  existingRuns: DoERun[] = []
+  existingRuns: DoERun[] = [],
+  config?: DoEDesignConfig
 ): Promise<ParsedDoEData> {
   if (!file.name.toLowerCase().endsWith('.csv')) {
     throw new Error('Chỉ nhận CSV UTF-8. Hãy mở file Excel bằng Excel và Save As CSV trước khi nhập.');
@@ -377,7 +381,7 @@ export async function parseExcelFile(
   const delimiter = text.split(/\r?\n/, 1)[0].includes(';') ? ';' : ',';
   const rows = parseDelimitedRows(text.replace(/^\uFEFF/, ''), delimiter);
   if (rows.length === 0) throw new Error('File CSV rỗng.');
-  return processRawTableData(rows[0], rows.slice(1), factors, cqas, existingRuns);
+  return processRawTableData(rows[0], rows.slice(1), factors, cqas, existingRuns, config);
 }
 
 function downloadCSV(headers: string[], rows: Array<Array<string | number | null | undefined>>, filename: string): void {

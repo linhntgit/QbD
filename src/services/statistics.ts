@@ -121,20 +121,17 @@ export function fitModel(
 ): StatisticalModelResult | null {
   // A 0/100 surrogate is not a binomial model.  Fail closed until a logistic
   // modelling engine is supplied rather than reporting invalid OLS p-values.
-  if (cqa.dataType === 'qualitative_binary' || cqa.objective === 'pass_category') return null;
+  if (cqa.dataType?.startsWith('qualitative') || cqa.objective === 'pass_category') return null;
   // Only vary factors that are not constant
   const activeFactors = factors.filter((f) => f.controllability !== 'constant');
 
   // Convert response value to numeric (handling qualitative binary / numbers)
   const parseResponse = (raw: number | string | null | undefined): number | null => {
-    if (raw === null || raw === undefined || raw === '') return null;
-    if (typeof raw === 'number') return isNaN(raw) ? null : raw;
+    if (raw === null || raw === undefined || (typeof raw === 'string' && raw.trim() === '')) return null;
+    if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
     if (typeof raw === 'string') {
-      const lower = raw.trim().toLowerCase();
-      if (lower === 'đạt' || lower === 'pass' || lower === 'yes' || lower === 'true') return 100.0;
-      if (lower === 'không đạt' || lower === 'fail' || lower === 'no' || lower === 'false') return 0.0;
       const num = Number(raw);
-      return isNaN(num) ? null : num;
+      return Number.isFinite(num) ? num : null;
     }
     return null;
   };
@@ -198,7 +195,8 @@ export function fitModel(
 
   const dfTotal = n - 1;
   const dfResidual = n - p;
-  const treatmentDF = terms.length - (hasExplicitIntercept ? 1 : 0);
+  // Both explicit intercepts and Scheffé mixture bases contain the constant.
+  const treatmentDF = terms.length - 1;
   const msResidual = dfResidual > 0 ? ssResidual / dfResidual : 0;
 
 
@@ -232,7 +230,9 @@ export function fitModel(
   const msPureError = dfPureError > 0 ? ssPureError / dfPureError : 0;
   const msLackOfFit = dfLackOfFit > 0 ? ssLackOfFit / dfLackOfFit : 0;
 
-  const fLackOfFit = msPureError > 0 && dfLackOfFit > 0 ? msLackOfFit / msPureError : undefined;
+  const fLackOfFit = dfPureError > 0 && dfLackOfFit > 0
+    ? msPureError > 0 ? msLackOfFit / msPureError : msLackOfFit > 1e-12 ? Infinity : undefined
+    : undefined;
   const pLackOfFit =
     fLackOfFit !== undefined ? fDistributionPValue(fLackOfFit, dfLackOfFit, dfPureError) : undefined;
 
@@ -244,7 +244,9 @@ export function fitModel(
   const interactionCount = modelBlocks.interactions;
   const quadraticCount = modelBlocks.quadratic;
 
-  const vifs = calculateVIFs(X, hasExplicitIntercept ? 1 : 0);
+  // Ordinary centered VIF is not identifiable for all mixture components
+  // together with a constant; don't report misleading finite mixture VIFs.
+  const vifs = hasExplicitIntercept ? calculateVIFs(X, 1) : new Array(p).fill(NaN);
 
   // Compute Term Statistics (SE, t-value, p-value)
   const regressionTerms: RegressionTerm[] = [...terms.map((t, idx) => {
@@ -321,14 +323,11 @@ export function fitModel(
   const infoCrit = calculateInformationCriteria(n, p, ssResidual);
 
   const yRange = Math.max(...yPred) - Math.min(...yPred);
-  const averagePredictionError = leverages.reduce(
-    (sum, leverage) => sum + Math.sqrt(Math.max(0, msResidual * leverage)),
-    0
-  ) / n;
+  const averagePredictionError = Math.sqrt(msResidual * p / n);
   const adeqPrecision = averagePredictionError > 0 ? yRange / averagePredictionError : 0;
 
   const stdDev = Math.sqrt(msResidual);
-  const cvPercent = yMean !== 0 ? (stdDev / yMean) * 100 : 0;
+  const cvPercent = yMean !== 0 ? (stdDev / Math.abs(yMean)) * 100 : Number.NaN;
 
   // Build ANOVA Table
   // Mixture bases omit an explicit intercept, but their components sum to one.
@@ -441,14 +440,17 @@ export function fitModel(
   let curvatureTest: (ANOVASource & { significant: boolean; note: string }) | undefined = undefined;
 
   const isCenterPoint = (item: (typeof validRuns)[number]) => {
-    return activeFactors.every((f) => Math.abs(item.run.factorCoded[f.code] ?? 0) <= 0.08);
+    return activeFactors.every((f) => Math.abs(item.run.factorCoded[f.code] ?? 0) <= 1e-8);
   };
   const isFactorialCorner = (item: (typeof validRuns)[number]) => activeFactors.every((factor) =>
-    Math.abs(Math.abs(item.run.factorCoded[factor.code] ?? 0) - 1) <= 0.08
+    Math.abs(Math.abs(item.run.factorCoded[factor.code] ?? 0) - 1) <= 1e-8
   );
   const centerPointRuns = validRuns.filter(isCenterPoint);
   const factorialRuns = validRuns.filter(isFactorialCorner);
   const supportsClassicalCurvature =
+    adjustedBlocks.length === 0 &&
+    terms.filter((term) => term.name !== 'Intercept' && !term.power.includes(2)).every((term) =>
+      factorialRuns.length > 0 && Math.abs(factorialRuns.reduce((sum, item) => sum + term.evaluator(item.run.factorCoded), 0) / factorialRuns.length) < 1e-8) &&
     !activeFactors.some((factor) => factor.role === 'mixture_component' || factor.type === 'Mixture') &&
     !activeFactors.some(isDiscreteFactor) &&
     validRuns.every((item) => isCenterPoint(item) || isFactorialCorner(item));
@@ -466,8 +468,8 @@ export function fitModel(
     const dfCurvature = 1;
     const msCurvature = ssCurvature;
 
-    const errMS = dfPureError > 0 && msPureError > 0 ? msPureError : msResidual > 0 ? msResidual : 1e-6;
-    const errDF = dfPureError > 0 ? dfPureError : dfResidual;
+    const errMS = msPureError;
+    const errDF = dfPureError;
 
     const fCurvature = msCurvature / errMS;
     const pCurvature = fDistributionPValue(fCurvature, dfCurvature, errDF);
@@ -483,7 +485,7 @@ export function fitModel(
       significant: isSig,
       note: isSig
         ? 'Phát hiện độ cong phi tuyến có ý nghĩa thống kê (p < 0.05). Khuyến nghị sử dụng mô hình Đa thức bậc 2 (Quadratic/RSM) hoặc Mạng Nơ-ron AI.'
-        : 'Không phát hiện độ cong có ý nghĩa thống kê (p ≥ 0.05). Mô hình tuyến tính/tương tác phù hợp.',
+        : 'Chưa phát hiện độ cong có ý nghĩa; kết quả này không chứng minh mô hình tuyến tính/tương tác phù hợp.',
     };
   }
 
@@ -685,29 +687,20 @@ export function projectToBoundedMixture(
   if (n === 0) return [];
   if (n === 1) return [Math.max(l[0], Math.min(u[0], total))];
 
-  // Clip to [l_i, u_i]
-  let current = p.map((val, i) => Math.max(l[i], Math.min(u[i], val)));
-
-  // Iterative projection onto simplex hyperplane sum(p_i) = total
-  for (let iter = 0; iter < n + 5; iter++) {
-    const curSum = current.reduce((a, b) => a + b, 0);
-    const diff = total - curSum;
-    if (Math.abs(diff) < 1e-6) break;
-
-    // Find indices of variables that can be adjusted
-    const freeIndices = current
-      .map((val, i) => (diff > 0 ? (val < u[i] - 1e-6 ? i : -1) : (val > l[i] + 1e-6 ? i : -1)))
-      .filter((i) => i >= 0);
-
-    if (freeIndices.length === 0) break;
-
-    const delta = diff / freeIndices.length;
-    freeIndices.forEach((i) => {
-      current[i] = Math.max(l[i], Math.min(u[i], current[i] + delta));
-    });
+  if (p.some((value) => !Number.isFinite(value))) return [];
+  // Euclidean projection: x_i = clip(p_i - lambda, l_i, u_i).
+  // Solve the monotone sum constraint; clipping first and redistributing is
+  // feasible but is not the nearest point in Euclidean distance.
+  let left = Math.min(...p.map((value, i) => value - u[i]));
+  let right = Math.max(...p.map((value, i) => value - l[i]));
+  for (let iteration = 0; iteration < 100; iteration++) {
+    const lambda = (left + right) / 2;
+    const sum = p.reduce((acc, value, i) => acc + Math.max(l[i], Math.min(u[i], value - lambda)), 0);
+    if (sum > total) left = lambda;
+    else right = lambda;
   }
-
-  return current.map((v) => Number(v.toFixed(10)));
+  const lambda = (left + right) / 2;
+  return p.map((value, i) => Math.max(l[i], Math.min(u[i], value - lambda)));
 }
 
 /** Return the mixture factors in their project order. */
@@ -823,22 +816,23 @@ export function isWithinSurveyBounds(
   let mixtureTotal = 0;
   let mixtureCount = 0;
   for (const f of factors) {
-    if (f.controllability === 'constant') continue;
     const isMixture = f.role === 'mixture_component' || f.type === 'Mixture';
+    if (f.controllability === 'constant' && !isMixture) continue;
     if (isMixture) {
       const lowPct = f.high <= 1.0 && f.unit !== '%' ? f.low * 100 : f.low;
       const highPct = f.high <= 1.0 && f.unit !== '%' ? f.high * 100 : f.high;
-      const valProp = coded[f.code] ?? 0;
+      const valProp = f.controllability === 'constant' ? actualToCoded(f.constantValue ?? f.low, f) : coded[f.code];
+      if (!Number.isFinite(valProp)) return false;
       const valPct = valProp * 100;
       // Allow slight numerical tolerance 0.05%
-      if (valPct < lowPct - 0.05 || valPct > highPct + 0.05) {
+      if (valPct < lowPct - 1e-8 || valPct > highPct + 1e-8) {
         return false;
       }
       mixtureTotal += valProp;
       mixtureCount++;
     } else {
       const c = coded[f.code] ?? 0;
-      if (c < -1.05 || c > 1.05) {
+      if (!Number.isFinite(c) || c < -1 - 1e-8 || c > 1 + 1e-8) {
         return false;
       }
       if (isDiscreteFactor(f) && Math.abs(snapFactorCoded(c, f) - c) > 1e-6) return false;
@@ -904,6 +898,15 @@ export function optimizeDesirability(
 
   const mixLowProps = mixFactors.map((f) => (f.high <= 1.0 && f.unit !== '%' ? f.low : f.low / 100));
   const mixHighProps = mixFactors.map((f) => (f.high <= 1.0 && f.unit !== '%' ? f.high : f.high / 100));
+  mixFactors.forEach((factor, index) => {
+    const fixed = lockedFactors?.[factor.code] ?? (factor.controllability === 'constant'
+      ? actualToCoded(factor.constantValue ?? factor.low, factor) : undefined);
+    if (fixed !== undefined) {
+      if (!Number.isFinite(fixed) || fixed < mixLowProps[index] || fixed > mixHighProps[index]) {
+        mixLowProps[index] = Infinity;
+      } else mixLowProps[index] = mixHighProps[index] = fixed;
+    }
+  });
   if (hasMixture && !isFeasibleBoundedMixture(mixLowProps, mixHighProps)) return null;
 
   let bestD = -1;
@@ -997,7 +1000,7 @@ export function optimizeDesirability(
   // 3. Multi-Start Local Fine-Tuning strictly inside Bounded Simplex
   const numStarts = 400;
   for (let iter = 0; iter < numStarts; iter++) {
-    const candidateCoded: Record<string, number> = {};
+    const candidateCoded: Record<string, number> = { ...initialCandidate };
     procFactors.forEach((f) => {
       if (lockedFactors && lockedFactors[f.code] !== undefined) {
         candidateCoded[f.code] = isDiscreteFactor(f) ? snapFactorCoded(lockedFactors[f.code], f) : lockedFactors[f.code];
@@ -1107,6 +1110,7 @@ export function runMonteCarloSimulation(
   variabilityPercent = Math.max(0.1, Math.min(15, Number.isFinite(variabilityPercent) ? variabilityPercent : 2));
   const startTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
   const validCQAs = cqas.filter((c) => models[c.code]);
+  if (validCQAs.length === 0) throw new Error('Monte Carlo requires at least one fitted response model.');
   const modeledCqaCodes = validCQAs.map((cqa) => cqa.code);
   const unmodeledCqaCodes = cqas.filter((cqa) => !models[cqa.code]).map((cqa) => cqa.code);
   let passCount = 0;
@@ -1122,6 +1126,15 @@ export function runMonteCarloSimulation(
   const hasMixture = mixFactors.length >= 2;
   const mixLowProps = mixFactors.map((f) => (f.high <= 1 && f.unit !== '%' ? f.low : f.low / 100));
   const mixHighProps = mixFactors.map((f) => (f.high <= 1 && f.unit !== '%' ? f.high : f.high / 100));
+  mixFactors.forEach((f, index) => {
+    if (f.controllability !== 'constant') return;
+    const value = Number(f.constantValue ?? f.low);
+    const proportion = f.high <= 1 && f.unit !== '%' ? value : value / 100;
+    if (!Number.isFinite(proportion) || proportion < mixLowProps[index] || proportion > mixHighProps[index]) {
+      throw new Error('Constant mixture component is outside its declared bounds.');
+    }
+    mixLowProps[index] = mixHighProps[index] = proportion;
+  });
   if (hasMixture && !isFeasibleBoundedMixture(mixLowProps, mixHighProps)) {
     throw new Error('Mixture bounds are infeasible: require Σlower ≤ 100% ≤ Σupper.');
   }
@@ -1135,7 +1148,7 @@ export function runMonteCarloSimulation(
     factor.high <= 1 && factor.unit !== '%' ? value : value / 100;
 
   // Preserve observed residual co-movement between CQAs when enough paired
-  // residuals exist; otherwise the conservative fallback is independence.
+  // residuals exist; otherwise assume independence (not necessarily conservative).
   const residualMaps = validCQAs.map((cqa) => {
     const map = new Map<number, number>();
     ((models[cqa.code].diagnostics as any).residuals ?? []).forEach((residual: any) => {
@@ -1243,9 +1256,10 @@ export function runMonteCarloSimulation(
       });
 
       if (hasMixture) {
-        const sampledTotal = sampledProps.reduce((sum, value) => sum + value, 0);
+        const fixedTotal = sampledProps.reduce((sum, value, i) => sum + (mixFactors[i].controllability === 'constant' ? value : 0), 0);
+        const sampledTotal = sampledProps.reduce((sum, value, i) => sum + (mixFactors[i].controllability === 'constant' ? 0 : value), 0);
         const normalizedProps = sampledTotal > 0
-          ? sampledProps.map((value) => value / sampledTotal)
+          ? sampledProps.map((value, i) => mixFactors[i].controllability === 'constant' ? value : value / sampledTotal * (1 - fixedTotal))
           : sampledProps;
         if (normalizedProps.some((value, index) => value < mixLowProps[index] - 1e-10 || value > mixHighProps[index] + 1e-10)) {
           batchOutsideSurveyRegion = true;
@@ -1274,12 +1288,16 @@ export function runMonteCarloSimulation(
       const model = models[cqa.code];
       const residualStd = (model.diagnostics as any).stdDev ?? (model.diagnostics as any).rmseVal ?? (model.diagnostics as any).rmseOverall ?? 0.1;
       const meanPredictionSE = 'predictStandardError' in model ? model.predictStandardError?.(sampleCoded) ?? 0 : 0;
+      if (!Number.isFinite(residualStd) || residualStd < 0 || !Number.isFinite(meanPredictionSE)) {
+        throw new Error(`Invalid uncertainty estimate for ${cqa.code}.`);
+      }
       const noiseStd = Math.sqrt(residualStd * residualStd + meanPredictionSE * meanPredictionSE);
 
       // Exact Box-Muller Gaussian Noise for model residual variance
       const resError = noiseStd * correlatedZ[cqaIndex];
 
       const yPred = model.predict(sampleCoded) + resError;
+      if (!Number.isFinite(yPred)) throw new Error(`Non-finite prediction for ${cqa.code}.`);
       cqaValues[cqa.code].push(yPred);
 
       if (cqa.lowerLimit !== undefined && yPred < cqa.lowerLimit) {
@@ -1376,8 +1394,8 @@ export function generateUpdatedRiskAssessment(
       if (model) {
         if ('terms' in model) {
           // Statistical Model
-          const term = model.terms.find((t) => t.factorCodes.includes(f.code));
-          if (term && term.significant) {
+          const significantTerm = model.terms.some((t) => t.factorCodes.includes(f.code) && t.significant);
+          if (significantTerm) {
             isSig = true;
           }
         } else if ('diagnostics' in model) {
@@ -1400,12 +1418,8 @@ export function generateUpdatedRiskAssessment(
       const diagnostics = model?.diagnostics as any;
       const q2 = diagnostics?.qSquared ?? diagnostics?.predRSquared;
       const lof = diagnostics?.pLOF;
-      const modelAdequate = isPolynomial
-        ? ((model as StatisticalModelResult | undefined)?.residualDegreesOfFreedom ?? 0) >= 4 && Number.isFinite(q2) && q2 >= 0 && (lof === undefined || lof === null || lof >= 0.05)
-        : Number.isFinite(diagnostics?.rSquaredVal) && diagnostics.rSquaredVal >= 0.5;
-      // A model alone never authorizes a risk downgrade.  Confirmation data and
-      // approved controls are required; retain medium risk when any evidence is missing.
-      const updatedRisk: 'Low' | 'Medium' = initialRisk === 'Low' && modelAdequate ? 'Low' : 'Medium';
+      // Statistical significance alone never justifies reducing an FMEA risk level.
+      const updatedRisk: 'Low' | 'Medium' | 'High' = initialRisk;
       const evidence = isPolynomial
         ? `OLS: df dư ${(model as StatisticalModelResult | undefined)?.residualDegreesOfFreedom ?? 0}, Q² ${Number.isFinite(q2) ? q2.toFixed(3) : 'không có'}, LOF ${lof === undefined || lof === null ? 'không ước lượng được' : `p=${lof.toFixed(3)}`}`
         : `ANN: validation R² ${Number.isFinite(diagnostics?.rSquaredVal) ? diagnostics.rSquaredVal.toFixed(3) : 'không có'} (không phải p-value/Q²)`;

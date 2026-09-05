@@ -235,7 +235,7 @@ export interface UpdatedRiskItem {
   cqaCode: string;
   cqaName: string;
   initialRisk: 'High' | 'Medium' | 'Low';
-  updatedRisk: 'Low' | 'Medium';
+  updatedRisk: 'Low' | 'Medium' | 'High';
   isSignificantInModel: boolean;
   justification: string;
 }

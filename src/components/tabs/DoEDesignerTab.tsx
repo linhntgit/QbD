@@ -914,7 +914,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
       setParsedData(null);
       return;
     }
-    const result = parseClipboardExcel(text, project.factors, project.cqas, project.runs);
+    const result = parseClipboardExcel(text, project.factors, project.cqas, project.runs, project.doeConfig);
     setParsedData(result);
   };
 
@@ -926,7 +926,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
     setIsProcessingFile(true);
     setFileError(null);
     try {
-      const result = await parseExcelFile(file, project.factors, project.cqas, project.runs);
+      const result = await parseExcelFile(file, project.factors, project.cqas, project.runs, project.doeConfig);
       setParsedData(result);
       setShowImportModal(true);
       setImportTab('file');

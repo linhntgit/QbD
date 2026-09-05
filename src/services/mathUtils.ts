@@ -204,7 +204,7 @@ export function logGamma(z: number): number {
  */
 function betacf(a: number, b: number, x: number): number {
   const MAXIT = 200;
-  const EPS = 3.0e-7;
+  const EPS = 3.0e-14;
   const FPMIN = 1.0e-30;
 
   const qab = a + b;
@@ -244,7 +244,7 @@ function betacf(a: number, b: number, x: number): number {
  * Regularized Incomplete Beta function I_x(a, b)
  */
 export function incBeta(a: number, b: number, x: number): number {
-  if (x < 0.0 || x > 1.0) return 0;
+  if (!(a > 0 && b > 0) || !Number.isFinite(a + b) || !(x >= 0 && x <= 1)) return Number.NaN;
   if (x === 0.0) return 0.0;
   if (x === 1.0) return 1.0;
 
@@ -263,7 +263,8 @@ export function incBeta(a: number, b: number, x: number): number {
  * Returns P(F >= fVal)
  */
 export function fDistributionPValue(fVal: number, df1: number, df2: number): number {
-  if (fVal <= 0 || isNaN(fVal) || df1 <= 0 || df2 <= 0) return 1.0;
+  if (isNaN(fVal) || !(df1 > 0 && df2 > 0) || !Number.isFinite(df1 + df2)) return Number.NaN;
+  if (fVal <= 0) return 1;
   const x = df2 / (df2 + df1 * fVal);
   const p = incBeta(df2 / 2, df1 / 2, x);
   return Math.min(1.0, Math.max(0.0, p));
@@ -274,7 +275,7 @@ export function fDistributionPValue(fVal: number, df1: number, df2: number): num
  * Returns P(|T| >= |tVal|)
  */
 export function tDistributionPValue(tVal: number, df: number): number {
-  if (df <= 0 || isNaN(tVal)) return 1.0;
+  if (!(df > 0) || !Number.isFinite(df) || isNaN(tVal)) return Number.NaN;
   const absT = Math.abs(tVal);
   const x = df / (df + absT * absT);
   const p = incBeta(df / 2, 0.5, x);
@@ -285,9 +286,11 @@ export function tDistributionPValue(tVal: number, df: number): number {
  * Standard Normal (Gaussian) Cumulative Distribution Function CDF
  */
 export function normalCDF(x: number, mean: number = 0, sd: number = 1): number {
+  if (!(sd > 0) || !Number.isFinite(sd) || !Number.isFinite(mean)) return NaN;
   const z = (x - mean) / sd;
+  if (z === 0) return 0.5;
   const t = 1 / (1 + 0.2316419 * Math.abs(z));
-  const d = 0.3989423 * Math.exp((-z * z) / 2);
+  const d = Math.exp((-z * z) / 2) / Math.sqrt(2 * Math.PI);
   const prob =
     d *
     t *
@@ -300,8 +303,9 @@ export function normalCDF(x: number, mean: number = 0, sd: number = 1): number {
  * Standard Normal Quantile Function (probit / inverse CDF)
  */
 export function normalInverseCDF(p: number): number {
-  if (p <= 0) return -6;
-  if (p >= 1) return 6;
+  if (!(p >= 0 && p <= 1)) return Number.NaN;
+  if (p === 0) return -Infinity;
+  if (p === 1) return Infinity;
   if (p === 0.5) return 0;
 
   // Rational approximation by Abramowitz and Stegun
@@ -363,7 +367,7 @@ export function calculateIndividualDesirability(
   s: number = 1.0,
   t: number = 1.0
 ): number {
-  if (isNaN(y) || y === null || y === undefined) return 0;
+  if (!Number.isFinite(y)) return 0;
 
   switch (objective) {
     case 'pass_category': {
@@ -447,53 +451,31 @@ export function calculateCQAMargin(
   objective: string,
   lowerLimit?: number,
   upperLimit?: number,
-  target?: number
+  _target?: number
 ): number {
-  if (isNaN(yPred)) return -1;
-
-  if (objective === 'minimize') {
-    // For minimize, specification is y <= upperLimit (USL)
-    if (upperLimit !== undefined) {
-      const range = lowerLimit !== undefined && upperLimit > lowerLimit ? upperLimit - lowerLimit : Math.abs(upperLimit) || 1.0;
-      return (upperLimit - yPred) / range;
-    }
-    if (lowerLimit !== undefined) {
-      return (lowerLimit - yPred) / (Math.abs(lowerLimit) || 1.0);
-    }
-  } else if (objective === 'maximize') {
-    // For maximize, specification is y >= lowerLimit (LSL)
-    if (lowerLimit !== undefined) {
-      const range = upperLimit !== undefined && upperLimit > lowerLimit ? upperLimit - lowerLimit : Math.abs(lowerLimit) || 1.0;
-      return (yPred - lowerLimit) / range;
-    }
-    if (upperLimit !== undefined) {
-      return (yPred - upperLimit) / (Math.abs(upperLimit) || 1.0);
-    }
-  } else if (objective === 'target') {
-    // For target, specification is within [lowerLimit, upperLimit]
-    if (lowerLimit !== undefined && upperLimit !== undefined) {
-      const range = upperLimit - lowerLimit || 1.0;
-      const distLower = (yPred - lowerLimit) / range;
-      const distUpper = (upperLimit - yPred) / range;
-      return Math.min(distLower, distUpper);
-    }
-    if (target !== undefined) {
-      const tol = Math.abs(target) > 0 ? Math.abs(target) * 0.1 : 1.0;
-      return 1.0 - Math.abs(yPred - target) / tol;
-    }
-  } else {
-    // Default dual limit
-    if (lowerLimit !== undefined && upperLimit !== undefined) {
-      const range = upperLimit - lowerLimit || 1.0;
-      const distLower = (yPred - lowerLimit) / range;
-      const distUpper = (upperLimit - yPred) / range;
-      return Math.min(distLower, distUpper);
-    }
-    if (lowerLimit !== undefined) return (yPred - lowerLimit) / (Math.abs(lowerLimit) || 1.0);
-    if (upperLimit !== undefined) return (upperLimit - yPred) / (Math.abs(upperLimit) || 1.0);
+  if (!Number.isFinite(yPred)) return -Infinity;
+  // Specification limits apply regardless of the optimization direction.
+  // A target without limits is a preference, not an invented ±10% specification.
+  if (lowerLimit !== undefined || upperLimit !== undefined) {
+    const scale = lowerLimit !== undefined && upperLimit !== undefined
+      ? Math.abs(upperLimit - lowerLimit) || 1
+      : Math.abs(lowerLimit ?? upperLimit!) || 1;
+    return Math.min(lowerLimit === undefined ? Infinity : (yPred - lowerLimit) / scale,
+      upperLimit === undefined ? Infinity : (upperLimit - yPred) / scale);
   }
+  return objective === 'pass_category' ? -Infinity : 1;
+}
 
-  return 1.0;
+/** Wilson score interval for a binomial proportion, including zero events. */
+export function wilsonInterval(events: number, n: number, z = 1.959963984540054): { low: number; high: number } {
+  if (!Number.isInteger(n) || n <= 0 || !Number.isInteger(events) || events < 0 || events > n) {
+    return { low: NaN, high: NaN };
+  }
+  const p = events / n;
+  const denominator = 1 + z * z / n;
+  const center = (p + z * z / (2 * n)) / denominator;
+  const half = z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denominator;
+  return { low: Math.max(0, center - half), high: Math.min(1, center + half) };
 }
 
 /**
@@ -679,11 +661,10 @@ export interface InformationCriteria {
 }
 
 export function calculateInformationCriteria(n: number, p: number, sse: number): InformationCriteria {
-  if (n <= 0 || sse <= 0) {
-    return { aicc: 0, bic: 0, twoLL: 0, logLikelihood: 0 };
+  if (!(n > 0 && p >= 0 && sse > 0) || !Number.isFinite(n + p + sse)) {
+    return { aicc: NaN, bic: NaN, twoLL: NaN, logLikelihood: NaN };
   }
-  const safeSSE = Math.max(1e-12, sse);
-  const logTerm = n * Math.log(safeSSE / n);
+  const logTerm = n * Math.log(sse / n);
   const constTerm = n * Math.log(2 * Math.PI) + n;
 
   const twoLL = logTerm + constTerm;
@@ -691,7 +672,8 @@ export function calculateInformationCriteria(n: number, p: number, sse: number):
 
   // AICc with Hurvich & Tsai small-sample correction
   const denom = n - p - 1;
-  const aiccPenalty = 2 * p + (denom > 0 ? (2 * p * (p + 1)) / denom : 2 * p);
+  // Mean-parameter convention, matching statsmodels OLS info_criteria default.
+  const aiccPenalty = denom > 0 ? 2 * p + (2 * p * (p + 1)) / denom : Infinity;
   const aicc = twoLL + aiccPenalty;
 
   // BIC penalty (Schwarz Criterion)
@@ -699,16 +681,16 @@ export function calculateInformationCriteria(n: number, p: number, sse: number):
   const bic = twoLL + bicPenalty;
 
   return {
-    aicc: Number(aicc.toFixed(3)),
-    bic: Number(bic.toFixed(3)),
-    twoLL: Number(twoLL.toFixed(3)),
-    logLikelihood: Number(logLikelihood.toFixed(3)),
+    aicc,
+    bic,
+    twoLL,
+    logLikelihood,
   };
 }
 
 /**
- * Calculate Carpenter (1995) Neural Architecture and Empirical Rules
- * According to Pharmaceutical Formulation ANN Guidelines (Slide 31-32)
+ * Single-hidden-layer parameter-budget heuristic (not an optimality theorem)
+ * Legacy API name retained for compatibility.
  */
 export interface CarpenterArchitectureResult {
   carpenterRecommended: number;
@@ -731,9 +713,9 @@ export function calculateCarpenterArchitecture(
   const m = Math.max(1, nOutputs);
   const N = Math.max(1, nSamples);
 
-  // Carpenter (1995) formula: h = (N/beta - m) / (n + m + 1)
+  // Solve beta * [h(n+m+1)+m] <= N: h = (N/beta - m) / (n + m + 1)
   const rawH = (N / Math.max(1.0, beta) - m) / (n + m + 1);
-  const hCarpenter = Math.max(1, Math.min(Math.max(1, 2 * n), Math.round(rawH)));
+  const hCarpenter = Math.max(1, Math.min(Math.max(1, 2 * n), Math.floor(rawH)));
 
   // Parameter calculation for 1 hidden layer
   const weights = n * hCarpenter + hCarpenter * m;
@@ -743,14 +725,14 @@ export function calculateCarpenterArchitecture(
 
   const rules = [
     {
-      name: 'Carpenter (1995)',
+      name: 'Ngân sách tham số (heuristic)',
       value: hCarpenter,
-      description: `Công thức Carpenter với β=${beta}: h = (N/β - m)/(n + m + 1)`,
+      description: `Ngân sách tham số với β=${beta}: h = (N/β - m)/(n + m + 1)`,
     },
     {
       name: 'Quy tắc 2/3 (Two-Thirds Rule)',
-      value: Math.max(1, Math.round(n + (2 / 3) * m)),
-      description: `h = n + 2/3 * m = ${n} + 2/3 * ${m}`,
+      value: Math.max(1, Math.round((2 / 3) * n + m)),
+      description: `h = 2/3 * n + m = 2/3 * ${n} + ${m}`,
     },
     {
       name: 'Quy tắc Trung bình (Between Inputs & Outputs)',
@@ -774,13 +756,13 @@ export function calculateCarpenterArchitecture(
 
   if (totalParams >= N) {
     overfittingRisk = 'danger';
-    recommendation = `⚠️ Cảnh báo Overfitting: Tổng số tham số (${totalParams}) vượt quá số mẫu thí nghiệm (${N}). Khuyến nghị giảm số nơ-ron ẩn xuống ${Math.max(1, Math.floor(hCarpenter / 2))} hoặc tăng số thí nghiệm.`;
+    recommendation = `⚠️ Cảnh báo Overfitting: Tổng số tham số (${totalParams}) bằng hoặc vượt số mẫu thí nghiệm (${N}). Khuyến nghị giảm số nơ-ron ẩn xuống ${Math.max(1, Math.floor(hCarpenter / 2))} hoặc tăng số thí nghiệm.`;
   } else if (totalParams >= N * 0.75) {
     overfittingRisk = 'warning';
-    recommendation = `⚡ Cảnh báo: Tỷ lệ tham số / mẫu khá cao (${totalParams}/${N}). Nên áp dụng Dropout hoặc Weight Decay L2 >= 0.01.`;
+    recommendation = `⚡ Cảnh báo: Tỷ lệ tham số / mẫu khá cao (${totalParams}/${N}). Cần chọn mức regularization bằng kiểm định phù hợp.`;
   } else {
     overfittingRisk = 'safe';
-    recommendation = `✓ Cấu trúc tối ưu: Kiến trúc [${n} → ${hCarpenter} → ${m}] cân bằng hoàn hảo giữa độ chính xác và khả năng tổng quát hóa (Tổng tham số = ${totalParams} < N = ${N}).`;
+    recommendation = `Gợi ý khởi đầu: Kiến trúc [${n} → ${hCarpenter} → ${m}] cần được so sánh bằng kiểm định ngoài mẫu (Tổng tham số = ${totalParams} < N = ${N}).`;
   }
 
   return {

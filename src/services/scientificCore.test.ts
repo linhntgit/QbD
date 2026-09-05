@@ -137,7 +137,7 @@ describe('reproducible analysis and report release gate', () => {
   it('does not silently downgrade risk when model or confirmation evidence is absent', () => {
     const updated = generateUpdatedRiskAssessment(CASE_STUDIES[2], {});
     expect(updated.length).toBeGreaterThan(0);
-    expect(updated.every((item) => item.updatedRisk === 'Medium')).toBe(true);
+    expect(updated.every((item) => item.updatedRisk === item.initialRisk)).toBe(true);
   });
 
   it('reproduces Monte Carlo results exactly from the persisted seed', () => {

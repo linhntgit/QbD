@@ -1,6 +1,6 @@
 import type { CQA, Factor, MonteCarloResult, NeuralNetModelResult, StatisticalModelResult } from '../types/qbd';
 import { actualToCoded, codedToActual, getConfiguredFactorCodes, isDiscreteFactor, snapFactorCoded } from './doeGenerator';
-import { calculateCQAMargin } from './mathUtils';
+import { calculateCQAMargin, wilsonInterval } from './mathUtils';
 
 type PredictiveModel = StatisticalModelResult | NeuralNetModelResult;
 
@@ -60,12 +60,12 @@ export function assessDesignSpaceRobustness(
     const normalizedMargin = calculateCQAMargin(predicted, cqa.objective, cqa.lowerLimit, cqa.upperLimit, cqa.target);
     return { code: cqa.code, predicted, normalizedMargin, accepted: normalizedMargin >= 0 };
   });
-  const failure = monteCarlo ? 1 - monteCarlo.reliabilityPercent / 100 : null;
+  const failure = monteCarlo && monteCarlo.simulations > 0 ? monteCarlo.failCount / monteCarlo.simulations : null;
   const simulations = monteCarlo?.simulations ?? 0;
-  const halfWidth = failure !== null && simulations > 0 ? 1.96 * Math.sqrt(Math.max(0, failure * (1 - failure) / simulations)) : null;
-  const probabilityInterval95 = failure !== null && halfWidth !== null ? {
-    low: Number((Math.max(0, failure - halfWidth) * 100).toFixed(3)),
-    high: Number((Math.min(1, failure + halfWidth) * 100).toFixed(3)),
+  const interval = monteCarlo && simulations > 0 ? wilsonInterval(monteCarlo.failCount, simulations) : null;
+  const probabilityInterval95 = interval ? {
+    low: interval.low * 100,
+    high: interval.high * 100,
   } : null;
 
   const sensitivities = factors

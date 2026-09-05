@@ -84,6 +84,12 @@ export function App() {
 
   const analysisProvenance = project.analysisProvenance ?? createAnalysisProvenance(project.id);
 
+  useEffect(() => {
+    if (!project.cqas.some((cqa) => cqa.code === selectedCQA)) {
+      setSelectedCQA(project.cqas[0]?.code ?? '');
+    }
+  }, [project.cqas, selectedCQA]);
+
   // Global keyboard shortcut: Press ? or F1 to toggle Help Drawer
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -197,12 +203,14 @@ export function App() {
 
   // Handle Copying config to all CQAs
   const handleCopyNeuralConfigToAll = (sourceConfig: NeuralNetConfig) => {
+    setNeuralTrainingVersion(0);
+    setRestoredNeuralModels({});
     const next: Record<string, NeuralNetConfig> = {};
     project.cqas.forEach((cqa) => {
       next[cqa.code] = { ...sourceConfig, seed: sourceConfig.seed };
     });
     setNeuralConfigs(next);
-    persistAnalysisSettings({ neuralConfigs: next, appliedOptimum: undefined });
+    persistAnalysisSettings({ neuralConfigs: next, appliedOptimum: undefined, neuralArtifacts: undefined });
   };
 
   // Calculate Desirability Optimum dynamically from active modeling engine
@@ -217,7 +225,8 @@ export function App() {
   const [monteCarlo, setMonteCarlo] = useState<MonteCarloResult | null>(null);
   useEffect(() => {
     setMonteCarlo(null);
-  }, [optimum, project.factors, project.cqas, activeModels]);
+  }, [optimum, project.factors, project.cqas, activeModels, analysisProvenance.monteCarloSeed,
+    analysisProvenance.monteCarloVariabilityPercent, analysisProvenance.monteCarloSimulations]);
   const reportReadiness = useMemo(
     () => getReportReadiness(project, activeModels, optimum, monteCarlo),
     [project, activeModels, optimum, monteCarlo],
@@ -273,8 +282,10 @@ export function App() {
   };
 
   const handleNeuralTrainingModeChange = (mode: NeuralTrainingMode) => {
+    setNeuralTrainingVersion(0);
+    setRestoredNeuralModels({});
     setNeuralTrainingMode(mode);
-    persistAnalysisSettings({ neuralTrainingMode: mode, appliedOptimum: undefined });
+    persistAnalysisSettings({ neuralTrainingMode: mode, appliedOptimum: undefined, neuralArtifacts: undefined });
   };
 
   const handleApplyOptimum = (solution: DesirabilitySolution) => {
@@ -401,6 +412,7 @@ export function App() {
     setSharedNeuralConfig({ ...DEFAULT_NEURAL_CONFIG });
     setNeuralConfigs({});
     setNeuralTrainingVersion(0);
+    setRestoredNeuralModels({});
     setModelingEngine('polynomial');
     setSelectedCQA('Y1');
     setActiveTab('qtpp');
@@ -414,6 +426,11 @@ export function App() {
     setNeuralTrainingMode(normalized.analysisSettings?.neuralTrainingMode ?? 'independent');
     setSharedNeuralConfig(normalized.analysisSettings?.sharedNeuralConfig ?? { ...DEFAULT_NEURAL_CONFIG });
     setNeuralConfigs(normalized.analysisSettings?.neuralConfigs ?? {});
+    const artifact = normalized.analysisSettings?.neuralArtifacts;
+    setRestoredNeuralModels(artifact?.version === 1 &&
+      artifact.fingerprint === getNeuralArtifactFingerprint(normalized.factors, normalized.cqas, normalized.runs)
+      ? hydrateNeuralModels(artifact.models, normalized.factors, normalized.runs)
+      : {});
     setNeuralTrainingVersion(0);
     setModelingEngine(normalized.analysisSettings?.modelingEngine ?? 'polynomial');
     setSelectedCQA(snapshot.cqas[0]?.code || 'Y1');

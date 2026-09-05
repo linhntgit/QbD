@@ -16,7 +16,7 @@ import type {
   ModelingEngine,
 } from '../../types/qbd';
 import { PlotlyChart } from '../PlotlyChart';
-import { normalInverseCDF, formatAxisTitle } from '../../services/mathUtils';
+import { normalInverseCDF, formatAxisTitle, tDistributionCritical } from '../../services/mathUtils';
 import { assessModelCandidates, buildConfirmationPlan, generateUpdatedRiskAssessment } from '../../services/statistics';
 
 interface StatisticalANOVATabProps {
@@ -115,6 +115,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
 
         const names = effectTerms.map((t) => formatTermName(t.name));
         const tVals = effectTerms.map((t) => Math.abs(t.tValue));
+        const tCritical = tDistributionCritical(0.05, model.residualDegreesOfFreedom ?? NaN);
         const colors = effectTerms.map((t) => (t.significant ? '#1e3a8a' : '#94a3b8'));
 
         const data = [
@@ -148,8 +149,8 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
           shapes: [
             {
               type: 'line',
-              x0: 2.086, // ~ t critical alpha=0.05
-              x1: 2.086,
+              x0: tCritical,
+              x1: tCritical,
               y0: -0.5,
               y1: names.length - 0.5,
               line: { color: '#dc2626', width: 2, dash: 'dash' },
@@ -157,7 +158,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
           ],
           annotations: [
             {
-              x: 2.086,
+              x: tCritical,
               y: 0,
               text: 'Ngưỡng p = 0.05 (t-Critical)',
               showarrow: true,

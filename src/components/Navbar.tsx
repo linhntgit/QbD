@@ -47,20 +47,22 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const handleJSONUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      alert('File JSON vượt quá giới hạn 10 MB.');
+      return;
+    }
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
         const data = JSON.parse(event.target?.result as string);
-        if (data.cqas && data.factors && data.doeConfig) {
-          onLoadProject(data);
-        } else {
-          alert('File JSON không hợp lệ theo chuẩn cấu trúc QbD Project.');
-        }
+        onLoadProject(data);
       } catch (err) {
         alert('Lỗi đọc file JSON: ' + (err as Error).message);
       }
     };
+    reader.onerror = () => alert('Không thể đọc file JSON. Hãy thử chọn lại file.');
     reader.readAsText(file);
   };
 

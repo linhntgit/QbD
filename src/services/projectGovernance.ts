@@ -6,6 +6,7 @@ import type {
   QBDProject,
   StatisticalModelResult,
 } from '../types/qbd';
+import { getFactorDesignBounds } from './doeGenerator';
 
 export interface ProjectAuditEntry {
   id: string;
@@ -28,17 +29,61 @@ export interface ReportReadinessResult extends ProjectValidationResult {
   readyForScientificReport: boolean;
 }
 
-const storageAvailable = (): boolean => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+const storageAvailable = (): boolean => {
+  try {
+    return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+  } catch {
+    return false;
+  }
+};
 const projectKey = (projectId: string) => `qbd.project.${projectId}`;
 const historyKey = (projectId: string) => `qbd.project.history.${projectId}`;
 
 const cloneProject = (project: QBDProject): QBDProject => JSON.parse(JSON.stringify(project)) as QBDProject;
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/** Check persisted/JSON data before any component or model dereferences it.
+ * Keep this separate from scientific validation: an unfinished draft is loadable.
+ */
+export function hasProjectStructure(value: unknown): value is QBDProject {
+  if (!isRecord(value)) return false;
+  const strings = (item: Record<string, unknown>, keys: string[]) => keys.every((key) => typeof item[key] === 'string');
+  const rows = (key: string, check: (row: Record<string, unknown>) => boolean) =>
+    Array.isArray(value[key]) && value[key].every((row: unknown) => isRecord(row) && check(row));
+  const categories = (row: Record<string, unknown>) => row.categories === undefined ||
+    (Array.isArray(row.categories) && row.categories.every((level) => typeof level === 'string'));
+  if (!strings(value, ['id', 'name', 'moleculeName', 'dosageForm', 'author', 'version', 'createdDate', 'updatedDate', 'description'])) return false;
+  if (!isRecord(value.doeConfig)) return false;
+  if (!rows('qtpp', (row) => strings(row, ['id', 'element', 'target', 'justification'])) ||
+      !rows('factors', (row) => strings(row, ['id', 'code', 'name', 'unit', 'type', 'dataType', 'controllability']) &&
+        Number.isFinite(row.low) && Number.isFinite(row.high) && categories(row)) ||
+      !rows('cqas', (row) => strings(row, ['id', 'code', 'name', 'unit', 'objective']) &&
+        Number.isFinite(row.weight) && (row.dataType === undefined || typeof row.dataType === 'string') && categories(row)) ||
+      !rows('runs', (row) => strings(row, ['id']) && isRecord(row.factorCoded) && isRecord(row.factorActual) && isRecord(row.responses)) ||
+      !rows('fmeaRisks', (row) => strings(row, ['id', 'factorId', 'cqaId'])) ||
+      !rows('designSpace', (row) => strings(row, ['factorCode']))) return false;
+  if (value.analysisSettings !== undefined) {
+    const settings = value.analysisSettings;
+    if (!isRecord(settings)) return false;
+    for (const key of ['modelTypes', 'sharedNeuralConfig', 'neuralConfigs']) {
+      if (settings[key] !== undefined && !isRecord(settings[key])) return false;
+    }
+    if (settings.neuralArtifacts !== undefined && (!isRecord(settings.neuralArtifacts) || !isRecord(settings.neuralArtifacts.models))) return false;
+    if (settings.appliedOptimum !== undefined && (!isRecord(settings.appliedOptimum) ||
+        !isRecord(settings.appliedOptimum.codedFactors) || !isRecord(settings.appliedOptimum.actualFactors) ||
+        !isRecord(settings.appliedOptimum.predictedResponses))) return false;
+  }
+  return value.analysisProvenance === undefined || isRecord(value.analysisProvenance);
+}
+
 export function loadPersistedProject(): QBDProject | null {
   if (!storageAvailable()) return null;
   try {
     const value = window.localStorage.getItem('qbd.project.last');
-    return value ? JSON.parse(value) as QBDProject : null;
+    const parsed: unknown = value ? JSON.parse(value) : null;
+    return hasProjectStructure(parsed) ? parsed : null;
   } catch {
     return null;
   }
@@ -60,7 +105,10 @@ export function getProjectHistory(projectId: string): ProjectVersionSnapshot[] {
   if (!storageAvailable()) return [];
   try {
     const value = window.localStorage.getItem(historyKey(projectId));
-    return value ? JSON.parse(value) as ProjectVersionSnapshot[] : [];
+    const parsed: unknown = value ? JSON.parse(value) : [];
+    return Array.isArray(parsed) ? parsed.filter((entry): entry is ProjectVersionSnapshot =>
+      isRecord(entry) && typeof entry.id === 'string' && typeof entry.timestamp === 'string' &&
+      typeof entry.action === 'string' && typeof entry.versionLabel === 'string' && hasProjectStructure(entry.project)) : [];
   } catch {
     return [];
   }
@@ -88,6 +136,7 @@ export function recordProjectVersion(project: QBDProject, action: string): boole
 export function validateProjectTemplate(project: QBDProject): ProjectValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
+  if (!hasProjectStructure(project)) return { valid: false, errors: ['Cấu trúc QbD Project không hợp lệ hoặc thiếu trường bắt buộc.'], warnings };
   if (!project.name.trim()) errors.push('Thiếu tên project.');
   if (project.cqas.length === 0) errors.push('Cần ít nhất một CQA.');
   if (project.factors.length === 0) errors.push('Cần ít nhất một factor.');
@@ -101,6 +150,9 @@ export function validateProjectTemplate(project: QBDProject): ProjectValidationR
     if ((factor.dataType === 'qualitative' || factor.dataType === 'quantitative_multilevel')) {
       const levels = (factor.categories ?? []).map((level) => level.trim()).filter(Boolean);
       if (levels.length < 2 || levels.length > 10) errors.push(`${factor.code}: phải khai báo từ 2 đến 10 mức.`);
+      if (factor.dataType === 'quantitative_multilevel' && levels.some((level) => !Number.isFinite(Number(level)))) {
+        errors.push(`${factor.code}: các mức định lượng phải là số hữu hạn.`);
+      }
       if (new Set(levels).size !== levels.length) errors.push(`${factor.code}: các mức không được trùng nhau.`);
       if (factor.dataType === 'quantitative_multilevel' && new Set(levels.map(Number)).size !== levels.length) {
         errors.push(`${factor.code}: các mức định lượng không được trùng nhau về giá trị.`);
@@ -135,6 +187,7 @@ export function validateProjectTemplate(project: QBDProject): ProjectValidationR
     else seenStdOrders.add(run.stdOrder);
 
     project.factors.forEach((factor) => {
+      const designBounds = getFactorDesignBounds(factor, project.doeConfig);
       const coded = run.factorCoded[factor.code];
       const actual = run.factorActual[factor.code];
       if (factor.controllability === 'constant') return;
@@ -147,7 +200,7 @@ export function validateProjectTemplate(project: QBDProject): ProjectValidationR
       if (typeof actual !== 'number' || !Number.isFinite(actual)) errors.push(`${runLabel}: ${factor.code} thiếu/không hợp lệ ở actual scale.`);
       else if (factor.dataType === 'quantitative_multilevel' && factor.categories?.length && !factor.categories.some((level) => Number(level) === actual)) {
         errors.push(`${runLabel}: ${factor.code} có mức '${actual}' ngoài các mức định lượng đã khai báo.`);
-      } else if (actual < factor.low - 1e-8 || actual > factor.high + 1e-8) errors.push(`${runLabel}: ${factor.code} nằm ngoài dải khảo sát.`);
+      } else if (actual < designBounds.low - 1e-8 || actual > designBounds.high + 1e-8) errors.push(`${runLabel}: ${factor.code} nằm ngoài dải khảo sát.`);
     });
 
     if (mixture.length >= 2) {
@@ -207,7 +260,7 @@ export function getReportReadiness(
     } else {
       if (model.config.validationMethod === 'none') errors.push(`${cqa.code}: NN chưa có validation holdout.`);
       if (!Number.isFinite(model.diagnostics.rSquaredVal)) errors.push(`${cqa.code}: NN không có chỉ số validation hợp lệ.`);
-      if ((model.parameterCount ?? 0) >= model.diagnostics.residuals.filter((item) => !item.isValidation).length) {
+      if ((model.parameterCount ?? 0) >= (model.diagnostics.trainingSampleCount ?? model.diagnostics.residuals.filter((item) => !item.isValidation).length)) {
         errors.push(`${cqa.code}: số tham số NN không nhỏ hơn số mẫu training.`);
       }
     }

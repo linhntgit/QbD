@@ -12,15 +12,13 @@ import type {
   DesirabilitySolution,
 } from '../types/qbd';
 import {
-  calculateIndividualDesirability,
-  calculateInformationCriteria,
   calculateCarpenterArchitecture,
 } from './mathUtils';
-import { projectToBoundedMixture, isWithinSurveyBounds, isFeasibleBoundedMixture } from './statistics';
+import { projectToBoundedMixture, optimizeDesirability } from './statistics';
 import { buildFactorFeatures } from './modelTerms';
 
 export const getNeuralArtifactFingerprint = (factors: Factor[], cqas: CQA[], runs: DoERun[]): string => {
-  const source = JSON.stringify({ factors, cqas, runs });
+  const source = JSON.stringify({ algorithm: 'ann-audit-2026-09-05', factors, cqas, runs });
   let hash = 2166136261;
   for (let index = 0; index < source.length; index++) {
     hash ^= source.charCodeAt(index);
@@ -218,6 +216,66 @@ export interface NeuralValidationSplit {
   valIdx: number[];
 }
 
+/** Pool exactly one out-of-fold prediction per response, then refit all rows.
+ * Restart/epoch selection is confined to training loss inside each fold.
+ */
+function crossValidatedModels(
+  config: NeuralNetConfig,
+  splits: NeuralValidationSplit[],
+  fit: (config: NeuralNetConfig, split?: NeuralValidationSplit) => Record<string, NeuralNetModelResult>,
+): Record<string, NeuralNetModelResult> {
+  const pooled: Record<string, NeuralResidual[]> = {};
+  for (const split of splits) {
+    const models = fit({ ...config, validationMethod: 'holdout' }, split);
+    if (Object.keys(models).length === 0) return {};
+    for (const [code, model] of Object.entries(models)) {
+      (pooled[code] ??= []).push(...model.diagnostics.residuals.filter((row) => row.isValidation));
+    }
+  }
+  const final = fit({ ...config, validationMethod: 'none' });
+  for (const [code, model] of Object.entries(final)) {
+    const residuals = pooled[code] ?? [];
+    if (residuals.length !== model.diagnostics.residuals.length) { delete final[code]; continue; }
+    const n = residuals.length;
+    const mean = residuals.reduce((sum, row) => sum + row.actual, 0) / n;
+    const sst = residuals.reduce((sum, row) => sum + (row.actual - mean) ** 2, 0);
+    const sse = residuals.reduce((sum, row) => sum + row.residual ** 2, 0);
+    const mae = residuals.reduce((sum, row) => sum + Math.abs(row.residual), 0) / n;
+    const r2 = n > 1 && sst > 0 ? 1 - sse / sst : NaN;
+    model.config = config;
+    Object.assign(model.diagnostics, {
+      trainingSampleCount: Math.min(...splits.map((split) => split.trainIdx.length)),
+      validationSampleCount: n, validationKind: 'out-of-fold',
+      rSquaredVal: r2, rmseVal: Math.sqrt(sse / n), maeVal: mae, sseVal: sse,
+      rSquaredOverall: r2, rmseOverall: Math.sqrt(sse / n), maeOverall: mae, sseOverall: sse,
+      residuals: residuals.sort((a, b) => a.runOrder - b.runOrder),
+    });
+  }
+  return final;
+}
+
+/** Objective whose derivative is used in backprop: sum-output SSE/(2N) + λ||W||²/2. */
+function networkTrainingLoss(
+  inputs: number[][], targets: number[][], mask: boolean[][], indices: number[],
+  weights: { W1: number[][]; b1: number[]; W2?: number[][]; b2?: number[]; WOut: number[][]; bOut: number[] },
+  activation: NeuralActivation, lambda: number,
+): number {
+  let sse = 0;
+  for (const index of indices) {
+    const a1 = weights.b1.map((bias, j) => activate(bias + inputs[index].reduce((sum, value, k) => sum + value * weights.W1[k][j], 0), activation));
+    const last = weights.W2 && weights.b2 ? weights.b2.map((bias, j) => activate(bias + a1.reduce((sum, value, k) => sum + value * weights.W2![k][j], 0), activation)) : a1;
+    weights.bOut.forEach((bias, c) => {
+      if (mask[index][c]) {
+        const prediction = bias + last.reduce((sum, value, k) => sum + value * weights.WOut[k][c], 0);
+        sse += (prediction - targets[index][c]) ** 2;
+      }
+    });
+  }
+  const penalty = [weights.W1, weights.W2 ?? [], weights.WOut].reduce((sum, matrix) =>
+    sum + matrix.reduce((subtotal, row) => subtotal + row.reduce((acc, value) => acc + value * value, 0), 0), 0);
+  return sse / (2 * indices.length) + lambda * penalty / 2;
+}
+
 /**
  * Create deterministic validation partitions.  K-fold rotates every valid
  * experiment through validation exactly once; its largest validation fold is
@@ -325,9 +383,10 @@ export function fitNeuralNetModel(
   cqa: CQA,
   factors: Factor[],
   runs: DoERun[],
-  userConfig: Partial<NeuralNetConfig> = {}
+  userConfig: Partial<NeuralNetConfig> = {},
+  splitOverride?: NeuralValidationSplit,
 ): NeuralNetModelResult | null {
-  if (cqa.dataType === 'qualitative_binary' || cqa.objective === 'pass_category') return null;
+  if (cqa.dataType?.startsWith('qualitative') || cqa.objective === 'pass_category') return null;
   const config: NeuralNetConfig = { ...DEFAULT_NEURAL_CONFIG, ...userConfig };
   const activeFactors = factors.filter((f) => f.controllability !== 'constant');
   const inputFeatures = buildFactorFeatures(activeFactors);
@@ -340,14 +399,11 @@ export function fitNeuralNetModel(
 
   // 1. Parse and extract valid data points
   const parseResponse = (raw: number | string | null | undefined): number | null => {
-    if (raw === null || raw === undefined || raw === '') return null;
-    if (typeof raw === 'number') return isNaN(raw) ? null : raw;
+    if (raw === null || raw === undefined || (typeof raw === 'string' && raw.trim() === '')) return null;
+    if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
     if (typeof raw === 'string') {
-      const lower = raw.trim().toLowerCase();
-      if (lower === 'đạt' || lower === 'pass' || lower === 'yes' || lower === 'true') return 100.0;
-      if (lower === 'không đạt' || lower === 'fail' || lower === 'no' || lower === 'false') return 0.0;
       const num = Number(raw);
-      return isNaN(num) ? null : num;
+      return Number.isFinite(num) ? num : null;
     }
     return null;
   };
@@ -363,15 +419,20 @@ export function fitNeuralNetModel(
   const N = validData.length;
   if (N < 4) return null; // Need minimum data points
 
-  // 2. Normalization Parameters for Y
+  const validationSplits = splitOverride ? [splitOverride] : getNeuralValidationSplits(N, config);
+  if (config.validationMethod === 'kfold' && !splitOverride) {
+    return crossValidatedModels(config, validationSplits, (cfg, split) => {
+      const model = fitNeuralNetModel(cqa, factors, runs, cfg, split);
+      return model ? { [cqa.code]: model } : {};
+    })[cqa.code] ?? null;
+  }
   const yValues = validData.map((d) => d.y);
-  const yMean = yValues.reduce((a, b) => a + b, 0) / N;
-  const yVar = yValues.reduce((sum, val) => sum + Math.pow(val - yMean, 2), 0) / Math.max(1, N - 1);
+  const trainingY = validationSplits[0].trainIdx.map((index) => yValues[index]);
+  const yMean = trainingY.reduce((a, b) => a + b, 0) / trainingY.length;
+  const yVar = trainingY.reduce((sum, value) => sum + (value - yMean) ** 2, 0) / Math.max(1, trainingY.length - 1);
   const ySd = Math.sqrt(Math.max(1e-6, yVar));
-
-  // Normalized inputs X (already coded in [-1, 1]) and normalized targets Y
   const X_all = validData.map((d) => [...d.x]);
-  const Y_norm_all = validData.map((d) => (d.y - yMean) / ySd);
+  const Y_norm_all = yValues.map((value) => (value - yMean) / ySd);
 
   const h1 = Math.max(1, config.hiddenNodes1);
   const h2 = Math.max(0, config.hiddenNodes2);
@@ -380,8 +441,7 @@ export function fitNeuralNetModel(
   const lambda = config.weightDecay;
   const lr = config.learningRate;
   const parameterCount = calculateNeuralArchitectureMetrics(numInputs, h1, h2, 1, N).totalParameters;
-  const validationSplits = getNeuralValidationSplits(N, config);
-  if (getNeuralTrainingSampleCount(N, config) <= parameterCount) return null;
+  if (validationSplits[0].trainIdx.length <= parameterCount) return null;
 
   let bestGlobalSelectionLoss = Infinity;
   let bestGlobalWeights: NeuralLayerWeights | null = null;
@@ -465,7 +525,6 @@ export function fitNeuralNetModel(
       const gradWOut = Array.from({ length: lastHidden }, () => [0]);
       let gradBOut = 0;
 
-      let trainSSE = 0;
 
       for (let i = 0; i < nTrain; i++) {
         const idx = trainIdx[i];
@@ -504,7 +563,6 @@ export function fitNeuralNetModel(
         }
 
         const err = yPredNorm - yTrue;
-        trainSSE += err * err;
 
         // Backprop Output
         const deltaOut = err;
@@ -634,12 +692,9 @@ export function fitNeuralNetModel(
         bOut -= (lr * mHat) / (Math.sqrt(vHat) + eps);
       }
 
-      const trainMSE = trainSSE / nTrain;
-      let l2Penalty = 0;
-      W1.forEach((row) => row.forEach((weight) => { l2Penalty += weight * weight; }));
-      W2.forEach((row) => row.forEach((weight) => { l2Penalty += weight * weight; }));
-      WOut.forEach((row) => row.forEach((weight) => { l2Penalty += weight * weight; }));
-      const selectionLoss = trainMSE + 0.5 * lambda * l2Penalty;
+      const selectionLoss = networkTrainingLoss(X_all, Y_norm_all.map((value) => [value]),
+        Y_norm_all.map(() => [true]), trainIdx,
+        { W1, b1, W2: hasLayer2 ? W2 : undefined, b2: hasLayer2 ? b2 : undefined, WOut, bOut: [bOut] }, act, lambda);
 
       if (selectionLoss < tourBestSelectionLoss) {
         tourBestSelectionLoss = selectionLoss;
@@ -657,30 +712,13 @@ export function fitNeuralNetModel(
       if (epoch === 1 || epoch % Math.max(1, Math.floor(config.maxEpochs / 50)) === 0 || epoch === config.maxEpochs) {
         lossHistory.push({
           epoch,
-          trainLoss: Number(trainMSE.toFixed(5)),
+          trainLoss: selectionLoss,
         });
       }
     }
 
-    // Validation loss selects the candidate whenever a validation partition
-    // exists. For K-fold this makes every fold contribute a held-out model
-    // comparison instead of merely rotating the training rows.
-    const validationSelectionLoss = valIdx.length > 0
-      ? valIdx.reduce((sum, index) => {
-        const x = X_all[index];
-        const weights = tourBestWeights;
-        const a1 = weights.b1.map((bias, hiddenIndex) => activate(
-          bias + x.reduce((inner, value, inputIndex) => inner + value * weights.W1[inputIndex][hiddenIndex], 0), act,
-        ));
-        const aLast = hasLayer2 && weights.W2 && weights.b2
-          ? weights.b2.map((bias, hiddenIndex) => activate(
-            bias + a1.reduce((inner, value, inputIndex) => inner + value * weights.W2![inputIndex][hiddenIndex], 0), act,
-          ))
-          : a1;
-        const prediction = weights.bOut + aLast.reduce((inner, value, hiddenIndex) => inner + value * weights.WOut[hiddenIndex][0], 0);
-        return sum + Math.pow(prediction - Y_norm_all[index], 2);
-      }, 0) / valIdx.length
-      : tourBestSelectionLoss;
+    // Validation observations never select an epoch or restart.
+    const validationSelectionLoss = tourBestSelectionLoss;
 
     if (validationSelectionLoss < bestGlobalSelectionLoss) {
       bestGlobalSelectionLoss = validationSelectionLoss;
@@ -757,9 +795,9 @@ export function fitNeuralNetModel(
 
     residuals.push({
       runOrder: d.run.runOrder,
-      actual: Number(d.y.toFixed(3)),
-      predicted: Number(predVal.toFixed(3)),
-      residual: Number(res.toFixed(3)),
+      actual: d.y,
+      predicted: predVal,
+      residual: res,
       isValidation: isVal,
     });
 
@@ -782,21 +820,22 @@ export function fitNeuralNetModel(
 
   const meanTrainY = yTrainVals.length > 0 ? yTrainVals.reduce((a, b) => a + b, 0) / nTrain : yMean;
   const sstTrain = yTrainVals.reduce((sum, v) => sum + Math.pow(v - meanTrainY, 2), 0);
-  const r2Train = sstTrain > 0 ? Math.max(0, Math.min(1, 1 - trainSSE / sstTrain)) : 1.0;
+  const r2Train = sstTrain > 0 ? 1 - trainSSE / sstTrain : NaN;
 
   const meanValY = yValVals.length > 0 ? yValVals.reduce((a, b) => a + b, 0) / nVal : yMean;
   const sstVal = yValVals.reduce((sum, v) => sum + Math.pow(v - meanValY, 2), 0);
-  const r2Val = sstVal > 0 ? Math.max(0, Math.min(1, 1 - valSSE / sstVal)) : r2Train;
+  const r2Val = sstVal > 0 ? 1 - valSSE / sstVal : NaN;
 
-  const sstOverall = yValues.reduce((sum, v) => sum + Math.pow(v - yMean, 2), 0);
-  const r2Overall = sstOverall > 0 ? Math.max(0, Math.min(1, 1 - overallSSE / sstOverall)) : 1.0;
+  const overallMean = yValues.reduce((sum, value) => sum + value, 0) / N;
+  const sstOverall = yValues.reduce((sum, v) => sum + Math.pow(v - overallMean, 2), 0);
+  const r2Overall = sstOverall > 0 ? 1 - overallSSE / sstOverall : NaN;
 
   const rmseTrain = Math.sqrt(trainSSE / Math.max(1, nTrain));
-  const rmseVal = nVal > 0 ? Math.sqrt(valSSE / nVal) : rmseTrain;
+  const rmseVal = nVal > 0 ? Math.sqrt(valSSE / nVal) : NaN;
   const rmseOverall = Math.sqrt(overallSSE / N);
 
   const maeTrain = trainSAE / Math.max(1, nTrain);
-  const maeVal = nVal > 0 ? valSAE / nVal : maeTrain;
+  const maeVal = nVal > 0 ? valSAE / nVal : NaN;
   const maeOverall = overallSAE / N;
 
   // 6. Independent Variable Importance / Sensitivity Analysis
@@ -880,32 +919,30 @@ export function fitNeuralNetModel(
   }
 
   pyLines.push(`    W_out = np.array(${JSON.stringify(WOut)})`);
-  pyLines.push(`    b_out = ${bOut.toFixed(6)}`);
+  pyLines.push(`    b_out = ${String(bOut)}`);
   pyLines.push(`    y_norm = np.dot(a_last, W_out)[0] + b_out`);
-  pyLines.push(`    y_actual = y_norm * ${ySd.toFixed(6)} + ${yMean.toFixed(6)}`);
+  pyLines.push(`    y_actual = y_norm * ${String(ySd)} + ${String(yMean)}`);
   pyLines.push(`    return float(y_actual)`);
 
   const pythonCode = pyLines.join('\n');
 
   // Excel formula representation for 1 hidden layer
-  let excelFormula = `=(${bOut.toFixed(4)}`;
+  let excelFormula = `=(${String(bOut)}`;
   for (let j = 0; j < h1; j++) {
-    const wOutJ = WOut[j][0].toFixed(4);
-    let inner = `${b1[j].toFixed(4)}`;
+    const wOutJ = String(WOut[j][0]);
+    let inner = `${String(b1[j])}`;
     for (let k = 0; k < numInputs; k++) {
-      const w1KJ = W1[k][j].toFixed(4);
+      const w1KJ = String(W1[k][j]);
       inner += ` + (${w1KJ} * [Cell_${inputCodes[k]}])`;
     }
     excelFormula += ` + (${wOutJ} * TANH(${inner}))`;
   }
-  excelFormula += `) * ${ySd.toFixed(4)} + ${yMean.toFixed(4)}`;
+  excelFormula += `) * ${String(ySd)} + ${String(yMean)}`;
   if (hasLayer2 || act !== 'tanh') {
     excelFormula = 'N/A — Excel export currently supports only a one-hidden-layer TANH network.';
   }
 
   const pCount = parameterCount;
-  const adjRSquared = N > pCount && N > 1 ? Math.max(0, Math.min(1, 1 - ((1 - r2Overall) * (N - 1)) / (N - pCount))) : r2Overall;
-  const infoCrit = calculateInformationCriteria(N, pCount, overallSSE);
 
   return {
     cqaCode: cqa.code,
@@ -919,23 +956,24 @@ export function fitNeuralNetModel(
       ySd,
     },
     diagnostics: {
-      rSquaredTrain: Number(r2Train.toFixed(4)),
-      rSquaredVal: Number(r2Val.toFixed(4)),
-      rSquaredOverall: Number(r2Overall.toFixed(4)),
-      adjRSquared: Number(adjRSquared.toFixed(4)),
-      rmseTrain: Number(rmseTrain.toFixed(4)),
-      rmseVal: Number(rmseVal.toFixed(4)),
-      rmseOverall: Number(rmseOverall.toFixed(4)),
-      maeTrain: Number(maeTrain.toFixed(4)),
-      maeVal: Number(maeVal.toFixed(4)),
-      maeOverall: Number(maeOverall.toFixed(4)),
-      sseTrain: Number(trainSSE.toFixed(4)),
-      sseVal: Number(valSSE.toFixed(4)),
-      sseOverall: Number(overallSSE.toFixed(4)),
-      aicc: infoCrit.aicc,
-      bic: infoCrit.bic,
-      logLikelihood: infoCrit.logLikelihood,
-      twoLL: infoCrit.twoLL,
+      trainingSampleCount: nTrain, validationSampleCount: nVal, validationKind: nVal > 0 ? 'holdout' : 'none',
+      rSquaredTrain: r2Train,
+      rSquaredVal: r2Val,
+      rSquaredOverall: r2Overall,
+      adjRSquared: undefined,
+      rmseTrain: rmseTrain,
+      rmseVal: rmseVal,
+      rmseOverall: rmseOverall,
+      maeTrain: maeTrain,
+      maeVal: maeVal,
+      maeOverall: maeOverall,
+      sseTrain: trainSSE,
+      sseVal: valSSE,
+      sseOverall: overallSSE,
+      aicc: undefined,
+      bic: undefined,
+      logLikelihood: undefined,
+      twoLL: undefined,
       lossHistory: bestGlobalLossHistory,
       residuals,
       variableImportance,
@@ -957,9 +995,10 @@ export function fitMultiOutputNeuralNet(
   cqas: CQA[],
   factors: Factor[],
   runs: DoERun[],
-  userConfig: Partial<NeuralNetConfig> = {}
+  userConfig: Partial<NeuralNetConfig> = {},
+  splitOverride?: NeuralValidationSplit,
 ): Record<string, NeuralNetModelResult> {
-  cqas = cqas.filter((cqa) => cqa.dataType !== 'qualitative_binary' && cqa.objective !== 'pass_category');
+  cqas = cqas.filter((cqa) => !cqa.dataType?.startsWith('qualitative') && cqa.objective !== 'pass_category');
   const config: NeuralNetConfig = { ...DEFAULT_NEURAL_CONFIG, ...userConfig };
   const activeFactors = factors.filter((f) => f.controllability !== 'constant');
   const inputFeatures = buildFactorFeatures(activeFactors);
@@ -972,14 +1011,11 @@ export function fitMultiOutputNeuralNet(
   if (numInputs === 0 || numOutputs === 0) return {};
 
   const parseResponse = (raw: number | string | null | undefined): number | null => {
-    if (raw === null || raw === undefined || raw === '') return null;
-    if (typeof raw === 'number') return isNaN(raw) ? null : raw;
+    if (raw === null || raw === undefined || (typeof raw === 'string' && raw.trim() === '')) return null;
+    if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
     if (typeof raw === 'string') {
-      const lower = raw.trim().toLowerCase();
-      if (lower === 'đạt' || lower === 'pass' || lower === 'yes' || lower === 'true') return 100.0;
-      if (lower === 'không đạt' || lower === 'fail' || lower === 'no' || lower === 'false') return 0.0;
       const num = Number(raw);
-      return isNaN(num) ? null : num;
+      return Number.isFinite(num) ? num : null;
     }
     return null;
   };
@@ -996,10 +1032,14 @@ export function fitMultiOutputNeuralNet(
   const N = validData.length;
   if (N < 4) return {};
 
+  const validationSplits = splitOverride ? [splitOverride] : getNeuralValidationSplits(N, config);
+  if (config.validationMethod === 'kfold' && !splitOverride) {
+    return crossValidatedModels(config, validationSplits, (cfg, split) => fitMultiOutputNeuralNet(cqas, factors, runs, cfg, split));
+  }
   // Normalization parameters per CQA
   const cqaNorms = cqas.map((_, cIdx) => {
-    const validVals = validData
-      .map((d) => d.yArr[cIdx])
+    const validVals = validationSplits[0].trainIdx
+      .map((index) => validData[index].yArr[cIdx])
       .filter((v): v is number => v !== null);
     const count = validVals.length;
     const mean = count > 0 ? validVals.reduce((a, b) => a + b, 0) / count : 0;
@@ -1028,8 +1068,7 @@ export function fitMultiOutputNeuralNet(
   const lr = config.learningRate;
 
   const totalParams = calculateNeuralArchitectureMetrics(numInputs, h1, h2, numOutputs, N).totalParameters;
-  const validationSplits = getNeuralValidationSplits(N, config);
-  if (getNeuralTrainingSampleCount(N, config) <= totalParams) return {};
+  if (validationSplits[0].trainIdx.length <= totalParams || cqaNorms.some((norm) => norm.count < 2)) return {};
 
   // Reserve one fixed final holdout. Epoch and restart selection below use
   // regularized training loss only, preventing optimistic holdout reuse.
@@ -1119,8 +1158,6 @@ export function fitMultiOutputNeuralNet(
       const gradWOut = Array.from({ length: lastHidden }, () => new Array(numOutputs).fill(0));
       const gradBOut = new Array(numOutputs).fill(0);
 
-      let trainSSE = 0;
-      let trainPointsCount = 0;
 
       for (let i = 0; i < nTrain; i++) {
         const idx = trainIdx[i];
@@ -1162,9 +1199,7 @@ export function fitMultiOutputNeuralNet(
             yPredNorm += aLast[k] * WOut[k][c];
           }
           const err = yPredNorm - yTrueArr[c];
-          trainSSE += err * err;
-          trainPointsCount++;
-
+  
           deltaOut[c] = err;
           gradBOut[c] += err;
           for (let k = 0; k < lastHidden; k++) {
@@ -1219,25 +1254,21 @@ export function fitMultiOutputNeuralNet(
       }
 
       // L2 Regularization
-      let l2Sum = 0;
       for (let k = 0; k < numInputs; k++) {
         for (let j = 0; j < h1; j++) {
           gradW1[k][j] += lambda * W1[k][j] * nTrain;
-          l2Sum += W1[k][j] * W1[k][j];
         }
       }
       if (hasLayer2) {
         for (let k = 0; k < h1; k++) {
           for (let j = 0; j < h2; j++) {
             gradW2[k][j] += lambda * W2[k][j] * nTrain;
-            l2Sum += W2[k][j] * W2[k][j];
           }
         }
       }
       for (let k = 0; k < lastHidden; k++) {
         for (let c = 0; c < numOutputs; c++) {
           gradWOut[k][c] += lambda * WOut[k][c] * nTrain;
-          l2Sum += WOut[k][c] * WOut[k][c];
         }
       }
 
@@ -1305,7 +1336,8 @@ export function fitMultiOutputNeuralNet(
 
       // Select epochs and restarts only from the regularized training loss.
       // The fixed holdout remains untouched until final diagnostics below.
-      const totalTrainLoss = trainSSE / Math.max(1, trainPointsCount) + 0.5 * lambda * l2Sum;
+      const totalTrainLoss = networkTrainingLoss(X_all, Y_norm_all, Y_valid_mask, trainIdx,
+        { W1, b1, W2: hasLayer2 ? W2 : undefined, b2: hasLayer2 ? b2 : undefined, WOut, bOut }, act, lambda);
       if (totalTrainLoss < tourBestSelectionLoss) {
         tourBestSelectionLoss = totalTrainLoss;
         tourBestWeights = {
@@ -1321,35 +1353,12 @@ export function fitMultiOutputNeuralNet(
       if (epoch % 20 === 0 || epoch === config.maxEpochs) {
         lossHistory.push({
           epoch,
-          trainLoss: Number(totalTrainLoss.toFixed(5)),
+          trainLoss: totalTrainLoss,
         });
       }
     }
 
-    const validationSelectionLoss = valIdx.length > 0
-      ? valIdx.reduce((sum, index) => {
-        const x = X_all[index];
-        const weights = tourBestWeights;
-        const a1 = weights.b1.map((bias, hiddenIndex) => activate(
-          bias + x.reduce((inner, value, inputIndex) => inner + value * weights.W1[inputIndex][hiddenIndex], 0), act,
-        ));
-        const aLast = hasLayer2 && weights.W2 && weights.b2
-          ? weights.b2.map((bias, hiddenIndex) => activate(
-            bias + a1.reduce((inner, value, inputIndex) => inner + value * weights.W2![inputIndex][hiddenIndex], 0), act,
-          ))
-          : a1;
-        let loss = 0;
-        let count = 0;
-        for (let outputIndex = 0; outputIndex < numOutputs; outputIndex++) {
-          if (!Y_valid_mask[index][outputIndex]) continue;
-          const prediction = weights.bOut[outputIndex] + aLast.reduce((inner, value, hiddenIndex) =>
-            inner + value * weights.WOut[hiddenIndex][outputIndex], 0);
-          loss += Math.pow(prediction - Y_norm_all[index][outputIndex], 2);
-          count++;
-        }
-        return sum + loss / Math.max(1, count);
-      }, 0) / valIdx.length
-      : tourBestSelectionLoss;
+    const validationSelectionLoss = tourBestSelectionLoss;
 
     if (validationSelectionLoss < bestGlobalSelectionLoss) {
       bestGlobalSelectionLoss = validationSelectionLoss;
@@ -1432,9 +1441,9 @@ export function fitMultiOutputNeuralNet(
 
       residuals.push({
         runOrder: d.run.runOrder,
-        actual: Number(actualY.toFixed(3)),
-        predicted: Number(predVal.toFixed(3)),
-        residual: Number(res.toFixed(3)),
+        actual: actualY,
+        predicted: predVal,
+        residual: res,
         isValidation: isVal,
       });
 
@@ -1458,22 +1467,23 @@ export function fitMultiOutputNeuralNet(
 
     const meanTrainY = nCqaTrain > 0 ? yTrainVals.reduce((a, b) => a + b, 0) / nCqaTrain : yMean;
     const sstTrain = yTrainVals.reduce((sum, v) => sum + Math.pow(v - meanTrainY, 2), 0);
-    const r2Train = sstTrain > 0 ? Math.max(0, Math.min(1, 1 - trainSSE / sstTrain)) : 1.0;
+    const r2Train = sstTrain > 0 ? 1 - trainSSE / sstTrain : NaN;
 
     const meanValY = nCqaVal > 0 ? yValVals.reduce((a, b) => a + b, 0) / nCqaVal : yMean;
     const sstVal = yValVals.reduce((sum, v) => sum + Math.pow(v - meanValY, 2), 0);
-    const r2Val = sstVal > 0 ? Math.max(0, Math.min(1, 1 - valSSE / sstVal)) : r2Train;
+    const r2Val = sstVal > 0 ? 1 - valSSE / sstVal : NaN;
 
-    const allActualY = residuals.map((r) => r.actual);
-    const sstOverall = allActualY.reduce((sum, v) => sum + Math.pow(v - yMean, 2), 0);
-    const r2Overall = sstOverall > 0 ? Math.max(0, Math.min(1, 1 - overallSSE / sstOverall)) : 1.0;
+    const allActualY = validData.map((d) => d.yArr[cIdx]).filter((value): value is number => value !== null);
+    const overallMean = allActualY.reduce((sum, value) => sum + value, 0) / allActualY.length;
+    const sstOverall = allActualY.reduce((sum, v) => sum + Math.pow(v - overallMean, 2), 0);
+    const r2Overall = sstOverall > 0 ? 1 - overallSSE / sstOverall : NaN;
 
     const rmseTrain = Math.sqrt(trainSSE / Math.max(1, nCqaTrain));
-    const rmseVal = nCqaVal > 0 ? Math.sqrt(valSSE / Math.max(1, nCqaVal)) : rmseTrain;
+    const rmseVal = nCqaVal > 0 ? Math.sqrt(valSSE / Math.max(1, nCqaVal)) : NaN;
     const rmseOverall = Math.sqrt(overallSSE / Math.max(1, nCqaTotal));
 
     const maeTrain = trainSAE / Math.max(1, nCqaTrain);
-    const maeVal = nCqaVal > 0 ? valSAE / Math.max(1, nCqaVal) : maeTrain;
+    const maeVal = nCqaVal > 0 ? valSAE / Math.max(1, nCqaVal) : NaN;
     const maeOverall = overallSAE / Math.max(1, nCqaTotal);
 
     // Variable Sensitivity for this CQA
@@ -1547,23 +1557,23 @@ export function fitMultiOutputNeuralNet(
     }
 
     pyLines.push(`    W_out_c = np.array(${JSON.stringify(singleWOut)})`);
-    pyLines.push(`    b_out_c = ${singleBOut.toFixed(6)}`);
+    pyLines.push(`    b_out_c = ${String(singleBOut)}`);
     pyLines.push(`    y_norm = np.dot(a_last, W_out_c)[0] + b_out_c`);
-    pyLines.push(`    y_actual = y_norm * ${ySd.toFixed(6)} + ${yMean.toFixed(6)}`);
+    pyLines.push(`    y_actual = y_norm * ${String(ySd)} + ${String(yMean)}`);
     pyLines.push(`    return float(y_actual)`);
     const pythonCode = pyLines.join('\n');
 
-    let excelFormula = `=(${singleBOut.toFixed(4)}`;
+    let excelFormula = `=(${String(singleBOut)}`;
     for (let j = 0; j < h1; j++) {
-      const wOutJ = singleWOut[j][0].toFixed(4);
-      let inner = `${b1[j].toFixed(4)}`;
+      const wOutJ = String(singleWOut[j][0]);
+      let inner = `${String(b1[j])}`;
       for (let k = 0; k < numInputs; k++) {
-        const w1KJ = W1[k][j].toFixed(4);
+        const w1KJ = String(W1[k][j]);
         inner += ` + (${w1KJ} * [Cell_${inputCodes[k]}])`;
       }
       excelFormula += ` + (${wOutJ} * TANH(${inner}))`;
     }
-    excelFormula += `) * ${ySd.toFixed(4)} + ${yMean.toFixed(4)}`;
+    excelFormula += `) * ${String(ySd)} + ${String(yMean)}`;
     if (hasLayer2 || act !== 'tanh') {
       excelFormula = 'N/A — Excel export currently supports only a one-hidden-layer TANH network.';
     }
@@ -1587,19 +1597,20 @@ export function fitMultiOutputNeuralNet(
         ySd,
       },
       diagnostics: {
-        rSquaredTrain: Number(r2Train.toFixed(4)),
-        rSquaredVal: Number(r2Val.toFixed(4)),
-        rSquaredOverall: Number(r2Overall.toFixed(4)),
-        adjRSquared: Number((nCqaTotal > numInputs && nCqaTotal > 1 ? Math.max(0, Math.min(1, 1 - ((1 - r2Overall) * (nCqaTotal - 1)) / (nCqaTotal - numInputs))) : r2Overall).toFixed(4)),
-        rmseTrain: Number(rmseTrain.toFixed(4)),
-        rmseVal: Number(rmseVal.toFixed(4)),
-        rmseOverall: Number(rmseOverall.toFixed(4)),
-        maeTrain: Number(maeTrain.toFixed(4)),
-        maeVal: Number(maeVal.toFixed(4)),
-        maeOverall: Number(maeOverall.toFixed(4)),
-        sseTrain: Number(trainSSE.toFixed(4)),
-        sseVal: Number(valSSE.toFixed(4)),
-        sseOverall: Number(overallSSE.toFixed(4)),
+        trainingSampleCount: nCqaTrain, validationSampleCount: nCqaVal, validationKind: nCqaVal > 0 ? 'holdout' : 'none',
+        rSquaredTrain: r2Train,
+        rSquaredVal: r2Val,
+        rSquaredOverall: r2Overall,
+        adjRSquared: undefined,
+        rmseTrain: rmseTrain,
+        rmseVal: rmseVal,
+        rmseOverall: rmseOverall,
+        maeTrain: maeTrain,
+        maeVal: maeVal,
+        maeOverall: maeOverall,
+        sseTrain: trainSSE,
+        sseVal: valSSE,
+        sseOverall: overallSSE,
         // Information criteria cannot be allocated per CQA for a shared
         // multi-output network without a joint likelihood model.
         aicc: undefined,
@@ -1627,202 +1638,8 @@ export function fitMultiOutputNeuralNet(
  * Multi-Response Desirability Optimization using Neural Network Models
  */
 export function optimizeNeuralDesirability(
-  factors: Factor[],
-  cqas: CQA[],
-  neuralModels: Record<string, NeuralNetModelResult>,
-  seed: number = 20260827,
+  factors: Factor[], cqas: CQA[], neuralModels: Record<string, NeuralNetModelResult>, seed = 20260827,
 ): DesirabilitySolution | null {
-  if (cqas.some((c) => !neuralModels[c.code])) return null;
-  const validCQAs = cqas;
-
-  const totalWeight = validCQAs.reduce((sum, c) => sum + (c.weight || 1), 0);
-  const k = factors.length;
-
-  const evaluateOverallDesirability = (coded: Record<string, number>): { dOverall: number; dMap: Record<string, number> } => {
-    // 1. Strict Survey Boundary Check: Reject any point outside the experimental bounding box
-    if (!isWithinSurveyBounds(coded, factors)) {
-      return { dOverall: 0, dMap: {} };
-    }
-
-    let logSum = 0;
-    const dMap: Record<string, number> = {};
-
-    for (const cqa of validCQAs) {
-      const model = neuralModels[cqa.code];
-      const yPred = model.predict(coded);
-      const di = calculateIndividualDesirability(
-        yPred,
-        cqa.objective,
-        cqa.lowerLimit,
-        cqa.upperLimit,
-        cqa.target,
-        cqa.sShape || 1.0,
-        cqa.tShape || 1.0
-      );
-      dMap[cqa.code] = di;
-      if (di <= 0) return { dOverall: 0, dMap };
-      logSum += (cqa.weight || 1) * Math.log(di);
-    }
-
-    const dOverall = Math.exp(logSum / totalWeight);
-    return { dOverall, dMap };
-  };
-
-  // Identify mixture and process factors and their survey bounds
-  const mixFactors = factors.filter((f) => f.role === 'mixture_component' || f.type === 'Mixture');
-  const procFactors = factors.filter(
-    (f) => f.role !== 'mixture_component' && f.type !== 'Mixture' && f.controllability === 'controllable'
-  );
-  const hasMixture = mixFactors.length >= 2;
-
-  const mixLowProps = mixFactors.map((f) => (f.high <= 1.0 && f.unit !== '%' ? f.low : f.low / 100));
-  const mixHighProps = mixFactors.map((f) => (f.high <= 1.0 && f.unit !== '%' ? f.high : f.high / 100));
-  if (hasMixture && !isFeasibleBoundedMixture(mixLowProps, mixHighProps)) return null;
-
-  let bestD = -1;
-  let bestCoded: Record<string, number> = {};
-  let bestDMap: Record<string, number> = {};
-
-  // 1. Seed candidate with Feasible Polytope Centroid
-  const initialCandidate: Record<string, number> = {};
-  factors.filter((f) => f.controllability === 'uncontrollable_noise').forEach((f) => { initialCandidate[f.code] = 0; });
-  procFactors.forEach((f) => {
-    initialCandidate[f.code] = 0.0;
-  });
-
-  if (hasMixture) {
-    const rawMid = mixFactors.map((_, i) => (mixLowProps[i] + mixHighProps[i]) / 2);
-    const projMid = projectToBoundedMixture(rawMid, mixLowProps, mixHighProps, 1.0);
-    mixFactors.forEach((f, i) => {
-      initialCandidate[f.code] = projMid[i];
-    });
-  } else if (mixFactors.length === 1) {
-    initialCandidate[mixFactors[0].code] = 1.0;
-  }
-
-  const { dOverall: initD, dMap: initDMap } = evaluateOverallDesirability(initialCandidate);
-  if (initD > bestD) {
-    bestD = initD;
-    bestCoded = { ...initialCandidate };
-    bestDMap = { ...initDMap };
-  }
-
-  // 2. High-Density Grid Exploration inside the Survey Bounds [L_i, U_i]
-  const gridSteps = k <= 3 ? 18 : (k <= 4 ? 12 : 7);
-
-  const exploreGrid = (factorIdx: number, currentCoded: Record<string, number>) => {
-    if (factorIdx >= k) {
-      let evalCoded = { ...currentCoded };
-      if (hasMixture) {
-        const rawVals = mixFactors.map((f) => evalCoded[f.code] ?? 0);
-        const projVals = projectToBoundedMixture(rawVals, mixLowProps, mixHighProps, 1.0);
-        mixFactors.forEach((f, i) => {
-          evalCoded[f.code] = projVals[i];
-        });
-      }
-      const { dOverall, dMap } = evaluateOverallDesirability(evalCoded);
-      if (dOverall > bestD) {
-        bestD = dOverall;
-        bestCoded = { ...evalCoded };
-        bestDMap = { ...dMap };
-      }
-      return;
-    }
-
-    const factor = factors[factorIdx];
-    if (factor.controllability !== 'controllable') {
-      currentCoded[factor.code] = 0;
-      exploreGrid(factorIdx + 1, currentCoded);
-      return;
-    }
-    const isMix = factor.role === 'mixture_component' || factor.type === 'Mixture';
-    const lowVal = isMix ? (factor.high <= 1.0 && factor.unit !== '%' ? factor.low : factor.low / 100) : -1.0;
-    const highVal = isMix ? (factor.high <= 1.0 && factor.unit !== '%' ? factor.high : factor.high / 100) : 1.0;
-
-    for (let step = 0; step < gridSteps; step++) {
-      const val = lowVal + (step / (gridSteps - 1)) * (highVal - lowVal);
-      currentCoded[factor.code] = Number(val.toFixed(4));
-      exploreGrid(factorIdx + 1, currentCoded);
-    }
-  };
-
-  exploreGrid(0, {});
-
-  // 3. Multi-Start Local Fine-Tuning strictly inside Bounded Simplex
-  const numStarts = 400;
-  const random = createRNG(seed);
-  for (let iter = 0; iter < numStarts; iter++) {
-    const candidateCoded: Record<string, number> = {};
-    procFactors.forEach((f) => {
-      const current = bestCoded[f.code] ?? 0;
-      const jitter = (random() - 0.5) * 0.25;
-      candidateCoded[f.code] = Math.max(-1.0, Math.min(1.0, Number((current + jitter).toFixed(4))));
-    });
-
-    if (hasMixture) {
-      const rawJittered = mixFactors.map((f, i) => {
-        const current = bestCoded[f.code] ?? (mixLowProps[i] + mixHighProps[i]) / 2;
-        const range = mixHighProps[i] - mixLowProps[i];
-        const jitter = (random() - 0.5) * range * 0.4;
-        return current + jitter;
-      });
-
-      const proj = projectToBoundedMixture(rawJittered, mixLowProps, mixHighProps, 1.0);
-      mixFactors.forEach((f, i) => {
-        candidateCoded[f.code] = proj[i];
-      });
-    }
-
-    const { dOverall, dMap } = evaluateOverallDesirability(candidateCoded);
-    if (dOverall > bestD) {
-      bestD = dOverall;
-      bestCoded = { ...candidateCoded };
-      bestDMap = { ...dMap };
-    }
-  }
-
-  // Calculate actual factor values and predicted responses with CI
-  const actualFactors: Record<string, number | string> = {};
-  factors.forEach((f) => {
-    if (f.controllability === 'constant') {
-      actualFactors[f.code] = f.constantValue ?? f.low;
-    } else if (f.role === 'mixture_component' || f.type === 'Mixture') {
-      const frac = bestCoded[f.code] ?? (1 / mixFactors.length);
-      actualFactors[f.code] = f.high <= 1.0 && f.unit !== '%'
-        ? Number(frac.toFixed(4))
-        : Number((frac * 100).toFixed(2));
-    } else {
-      const c = bestCoded[f.code] ?? 0;
-      if (f.dataType === 'qualitative' && f.categories && f.categories.length > 0) {
-        if (c <= -0.5) actualFactors[f.code] = f.categories[0];
-        else if (c >= 0.5) actualFactors[f.code] = f.categories[1] || f.categories[0];
-        else actualFactors[f.code] = f.categories[2] || f.categories[0];
-      } else {
-        const center = f.center !== undefined ? f.center : (f.low + f.high) / 2;
-        const half = (f.high - f.low) / 2;
-        actualFactors[f.code] = Number((center + c * half).toFixed(3));
-      }
-    }
-  });
-
-  const predictedResponses: Record<string, { value: number; se: number; ciLow: number; ciHigh: number; desirability: number }> = {};
-  validCQAs.forEach((cqa) => {
-    const model = neuralModels[cqa.code];
-    const val = model.predict(bestCoded);
-    const se = model.diagnostics.rmseOverall;
-    predictedResponses[cqa.code] = {
-      value: Number(val.toFixed(3)),
-      se: Number(se.toFixed(3)),
-      ciLow: Number.NaN,
-      ciHigh: Number.NaN,
-      desirability: Number((bestDMap[cqa.code] ?? 0).toFixed(4)),
-    };
-  });
-
-  return {
-    codedFactors: bestCoded,
-    actualFactors,
-    predictedResponses,
-    overallDesirability: Number(Math.max(0, bestD).toFixed(4)),
-  };
+  if (cqas.some((cqa) => !neuralModels[cqa.code])) return null;
+  return optimizeDesirability(factors, cqas, neuralModels, undefined, seed);
 }
