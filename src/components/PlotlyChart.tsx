@@ -231,9 +231,9 @@ function normaliseChart(data: any[], layout: any, compact = false) {
           ...mergeTitle(layout.title, compact ? 13 : 15, compact ? 45 : 75),
           x: layout.title?.x ?? (hasColorbar ? (compact ? 0.44 : 0.46) : 0.5),
           xanchor: layout.title?.xanchor || 'center',
-          y: layout.title?.y ?? (compact ? 0.97 : 0.98),
+          y: layout.title?.y ?? (compact ? 0.985 : 0.99),
           yanchor: layout.title?.yanchor || 'top',
-          pad: { t: 6, b: 4, ...(typeof layout.title === 'object' ? layout.title?.pad || {} : {}) },
+          pad: { t: 2, b: 2, ...(typeof layout.title === 'object' ? layout.title?.pad || {} : {}) },
         }
       : undefined,
     legend: showLegend
@@ -247,7 +247,7 @@ function normaliseChart(data: any[], layout: any, compact = false) {
           yanchor: 'bottom',
           ...(layout.legend || {}),
           x: layout.legend?.x ?? (hasColorbar ? (compact ? 0.44 : 0.46) : 0.5),
-          y: layout.legend?.y ?? (layout.title ? (compact ? 1.025 : 1.03) : 1.02),
+          y: layout.legend?.y ?? (layout.title ? (compact ? 1.002 : 1.005) : 1.005),
           font: {
             family: SCIENTIFIC_FONT,
             size: compact ? 9.5 : 10.5,
