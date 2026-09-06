@@ -181,7 +181,7 @@ function normaliseChart(data: any[], layout: any, compact = false) {
   let computedMargin = {
     l: Math.max(margin.l ?? 0, compact ? 60 : 75),
     r: Math.max(margin.r ?? 0, hasColorbar ? (compact ? 90 : 115) : compact ? 25 : 35),
-    t: Math.max(margin.t ?? 0, showLegend ? (compact ? 88 : 84) : compact ? 58 : 68),
+    t: Math.max(margin.t ?? 0, showLegend ? (compact ? 94 : 90) : compact ? 58 : 68),
     b: Math.max(margin.b ?? 0, compact ? 55 : 68),
     pad: Math.max(margin.pad ?? 0, compact ? 2 : 4),
   };
@@ -199,7 +199,7 @@ function normaliseChart(data: any[], layout: any, compact = false) {
     computedMargin = {
       l: Math.max(margin.l ?? 0, compact ? 25 : 35),
       r: Math.max(margin.r ?? 0, hasColorbar ? (compact ? 70 : 85) : compact ? 20 : 35),
-      t: Math.max(margin.t ?? 0, showLegend ? (compact ? 92 : 88) : compact ? 50 : 60),
+      t: Math.max(margin.t ?? 0, showLegend ? (compact ? 94 : 90) : compact ? 50 : 60),
       b: Math.max(margin.b ?? 0, compact ? 30 : 40),
       pad: Math.max(margin.pad ?? 0, 2),
     };
@@ -207,7 +207,7 @@ function normaliseChart(data: any[], layout: any, compact = false) {
     computedMargin = {
       l: Math.max(margin.l ?? 0, compact ? 25 : 35),
       r: Math.max(margin.r ?? 0, hasColorbar ? (compact ? 75 : 95) : compact ? 20 : 35),
-      t: Math.max(margin.t ?? 0, showLegend ? (compact ? 88 : 84) : compact ? 65 : 75),
+      t: Math.max(margin.t ?? 0, showLegend ? (compact ? 94 : 90) : compact ? 65 : 75),
       b: Math.max(margin.b ?? 0, compact ? 55 : 65),
       pad: Math.max(margin.pad ?? 0, 2),
     };
@@ -231,7 +231,7 @@ function normaliseChart(data: any[], layout: any, compact = false) {
           ...mergeTitle(layout.title, compact ? 13 : 15, compact ? 45 : 75),
           x: layout.title?.x ?? (hasColorbar ? (compact ? 0.44 : 0.46) : 0.5),
           xanchor: layout.title?.xanchor || 'center',
-          y: layout.title?.y ?? (compact ? 0.95 : 0.96),
+          y: layout.title?.y ?? (compact ? 0.97 : 0.98),
           yanchor: layout.title?.yanchor || 'top',
           pad: { t: 6, b: 4, ...(typeof layout.title === 'object' ? layout.title?.pad || {} : {}) },
         }
@@ -242,12 +242,12 @@ function normaliseChart(data: any[], layout: any, compact = false) {
           bordercolor: '#cbd5e1',
           borderwidth: 1,
           tracegroupgap: compact ? 4 : 8,
+          orientation: 'h',
+          xanchor: 'center',
+          yanchor: 'bottom',
           ...(layout.legend || {}),
-          orientation: layout.legend?.orientation || 'h',
           x: layout.legend?.x ?? (hasColorbar ? (compact ? 0.44 : 0.46) : 0.5),
-          xanchor: layout.legend?.xanchor || 'center',
-          y: layout.legend?.y ?? (layout.title ? (compact ? 0.88 : 0.88) : 0.98),
-          yanchor: layout.legend?.yanchor || 'top',
+          y: layout.legend?.y ?? (layout.title ? (compact ? 1.025 : 1.03) : 1.02),
           font: {
             family: SCIENTIFIC_FONT,
             size: compact ? 9.5 : 10.5,
