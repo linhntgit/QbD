@@ -213,21 +213,6 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
             border: '1px solid #e2e8f0',
           }}
         >
-          <defs>
-            {/* Gradients */}
-            <linearGradient id="synapseGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#94a3b8" stopOpacity="0.4" />
-              <stop offset="100%" stopColor="#7c3aed" stopOpacity="0.45" />
-            </linearGradient>
-            <linearGradient id="synapseGrad2" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.45" />
-              <stop offset="100%" stopColor="#6b21a8" stopOpacity="0.45" />
-            </linearGradient>
-            <linearGradient id="synapseGradOut" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.45" />
-              <stop offset="100%" stopColor="#0f766e" stopOpacity="0.5" />
-            </linearGradient>
-          </defs>
 
           {/* Layer Background Column Panels */}
           {/* Input Layer Column Header */}
@@ -274,7 +259,8 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
                   key={`syn-in-h1-${iIdx}-${hIdx}`}
                   d={`M ${xInput} ${yIn} C ${xInput + dx * 0.45} ${yIn}, ${xH1 - dx * 0.45} ${yH1}, ${xH1} ${yH1}`}
                   fill="none"
-                  stroke="url(#synapseGrad1)"
+                  stroke="#8b5cf6"
+                  strokeOpacity={isTraining ? 0.75 : 0.38}
                   strokeWidth={isTraining ? '1.8' : '1.1'}
                   className={isTraining ? 'neural-synapse-pulsing' : undefined}
                 />
@@ -292,7 +278,8 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
                     key={`syn-h1-h2-${h1Idx}-${h2Idx}`}
                     d={`M ${xH1} ${yH1} C ${xH1 + dx * 0.45} ${yH1}, ${xH2 - dx * 0.45} ${yH2}, ${xH2} ${yH2}`}
                     fill="none"
-                    stroke="url(#synapseGrad2)"
+                    stroke="#a855f7"
+                    strokeOpacity={isTraining ? 0.75 : 0.42}
                     strokeWidth={isTraining ? '1.8' : '1.1'}
                     className={isTraining ? 'neural-synapse-pulsing' : undefined}
                   />
@@ -310,7 +297,8 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
                       key={`syn-h2-out-${h2Idx}-${oIdx}`}
                       d={`M ${xH2} ${yH2} C ${xH2 + dx * 0.45} ${yH2}, ${xOutput - dx * 0.45} ${yOut}, ${xOutput} ${yOut}`}
                       fill="none"
-                      stroke="url(#synapseGradOut)"
+                      stroke="#0d9488"
+                      strokeOpacity={isTraining ? 0.8 : 0.45}
                       strokeWidth={isTraining ? '1.9' : '1.2'}
                       className={isTraining ? 'neural-synapse-pulsing' : undefined}
                     />
@@ -325,7 +313,8 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
                       key={`syn-h1-out-${h1Idx}-${oIdx}`}
                       d={`M ${xH1} ${yH1} C ${xH1 + dx * 0.45} ${yH1}, ${xOutput - dx * 0.45} ${yOut}, ${xOutput} ${yOut}`}
                       fill="none"
-                      stroke="url(#synapseGradOut)"
+                      stroke="#0d9488"
+                      strokeOpacity={isTraining ? 0.8 : 0.45}
                       strokeWidth={isTraining ? '1.9' : '1.2'}
                       className={isTraining ? 'neural-synapse-pulsing' : undefined}
                     />
