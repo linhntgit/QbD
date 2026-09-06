@@ -1016,11 +1016,11 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             tickfont: { size: 10 },
             automargin: true,
           },
-          legend: { orientation: 'h', y: -0.25 },
-          margin: { l: 80, r: 40, t: 50, b: 80, pad: 4 },
+          legend: { orientation: 'h', y: -0.35, yanchor: 'top', x: 0.5, xanchor: 'center' },
+          margin: { l: 80, r: 40, t: 50, b: 115, pad: 4 },
         };
 
-        return <PlotlyChart data={data} layout={layout} style={{ height: '360px' }} />;
+        return <PlotlyChart data={data} layout={layout} style={{ height: '400px' }} />;
       }
 
       case 'resPred': {
@@ -1130,11 +1130,11 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             tickfont: { size: 10 },
             automargin: true,
           },
-          legend: { orientation: 'h', y: -0.25 },
-          margin: { l: 80, r: 40, t: 50, b: 80, pad: 4 },
+          legend: { orientation: 'h', y: -0.30, yanchor: 'top', x: 0.5, xanchor: 'center' },
+          margin: { l: 80, r: 40, t: 50, b: 100, pad: 4 },
         };
 
-        return <PlotlyChart data={data} layout={layout} style={{ height: '360px' }} />;
+        return <PlotlyChart data={data} layout={layout} style={{ height: '390px' }} />;
       }
 
       case 'varImp': {
