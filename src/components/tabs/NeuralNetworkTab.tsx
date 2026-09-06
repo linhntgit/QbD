@@ -1433,7 +1433,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
 
             <div>
               <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: '700', color: '#475569', marginBottom: '0.25rem' }}>
-                SỐ VÒNG TOUR (RESTARS)
+                SỐ VÒNG TOUR (RESTARTS)
               </label>
               <input
                 type="number"
