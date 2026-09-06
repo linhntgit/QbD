@@ -181,7 +181,7 @@ function normaliseChart(data: any[], layout: any, compact = false) {
   let computedMargin = {
     l: Math.max(margin.l ?? 0, compact ? 60 : 75),
     r: Math.max(margin.r ?? 0, hasColorbar ? (compact ? 90 : 115) : compact ? 25 : 35),
-    t: Math.max(margin.t ?? 0, showLegend ? (compact ? 85 : 80) : compact ? 55 : 65),
+    t: Math.max(margin.t ?? 0, showLegend ? (compact ? 88 : 84) : compact ? 58 : 68),
     b: Math.max(margin.b ?? 0, compact ? 55 : 68),
     pad: Math.max(margin.pad ?? 0, compact ? 2 : 4),
   };
@@ -229,11 +229,11 @@ function normaliseChart(data: any[], layout: any, compact = false) {
     title: layout.title
       ? {
           ...mergeTitle(layout.title, compact ? 13 : 15, compact ? 45 : 75),
-          x: hasColorbar ? (compact ? 0.44 : 0.46) : 0.5,
-          xanchor: 'center',
-          y: 0.99,
-          yanchor: 'top',
-          pad: { t: 2, b: 4, ...(typeof layout.title === 'object' ? layout.title?.pad || {} : {}) },
+          x: layout.title?.x ?? (hasColorbar ? (compact ? 0.44 : 0.46) : 0.5),
+          xanchor: layout.title?.xanchor || 'center',
+          y: layout.title?.y ?? (compact ? 0.95 : 0.96),
+          yanchor: layout.title?.yanchor || 'top',
+          pad: { t: 6, b: 4, ...(typeof layout.title === 'object' ? layout.title?.pad || {} : {}) },
         }
       : undefined,
     legend: showLegend
@@ -246,7 +246,7 @@ function normaliseChart(data: any[], layout: any, compact = false) {
           orientation: layout.legend?.orientation || 'h',
           x: layout.legend?.x ?? (hasColorbar ? (compact ? 0.44 : 0.46) : 0.5),
           xanchor: layout.legend?.xanchor || 'center',
-          y: layout.legend?.y ?? (layout.title ? (compact ? 0.91 : 0.92) : 0.99),
+          y: layout.legend?.y ?? (layout.title ? (compact ? 0.88 : 0.88) : 0.98),
           yanchor: layout.legend?.yanchor || 'top',
           font: {
             family: SCIENTIFIC_FONT,

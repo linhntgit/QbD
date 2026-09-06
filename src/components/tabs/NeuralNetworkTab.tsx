@@ -1017,7 +1017,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             automargin: true,
           },
           legend: { orientation: 'h', y: -0.35, yanchor: 'top', x: 0.5, xanchor: 'center' },
-          margin: { l: 80, r: 40, t: 50, b: 115, pad: 4 },
+          margin: { l: 80, r: 40, t: 65, b: 115, pad: 4 },
         };
 
         return <PlotlyChart data={data} layout={layout} style={{ height: '400px' }} />;
@@ -1074,7 +1074,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             { type: 'line', x0: minX, x1: maxX, y0: 2 * rmse, y1: 2 * rmse, line: { color: '#dc2626', width: 1, dash: 'dot' } },
             { type: 'line', x0: minX, x1: maxX, y0: -2 * rmse, y1: -2 * rmse, line: { color: '#dc2626', width: 1, dash: 'dot' } },
           ],
-          margin: { l: 80, r: 40, t: 50, b: 70, pad: 4 },
+          margin: { l: 80, r: 40, t: 65, b: 70, pad: 4 },
         };
 
         return <PlotlyChart data={data} layout={layout} style={{ height: '360px' }} />;
@@ -1131,7 +1131,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             automargin: true,
           },
           legend: { orientation: 'h', y: -0.30, yanchor: 'top', x: 0.5, xanchor: 'center' },
-          margin: { l: 80, r: 40, t: 50, b: 100, pad: 4 },
+          margin: { l: 80, r: 40, t: 65, b: 100, pad: 4 },
         };
 
         return <PlotlyChart data={data} layout={layout} style={{ height: '390px' }} />;
@@ -1173,7 +1173,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             tickfont: { size: 11 },
             automargin: true,
           },
-          margin: { l: 280, r: 40, t: 50, b: 70, pad: 10 },
+          margin: { l: 280, r: 40, t: 65, b: 70, pad: 10 },
         };
 
         return <PlotlyChart data={data} layout={layout} style={{ height: '360px' }} />;
