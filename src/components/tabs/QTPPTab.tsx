@@ -218,6 +218,9 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
       if (field === 'role') {
         if (value === 'mixture_component') {
           modified.type = 'Mixture';
+          // Mixture components are expressed on a 0–100 composition scale.
+          // Set the conventional unit as soon as the role is selected.
+          modified.unit = '%';
         } else if (value === 'formulation_other') {
           modified.type = 'Formulation';
         } else if (value === 'process_parameter') {
