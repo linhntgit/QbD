@@ -33,6 +33,7 @@ import type {
   NeuralActivation,
   DesirabilitySolution,
   ModelingEngine,
+  Factor,
 } from '../../types/qbd';
 import { PlotlyChart } from '../PlotlyChart';
 import { NeuralNetworkTopologyDiagram } from '../NeuralNetworkTopologyDiagram';
@@ -185,11 +186,10 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
   );
   const [colorScale, setColorScale] = useState<string>('Plasma');
 
-  // If project changes and has mixture, sync default plot type
+  // Only ternary requires a three-component mixture. Cartesian views are also
+  // valid for a mixture–process pair, but never for two mixture components.
   useEffect(() => {
-    if (hasMixture && plotType !== 'ternary') {
-      setPlotType('ternary');
-    } else if (!hasMixture && plotType === 'ternary') {
+    if (!hasMixture && plotType === 'ternary') {
       setPlotType('3d');
     }
   }, [project.id, hasMixture, plotType]);
@@ -232,11 +232,18 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
   // Surface Grid Data from Neural Model (Unconditional Hooks for React Rules of Hooks)
   const factorX = project.factors.find((f) => f.code === xAxisFactor) || project.factors[0];
   const factorY = project.factors.find((f) => f.code === yAxisFactor) || project.factors[1];
+  const isMixtureFactor = (factor?: Factor) => Boolean(factor && (factor.role === 'mixture_component' || factor.type === 'Mixture'));
+  const cartesianAxesValid = Boolean(factorX && factorY) && !(isMixtureFactor(factorX) && isMixtureFactor(factorY));
+  const hasCartesianPair = project.factors.some((x) => project.factors.some((y) => x.code !== y.code && !(isMixtureFactor(x) && isMixtureFactor(y))));
+
+  useEffect(() => {
+    if (!factorX || !factorY || !isMixtureFactor(factorX) || !isMixtureFactor(factorY)) return;
+    const replacement = project.factors.find((factor) => factor.code !== factorX.code && !isMixtureFactor(factor));
+    if (replacement) setYAxisFactor(replacement.code);
+  }, [project.factors, factorX, factorY]);
 
   const surfaceGrid = useMemo(() => {
-    // Cartesian grids vary axes independently and are not valid for mixture
-    // compositions.  Mixture projects are rendered only on the simplex.
-    if (hasMixture || !neuralModel || !factorX || !factorY) return null;
+    if (!cartesianAxesValid || !neuralModel || !factorX || !factorY) return null;
 
     const xActualArr: number[] = [];
     const yActualArr: number[] = [];
@@ -306,7 +313,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
     }
 
     return { xActualArr, yActualArr, zGrid, hoverX, hoverY, hoverText, xDisplayArr, yDisplayArr };
-  }, [hasMixture, neuralModel, factorX, factorY, profilerCoded, currentCQA]);
+  }, [cartesianAxesValid, neuralModel, factorX, factorY, profilerCoded, currentCQA]);
 
   // Ternary Mesh & Contour Calculation for Neural Model
   const ternaryResult = useMemo(() => {
@@ -2479,22 +2486,24 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                 {/* Plot Type Mode Toggle */}
                 <div style={{ display: 'flex', backgroundColor: '#f1f5f9', borderRadius: '0.5rem', padding: '0.2rem', gap: '0.2rem' }}>
-                  {!hasMixture && <>
-                    <button
-                      onClick={() => setPlotType('3d')}
-                      className={`btn ${plotType === '3d' ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', border: 'none' }}
-                    >
-                      3D
-                    </button>
-                    <button
-                      onClick={() => setPlotType('contour')}
-                      className={`btn ${plotType === 'contour' ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', border: 'none' }}
-                    >
-                      2D
-                    </button>
-                  </>}
+                  <button
+                    onClick={() => setPlotType('3d')}
+                    disabled={!hasCartesianPair}
+                    className={`btn ${plotType === '3d' ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', border: 'none' }}
+                    title={hasCartesianPair ? 'Mặt đáp 3D' : 'Cần một cặp trục không phải đồng thời là hai thành phần hỗn hợp.'}
+                  >
+                    3D
+                  </button>
+                  <button
+                    onClick={() => setPlotType('contour')}
+                    disabled={!hasCartesianPair}
+                    className={`btn ${plotType === 'contour' ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', border: 'none' }}
+                    title={hasCartesianPair ? 'Đường đồng mức 2D' : 'Cần một cặp trục không phải đồng thời là hai thành phần hỗn hợp.'}
+                  >
+                    2D
+                  </button>
                   {hasMixture && (
                     <button
                       onClick={() => setPlotType('ternary')}
@@ -2745,7 +2754,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                     <label style={{ fontSize: '0.75rem', fontWeight: '600' }}>Trục X:</label>
                     <select className="input-field" style={{ width: '180px', fontSize: '0.78rem' }} value={xAxisFactor} onChange={(e) => setXAxisFactor(e.target.value)}>
                       {project.factors.map((f) => (
-                        <option key={f.code} value={f.code} disabled={f.code === yAxisFactor}>
+                        <option key={f.code} value={f.code} disabled={f.code === yAxisFactor || (isMixtureFactor(f) && isMixtureFactor(factorY))}>
                           {f.name} ({f.code}) {f.unit ? `[${f.unit}]` : ''}
                         </option>
                       ))}
@@ -2756,7 +2765,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                     <label style={{ fontSize: '0.75rem', fontWeight: '600' }}>Trục Y:</label>
                     <select className="input-field" style={{ width: '180px', fontSize: '0.78rem' }} value={yAxisFactor} onChange={(e) => setYAxisFactor(e.target.value)}>
                       {project.factors.map((f) => (
-                        <option key={f.code} value={f.code} disabled={f.code === xAxisFactor}>
+                        <option key={f.code} value={f.code} disabled={f.code === xAxisFactor || (isMixtureFactor(f) && isMixtureFactor(factorX))}>
                           {f.name} ({f.code}) {f.unit ? `[${f.unit}]` : ''}
                         </option>
                       ))}

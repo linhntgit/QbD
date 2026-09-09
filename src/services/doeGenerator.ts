@@ -958,6 +958,9 @@ export function validateDesignSetup(factors: Factor[], config: DoEDesignConfig):
 
   const mixture = active.filter((factor) => factor.role === 'mixture_component' || factor.type === 'Mixture');
   if (mixture.length > 0) {
+    if (mixture.length < 3) {
+      errors.push('Khi khai báo thành phần hỗn hợp, cần có ít nhất 3 biến thành phần hỗn hợp để tạo simplex hợp lệ.');
+    }
     const normalize = (value: number, factor: Factor) => (factor.high > 1 || factor.unit === '%' ? value / 100 : value);
     const sumLower = mixture.reduce((sum, factor) => sum + normalize(factor.low, factor), 0);
     const sumUpper = mixture.reduce((sum, factor) => sum + normalize(factor.high, factor), 0);

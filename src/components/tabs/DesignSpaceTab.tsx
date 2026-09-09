@@ -25,6 +25,7 @@ import type {
   DesignSpaceRanges,
   MonteCarloResult,
   ModelingEngine,
+  Factor,
 } from '../../types/qbd';
 import { PlotlyChart } from '../PlotlyChart';
 import { DesirabilityProfiler } from '../DesirabilityProfiler';
@@ -82,16 +83,14 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
   const hasMixture = mixtureFactors.length >= 3;
 
   // Mode: 2D Cartesian Overlay vs Ternary Design Space
-  const [overlayMode, setOverlayMode] = useState<'2d' | 'ternary'>(() =>
+  const [overlayMode, setOverlayMode] = useState<'2d' | '3d' | 'ternary'>(() =>
     hasMixture ? 'ternary' : '2d'
   );
 
-  // A Cartesian overlay independently varies two axes and is therefore invalid
-  // when the factors are constrained to a mixture simplex.
+  // Ternary requires three mixture components. A Cartesian overlay is also
+  // valid for a mixture–process pair, but never for two mixture axes.
   useEffect(() => {
-    if (hasMixture && overlayMode !== 'ternary') {
-      setOverlayMode('ternary');
-    }
+    if (!hasMixture && overlayMode === 'ternary') setOverlayMode('2d');
   }, [project.id, hasMixture, overlayMode]);
 
   // Selected Axis Factors for 2D Overlay Plot
@@ -114,6 +113,15 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
 
   const factorX = factors.find((f) => f.code === xAxisFactor) || factors[0];
   const factorY = factors.find((f) => f.code === yAxisFactor) || factors[1];
+  const isMixtureFactor = (factor?: Factor) => Boolean(factor && (factor.role === 'mixture_component' || factor.type === 'Mixture'));
+  const cartesianAxesValid = Boolean(factorX && factorY) && !(isMixtureFactor(factorX) && isMixtureFactor(factorY));
+  const hasCartesianPair = factors.some((x) => factors.some((y) => x.code !== y.code && !(isMixtureFactor(x) && isMixtureFactor(y))));
+
+  useEffect(() => {
+    if (!factorX || !factorY || !isMixtureFactor(factorX) || !isMixtureFactor(factorY)) return;
+    const replacement = factors.find((factor) => factor.code !== factorX.code && !isMixtureFactor(factor));
+    if (replacement) setYAxisFactor(replacement.code);
+  }, [factors, factorX, factorY]);
 
   const factorA = factors.find((f) => f.code === ternaryA) || mixtureFactors[0] || factors[0];
   const factorB = factors.find((f) => f.code === ternaryB) || mixtureFactors[1] || factors[1];
@@ -260,7 +268,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
 
   // Sweet Spot / Design Space Overlay Grid Computation (2D Cartesian)
   const sweetSpotGrid = useMemo(() => {
-    if (hasMixture || overlayMode !== '2d' || !factorX || !factorY || Object.keys(models).length === 0) return null;
+    if (!cartesianAxesValid || (overlayMode !== '2d' && overlayMode !== '3d') || !factorX || !factorY || Object.keys(models).length === 0) return null;
 
     const N = Math.max(40, Math.min(300, resolution));
     const xActualArr: number[] = [];
@@ -352,7 +360,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
       xDisplayArr,
       yDisplayArr,
     };
-  }, [hasMixture, overlayMode, factorX, factorY, models, cqas, factors, sliceFactorsCoded, resolution]);
+  }, [cartesianAxesValid, overlayMode, factorX, factorY, models, cqas, factors, sliceFactorsCoded, resolution]);
 
   // Ternary Design Space Mesh Computation
   const ternaryDS = useMemo(() => {
@@ -388,6 +396,20 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
     }
 
     if (!sweetSpotGrid || !factorX || !factorY) return [];
+
+    if (overlayMode === '3d') {
+      return [{
+        type: 'surface',
+        x: sweetSpotGrid.xActualArr,
+        y: sweetSpotGrid.yActualArr,
+        z: sweetSpotGrid.zScoreGrid,
+        colorscale: 'Viridis',
+        colorbar: { title: { text: 'Biên CQA' }, len: 0.72, y: 0.52 },
+        hovertemplate: '%{text}<extra></extra>',
+        text: sweetSpotGrid.hoverText,
+        showscale: true,
+      }];
+    }
 
     const data: any[] = [
       {
@@ -492,6 +514,20 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
   const overlayLayout = useMemo(() => {
     if (overlayMode === 'ternary' && ternaryDS) {
       return ternaryDS.layout;
+    }
+
+    if (overlayMode === '3d') {
+      return {
+        title: { text: 'Không gian thiết kế 3D — biên CQA nhỏ nhất', font: { size: 14, color: '#0f172a' }, x: 0.02 },
+        autosize: true,
+        margin: { l: 20, r: 20, t: 58, b: 20 },
+        scene: {
+          xaxis: { title: { text: formatAxisTitle(factorX.name, factorX.code, factorX.unit) }, automargin: true },
+          yaxis: { title: { text: formatAxisTitle(factorY.name, factorY.code, factorY.unit) }, automargin: true },
+          zaxis: { title: { text: 'Biên CQA' }, automargin: true },
+          camera: { eye: { x: 1.45, y: 1.45, z: 0.9 } },
+        },
+      };
     }
 
     return {
@@ -649,8 +685,26 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
               {/* Overlay Mode Toggle: 2D vs Ternary */}
-              {hasMixture && (
-                <div style={{ display: 'flex', backgroundColor: '#f1f5f9', borderRadius: '0.375rem', padding: '0.15rem', gap: '0.15rem' }}>
+              <div style={{ display: 'flex', backgroundColor: '#f1f5f9', borderRadius: '0.375rem', padding: '0.15rem', gap: '0.15rem' }}>
+                  <button
+                    onClick={() => setOverlayMode('2d')}
+                    disabled={!hasCartesianPair}
+                    className={`btn ${overlayMode === '2d' ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ fontSize: '0.72rem', padding: '0.25rem 0.5rem', fontWeight: '700' }}
+                    title={hasCartesianPair ? 'Mặt cắt 2D' : 'Cần một cặp trục không phải đồng thời là hai thành phần hỗn hợp.'}
+                  >
+                    2D Overlay
+                  </button>
+                  <button
+                    onClick={() => setOverlayMode('3d')}
+                    disabled={!hasCartesianPair}
+                    className={`btn ${overlayMode === '3d' ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ fontSize: '0.72rem', padding: '0.25rem 0.5rem', fontWeight: '700' }}
+                    title={hasCartesianPair ? 'Không gian thiết kế 3D' : 'Cần một cặp trục không phải đồng thời là hai thành phần hỗn hợp.'}
+                  >
+                    3D Surface
+                  </button>
+                  {hasMixture && (
                   <button
                     onClick={() => setOverlayMode('ternary')}
                     className={`btn ${overlayMode === 'ternary' ? 'btn-teal' : 'btn-secondary'}`}
@@ -659,8 +713,8 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                     <FlaskConical size={12} style={{ display: 'inline', marginRight: '0.2rem' }} />
                     <span>Tam Giác Hỗn Hợp</span>
                   </button>
-                </div>
-              )}
+                  )}
+              </div>
 
               {/* Resolution Selector (both 2D and Ternary) */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', backgroundColor: '#f8fafc', padding: '0.2rem 0.4rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
@@ -710,7 +764,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
               </div>
 
               {/* Boundary Lines Toggle (for 2D) */}
-              {overlayMode === '2d' && (
+              {(overlayMode === '2d' || overlayMode === '3d') && (
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.73rem', color: '#334155', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
@@ -868,7 +922,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                   <label style={{ fontSize: '0.75rem', color: '#64748b' }}>Trục X (Hoành):</label>
                   <select className="input-field" value={xAxisFactor} onChange={(e) => setXAxisFactor(e.target.value)}>
                     {factors.map((f) => (
-                      <option key={f.code} value={f.code} disabled={f.code === yAxisFactor}>
+                      <option key={f.code} value={f.code} disabled={f.code === yAxisFactor || (isMixtureFactor(f) && isMixtureFactor(factorY))}>
                         {f.name} ({f.code})
                       </option>
                     ))}
@@ -878,7 +932,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                   <label style={{ fontSize: '0.75rem', color: '#64748b' }}>Trục Y (Tung):</label>
                   <select className="input-field" value={yAxisFactor} onChange={(e) => setYAxisFactor(e.target.value)}>
                     {factors.map((f) => (
-                      <option key={f.code} value={f.code} disabled={f.code === xAxisFactor}>
+                      <option key={f.code} value={f.code} disabled={f.code === xAxisFactor || (isMixtureFactor(f) && isMixtureFactor(factorX))}>
                         {f.name} ({f.code})
                       </option>
                     ))}

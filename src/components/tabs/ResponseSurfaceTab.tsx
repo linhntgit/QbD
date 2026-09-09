@@ -60,12 +60,11 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
     hasMixture ? 'ternary' : '3d'
   );
 
-  // Cartesian grids vary their axes independently.  For mixture projects this
-  // leaves the simplex, so only the ternary representation is permitted.
+  // Ternary is available only with a valid three-component mixture. Cartesian
+  // views remain useful for mixture–process interactions, but must never vary
+  // two mixture components independently.
   useEffect(() => {
-    if (hasMixture && plotType !== 'ternary') {
-      setPlotType('ternary');
-    } else if (!hasMixture && plotType === 'ternary') {
+    if (!hasMixture && plotType === 'ternary') {
       setPlotType('3d');
     }
   }, [project.id, hasMixture, plotType]);
@@ -122,6 +121,15 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
   // Active factors for 2D/3D
   const factorX = factors.find((f) => f.code === xAxisFactor) || factors[0];
   const factorY = factors.find((f) => f.code === yAxisFactor) || factors[1];
+  const isMixtureFactor = (factor?: Factor) => Boolean(factor && (factor.role === 'mixture_component' || factor.type === 'Mixture'));
+  const cartesianAxesValid = Boolean(factorX && factorY) && !(isMixtureFactor(factorX) && isMixtureFactor(factorY));
+  const hasCartesianPair = factors.some((x) => factors.some((y) => x.code !== y.code && !(isMixtureFactor(x) && isMixtureFactor(y))));
+
+  useEffect(() => {
+    if (!factorX || !factorY || !isMixtureFactor(factorX) || !isMixtureFactor(factorY)) return;
+    const replacement = factors.find((factor) => factor.code !== factorX.code && !isMixtureFactor(factor));
+    if (replacement) setYAxisFactor(replacement.code);
+  }, [factors, factorX, factorY]);
 
   // Active factors for Ternary
   const factorA = factors.find((f) => f.code === ternaryA) || mixtureFactors[0] || factors[0];
@@ -169,7 +177,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
 
   // Grid calculation for 3D Surface & 2D Cartesian Contour
   const surfaceGrid = useMemo(() => {
-    if (hasMixture || !model || !factorX || !factorY) return null;
+    if (!cartesianAxesValid || !model || !factorX || !factorY) return null;
 
     const xCodedArr = getFactorGridCodes(factorX, 35);
     const yCodedArr = getFactorGridCodes(factorY, 35);
@@ -248,7 +256,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
       xDisplayArr,
       yDisplayArr,
     };
-  }, [hasMixture, model, factorX, factorY, fixedFactorCoded, currentCQA]);
+  }, [cartesianAxesValid, model, factorX, factorY, fixedFactorCoded, currentCQA]);
 
   // Ternary Mesh & Contour Calculation
   const ternaryResult = useMemo(() => {
@@ -746,24 +754,24 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
 
             {/* Plot Type Selector: 3D / 2D / Ternary */}
             <div style={{ display: 'flex', backgroundColor: '#f1f5f9', borderRadius: '0.5rem', padding: '0.25rem', gap: '0.2rem' }}>
-              {!hasMixture && <>
-                <button
-                  onClick={() => setPlotType('3d')}
-                  className={`btn ${plotType === '3d' ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', border: 'none' }}
-                  title="Mặt đáp 3 chiều trong không gian"
-                >
-                  3D Surface
-                </button>
-                <button
-                  onClick={() => setPlotType('contour')}
-                  className={`btn ${plotType === 'contour' ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', border: 'none' }}
-                  title="Đường đồng mức 2D trên hệ tọa độ Descartes"
-                >
-                  2D Contour
-                </button>
-              </>}
+              <button
+                onClick={() => setPlotType('3d')}
+                disabled={!hasCartesianPair}
+                className={`btn ${plotType === '3d' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', border: 'none' }}
+                title={hasCartesianPair ? 'Mặt đáp 3 chiều trong không gian' : 'Cần một cặp trục không phải đồng thời là hai thành phần hỗn hợp.'}
+              >
+                3D Surface
+              </button>
+              <button
+                onClick={() => setPlotType('contour')}
+                disabled={!hasCartesianPair}
+                className={`btn ${plotType === 'contour' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', border: 'none' }}
+                title={hasCartesianPair ? 'Đường đồng mức 2D trên hệ tọa độ Descartes' : 'Cần một cặp trục không phải đồng thời là hai thành phần hỗn hợp.'}
+              >
+                2D Contour
+              </button>
               {hasMixture && (
                 <button
                   onClick={() => setPlotType('ternary')}
@@ -900,7 +908,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                     onChange={(e) => setXAxisFactor(e.target.value)}
                   >
                     {factors.map((f) => (
-                      <option key={f.code} value={f.code} disabled={f.code === yAxisFactor}>
+                      <option key={f.code} value={f.code} disabled={f.code === yAxisFactor || (isMixtureFactor(f) && isMixtureFactor(factorY))}>
                         {f.name} ({f.code})
                       </option>
                     ))}
@@ -917,7 +925,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                     onChange={(e) => setYAxisFactor(e.target.value)}
                   >
                     {factors.map((f) => (
-                      <option key={f.code} value={f.code} disabled={f.code === xAxisFactor}>
+                      <option key={f.code} value={f.code} disabled={f.code === xAxisFactor || (isMixtureFactor(f) && isMixtureFactor(factorX))}>
                         {f.name} ({f.code})
                       </option>
                     ))}
