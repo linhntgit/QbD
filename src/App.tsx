@@ -15,7 +15,7 @@ import type {
 import { CASE_STUDIES } from './data/caseStudies';
 import { fitModel, optimizeDesirability } from './services/statistics';
 import { fitNeuralNetModel, fitMultiOutputNeuralNet, DEFAULT_NEURAL_CONFIG, getNeuralArtifactFingerprint, hydrateNeuralModels, serializeNeuralModels } from './services/neuralNetwork';
-import { getReportReadiness, loadPersistedProject, persistProject, recordProjectVersion, validateProjectTemplate } from './services/projectGovernance';
+import { loadPersistedProject, persistProject, recordProjectVersion, validateProjectTemplate } from './services/projectGovernance';
 import { stableSeedFromText } from './services/random';
 import { Navbar } from './components/Navbar';
 import { TabNavigation, type TabKey } from './components/TabNavigation';
@@ -227,11 +227,6 @@ export function App() {
     setMonteCarlo(null);
   }, [optimum, project.factors, project.cqas, activeModels, analysisProvenance.monteCarloSeed,
     analysisProvenance.monteCarloVariabilityPercent, analysisProvenance.monteCarloSimulations]);
-  const reportReadiness = useMemo(
-    () => getReportReadiness(project, activeModels, optimum, monteCarlo),
-    [project, activeModels, optimum, monteCarlo],
-  );
-
   // Update Project Handler
   const handleUpdateProject = (updated: Partial<QBDProject>) => {
     pendingAuditAction.current = `Cập nhật: ${Object.keys(updated).join(', ')}`;
@@ -449,17 +444,6 @@ export function App() {
     URL.revokeObjectURL(url);
   };
 
-  // Export Word Report
-  const handleExportWord = async () => {
-    if (!reportReadiness.readyForScientificReport) {
-      window.alert(`Chưa thể xuất bản thảo báo cáo phát triển.\n${[...reportReadiness.errors, ...reportReadiness.warnings].slice(0, 8).join('\n')}`);
-      return;
-    }
-    trackProjectAction('export_word');
-    const { exportQBDWordReport } = await import('./services/reportGenerator');
-    exportQBDWordReport(project, models, optimum, monteCarlo, neuralModels, modelingEngine);
-  };
-
   return (
     <div
       className={`app-shell${isHelpOpen && isHelpPinned ? ' app-shell--help-pinned' : ''}`}
@@ -473,15 +457,11 @@ export function App() {
       {/* Top Navbar */}
       <Navbar
         project={project}
-        activeTab={activeTab}
         modelingEngine={modelingEngine}
         onToggleEngine={handleModelingEngineChange}
-        onNavigateToTab={setActiveTab}
         onLoadProject={handleLoadProject}
-        onExportWord={handleExportWord}
         onSaveJSON={handleSaveJSON}
         onNewProject={handleNewProject}
-        canExportWord={reportReadiness.readyForScientificReport}
         onToggleHelp={() => setIsHelpOpen((prev) => !prev)}
         isHelpOpen={isHelpOpen}
       />

@@ -1,12 +1,10 @@
 import React, { useRef } from 'react';
 import {
   FlaskConical,
-  FileText,
   Save,
   FolderOpen,
   PlusCircle,
   BookOpen,
-  FileCheck2,
   Calculator,
   BrainCircuit,
   HelpCircle,
@@ -16,30 +14,22 @@ import { CASE_STUDIES } from '../data/caseStudies';
 
 interface NavbarProps {
   project: QBDProject;
-  activeTab?: string;
   modelingEngine?: ModelingEngine;
   onToggleEngine?: (engine: ModelingEngine) => void;
-  onNavigateToTab?: (tab: any) => void;
   onLoadProject: (project: QBDProject) => void;
-  onExportWord: () => void;
   onSaveJSON: () => void;
   onNewProject: () => void;
-  canExportWord?: boolean;
   onToggleHelp?: () => void;
   isHelpOpen?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   project,
-  activeTab,
   modelingEngine = 'polynomial',
   onToggleEngine,
-  onNavigateToTab,
   onLoadProject,
-  onExportWord,
   onSaveJSON,
   onNewProject,
-  canExportWord = false,
   onToggleHelp,
   isHelpOpen = false,
 }) => {
@@ -204,31 +194,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 ))}
               </select>
             </div>
-
-            {/* Direct Jump to Report Tab */}
-            {onNavigateToTab && (
-              <button
-                onClick={() => onNavigateToTab('report')}
-                className={`btn ${activeTab === 'report' ? 'btn-primary' : 'btn-teal'}`}
-                style={{ fontSize: '0.82rem', padding: '0.4rem 0.75rem' }}
-                title="Xem ngay Hồ sơ báo cáo phát triển thuốc CTD Module 3.2.P.2 (Tab 8)"
-              >
-                <FileCheck2 size={16} />
-                <span>8. Báo Cáo Hồ Sơ</span>
-              </button>
-            )}
-
-            {/* Export Word */}
-            <button
-              onClick={onExportWord}
-              disabled={!canExportWord}
-              className="btn btn-secondary"
-              style={{ fontSize: '0.82rem', padding: '0.4rem 0.75rem' }}
-              title={canExportWord ? 'Xuất bản thảo báo cáo phát triển theo cấu trúc tham khảo CTD 3.2.P.2' : 'Bản thảo đang bị khóa bởi readiness gate kỹ thuật'}
-            >
-              <FileText size={16} color="#0f766e" />
-              <span>Xuất Bản Thảo Word</span>
-            </button>
 
             {/* Save JSON */}
             <button
