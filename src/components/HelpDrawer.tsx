@@ -43,7 +43,79 @@ interface HelpSection {
   title: string;
   icon: any;
   content: React.ReactNode;
+  keywords?: string[];
 }
+
+interface GlossaryTermItem {
+  term: string;
+  vietnamese: string;
+  tag: string;
+  tagColor?: 'teal' | 'primary' | 'warning' | 'danger' | 'purple' | 'slate';
+  definition: React.ReactNode;
+}
+
+const GlossaryTermCard: React.FC<GlossaryTermItem> = ({
+  term,
+  vietnamese,
+  tag,
+  tagColor = 'teal',
+  definition,
+}) => {
+  const getTagStyle = () => {
+    switch (tagColor) {
+      case 'primary':
+        return { backgroundColor: '#dbeafe', color: '#1e40af', border: '1px solid #bfdbfe' };
+      case 'warning':
+        return { backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' };
+      case 'danger':
+        return { backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca' };
+      case 'purple':
+        return { backgroundColor: '#f3e8ff', color: '#6b21a8', border: '1px solid #e9d5ff' };
+      case 'slate':
+        return { backgroundColor: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1' };
+      case 'teal':
+      default:
+        return { backgroundColor: '#ccfbf1', color: '#0f766e', border: '1px solid #99f6e4' };
+    }
+  };
+
+  return (
+    <div
+      style={{
+        backgroundColor: '#ffffff',
+        border: '1px solid #e2e8f0',
+        borderRadius: '0.4rem',
+        padding: '0.65rem 0.8rem',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.3rem' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', flexWrap: 'wrap' }}>
+          <strong style={{ color: '#0f172a', fontSize: '0.82rem' }}>{term}</strong>
+          {vietnamese && (
+            <span style={{ color: '#64748b', fontSize: '0.74rem', fontStyle: 'italic' }}>
+              ({vietnamese})
+            </span>
+          )}
+        </div>
+        <span
+          style={{
+            fontSize: '0.66rem',
+            fontWeight: '600',
+            padding: '0.1rem 0.45rem',
+            borderRadius: '9999px',
+            ...getTagStyle(),
+          }}
+        >
+          {tag}
+        </span>
+      </div>
+      <div style={{ color: '#334155', fontSize: '0.78rem', lineHeight: 1.55 }}>
+        {definition}
+      </div>
+    </div>
+  );
+};
 
 export const HelpDrawer: React.FC<HelpDrawerProps> = ({
   isOpen,
@@ -69,6 +141,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
     algorithms: true,
     diagnostics: true,
     tips: true,
+    glossary: true,
   });
 
   useEffect(() => {
@@ -84,6 +157,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
       algorithms: true,
       diagnostics: true,
       tips: true,
+      glossary: true,
     });
   }, [viewingTab]);
 
@@ -146,6 +220,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
       algorithms: true,
       diagnostics: true,
       tips: true,
+      glossary: true,
     });
   };
 
@@ -156,6 +231,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
       algorithms: false,
       diagnostics: false,
       tips: false,
+      glossary: false,
     });
   };
 
@@ -309,6 +385,84 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
               </ul>
             ),
           },
+          {
+            id: 'glossary',
+            title: 'Giải Thích Thuật Ngữ (Glossary & Terminology)',
+            icon: BookOpen,
+            keywords: ['QbD', 'QTPP', 'CQA', 'CMA', 'CPP', 'LSL', 'USL', 'Desirability', 'Simplex', 'Mixture'],
+            content: (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+                <GlossaryTermCard
+                  term="QbD (Quality by Design)"
+                  vietnamese="Thiết kế chất lượng"
+                  tag="ICH Q8(R2)"
+                  tagColor="teal"
+                  definition="Cách tiếp cận có hệ thống trong nghiên cứu và phát triển dược phẩm bắt đầu từ các mục tiêu chất lượng định trước, dựa trên sự thấu hiểu sâu sắc về sản phẩm, quy trình sản xuất và quản lý rủi ro chất lượng (thay vì chỉ kiểm tra chất lượng ở khâu thành phẩm cuối cùng)."
+                />
+                <GlossaryTermCard
+                  term="QTPP (Quality Target Product Profile)"
+                  vietnamese="Hồ sơ chất lượng sản phẩm mục tiêu"
+                  tag="ICH Q8"
+                  tagColor="teal"
+                  definition="Bản tóm lược có tính chất dự kiến về các đặc tính chất lượng của một sản phẩm thuốc cần đạt được một cách lý tưởng để bảo đảm hiệu quả điều trị và độ an toàn như công bố trên nhãn thuốc (bao gồm dạng bào chế, đường dùng, hàm lượng, độ hòa tan, độ tinh khiết và độ ổn định)."
+                />
+                <GlossaryTermCard
+                  term="CQA (Critical Quality Attribute)"
+                  vietnamese="Thuộc tính chất lượng trọng yếu"
+                  tag="Biến Đầu Ra (Y)"
+                  tagColor="primary"
+                  definition="Đặc tính vật lý, hóa học, sinh học hoặc vi sinh vật của sản phẩm thuốc bắt buộc phải nằm trong giới hạn hoặc phân bố xác định (LSL–USL) để bảo đảm sản phẩm đạt chất lượng mong muốn (ví dụ: độ hòa tan sau 12h, độ cứng viên, độ đồng đều hàm lượng, hàm lượng tạp chất)."
+                />
+                <GlossaryTermCard
+                  term="CMA (Critical Material Attribute)"
+                  vietnamese="Thuộc tính nguyên vật liệu trọng yếu"
+                  tag="Biến Đầu Vào (X)"
+                  tagColor="warning"
+                  definition="Thuộc tính vật lý, hóa học hoặc sinh học của nguyên vật liệu đầu vào (hoạt chất API hoặc tá dược) mà sự biến thiên của nó có tác động trực tiếp đến ít nhất một CQA (ví dụ: kích thước hạt D50 của API, độ nhớt của tá dược polymer kéo dài giải phóng, độ ẩm tá dược)."
+                />
+                <GlossaryTermCard
+                  term="CPP (Critical Process Parameter)"
+                  vietnamese="Thông số quy trình trọng yếu"
+                  tag="Biến Đầu Vào (X)"
+                  tagColor="warning"
+                  definition="Thông số vận hành trong quá trình sản xuất (như lực dập chính, tốc độ cánh khuấy tạo hạt, nhiệt độ gió vào khi sấy tầng sôi) mà sự dao động của nó ảnh hưởng trực tiếp đến CQA, do đó cần được giám sát hoặc kiểm soát nghiêm ngặt."
+                />
+                <GlossaryTermCard
+                  term="LSL & USL (Specification Limits)"
+                  vietnamese="Giới hạn tiêu chuẩn dưới & trên"
+                  tag="Dược Điển / Tiêu Chuẩn"
+                  tagColor="slate"
+                  definition={
+                    <>
+                      Giới hạn tiêu chuẩn dưới (<InlineMath math="\text{LSL}" />) và giới hạn tiêu chuẩn trên (<InlineMath math="\text{USL}" />) theo Dược điển (DĐVN, USP, Ph. Eur.) hoặc hồ sơ đăng ký thuốc; đáp ứng CQA bắt buộc phải nằm trong dải <InlineMath math="[\text{LSL}, \text{USL}]" /> để lô thuốc được đánh giá đạt tiêu chuẩn chất lượng.
+                    </>
+                  }
+                />
+                <GlossaryTermCard
+                  term="Desirability Function"
+                  vietnamese="Hàm thỏa dụng Derringer & Suich"
+                  tag="Thống Kê Tối Ưu"
+                  tagColor="primary"
+                  definition={
+                    <>
+                      Phương pháp toán học chuyển đổi các đáp ứng CQA có đơn vị và thang đo khác nhau thành các giá trị không thứ nguyên <InlineMath math="d_i \in [0, 1]" /> (trong đó 0 = không chấp nhận được, 1 = đạt mục tiêu lý tưởng) để phục vụ bài toán tối ưu hóa đa mục tiêu đồng thời.
+                    </>
+                  }
+                />
+                <GlossaryTermCard
+                  term="Simplex / Mixture Constraint"
+                  vietnamese="Ràng buộc thành phần hỗn hợp"
+                  tag="Ràng Buộc Công Thức"
+                  tagColor="slate"
+                  definition={
+                    <>
+                      Ràng buộc toán học trong công thức thuốc quy định tổng tỷ lệ phần trăm của các cấu tử hỗn hợp luôn bằng 100% (<InlineMath math="\sum X_i = 100\%" />). Khi đó các thành phần không thể biến thiên hoàn toàn độc lập mà phụ thuộc ràng buộc lẫn nhau.
+                    </>
+                  }
+                />
+              </div>
+            ),
+          },
         ];
 
       case 'fmea':
@@ -402,6 +556,76 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
               </ul>
             ),
           },
+          {
+            id: 'glossary',
+            title: 'Giải Thích Thuật Ngữ (Glossary & Terminology)',
+            icon: BookOpen,
+            keywords: ['QRM', 'FMEA', 'RPN', 'Severity', 'Occurrence', 'Detection', 'Ishikawa', '6M', 'Mitigation'],
+            content: (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+                <GlossaryTermCard
+                  term="QRM (Quality Risk Management)"
+                  vietnamese="Quản lý rủi ro chất lượng"
+                  tag="ICH Q9(R1)"
+                  tagColor="teal"
+                  definition="Quy trình có hệ thống để nhận diện, đánh giá, kiểm soát, trao đổi thông tin và định kỳ rà soát các nguy cơ đối với chất lượng của sản phẩm thuốc xuyên suốt vòng đời sản phẩm, bảo đảm quyền lợi và độ an toàn của người bệnh."
+                />
+                <GlossaryTermCard
+                  term="FMEA (Failure Mode and Effects Analysis)"
+                  vietnamese="Phân tích dạng sai lỗi và tác động"
+                  tag="ICH Q9"
+                  tagColor="teal"
+                  definition="Phương pháp đánh giá rủi ro định lượng có cấu trúc nhằm phân tích các cơ chế sai lỗi tiềm ẩn của từng biến đầu vào (CMA/CPP), hậu quả của chúng đến các CQA và đánh giá tính hữu hiệu của các biện pháp kiểm soát hiện có."
+                />
+                <GlossaryTermCard
+                  term="RPN (Risk Priority Number)"
+                  vietnamese="Chỉ số ưu tiên rủi ro"
+                  tag="QRM Sàng Lọc"
+                  tagColor="danger"
+                  definition={
+                    <>
+                      Tích số định lượng <InlineMath math="\text{RPN} = S \times O \times D \in [1, 1000]" /> dùng để lượng hóa và xếp hạng các rủi ro. Các yếu tố có RPN cao được ưu tiên đưa vào khảo sát thực nghiệm trong DoE để xác định biên kiểm soát an toàn.
+                    </>
+                  }
+                />
+                <GlossaryTermCard
+                  term="Severity (S)"
+                  vietnamese="Mức độ nghiêm trọng (1–10)"
+                  tag="Chỉ Số FMEA"
+                  tagColor="warning"
+                  definition="Điểm số định lượng hậu quả của sai lỗi đối với sức khỏe bệnh nhân hoặc mức độ vi phạm tiêu chuẩn chất lượng Dược điển bắt buộc nếu sai lỗi xảy ra (1 = ảnh hưởng không đáng kể, 10 = gây hậu quả nguy hiểm, mất an toàn nghiêm trọng cho bệnh nhân)."
+                />
+                <GlossaryTermCard
+                  term="Occurrence (O)"
+                  vietnamese="Khả năng xuất hiện / Tần suất (1–10)"
+                  tag="Chỉ Số FMEA"
+                  tagColor="warning"
+                  definition="Xác suất hoặc tần suất mà nguyên nhân gốc rễ gây ra sai lỗi có thể xảy ra trong điều kiện sản xuất thực tế dựa trên dữ liệu lịch sử hoặc kinh nghiệm chuyên gia (1 = cực kỳ hiếm gặp, 10 = gần như chắc chắn xảy ra thường xuyên)."
+                />
+                <GlossaryTermCard
+                  term="Detection (D)"
+                  vietnamese="Khả năng phát hiện (1–10)"
+                  tag="Chỉ Số FMEA"
+                  tagColor="warning"
+                  definition="Mức độ khó khăn trong việc phát hiện sai lỗi trước khi sản phẩm xuất xưởng đến tay bệnh nhân (1 = phát hiện tức thời qua IPC tự động trên dây chuyền, 10 = hoàn toàn không thể phát hiện qua kiểm tra thông thường)."
+                />
+                <GlossaryTermCard
+                  term="Ishikawa Diagram (Fishbone / 6M)"
+                  vietnamese="Biểu đồ xương cá nhân-quả"
+                  tag="Phân Tích Nguyên Nhân"
+                  tagColor="slate"
+                  definition="Công cụ trực quan hóa các nguồn biến thiên tiềm ẩn tác động đến CQA theo 6 nhóm: Material (Nguyên liệu), Machine (Máy móc/Thiết bị), Method (Phương pháp/Quy trình), Measurement (Đo lường/Kiểm nghiệm), Environment (Môi trường sản xuất) và Man (Con người/Thao tác)."
+                />
+                <GlossaryTermCard
+                  term="Risk Mitigation"
+                  vietnamese="Biện pháp giảm thiểu rủi ro"
+                  tag="Kiểm Soát QRM"
+                  tagColor="teal"
+                  definition="Các biện pháp kỹ thuật, thiết kế DoE hoặc bổ sung điểm kiểm soát trong quá trình (IPC) nhằm hạ thấp điểm S, O, D và đưa chỉ số RPN về vùng an toàn chấp nhận được (Acceptable Risk)."
+                />
+              </div>
+            ),
+          },
         ];
 
       case 'doe':
@@ -492,6 +716,103 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 <li><strong>Điểm tâm và run lặp:</strong> Khi thiết kế cho phép, thêm run lặp (thường gồm điểm tâm) để ước lượng <em>pure error</em>—dao động giữa các phép đo cùng điều kiện—và hỗ trợ kiểm định Lack of Fit. Số lần lặp phải dựa trên độ biến thiên và mục tiêu nghiên cứu.</li>
                 <li><strong>Thứ tự ngẫu nhiên hóa (Randomized Run Order):</strong> Thực hiện các mẻ thử theo thứ tự ngẫu nhiên của cột Run Order để triệt tiêu sai số hệ thống theo thời gian.</li>
               </ul>
+            ),
+          },
+          {
+            id: 'glossary',
+            title: 'Giải Thích Thuật Ngữ (Glossary & Terminology)',
+            icon: BookOpen,
+            keywords: ['DoE', 'D-Efficiency', 'A-Efficiency', 'G-Efficiency', 'Coded', 'Leverage', 'Condition Number', 'Randomization', 'Center Points', 'Pure Error', 'Sequential'],
+            content: (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+                <GlossaryTermCard
+                  term="DoE (Design of Experiments)"
+                  vietnamese="Quy hoạch thực nghiệm"
+                  tag="DoE / Thống Kê"
+                  tagColor="primary"
+                  definition="Phương pháp thống kê đa biến có cấu trúc, thay đổi đồng thời có chủ đích các biến đầu vào để xác định quy luật toán học, hiệu ứng chính và tương tác tác động lên CQA với số lần chạy tối thiểu."
+                />
+                <GlossaryTermCard
+                  term="D-Efficiency (D-Optimality)"
+                  vietnamese="Hiệu suất D"
+                  tag="Tối Ưu Ma Trận"
+                  tagColor="teal"
+                  definition={
+                    <>
+                      Tiêu chuẩn tối ưu ma trận thực nghiệm dựa trên việc cực đại hóa định thức ma trận thông tin Fisher <InlineMath math="|\mathbf{X}^T\mathbf{X}|" />, giúp cực tiểu hóa thể tích elip sai số của các hệ số hồi quy ước lượng <InlineMath math="\hat{\boldsymbol{\beta}}" />.
+                    </>
+                  }
+                />
+                <GlossaryTermCard
+                  term="A-Efficiency & G-Efficiency"
+                  vietnamese="Hiệu suất A & Hiệu suất G"
+                  tag="Tiêu Chí Tối Ưu"
+                  tagColor="slate"
+                  definition={
+                    <>
+                      Tiêu chuẩn A cực tiểu hóa vết ma trận nghịch đảo <InlineMath math="\text{Tr}((\mathbf{X}^T\mathbf{X})^{-1})" /> (tổng phương sai các hệ số hồi quy); tiêu chuẩn G cực tiểu hóa phương sai dự báo cực đại trên toàn bộ không gian thực nghiệm.
+                    </>
+                  }
+                />
+                <GlossaryTermCard
+                  term="Coded Factors"
+                  vietnamese="Biến mã hóa [-1, +1]"
+                  tag="Chuẩn Hóa Số Liệu"
+                  tagColor="slate"
+                  definition={
+                    <>
+                      Kỹ thuật chuyển đổi các giá trị thực tế (mg, °C, rpm) về thang đo chuẩn hóa không thứ nguyên <InlineMath math="[-1, 0, +1]" /> theo công thức <InlineMath math="x = \frac{X - X_{\text{tâm}}}{(X_{\text{cao}} - X_{\text{thấp}})/2}" />, giúp so sánh trực quan và công bằng độ lớn tác động giữa các yếu tố.
+                    </>
+                  }
+                />
+                <GlossaryTermCard
+                  term="Leverage (hii)"
+                  vietnamese="Độ đòn bẩy ma trận"
+                  tag="Chẩn Đoán Vị Trí"
+                  tagColor="warning"
+                  definition={
+                    <>
+                      Phần tử trên đường chéo chính của ma trận hình chiếu Hat <InlineMath math="\mathbf{H} = \mathbf{X}(\mathbf{X}^T\mathbf{X})^{-1}\mathbf{X}^T" />, đo lường khoảng cách từ một điểm chạy thí nghiệm đến trọng tâm của ma trận thiết kế và mức độ ảnh hưởng vị trí của nó lên mô hình hồi quy.
+                    </>
+                  }
+                />
+                <GlossaryTermCard
+                  term="Condition Number (κ)"
+                  vietnamese="Chỉ số điều kiện ma trận"
+                  tag="Độ Ổn Định Số Học"
+                  tagColor="warning"
+                  definition={
+                    <>
+                      Tỷ số giữa giá trị kỳ dị cực đại và cực tiểu của ma trận thông tin <InlineMath math="\mathbf{X}^T\mathbf{X}" />, phản ánh độ nhạy của phép nghịch đảo ma trận và cảnh báo hiện tượng đa cộng tuyến nghiêm trọng khi chỉ số quá cao.
+                    </>
+                  }
+                />
+                <GlossaryTermCard
+                  term="Randomization"
+                  vietnamese="Ngẫu nhiên hóa thứ tự chạy"
+                  tag="Nguyên Tắc DoE"
+                  tagColor="teal"
+                  definition="Bố trí thứ tự thực hiện thí nghiệm ngẫu nhiên (Run Order thay vì Standard Order) để triệt tiêu các sai số hệ thống phụ thuộc vào thời gian (nhiệt độ môi trường trôi dạt, độ mòn dao cụ, mỏi mệt của thao tác viên)."
+                />
+                <GlossaryTermCard
+                  term="Center Points & Pure Error"
+                  vietnamese="Điểm tâm & Sai số thuần túy"
+                  tag="Kiểm Định Lặp"
+                  tagColor="slate"
+                  definition={
+                    <>
+                      Các lần chạy lặp lại ở cùng điều kiện tâm <InlineMath math="[0, 0, \dots, 0]" /> để ước lượng độ biến thiên tự nhiên của phép đo độc lập với mô hình (pure error), làm cơ sở toán học để kiểm định độ kém tương thích (Lack of Fit).
+                    </>
+                  }
+                />
+                <GlossaryTermCard
+                  term="Sequential DoE"
+                  vietnamese="DoE tuần tự"
+                  tag="Chiến Lược DoE"
+                  tagColor="primary"
+                  definition="Chiến lược phát triển bổ sung có mục tiêu (ví dụ bổ sung thêm các điểm D-optimal vào ma trận sàng lọc trước đó) nhằm nâng cao bậc tự do và chuyển đổi mô hình từ tuyến tính sang phi tuyến bậc 2 mà không lãng phí các mẻ thử nghiệm cũ."
+                />
+              </div>
             ),
           },
         ];
@@ -592,6 +913,115 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   <br />Khi số tham số <InlineMath math="p" /> của mô hình đúng bằng số lần chạy thực nghiệm độc lập <InlineMath math="N" />, bậc tự do phần dư không còn dư cho Lack of Fit (<InlineMath math="df_{\text{LOF}} = 0" />).
                   <br /><strong>Cách xử lý:</strong> Chuyển sang dạng mô hình <em>Tuyến tính (Linear)</em> hoặc <em>Tương tác (2FI)</em>, hoặc bấm nút <em>"+ Thêm run thông tin nhất"</em> ở Tab 3 để bổ sung thêm các điểm chạy thực nghiệm.
                 </div>
+              </div>
+            ),
+          },
+          {
+            id: 'glossary',
+            title: 'Giải Thích Thuật Ngữ (Glossary & Terminology)',
+            icon: BookOpen,
+            keywords: ['ANOVA', 'OLS', 'R2', 'R-squared', 'Adjusted R2', 'Q2', 'Predicted R2', 'Lack of Fit', 'LOF', 'p-value', 'VIF', 'Cook Distance', 'Degrees of Freedom', 'df'],
+            content: (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+                <GlossaryTermCard
+                  term="ANOVA (Analysis of Variance)"
+                  vietnamese="Phân tích phương sai"
+                  tag="Thống Kê MLR"
+                  tagColor="primary"
+                  definition={
+                    <>
+                      Kỹ thuật thống kê chia tách tổng biến thiên quan sát được (<InlineMath math="SS_{\text{Total}}" />) thành phần biến thiên do mô hình giải thích (<InlineMath math="SS_{\text{Model}}" />) và biến thiên ngẫu nhiên phần dư (<InlineMath math="SS_{\text{Residual}}" />), kiểm định mức độ tin cậy của mô hình thông qua tỷ số Fisher <InlineMath math="F" />.
+                    </>
+                  }
+                />
+                <GlossaryTermCard
+                  term="OLS (Ordinary Least Squares)"
+                  vietnamese="Bình phương bé nhất cổ điển"
+                  tag="Hồi Quy Tuyến Tính"
+                  tagColor="slate"
+                  definition={
+                    <>
+                      Kỹ thuật toán học giải tích tìm vector hệ số hồi quy <InlineMath math="\hat{\boldsymbol{\beta}} = (\mathbf{X}^T\mathbf{X})^{-1}\mathbf{X}^T\mathbf{Y}" /> sao cho tổng bình phương khoảng cách giữa các điểm thực nghiệm và mặt phẳng hồi quy đạt cực tiểu.
+                    </>
+                  }
+                />
+                <GlossaryTermCard
+                  term="R² & Adjusted R² (R²adj)"
+                  vietnamese="Hệ số xác định & Hệ số hiệu chỉnh"
+                  tag="Độ Khớp Mô Hình"
+                  tagColor="primary"
+                  definition={
+                    <>
+                      <InlineMath math="R^2" /> đo tỷ lệ phần trăm biến thiên của CQA được mô hình giải thích trên tập dữ liệu hiện có; <InlineMath math="R^2_{\text{adj}}" /> trừ điểm phạt theo số lượng tham số thêm vào mô hình, giúp tránh việc thêm biến ảo làm tăng giả tạo <InlineMath math="R^2" />.
+                    </>
+                  }
+                />
+                <GlossaryTermCard
+                  term="Predicted R² (Q²)"
+                  vietnamese="Hệ số xác định dự báo"
+                  tag="Năng Lực Dự Báo"
+                  tagColor="teal"
+                  definition={
+                    <>
+                      Thước đo độ chuẩn xác khi dự báo trên các mẫu mới thông qua kiểm định chéo loại từng quan sát (Leave-One-Out / PRESS); khoảng cách <InlineMath math="R^2_{\text{adj}} - Q^2 < 0.2" /> cho thấy mô hình ổn định và không bị hiện tượng quá khớp (overfitting).
+                    </>
+                  }
+                />
+                <GlossaryTermCard
+                  term="Lack of Fit (LOF)"
+                  vietnamese="Độ kém tương thích"
+                  tag="Kiểm Định Dạng Mô Hình"
+                  tagColor="warning"
+                  definition={
+                    <>
+                      Kiểm định F so sánh sai số do mô hình sai dạng với sai số thuần túy (pure error) từ các mẻ lặp; giá trị <InlineMath math="p \ge 0.05" /> (không có ý nghĩa thống kê) là tín hiệu tốt, chứng tỏ dạng mô hình toán học đã đủ phù hợp để mô tả dữ liệu.
+                    </>
+                  }
+                />
+                <GlossaryTermCard
+                  term="p-value"
+                  vietnamese="Mức ý nghĩa thống kê p"
+                  tag="Ý Nghĩa Thống Kê"
+                  tagColor="teal"
+                  definition={
+                    <>
+                      Xác suất quan sát thấy hiệu ứng chỉ do ngẫu nhiên nếu giả thiết không (<InlineMath math="H_0" />) là đúng; quy ước phổ biến <InlineMath math="p < 0.05" /> được xem là yếu tố có tác động ý nghĩa thống kê ở độ tin cậy 95%.
+                    </>
+                  }
+                />
+                <GlossaryTermCard
+                  term="VIF (Variance Inflation Factor)"
+                  vietnamese="Hệ số phóng đại phương sai"
+                  tag="Đa Cộng Tuyến"
+                  tagColor="danger"
+                  definition={
+                    <>
+                      Thước đo mức độ tương quan đa cộng tuyến giữa các biến độc lập trong mô hình; <InlineMath math="\text{VIF} \approx 1" /> là lý tưởng (trực giao), <InlineMath math="\text{VIF} > 5 - 10" /> cảnh báo các biến phụ thuộc lẫn nhau làm sai lệch ước lượng hệ số.
+                    </>
+                  }
+                />
+                <GlossaryTermCard
+                  term="Cook's Distance (Di)"
+                  vietnamese="Khoảng cách Cook"
+                  tag="Điểm Dị Biệt"
+                  tagColor="danger"
+                  definition={
+                    <>
+                      Thước đo mức độ thay đổi của toàn bộ các giá trị dự báo khi loại bỏ quan sát thứ <InlineMath math="i" />; giá trị <InlineMath math="D_i > 1" /> cảnh báo một điểm dữ liệu có sức ảnh hưởng bất thường (influential outlier) cần được kiểm tra nguyên nhân gốc rễ.
+                    </>
+                  }
+                />
+                <GlossaryTermCard
+                  term="Degrees of Freedom (df)"
+                  vietnamese="Bậc tự do"
+                  tag="Thống Kê Cơ Bản"
+                  tagColor="slate"
+                  definition={
+                    <>
+                      Số lượng giá trị độc lập có thể biến thiên tự do trong một phép tính thống kê (<InlineMath math="df_{\text{Residual}} = N - p" />). Khi <InlineMath math="N = p" />, bậc tự do phần dư bằng 0 dẫn đến mô hình bão hòa và không thể tính được Lack of Fit.
+                    </>
+                  }
+                />
               </div>
             ),
           },
@@ -712,6 +1142,95 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
               </ul>
             ),
           },
+          {
+            id: 'glossary',
+            title: 'Giải Thích Thuật Ngữ (Glossary & Terminology)',
+            icon: BookOpen,
+            keywords: ['ANN', 'MLP', 'Activation Function', 'Weight Decay', 'Regularization', 'Overfitting', 'Generalization', 'K-Fold', 'Cross-Validation', 'Perturbation Sensitivity', 'df_eff', 'N/P'],
+            content: (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+                <GlossaryTermCard
+                  term="ANN (Artificial Neural Network)"
+                  vietnamese="Mạng nơ-ron nhân tạo"
+                  tag="ANN / Học Máy"
+                  tagColor="purple"
+                  definition="Mô hình toán học học máy lấy cảm hứng từ cấu trúc mạng lưới nơ-ron thần kinh sinh học, có khả năng xấp xỉ vạn năng (Universal Approximation) các hàm số phi tuyến đa chiều phức tạp trong dược phẩm mà hồi quy đa thức bậc 2 khó biểu diễn được."
+                />
+                <GlossaryTermCard
+                  term="MLP (Multi-Layer Perceptron)"
+                  vietnamese="Mạng nơ-ron truyền thẳng đa tầng"
+                  tag="Kiến Trúc ANN"
+                  tagColor="purple"
+                  definition="Kiến trúc mạng nơ-ron tiêu chuẩn gồm lớp đầu vào (Input Layer nhận các biến X), một hoặc hai lớp ẩn (Hidden Layers chứa các nơ-ron trung gian) và lớp đầu ra (Output Layer đưa ra dự báo các CQA)."
+                />
+                <GlossaryTermCard
+                  term="Activation Function"
+                  vietnamese="Hàm kích hoạt phi tuyến"
+                  tag="Toán Học ANN"
+                  tagColor="slate"
+                  definition="Hàm toán học phi tuyến (như Tanh, Sigmoid, ReLU) quyết định tín hiệu đầu ra của mỗi nơ-ron dựa trên tổng trọng số đầu vào, mang lại khả năng mô phỏng các mối quan hệ uốn lượn phức tạp trong công nghệ bào chế."
+                />
+                <GlossaryTermCard
+                  term="Weight Decay (L2 Regularization / λ)"
+                  vietnamese="Hệ số suy giảm trọng số L2"
+                  tag="Điều Chuẩn Ngăn Quá Khớp"
+                  tagColor="teal"
+                  definition={
+                    <>
+                      Kỹ thuật điều chuẩn bằng cách cộng thêm số hạng phạt bình phương các trọng số <InlineMath math="\frac{\lambda}{2} \sum w_i^2" /> vào hàm mất mát khi huấn luyện, giúp ngăn ngừa mạng uốn lượn bất thường theo nhiễu và làm mịn mặt đáp.
+                    </>
+                  }
+                />
+                <GlossaryTermCard
+                  term="Overfitting vs. Generalization"
+                  vietnamese="Quá khớp đối lập Khái quát hóa"
+                  tag="Đánh Giá Mô Hình"
+                  tagColor="warning"
+                  definition={
+                    <>
+                      Quá khớp (Overfitting / Học vẹt) là tình trạng mạng nơ-ron nhớ máy móc cả dữ liệu nhiễu (Train <InlineMath math="R^2 \approx 1" /> nhưng Validation <InlineMath math="R^2" /> rất thấp), làm mất đi khả năng khái quát hóa (Generalization) để dự báo chính xác trên các lô thực tế mới.
+                    </>
+                  }
+                />
+                <GlossaryTermCard
+                  term="K-Fold Cross-Validation"
+                  vietnamese="Kiểm định chéo K phần"
+                  tag="Thẩm Định Dữ Liệu"
+                  tagColor="teal"
+                  definition="Phương pháp kiểm định chéo chia ngẫu nhiên dữ liệu DoE thành K phần bằng nhau, luân phiên huấn luyện trên K-1 phần và kiểm tra trên phần còn lại, giúp đánh giá khách quan năng lực dự báo khi cỡ mẫu nhỏ."
+                />
+                <GlossaryTermCard
+                  term="Perturbation Sensitivity"
+                  vietnamese="Độ nhạy nhiễu loạn"
+                  tag="Tầm Quan Trọng Biến"
+                  tagColor="primary"
+                  definition="Phương pháp giải mã hộp đen AI bằng cách lần lượt làm lệch nhẹ giá trị từng biến đầu vào quanh miền khảo sát và định lượng mức dao động của CQA, từ đó xếp hạng tầm quan trọng tương đối (Variable Importance) của từng yếu tố."
+                />
+                <GlossaryTermCard
+                  term="Effective Degrees of Freedom (dfeff)"
+                  vietnamese="Bậc tự do hiệu dụng"
+                  tag="Thống Kê ANN"
+                  tagColor="slate"
+                  definition={
+                    <>
+                      Số bậc tự do thực tế của mạng nơ-ron sau khi bị ràng buộc bởi hàm kích hoạt phi tuyến và điều chuẩn L2 Weight Decay; giải thích vì sao không thể áp dụng công thức OLS cổ điển để tính AICc hay <InlineMath math="R^2_{\text{adj}}" /> (hiển thị dấu "-") cho ANN.
+                    </>
+                  }
+                />
+                <GlossaryTermCard
+                  term="N/P Ratio"
+                  vietnamese="Tỷ lệ Cỡ mẫu / Số tham số tự do"
+                  tag="Quy Tắc Thực Hành"
+                  tagColor="danger"
+                  definition={
+                    <>
+                      Tỷ số giữa số mẻ thí nghiệm (<InlineMath math="N" />) và tổng số trọng số + bias (<InlineMath math="P" />). Khuyến nghị duy trì <InlineMath math="N/P \ge 2" /> hoặc dùng điều chuẩn L2 mạnh để tránh hiện tượng quá nhiều tham số tự do dẫn đến suy biến mô hình.
+                    </>
+                  }
+                />
+              </div>
+            ),
+          },
         ];
 
       case 'rsm':
@@ -785,6 +1304,69 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 <li><strong>Đổi trục tọa độ X và Y:</strong> Hãy thử đổi vị trí giữa các biến để quan sát góc nhìn trực quan và dễ hiểu nhất của các điểm cực trị.</li>
                 <li><strong>Đường LSL/USL:</strong> Cho biết biên đạt/không đạt <em>theo mô hình</em> trên lát cắt. Thay đổi biến cố định rồi kiểm tra lại, đặc biệt khi có tương tác giữa các factor.</li>
               </ul>
+            ),
+          },
+          {
+            id: 'glossary',
+            title: 'Giải Thích Thuật Ngữ (Glossary & Terminology)',
+            icon: BookOpen,
+            keywords: ['RSM', 'Surface', 'Contour', 'Ternary', 'Simplex', 'Slicing', 'Fixed Factors', 'Curvature', 'Barycentric'],
+            content: (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+                <GlossaryTermCard
+                  term="RSM (Response Surface Methodology)"
+                  vietnamese="Phương pháp mặt đáp"
+                  tag="RSM / Đồ Thị"
+                  tagColor="teal"
+                  definition="Tập hợp các công cụ toán học và đồ họa dùng để nghiên cứu mối tương quan thực nghiệm giữa các biến độc lập và đáp ứng CQA, nhằm tìm kiếm điều kiện vận hành tối ưu trong không gian đa chiều."
+                />
+                <GlossaryTermCard
+                  term="3D Surface Plot"
+                  vietnamese="Mặt đáp 3 chiều"
+                  tag="Trực Quan Hóa 3D"
+                  tagColor="primary"
+                  definition="Đồ thị không gian 3 chiều biểu diễn mối quan hệ hàm số giữa hai biến đầu vào trên trục X, Y và đáp ứng CQA trên trục Z, giúp nhận diện trực quan điểm cực đại (Peak), cực tiểu (Valley) hoặc điểm yên ngựa (Saddle point)."
+                />
+                <GlossaryTermCard
+                  term="2D Contour Plot"
+                  vietnamese="Đường đồng mức 2 chiều"
+                  tag="Bản Đồ Đồng Mức"
+                  tagColor="teal"
+                  definition="Bản đồ chiếu phẳng liên kết các điểm có cùng giá trị dự báo CQA bằng các đường đẳng trị. Mật độ đường đồng mức càng dày thể hiện độ dốc (độ nhạy) của đáp ứng theo biến đầu vào càng lớn."
+                />
+                <GlossaryTermCard
+                  term="Ternary Plot / Simplex"
+                  vietnamese="Đồ thị tọa độ tam giác"
+                  tag="Hỗn Hợp 3 Cấu Tử"
+                  tagColor="warning"
+                  definition="Đồ thị chuyên biệt cho các nghiên cứu công thức 3 thành phần hỗn hợp (ví dụ: dầu - diện hoạt - đồng diện hoạt trong hệ tự vi nhũ hóa SEDDS) với ràng buộc tổng tỷ lệ luôn bằng 100%, sử dụng hệ tọa độ tam giác Barycentric."
+                />
+                <GlossaryTermCard
+                  term="Fixed Factors / Slicing"
+                  vietnamese="Cố định biến phụ / Cắt lát không gian"
+                  tag="Kỹ Thuật Khảo Sát"
+                  tagColor="slate"
+                  definition="Thao tác gán giá trị cố định cho các yếu tố không hiển thị trên trục đồ thị (đặt về điểm tâm hoặc điểm tối ưu) để xem một lát cắt 2D hoặc 3D cụ thể của không gian nghiên cứu nhiều chiều."
+                />
+                <GlossaryTermCard
+                  term="Curvature"
+                  vietnamese="Độ cong mặt đáp"
+                  tag="Phi Tuyến Bậc 2"
+                  tagColor="slate"
+                  definition={
+                    <>
+                      Mức độ uốn cong của bề mặt đáp ứng do các hiệu ứng bậc hai (<InlineMath math="\beta_{ii} X_i^2" />) hoặc tương tác (<InlineMath math="\beta_{ij} X_i X_j" />), chứng minh sự cần thiết phải dùng mô hình bậc 2 (Quadratic) hoặc mạng nơ-ron thay cho mô hình tuyến tính đơn giản.
+                    </>
+                  }
+                />
+                <GlossaryTermCard
+                  term="Specification Contour Lines"
+                  vietnamese="Đường biên giới hạn tiêu chuẩn"
+                  tag="Biên Tiêu Chuẩn"
+                  tagColor="danger"
+                  definition="Các đường đồng mức đặc biệt tương ứng đúng với giá trị ngưỡng LSL, USL hoặc Target của CQA, giúp phân định rõ ranh giới giữa miền đạt tiêu chuẩn và miền không đạt trên lát cắt khảo sát."
+                />
+              </div>
             ),
           },
         ];
@@ -888,6 +1470,91 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
               </ul>
             ),
           },
+          {
+            id: 'glossary',
+            title: 'Giải Thích Thuật Ngữ (Glossary & Terminology)',
+            icon: BookOpen,
+            keywords: ['Design Space', 'Knowledge Space', 'PAR', 'NOR', 'Desirability', 'Monte Carlo', 'Cpk', 'PPM', 'Sweet Spot', 'Overlay'],
+            content: (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+                <GlossaryTermCard
+                  term="Design Space"
+                  vietnamese="Không gian thiết kế"
+                  tag="ICH Q8(R2)"
+                  tagColor="teal"
+                  definition="Sự kết hợp và tương tác đa chiều giữa các biến nguyên vật liệu đầu vào (CMA) và các thông số quy trình (CPP) đã được chứng minh là đảm bảo chất lượng sản phẩm thuốc luôn đạt yêu cầu. Làm việc trong Design Space không bị coi là thay đổi đăng ký thuốc (regulatory change)."
+                />
+                <GlossaryTermCard
+                  term="Knowledge Space"
+                  vietnamese="Miền hiểu biết"
+                  tag="ICH Q8"
+                  tagColor="slate"
+                  definition={
+                    <>
+                      Toàn bộ khoảng biến thiên của các thông số công thức và quy trình đã được khảo sát thực tế trong nghiên cứu phát triển và các ma trận DoE (<InlineMath math="[\text{Low}, \text{High}]" />).
+                    </>
+                  }
+                />
+                <GlossaryTermCard
+                  term="PAR (Proven Acceptable Range)"
+                  vietnamese="Dải thông số được chứng minh chấp nhận được"
+                  tag="Dải Vận Hành"
+                  tagColor="primary"
+                  definition="Dải thông số quy trình mà khi vận hành trong đó (các thông số khác giữ nguyên) vẫn đảm bảo CQA thỏa mãn tiêu chuẩn. Trong ứng dụng, dải ban đầu tạo ra là provisional screening range cần được khẳng định lại bằng kiểm tra đa biến và mẻ xác nhận."
+                />
+                <GlossaryTermCard
+                  term="NOR (Normal Operating Range)"
+                  vietnamese="Dải vận hành thường quy"
+                  tag="Dải Sản Xuất"
+                  tagColor="teal"
+                  definition="Dải thông số kiểm soát chặt chẽ quanh điểm cài đặt mục tiêu (Target Setpoint) được áp dụng trong sản xuất thường quy hàng ngày, có biên độ hẹp hơn PAR nhằm dự phòng cho các dao động tự nhiên của thiết bị."
+                />
+                <GlossaryTermCard
+                  term="Overall Desirability (D)"
+                  vietnamese="Độ thỏa dụng tổng thể"
+                  tag="Tối Ưu Đa Mục Tiêu"
+                  tagColor="primary"
+                  definition={
+                    <>
+                      Trung bình nhân hình học có trọng số của toàn bộ các hàm thỏa dụng thành phần <InlineMath math="D = [\prod (d_i)^{w_i}]^{1/\sum w_i}" /> (thang từ 0 đến 1). Nếu có bất kỳ CQA nào vi phạm tiêu chuẩn kỹ thuật (<InlineMath math="d_i = 0" />) thì <InlineMath math="D = 0" /> ngay lập tức.
+                    </>
+                  }
+                />
+                <GlossaryTermCard
+                  term="Monte Carlo Simulation"
+                  vietnamese="Mô phỏng Monte Carlo"
+                  tag="Mô Phỏng Độ Bền"
+                  tagColor="purple"
+                  definition="Kỹ thuật mô phỏng số ngẫu nhiên lặp lại hàng nghìn lần (ví dụ: 10.000 lô ảo) có tính đến độ trôi dạt ngẫu nhiên thực tế của thiết bị và môi trường (RSD%) để ước lượng xác suất rủi ro lỗi lô và kiểm tra độ bền vững (robustness) của quy trình."
+                />
+                <GlossaryTermCard
+                  term="Process Capability (Cpk)"
+                  vietnamese="Chỉ số năng lực quy trình"
+                  tag="Năng Lực Quy Trình"
+                  tagColor="teal"
+                  definition={
+                    <>
+                      Thước đo khoảng cách giữa giá trị trung bình quy trình và biên tiêu chuẩn kỹ thuật gần nhất theo đơn vị 3 độ lệch chuẩn: <InlineMath math="C_{pk} = \min\left(\frac{\text{USL}-\mu}{3\sigma}, \frac{\mu-\text{LSL}}{3\sigma}\right)" />. Chỉ số <InlineMath math="C_{pk} \ge 1.33" /> tương đương quy trình đạt mức kiểm soát 4-sigma ổn định.
+                    </>
+                  }
+                />
+                <GlossaryTermCard
+                  term="PPM (Parts Per Million)"
+                  vietnamese="Tỷ lệ lỗi phần triệu"
+                  tag="Chỉ Số Khuyết Tật"
+                  tagColor="danger"
+                  definition="Số lượng lô hoặc sản phẩm dự báo vượt ngoài giới hạn tiêu chuẩn chất lượng trên một triệu đơn vị sản xuất, ước tính từ kết quả mô phỏng ngẫu nhiên Monte Carlo."
+                />
+                <GlossaryTermCard
+                  term="Sweet Spot / Overlay Area"
+                  vietnamese="Vùng giao thoa tối ưu"
+                  tag="Không Gian Đạt Chuẩn"
+                  tagColor="teal"
+                  definition="Vùng không gian biểu thị bằng màu xanh lá cây trên đồ thị đa biến, nơi tất cả các mô hình dự báo CQA đồng thời thỏa mãn toàn bộ các giới hạn kỹ thuật cho phép."
+                />
+              </div>
+            ),
+          },
         ];
 
       case 'report':
@@ -973,6 +1640,58 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
               </ul>
             ),
           },
+          {
+            id: 'glossary',
+            title: 'Giải Thích Thuật Ngữ (Glossary & Terminology)',
+            icon: BookOpen,
+            keywords: ['CTD', '3.2.P.2', 'Control Strategy', 'Readiness Gate', 'ALCOA', 'Data Integrity', 'Audit Trail', 'Governance', 'Snapshot'],
+            content: (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+                <GlossaryTermCard
+                  term="CTD Module 3.2.P.2"
+                  vietnamese="Phát triển dược phẩm"
+                  tag="Hồ Sơ Đăng Ký ICH"
+                  tagColor="teal"
+                  definition="Chương mục cốt lõi trong Hồ sơ kỹ thuật chung (CTD) theo chuẩn quốc tế ICH để đăng ký thuốc mới hoặc thuốc generic, mô tả toàn bộ hành trình khoa học từ định nghĩa QTPP, nhận diện CQA, đánh giá rủi ro FMEA, thiết kế DoE đến Không gian thiết kế và Chiến lược kiểm soát."
+                />
+                <GlossaryTermCard
+                  term="Control Strategy"
+                  vietnamese="Chiến lược kiểm soát"
+                  tag="ICH Q10"
+                  tagColor="teal"
+                  definition="Tập hợp có kế hoạch các biện pháp kiểm soát bắt nguồn từ hiểu biết toàn diện về sản phẩm và quy trình, bao gồm kiểm soát chỉ tiêu nguyên liệu (CMA), kiểm soát thông số vận hành (CPP), kiểm tra trong quá trình (IPC), dải NOR/PAR và tiêu chuẩn xuất xưởng thành phẩm."
+                />
+                <GlossaryTermCard
+                  term="Scientific Readiness Gate"
+                  vietnamese="Cổng kiểm tra tính sẵn sàng khoa học"
+                  tag="Toàn Vẹn Dữ Liệu"
+                  tagColor="primary"
+                  definition="Cơ chế xác thực logic tích hợp trong phần mềm nhằm rà soát tự động tính đầy đủ và tính hợp lệ của dữ liệu thực nghiệm, trạng thái mô hình hóa, tối ưu hóa thỏa dụng và kết quả mô phỏng độ bền trước khi cho phép xuất bản thảo báo cáo hoàn chỉnh."
+                />
+                <GlossaryTermCard
+                  term="ALCOA+ / Data Integrity"
+                  vietnamese="Tính toàn vẹn dữ liệu dược phẩm"
+                  tag="Chuẩn GxP"
+                  tagColor="warning"
+                  definition="Nguyên tắc quốc tế bảo đảm chất lượng dữ liệu: Attributable (Quy kết rõ ràng người thực hiện), Legible (Dễ đọc, lưu trữ bền vững), Contemporaneous (Ghi nhận đúng thời điểm), Original (Bản gốc nguyên vẹn), Accurate (Chính xác) cùng với Complete (Đầy đủ), Consistent (Nhất quán), Enduring (Bền vững) và Available (Sẵn sàng truy xuất)."
+                />
+                <GlossaryTermCard
+                  term="Audit Trail"
+                  vietnamese="Nhật ký kiểm toán / Lưu vết dữ liệu"
+                  tag="Tuân Thủ GMP"
+                  tagColor="slate"
+                  definition="Bản ghi tự động, không thể chỉnh sửa, ghi lại có tem thời gian về mọi thao tác tạo mới, sửa đổi tham số, huấn luyện mô hình hay xuất báo cáo nhằm phục vụ công tác thanh tra, thẩm định GMP và bảo vệ tính pháp lý của hồ sơ."
+                />
+                <GlossaryTermCard
+                  term="Project Governance"
+                  vietnamese="Quản trị dự án & Snapshot"
+                  tag="Quản Trị Vòng Đời"
+                  tagColor="slate"
+                  definition="Cơ chế quản lý vòng đời dự án cho phép lưu trữ dự án dưới dạng tệp JSON, tự động lưu (autosave) trên trình duyệt và tạo các bản chụp trạng thái (snapshots) để dễ dàng đối chiếu, phục hồi các kịch bản nghiên cứu khác nhau."
+                />
+              </div>
+            ),
+          },
         ];
 
       default:
@@ -987,7 +1706,9 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
     const q = searchQuery.toLowerCase();
     return sections.filter((sec) => {
       const titleMatch = sec.title.toLowerCase().includes(q);
-      return titleMatch || sec.id.toLowerCase().includes(q);
+      const idMatch = sec.id.toLowerCase().includes(q);
+      const keywordMatch = sec.keywords?.some((k) => k.toLowerCase().includes(q));
+      return titleMatch || idMatch || Boolean(keywordMatch);
     });
   }, [sections, searchQuery]);
 
