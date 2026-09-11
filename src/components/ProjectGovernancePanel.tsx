@@ -42,8 +42,8 @@ export const ProjectGovernancePanel: React.FC<ProjectGovernancePanelProps> = ({ 
         <strong>So với {new Date(selected.timestamp).toLocaleString('vi-VN')}:</strong>
         {comparison.map((item) => <div key={item}>• {item}</div>)}
       </div>}
-      <div style={{ marginTop: '0.7rem', padding: '0.55rem 0.65rem', background: '#fffbeb', borderRadius: '0.4rem', color: '#92400e', fontSize: '0.72rem' }}>
-        Lưu vết này hỗ trợ R&amp;D và không phải audit trail GxP/21 CFR Part 11: chưa có xác thực người dùng, chữ ký điện tử hoặc validation package.
+      <div style={{ marginTop: '0.7rem', padding: '0.65rem 0.75rem', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '0.4rem', color: '#1e40af', fontSize: '0.74rem', lineHeight: '1.45' }}>
+        <strong>Lưu ý tuân thủ GxP (SEC-05):</strong> Nhật ký phiên bản này được lưu trữ cục bộ (Local Storage) phục vụ mục đích hỗ trợ R&amp;D khám phá. Ứng dụng client-side chưa thay thế được hệ thống hồ sơ điện tử 21 CFR Part 11 / EU Annex 11 (thiếu chữ ký số mã hóa, xác thực người dùng tập trung và validation package thẩm định hệ thống).
       </div>
     </div>
   );

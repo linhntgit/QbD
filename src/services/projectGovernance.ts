@@ -44,38 +44,147 @@ const cloneProject = (project: QBDProject): QBDProject => JSON.parse(JSON.string
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+import { z } from 'zod';
+
+export const factorSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  code: z.string(),
+  type: z.string(),
+  dataType: z.string(),
+  controllability: z.string(),
+  role: z.string().optional(),
+  unit: z.string(),
+  low: z.number(),
+  high: z.number(),
+  center: z.number().optional(),
+  alpha: z.number().optional(),
+  categories: z.array(z.string()).optional(),
+  constantValue: z.union([z.number(), z.string()]).optional(),
+  currentValue: z.number().optional(),
+  distribution: z.enum(['Normal', 'Lognormal', 'Uniform', 'Triangular']).optional(),
+  distParams: z.object({
+    mean: z.number().optional(),
+    sd: z.number().optional(),
+    min: z.number().optional(),
+    mode: z.number().optional(),
+    max: z.number().optional(),
+  }).optional(),
+}).passthrough();
+
+export const cqaSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  code: z.string(),
+  dataType: z.string().optional(),
+  unit: z.string(),
+  target: z.number().optional(),
+  lowerLimit: z.number().optional(),
+  upperLimit: z.number().optional(),
+  categories: z.array(z.string()).optional(),
+  targetCategory: z.string().optional(),
+  objective: z.string(),
+  weight: z.number(),
+  sShape: z.number().optional(),
+  tShape: z.number().optional(),
+}).passthrough();
+
+export const qtppSchema = z.object({
+  id: z.string(),
+  element: z.string(),
+  target: z.string(),
+  justification: z.string(),
+}).passthrough();
+
+export const fmeaRiskSchema = z.object({
+  id: z.string(),
+  factorId: z.string(),
+  cqaId: z.string(),
+  failureMode: z.string().optional(),
+  severity: z.number().optional(),
+  probability: z.number().optional(),
+  detectability: z.number().optional(),
+  rpn: z.number().optional(),
+  mitigation: z.string().optional(),
+  revisedSeverity: z.number().optional(),
+  revisedProbability: z.number().optional(),
+  revisedDetectability: z.number().optional(),
+  revisedRpn: z.number().optional(),
+}).passthrough();
+
+export const doeRunSchema = z.object({
+  id: z.string(),
+  runOrder: z.number().optional(),
+  standardOrder: z.number().optional(),
+  stdOrder: z.number().optional(),
+  block: z.number().optional(),
+  factorCoded: z.record(z.string(), z.union([z.number(), z.string()])),
+  factorActual: z.record(z.string(), z.union([z.number(), z.string()])),
+  responses: z.record(z.string(), z.union([z.number(), z.string()])),
+  included: z.boolean().optional(),
+  comment: z.string().optional(),
+}).passthrough();
+
+export const designSpaceRangesSchema = z.object({
+  factorCode: z.string(),
+  minCoded: z.number().optional(),
+  maxCoded: z.number().optional(),
+  minActual: z.number().optional(),
+  maxActual: z.number().optional(),
+  parMin: z.number().optional(),
+  parMax: z.number().optional(),
+  parMinActual: z.number().optional(),
+  parMaxActual: z.number().optional(),
+  norMin: z.number().optional(),
+  norMax: z.number().optional(),
+}).passthrough();
+
+export const qbdProjectSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  moleculeName: z.string(),
+  dosageForm: z.string(),
+  author: z.string(),
+  version: z.string(),
+  createdDate: z.string(),
+  updatedDate: z.string(),
+  description: z.string(),
+  qtpp: z.array(qtppSchema).max(100, 'Tối đa 100 mục QTPP'),
+  cqas: z.array(cqaSchema).max(50, 'Tối đa 50 chỉ tiêu CQA'),
+  factors: z.array(factorSchema).max(50, 'Tối đa 50 yếu tố thí nghiệm (SEC-04)'),
+  fmeaRisks: z.array(fmeaRiskSchema).max(500, 'Tối đa 500 mục rủi ro FMEA'),
+  fishbone: z.any().optional(),
+  doeConfig: z.record(z.string(), z.any()),
+  runs: z.array(doeRunSchema).max(5000, 'Tối đa 5.000 lần chạy (SEC-04)'),
+  designSpace: z.array(designSpaceRangesSchema).max(50),
+  modelingEngine: z.string().optional(),
+  analysisProvenance: z.record(z.string(), z.any()).optional(),
+  analysisSettings: z.record(z.string(), z.any()).optional(),
+}).passthrough();
+
+export interface SchemaValidationResult {
+  success: boolean;
+  data?: QBDProject;
+  errors: string[];
+}
+
+export function validateProjectSchema(value: unknown): SchemaValidationResult {
+  const result = qbdProjectSchema.safeParse(value);
+  if (result.success) {
+    return { success: true, data: result.data as unknown as QBDProject, errors: [] };
+  }
+  const errors = result.error.issues.map((issue) => {
+    const path = issue.path.join('.');
+    return `${path ? `[${path}] ` : ''}${issue.message}`;
+  });
+  return { success: false, errors };
+}
+
 /** Check persisted/JSON data before any component or model dereferences it.
  * Keep this separate from scientific validation: an unfinished draft is loadable.
  */
 export function hasProjectStructure(value: unknown): value is QBDProject {
-  if (!isRecord(value)) return false;
-  const strings = (item: Record<string, unknown>, keys: string[]) => keys.every((key) => typeof item[key] === 'string');
-  const rows = (key: string, check: (row: Record<string, unknown>) => boolean) =>
-    Array.isArray(value[key]) && value[key].every((row: unknown) => isRecord(row) && check(row));
-  const categories = (row: Record<string, unknown>) => row.categories === undefined ||
-    (Array.isArray(row.categories) && row.categories.every((level) => typeof level === 'string'));
-  if (!strings(value, ['id', 'name', 'moleculeName', 'dosageForm', 'author', 'version', 'createdDate', 'updatedDate', 'description'])) return false;
-  if (!isRecord(value.doeConfig)) return false;
-  if (!rows('qtpp', (row) => strings(row, ['id', 'element', 'target', 'justification'])) ||
-      !rows('factors', (row) => strings(row, ['id', 'code', 'name', 'unit', 'type', 'dataType', 'controllability']) &&
-        Number.isFinite(row.low) && Number.isFinite(row.high) && categories(row)) ||
-      !rows('cqas', (row) => strings(row, ['id', 'code', 'name', 'unit', 'objective']) &&
-        Number.isFinite(row.weight) && (row.dataType === undefined || typeof row.dataType === 'string') && categories(row)) ||
-      !rows('runs', (row) => strings(row, ['id']) && isRecord(row.factorCoded) && isRecord(row.factorActual) && isRecord(row.responses)) ||
-      !rows('fmeaRisks', (row) => strings(row, ['id', 'factorId', 'cqaId'])) ||
-      !rows('designSpace', (row) => strings(row, ['factorCode']))) return false;
-  if (value.analysisSettings !== undefined) {
-    const settings = value.analysisSettings;
-    if (!isRecord(settings)) return false;
-    for (const key of ['modelTypes', 'sharedNeuralConfig', 'neuralConfigs']) {
-      if (settings[key] !== undefined && !isRecord(settings[key])) return false;
-    }
-    if (settings.neuralArtifacts !== undefined && (!isRecord(settings.neuralArtifacts) || !isRecord(settings.neuralArtifacts.models))) return false;
-    if (settings.appliedOptimum !== undefined && (!isRecord(settings.appliedOptimum) ||
-        !isRecord(settings.appliedOptimum.codedFactors) || !isRecord(settings.appliedOptimum.actualFactors) ||
-        !isRecord(settings.appliedOptimum.predictedResponses))) return false;
-  }
-  return value.analysisProvenance === undefined || isRecord(value.analysisProvenance);
+  return validateProjectSchema(value).success;
 }
 
 export function loadPersistedProject(): QBDProject | null {

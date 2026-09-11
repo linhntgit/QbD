@@ -53,9 +53,9 @@ describe('screening design generators', () => {
     }
   });
 
-  it('does not silently turn a six-factor half fraction into a full factorial', () => {
+  it('generates standard Resolution IV 16-run design for six factors (STAT-04)', () => {
     const matrix = generateFractionalFactorial(6);
-    expect(matrix).toHaveLength(32);
+    expect(matrix).toHaveLength(16);
     expect(matrix.every((row) => row.length === 6)).toBe(true);
   });
 

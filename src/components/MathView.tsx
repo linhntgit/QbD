@@ -78,3 +78,5 @@ export const BlockMath: React.FC<MathProps> = ({ math, className, style }) => {
     />
   );
 };
+
+export const MathView = InlineMath;

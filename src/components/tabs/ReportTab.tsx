@@ -1059,6 +1059,26 @@ export const ReportTab: React.FC<ReportTabProps> = ({
               <div style={{ fontWeight: '600', color: '#0f172a', marginTop: '0.25rem' }}>..........................................</div>
             </div>
           </div>
+
+          {/* Regulatory Disclaimer & GxP Compliance Notice (SEC-05) */}
+          <div style={{
+            marginTop: '1.25rem',
+            padding: '0.85rem 1rem',
+            backgroundColor: '#eff6ff',
+            border: '1px solid #bfdbfe',
+            borderLeft: '4px solid #2563eb',
+            borderRadius: '0.375rem',
+            fontSize: '0.78rem',
+            color: '#1e40af',
+            lineHeight: '1.5',
+          }}>
+            <div style={{ fontWeight: '700', marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span>⚖</span> TUYÊN BỐ PHÁP LÝ &amp; THÔNG CÁO TUÂN THỦ GxP (21 CFR PART 11 / EU ANNEX 11)
+            </div>
+            <div>
+              Ứng dụng <strong>QbD Studio™ Pharma DoE Suite</strong> phiên bản client-side được thiết kế chuyên biệt cho mục đích <strong>Nghiên cứu &amp; Phát triển Khám phá (Exploratory Formulation R&amp;D)</strong> và tối ưu hóa quy trình. Hệ thống này <strong>chưa cấu thành</strong> một giải pháp lưu trữ hồ sơ điện tử tuân thủ đầy đủ US FDA 21 CFR Part 11 hoặc EU GMP Annex 11 (chưa tích hợp kiểm soát truy cập tập trung, phân quyền đa cấp, audit trail chuỗi khối bất biến và chữ ký số PKI). Mọi báo cáo hoặc kết quả xuất ra cần được in ấn, ký ướt (wet signature) hoặc thẩm định lại trên hệ thống LIMS/ELN đạt chuẩn của doanh nghiệp trước khi sử dụng cho hồ sơ nộp cơ quan quản lý y tế.
+            </div>
+          </div>
         </div>
 
         <div id="sec-governance" className="report-section" style={{ marginTop: '2rem' }}>

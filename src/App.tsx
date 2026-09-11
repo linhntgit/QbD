@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import type {
   AnalysisProvenance,
   QBDProject,
@@ -60,6 +60,13 @@ export function App() {
   // Default project: Case Study 1 (Metoprolol Tablet BBD)
   const [project, setProject] = useState<QBDProject>(() => normalizeProjectAnalysis(loadPersistedProject() || CASE_STUDIES[0]));
   const [activeTab, setActiveTab] = useState<TabKey>('qtpp');
+  const [isTabPending, startTabTransition] = useTransition();
+
+  const handleTabChange = useCallback((nextTab: TabKey) => {
+    startTabTransition(() => {
+      setActiveTab(nextTab);
+    });
+  }, []);
   const [selectedCQA, setSelectedCQA] = useState<string>(() => project.cqas[0]?.code || 'Y1');
   const [modelTypes, setModelTypes] = useState<Record<string, ModelType>>(() => project.analysisSettings?.modelTypes ?? {});
   const [neuralTrainingMode, setNeuralTrainingMode] = useState<NeuralTrainingMode>(() => project.analysisSettings?.neuralTrainingMode ?? 'independent');
@@ -468,7 +475,7 @@ export function App() {
       />
 
       {/* QbD Workflow Step Navigation */}
-      <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+      <TabNavigation activeTab={activeTab} onTabChange={handleTabChange} />
 
       {/* Main Tab Content */}
       <main
@@ -476,7 +483,15 @@ export function App() {
         id={`panel-${activeTab}`}
         aria-labelledby={`tab-${activeTab}`}
         tabIndex={0}
-        style={{ flex: 1, maxWidth: '1440px', width: '100%', margin: '0 auto', padding: '1.5rem 1.25rem' }}
+        style={{
+          flex: 1,
+          maxWidth: '1440px',
+          width: '100%',
+          margin: '0 auto',
+          padding: '1.5rem 1.25rem',
+          opacity: isTabPending ? 0.75 : 1,
+          transition: 'opacity 0.15s ease',
+        }}
       >
         {storageWarning && <div className="qbd-card" role="alert" style={{ borderLeft: '4px solid #d97706', color: '#92400e', marginBottom: '1rem' }}>{storageWarning}</div>}
         <Suspense fallback={<div className="qbd-card" role="status" aria-live="polite">Đang tải mô-đun phân tích…</div>}>
@@ -489,7 +504,7 @@ export function App() {
           <FMEATab
             project={project}
             onUpdateProject={handleUpdateProject}
-            onNavigateToDoE={() => setActiveTab('doe')}
+            onNavigateToDoE={() => handleTabChange('doe')}
           />
         )}
 
@@ -497,7 +512,7 @@ export function App() {
           <DoEDesignerTab
             project={project}
             onUpdateProject={handleUpdateProject}
-            onNavigateToANOVA={() => setActiveTab('anova')}
+            onNavigateToANOVA={() => handleTabChange('anova')}
           />
         )}
 
@@ -513,8 +528,8 @@ export function App() {
             onApplyModelTypeToAll={handleApplyModelTypeToAll}
             modelingEngine={modelingEngine}
             onSelectEngine={handleModelingEngineChange}
-            onNavigateToRSM={() => setActiveTab('rsm')}
-            onNavigateToNeural={() => setActiveTab('neural')}
+            onNavigateToRSM={() => handleTabChange('rsm')}
+            onNavigateToNeural={() => handleTabChange('neural')}
           />
         )}
 
@@ -535,8 +550,8 @@ export function App() {
             onSelectCQA={setSelectedCQA}
             modelingEngine={modelingEngine}
             onSelectEngine={handleModelingEngineChange}
-            onNavigateToRSM={() => setActiveTab('rsm')}
-            onNavigateToDesignSpace={() => setActiveTab('design_space')}
+            onNavigateToRSM={() => handleTabChange('rsm')}
+            onNavigateToDesignSpace={() => handleTabChange('design_space')}
           />
         )}
 
@@ -548,7 +563,7 @@ export function App() {
             onSelectCQA={setSelectedCQA}
             modelingEngine={modelingEngine}
             onToggleEngine={handleModelingEngineChange}
-            onNavigateToDesignSpace={() => setActiveTab('design_space')}
+            onNavigateToDesignSpace={() => handleTabChange('design_space')}
           />
         )}
 
@@ -568,7 +583,7 @@ export function App() {
             onMonteCarloConfigChange={handleMonteCarloConfigChange}
             onMonteCarloResult={setMonteCarlo}
             onUpdateProject={handleUpdateProject}
-            onNavigateToReport={() => setActiveTab('report')}
+            onNavigateToReport={() => handleTabChange('report')}
           />
         )}
 
@@ -596,7 +611,7 @@ export function App() {
         project={project}
         modelingEngine={modelingEngine}
         selectedCQA={selectedCQA}
-        onNavigateToTab={setActiveTab}
+        onNavigateToTab={handleTabChange}
         isPinned={isHelpPinned}
         onTogglePin={() => setIsHelpPinned((prev) => !prev)}
       />

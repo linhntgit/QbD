@@ -27,6 +27,7 @@ import {
   ListPlus,
   Sliders,
   Info,
+  Layers,
 } from 'lucide-react';
 import type {
   QBDProject,
@@ -39,6 +40,7 @@ import type {
 import {
   generateDoERuns,
   calculateDesignEfficiency,
+  calculateAliasStructure,
   calculateNumModelTerms,
   actualToCoded,
   assessDesignReadiness,
@@ -49,6 +51,7 @@ import {
 } from '../../services/doeGenerator';
 import { simulateDemoResponses } from '../../services/demoDataSimulator';
 import { createSeededRandom, stableSeedFromText } from '../../services/random';
+import { MathView } from '../MathView';
 import {
   exportToExcel,
   exportToCSV,
@@ -765,6 +768,11 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
       selectedOptimalModel
     );
   }, [project.runs, project.factors, selectedOptimalModel]);
+
+  // Calculate Confounding & Alias Structure Matrix (STAT-05)
+  const aliasStructure = useMemo(() => {
+    return calculateAliasStructure(project.factors, project.runs);
+  }, [project.factors, project.runs]);
 
   const handleGenerateMatrix = () => {
     if (!designValidation.isValid) {
@@ -1523,6 +1531,75 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
             <strong>{currentReadiness.isEstimable ? '✓ Mô hình khả định' : '⚠ Mô hình chưa khả định'}</strong>
             {' '}rank {currentReadiness.rank}/{currentReadiness.termCount}; df phần dư {currentReadiness.residualDegreesOfFreedom}.
             {currentReadiness.messages.length > 0 && ` ${currentReadiness.messages.join(' ')}`}
+          </div>
+        </div>
+      )}
+
+      {/* Alias Structure & Confounding Chains (STAT-05) */}
+      {(aliasStructure.hasAliasing || ['FractionalFactorial2k', 'PlackettBurman'].includes(designConfig.designType)) && (
+        <div className="qbd-card" style={{ padding: '1rem', border: '1px solid #cbd5e1', marginBottom: '1.5rem', backgroundColor: '#f8fafc' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Layers size={18} color="#0284c7" />
+              <h4 style={{ fontSize: '0.92rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
+                Cấu Trúc Gộp Hiệu Ứng &amp; Ma Trận Alias (Confounding &amp; Alias Chains)
+              </h4>
+            </div>
+            <span style={{
+              fontSize: '0.75rem',
+              fontWeight: '700',
+              padding: '0.2rem 0.6rem',
+              borderRadius: '9999px',
+              backgroundColor: aliasStructure.resolution === 'IV' || aliasStructure.resolution === 'V+' || aliasStructure.resolution === 'Full' ? '#dcfce7' : '#fef9c3',
+              color: aliasStructure.resolution === 'IV' || aliasStructure.resolution === 'V+' || aliasStructure.resolution === 'Full' ? '#166534' : '#854d0e',
+            }}>
+              Độ phân giải: Resolution {aliasStructure.resolution}
+            </span>
+          </div>
+
+          <p style={{ fontSize: '0.76rem', color: '#475569', marginBottom: '0.75rem', lineHeight: '1.4' }}>
+            Ma trận Alias <MathView math="A = (X_1^T X_1)^{-1} X_1^T X_2" /> theo chuẩn Montgomery.
+            {aliasStructure.resolution === 'IV' && ' Trong thiết kế Resolution IV, các hiệu ứng chính (Main Effects) không bị gộp với tương tác 2 yếu tố (2FI). Tuy nhiên, các cặp tương tác 2FI bị gộp với nhau.'}
+            {aliasStructure.resolution === 'III' && ' CẢNH BÁO: Trong thiết kế Resolution III, các hiệu ứng chính bị gộp trực tiếp với tương tác 2 yếu tố. Không thể kết luận CPP độc lập nếu chưa giải gộp.'}
+            {aliasStructure.resolution === 'Full' && ' Thiết kế trực giao hoàn toàn (Full Factorial), không có hiệu ứng nào bị gộp.'}
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: '0.75rem' }}>
+            {aliasStructure.mainEffectAliases.length > 0 && (
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '0.375rem', padding: '0.65rem', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: '700', color: '#b91c1c', marginBottom: '0.35rem' }}>
+                  Hiệu Ứng Chính Bị Gộp (Main Effects Aliased):
+                </div>
+                <div style={{ maxHeight: '140px', overflowY: 'auto', fontSize: '0.74rem', color: '#334155' }}>
+                  {aliasStructure.mainEffectAliases.map((item) => (
+                    <div key={item.term} style={{ padding: '0.15rem 0', borderBottom: '1px dashed #f1f5f9' }}>
+                      <strong>[{item.term}]</strong> &rarr; {item.aliasedWith.join(', ')}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {aliasStructure.twoFactorAliases.length > 0 && (
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '0.375rem', padding: '0.65rem', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: '700', color: '#0284c7', marginBottom: '0.35rem' }}>
+                  Chuỗi Tương Tác 2 Yếu Tố Bị Gộp (2FI Alias Chains):
+                </div>
+                <div style={{ maxHeight: '140px', overflowY: 'auto', fontSize: '0.74rem', color: '#334155' }}>
+                  {aliasStructure.twoFactorAliases.map((item) => (
+                    <div key={item.term} style={{ padding: '0.15rem 0', borderBottom: '1px dashed #f1f5f9' }}>
+                      <strong>{item.term}</strong> {item.aliasedWith.join(' ')}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {!aliasStructure.hasAliasing && (
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '0.375rem', padding: '0.65rem', border: '1px solid #e2e8f0', color: '#166534', fontSize: '0.76rem' }}>
+                ✓ Toàn bộ các hiệu ứng chính và tương tác 2 yếu tố độc lập tuyệt đối, không có gộp lẫn nhau.
+              </div>
+            )}
           </div>
         </div>
       )}

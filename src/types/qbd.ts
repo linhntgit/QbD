@@ -41,6 +41,16 @@ export type FactorRole =
   | 'process_parameter'      // Biến quy trình (nhiệt độ, lực dập, tốc độ...)
   | 'process_independent';   // Legacy alias for process_parameter
 
+export type ProbabilityDistributionType = 'Normal' | 'Lognormal' | 'Uniform' | 'Triangular';
+
+export interface DistributionParams {
+  mean?: number;
+  sd?: number;
+  min?: number;
+  mode?: number;
+  max?: number;
+}
+
 export interface Factor {
   id: string;
   name: string; // e.g., Polymer % (HPMC), Compression Force, Inlet Temp, Ambient Humidity, Supplier
@@ -57,6 +67,8 @@ export interface Factor {
   categories?: string[]; // allowed levels (2-10), e.g. suppliers or discrete numeric settings
   constantValue?: number | string; // for constant factors (e.g. 500 mg, 40 °C)
   currentValue?: number; // for contour slices
+  distribution?: ProbabilityDistributionType;
+  distParams?: DistributionParams;
 }
 
 export interface FMEARiskItem {
@@ -363,6 +375,21 @@ export interface QBDProject {
   modelingEngine?: ModelingEngine;
   analysisProvenance?: AnalysisProvenance;
   analysisSettings?: AnalysisSettings;
+}
+
+export interface AliasChainItem {
+  term: string; // e.g., 'X1', 'X1*X2'
+  aliasedWith: string[]; // e.g., ['X2*X3*X4'] or ['X3*X4']
+  maxCorrelation: number;
+}
+
+export interface AliasStructureResult {
+  hasAliasing: boolean;
+  resolution: 'Full' | 'V+' | 'IV' | 'III' | '<III' | 'Indeterminate';
+  mainEffectAliases: AliasChainItem[];
+  twoFactorAliases: AliasChainItem[];
+  allTerms: string[];
+  aliasChains: Record<string, string[]>;
 }
 
 export * from './neuralNetwork';

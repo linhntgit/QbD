@@ -1,4 +1,4 @@
-import type { Factor, DoEDesignConfig, DoERun, DesignEvaluationMetrics } from '../types/qbd';
+import type { Factor, DoEDesignConfig, DoERun, DesignEvaluationMetrics, AliasStructureResult, AliasChainItem } from '../types/qbd';
 import {
   matMul,
   matTranspose,
@@ -163,28 +163,70 @@ export function generateFullFactorial(k: number): number[][] {
 
 /**
  * Generate Fractional Factorial 2^(k-p)
+ * Follows Montgomery Table 8.14 standard 16-run Resolution IV designs for k = 6, 7, 8 (STAT-04).
  */
 export function generateFractionalFactorial(k: number): number[][] {
   if (k <= 2) return generateFullFactorial(k);
   if (k === 3) {
-    // 2^(3-1) = 4 runs, X3 = X1 * X2
+    // 2^(3-1) = 4 runs, X3 = X1 * X2 (Resolution III)
     const base = generateFullFactorial(2);
     return base.map(row => [...row, row[0] * row[1]]);
   }
   if (k === 4) {
-    // 2^(4-1) = 8 runs, X4 = X1 * X2 * X3
+    // 2^(4-1) = 8 runs, X4 = X1 * X2 * X3 (Resolution IV)
     const base = generateFullFactorial(3);
     return base.map(row => [...row, row[0] * row[1] * row[2]]);
   }
   if (k === 5) {
-    // 2^(5-1) = 16 runs, X5 = X1 * X2 * X3 * X4
+    // 2^(5-1) = 16 runs, X5 = X1 * X2 * X3 * X4 (Resolution V)
     const base = generateFullFactorial(4);
     return base.map(row => [...row, row[0] * row[1] * row[2] * row[3]]);
   }
-  // One-half fraction for larger screening designs. Use a resolution-IV
-  // generator Xk = X1*X2*X3 rather than silently expanding to a full 2^k.
-  const base = generateFullFactorial(k - 1);
-  return base.map((row) => [...row, row[0] * row[1] * row[2]]);
+  if (k === 6) {
+    // 2^(6-2) = 16 runs, Montgomery Table 8.14: X5 = X1*X2*X3, X6 = X2*X3*X4 (Resolution IV)
+    const base = generateFullFactorial(4);
+    return base.map(row => [
+      ...row,
+      row[0] * row[1] * row[2],
+      row[1] * row[2] * row[3],
+    ]);
+  }
+  if (k === 7) {
+    // 2^(7-3) = 16 runs, Montgomery Table 8.14: X5 = X1*X2*X3, X6 = X1*X2*X4, X7 = X1*X3*X4 (Resolution IV)
+    const base = generateFullFactorial(4);
+    return base.map(row => [
+      ...row,
+      row[0] * row[1] * row[2],
+      row[0] * row[1] * row[3],
+      row[0] * row[2] * row[3],
+    ]);
+  }
+  if (k === 8) {
+    // 2^(8-4) = 16 runs, Montgomery Table 8.14: X5 = X1*X2*X3, X6 = X1*X2*X4, X7 = X1*X3*X4, X8 = X2*X3*X4 (Resolution IV)
+    const base = generateFullFactorial(4);
+    return base.map(row => [
+      ...row,
+      row[0] * row[1] * row[2],
+      row[0] * row[1] * row[3],
+      row[0] * row[2] * row[3],
+      row[1] * row[2] * row[3],
+    ]);
+  }
+  // For k > 8, extend from 16-run Resolution IV basis
+  const base = generateFullFactorial(4);
+  return base.map((row) => {
+    const r = [
+      ...row,
+      row[0] * row[1] * row[2],
+      row[0] * row[1] * row[3],
+      row[0] * row[2] * row[3],
+      row[1] * row[2] * row[3],
+    ];
+    for (let extra = 9; extra <= k; extra++) {
+      r.push(row[extra % 4] * row[(extra + 1) % 4] * row[(extra + 2) % 4]);
+    }
+    return r;
+  });
 }
 
 /**
@@ -1570,5 +1612,173 @@ export function calculateDesignEfficiency(
     numParameters: p,
     degreesOfFreedom: Math.max(0, N - p),
     rating,
+  };
+}
+
+/**
+ * Calculate Confounding & Alias Structure Matrix A = (X1^T X1)^-1 X1^T X2 (STAT-05).
+ * Evaluates confounding between Main Effects (X1) and Two-Factor Interactions (X2),
+ * as well as two-factor interaction aliasing pairs in fractional factorial designs.
+ */
+export function calculateAliasStructure(factors: Factor[], runs: DoERun[]): AliasStructureResult {
+  const activeFactors = factors.filter((f) => f.controllability !== 'constant');
+  const k = activeFactors.length;
+  const N = runs.length;
+
+  if (k < 2 || N === 0) {
+    return {
+      hasAliasing: false,
+      resolution: 'Full',
+      mainEffectAliases: [],
+      twoFactorAliases: [],
+      allTerms: activeFactors.map((f) => f.code),
+      aliasChains: {},
+    };
+  }
+
+  // 1. Build X1 (Intercept + Main Effects)
+  const factorCodes = activeFactors.map((f) => f.code);
+  const X1: number[][] = runs.map((run) => {
+    const row = [1.0]; // Intercept
+    for (const code of factorCodes) {
+      const val = typeof run.factorCoded[code] === 'number' ? (run.factorCoded[code] as number) : Number(run.factorCoded[code]) || 0;
+      row.push(val);
+    }
+    return row;
+  });
+
+  // 2. Build X2 (All Two-Factor Interactions 2FI)
+  const twoFactorNames: string[] = [];
+  const twoFactorCols: number[][] = [];
+  for (let i = 0; i < k; i++) {
+    for (let j = i + 1; j < k; j++) {
+      const termName = `${factorCodes[i]}*${factorCodes[j]}`;
+      twoFactorNames.push(termName);
+      const col = runs.map((run) => {
+        const vi = typeof run.factorCoded[factorCodes[i]] === 'number' ? (run.factorCoded[factorCodes[i]] as number) : Number(run.factorCoded[factorCodes[i]]) || 0;
+        const vj = typeof run.factorCoded[factorCodes[j]] === 'number' ? (run.factorCoded[factorCodes[j]] as number) : Number(run.factorCoded[factorCodes[j]]) || 0;
+        return vi * vj;
+      });
+      twoFactorCols.push(col);
+    }
+  }
+
+  const m = twoFactorNames.length;
+  const X2: number[][] = Array.from({ length: N }, (_, r) =>
+    Array.from({ length: m }, (_, c) => twoFactorCols[c][r])
+  );
+
+  // 3. Compute A = (X1^T X1)^-1 X1^T X2
+  const X1T = matTranspose(X1);
+  const X1TX1 = matMul(X1T, X1);
+  let invX1TX1: number[][];
+  try {
+    invX1TX1 = matInverse(X1TX1, 1e-9);
+  } catch {
+    invX1TX1 = [];
+  }
+
+  const aliasChains: Record<string, string[]> = {};
+  const mainEffectAliases: AliasChainItem[] = [];
+
+  if (invX1TX1.length > 0) {
+    const X1TX2 = matMul(X1T, X2);
+    const A = matMul(invX1TX1, X1TX2); // (1 + k) x m
+
+    // For each main effect i = 1..k (row i in A, corresponding to factorCodes[i - 1])
+    for (let fIdx = 0; fIdx < k; fIdx++) {
+      const rowIdx = fIdx + 1;
+      const code = factorCodes[fIdx];
+      const aliasedWith: string[] = [];
+      let maxCorr = 0;
+
+      for (let cIdx = 0; cIdx < m; cIdx++) {
+        const coef = A[rowIdx][cIdx];
+        if (Math.abs(coef) > 0.05) {
+          const signStr = coef > 0 ? '+' : '-';
+          const valStr = Math.abs(Math.abs(coef) - 1.0) < 0.01 ? '' : `${Math.abs(coef).toFixed(2)} `;
+          aliasedWith.push(`${signStr} ${valStr}${twoFactorNames[cIdx]}`.trim());
+          maxCorr = Math.max(maxCorr, Math.abs(coef));
+        }
+      }
+
+      if (aliasedWith.length > 0) {
+        mainEffectAliases.push({
+          term: code,
+          aliasedWith,
+          maxCorrelation: Number(maxCorr.toFixed(2)),
+        });
+        aliasChains[code] = aliasedWith;
+      }
+    }
+  }
+
+  // 4. Compute 2FI vs 2FI Confounding (Resolution IV alias chains)
+  const twoFactorAliases: AliasChainItem[] = [];
+  for (let c1 = 0; c1 < m; c1++) {
+    const name1 = twoFactorNames[c1];
+    const col1 = twoFactorCols[c1];
+    const aliasedWith: string[] = [];
+    let maxCorr = 0;
+
+    for (let c2 = 0; c2 < m; c2++) {
+      if (c1 === c2) continue;
+      const name2 = twoFactorNames[c2];
+      const col2 = twoFactorCols[c2];
+
+      let dot = 0;
+      let s1 = 0;
+      let s2 = 0;
+      for (let r = 0; r < N; r++) {
+        dot += col1[r] * col2[r];
+        s1 += col1[r] * col1[r];
+        s2 += col2[r] * col2[r];
+      }
+      const denom = Math.sqrt(s1 * s2);
+      const corr = denom > 1e-9 ? dot / denom : 0;
+
+      if (Math.abs(corr) > 0.95) {
+        const signStr = corr > 0 ? '=' : '=-';
+        aliasedWith.push(`${signStr} ${name2}`);
+        maxCorr = Math.max(maxCorr, Math.abs(corr));
+      }
+    }
+
+    if (aliasedWith.length > 0) {
+      twoFactorAliases.push({
+        term: name1,
+        aliasedWith,
+        maxCorrelation: Number(maxCorr.toFixed(2)),
+      });
+      aliasChains[name1] = aliasedWith;
+    }
+  }
+
+  // 5. Determine Design Resolution
+  let resolution: AliasStructureResult['resolution'] = 'Full';
+  const hasMainAliases = mainEffectAliases.length > 0;
+  const has2FIAliases = twoFactorAliases.length > 0;
+
+  if (hasMainAliases) {
+    const isUnderThree = mainEffectAliases.some((item) => item.maxCorrelation > 0.99 && item.aliasedWith.length > 1);
+    resolution = isUnderThree ? '<III' : 'III';
+  } else if (has2FIAliases) {
+    resolution = 'IV';
+  } else if (N < Math.pow(2, k)) {
+    resolution = 'V+';
+  } else {
+    resolution = 'Full';
+  }
+
+  const allTerms = [...factorCodes, ...twoFactorNames];
+  const hasAliasing = hasMainAliases || has2FIAliases;
+
+  return {
+    hasAliasing,
+    resolution,
+    mainEffectAliases,
+    twoFactorAliases,
+    allTerms,
+    aliasChains,
   };
 }

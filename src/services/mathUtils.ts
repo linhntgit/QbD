@@ -891,3 +891,91 @@ export function jacobiEigenvalues(
 
   return { eigenvalues, eigenvectors };
 }
+
+export interface SampleDistributionParams {
+  mean?: number;
+  sd?: number;
+  min?: number;
+  mode?: number;
+  max?: number;
+}
+
+/**
+ * Sample from probability distributions for Monte Carlo process risk analysis (STAT-03).
+ * Supports Normal, Lognormal (strictly positive, right-skewed per ICH Q9),
+ * Uniform (bounded environmental variations), and Triangular (expert bounds per ICH Q9).
+ */
+export function sampleDistribution(
+  dist: 'Normal' | 'Lognormal' | 'Uniform' | 'Triangular' = 'Normal',
+  params: SampleDistributionParams,
+  rng: () => number = Math.random
+): number {
+  const drawStandardNormal = (): number => {
+    const u1 = Math.max(1e-12, rng());
+    const u2 = rng();
+    return Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+  };
+
+  switch (dist) {
+    case 'Lognormal': {
+      // Physical scale mean (m) and standard deviation (s)
+      const m = Math.max(1e-6, Number(params.mean) || 1.0);
+      const s = Math.max(1e-8, Number(params.sd) || m * 0.05);
+      // Log-space parameters:
+      // sigma_log^2 = ln(1 + (s/m)^2)
+      // mu_log = ln(m) - sigma_log^2 / 2
+      const varianceRatio = (s * s) / (m * m);
+      const sigmaLog = Math.sqrt(Math.log(1 + varianceRatio));
+      const muLog = Math.log(m) - 0.5 * sigmaLog * sigmaLog;
+      const z = drawStandardNormal();
+      return Math.exp(muLog + sigmaLog * z);
+    }
+
+    case 'Uniform': {
+      let a = params.min;
+      let b = params.max;
+      if (a === undefined || b === undefined || a >= b) {
+        const m = Number(params.mean) || 0;
+        const s = Math.max(1e-6, Number(params.sd) || 1);
+        const halfWidth = Math.sqrt(3) * s;
+        a = a ?? m - halfWidth;
+        b = b ?? m + halfWidth;
+        if (a >= b) b = a + 1e-6;
+      }
+      return a + rng() * (b - a);
+    }
+
+    case 'Triangular': {
+      let a = params.min;
+      let b = params.max;
+      let c = params.mode;
+      if (a === undefined || b === undefined || a >= b) {
+        const m = Number(params.mean) || 0;
+        const s = Math.max(1e-6, Number(params.sd) || 1);
+        a = a ?? m - Math.sqrt(6) * s;
+        b = b ?? m + Math.sqrt(6) * s;
+        if (a >= b) b = a + 1e-6;
+      }
+      if (c === undefined || c < a || c > b) {
+        c = params.mean !== undefined && params.mean >= a && params.mean <= b
+          ? 3 * params.mean - a - b
+          : (a + b) / 2;
+        c = Math.max(a, Math.min(b, c));
+      }
+      const u = rng();
+      const fc = (c - a) / (b - a);
+      if (u < fc) {
+        return a + Math.sqrt(u * (b - a) * (c - a));
+      } else {
+        return b - Math.sqrt((1 - u) * (b - a) * (b - c));
+      }
+    }
+
+    case 'Normal':
+    default: {
+      const mean = Number(params.mean) || 0;
+      const sd = Math.max(1e-8, Number(params.sd) || 1);
+      return mean + drawStandardNormal() * sd;
+    }
+  }
+}

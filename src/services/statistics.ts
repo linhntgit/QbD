@@ -25,6 +25,7 @@ import {
   tDistributionCritical,
   calculateIndividualDesirability,
   calculateInformationCriteria,
+  sampleDistribution,
 } from './mathUtils';
 import { buildModelTerms, getModelBlockCounts, type ModelTermDefinition } from './modelTerms';
 import { createSeededRandom } from './random';
@@ -1365,11 +1366,24 @@ export function runMonteCarloSimulation(
       const scale = Math.max(Math.abs(mean), Math.abs(f.high - f.low) / 2);
       const sd = Math.max(1e-5, scale * (variabilityPercent / 100.0));
 
-      // Box-Muller standard normal transform
+      // Stochastic factor sampling (STAT-03: Normal, Lognormal, Uniform, Triangular per ICH Q9)
       // Draw the physical process without truncation. An excursion outside the
       // studied region is a failed virtual batch; clamp only the value supplied
       // to the model so the model is never extrapolated beyond its evidence.
-      const rawActualVal = mean + standardNormal() * sd;
+      let rawActualVal: number;
+      if (f.distribution && f.distribution !== 'Normal') {
+        const distParams = {
+          mean,
+          sd,
+          min: f.distParams?.min ?? f.low,
+          mode: f.distParams?.mode ?? mean,
+          max: f.distParams?.max ?? f.high,
+          ...f.distParams,
+        };
+        rawActualVal = sampleDistribution(f.distribution, distParams, random);
+      } else {
+        rawActualVal = mean + standardNormal() * sd;
+      }
       if (rawActualVal < f.low || rawActualVal > f.high) batchOutsideSurveyRegion = true;
       const actualVal = Math.max(f.low, Math.min(f.high, rawActualVal));
 
@@ -1391,7 +1405,20 @@ export function runMonteCarloSimulation(
         const mean: number = typeof rawMean === 'number' ? rawMean : Number(rawMean) || (f.low + f.high) / 2; // mean in %
         const sd = Math.max(1e-5, mean * (variabilityPercent / 100.0));
 
-        const actualVal = Math.max(0, mean + standardNormal() * sd);
+        let actualVal: number;
+        if (f.distribution && f.distribution !== 'Normal') {
+          const distParams = {
+            mean,
+            sd,
+            min: f.distParams?.min ?? f.low,
+            mode: f.distParams?.mode ?? mean,
+            max: f.distParams?.max ?? f.high,
+            ...f.distParams,
+          };
+          actualVal = Math.max(0, sampleDistribution(f.distribution, distParams, random));
+        } else {
+          actualVal = Math.max(0, mean + standardNormal() * sd);
+        }
         sampledProps.push(valueToProportion(f, actualVal));
       });
 
