@@ -384,8 +384,23 @@ export async function parseExcelFile(
   return processRawTableData(rows[0], rows.slice(1), factors, cqas, existingRuns, config);
 }
 
+export function sanitizeCSVField(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'number') return String(value);
+  const str = String(value);
+  const trimmed = str.trimStart();
+  if (/^[=+\-@\t\r]/.test(trimmed)) {
+    // If it's a valid numeric string without an explicit formula trigger, output as-is
+    if (!isNaN(Number(trimmed)) && !trimmed.startsWith('=')) {
+      return str;
+    }
+    return `'${str}`;
+  }
+  return str;
+}
+
 function downloadCSV(headers: string[], rows: Array<Array<string | number | null | undefined>>, filename: string): void {
-  const escape = (value: string | number | null | undefined) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+  const escape = (value: string | number | null | undefined) => `"${sanitizeCSVField(value).replace(/"/g, '""')}"`;
   const contents = `\uFEFF${[headers, ...rows].map((row) => row.map(escape).join(',')).join('\n')}`;
   const url = URL.createObjectURL(new Blob([contents], { type: 'text/csv;charset=utf-8' }));
   const link = document.createElement('a');

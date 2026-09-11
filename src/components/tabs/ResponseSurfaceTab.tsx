@@ -11,6 +11,9 @@ import {
   Target,
   Eye,
   RotateCcw,
+  Activity,
+  CheckCircle2,
+  AlertTriangle,
 } from 'lucide-react';
 import type {
   QBDProject,
@@ -47,6 +50,8 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
   const factors = project.factors;
   const currentCQA = project.cqas.find((c) => c.code === selectedCQA) || project.cqas[0];
   const model = currentCQA ? models[currentCQA.code] : null;
+  const statModel = model && 'canonicalAnalysis' in model ? (model as StatisticalModelResult) : null;
+  const canonical = statModel?.canonicalAnalysis;
 
   // Mixture factors filter
   const mixtureFactors = useMemo(() => {
@@ -1399,6 +1404,193 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
         </div>
 
       </div>
+
+      {canonical && (
+        <div className="qbd-card" style={{ padding: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Activity size={18} style={{ color: '#0f766e' }} />
+              <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
+                Phân tích Chính tắc Mặt đáp ứng (Canonical Analysis - RSM)
+              </h3>
+              <span
+                style={{
+                  fontSize: '0.75rem',
+                  padding: '0.2rem 0.6rem',
+                  borderRadius: '9999px',
+                  fontWeight: '600',
+                  backgroundColor:
+                    canonical.surfaceNature === 'maximum' ? '#dcfce7' :
+                    canonical.surfaceNature === 'minimum' ? '#dbeafe' :
+                    canonical.surfaceNature === 'saddle' ? '#fef3c7' : '#f1f5f9',
+                  color:
+                    canonical.surfaceNature === 'maximum' ? '#166534' :
+                    canonical.surfaceNature === 'minimum' ? '#1e40af' :
+                    canonical.surfaceNature === 'saddle' ? '#92400e' : '#475569',
+                }}
+              >
+                {canonical.surfaceNature === 'maximum' ? 'Cực đại (Maximum)' :
+                 canonical.surfaceNature === 'minimum' ? 'Cực tiểu (Minimum)' :
+                 canonical.surfaceNature === 'saddle' ? 'Điểm yên ngựa (Saddle Point)' :
+                 'Sống trâu (Ridge Surface)'}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }}>
+              {canonical.isInsideDesignSpace ? (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#16a34a', fontWeight: '600' }}>
+                  <CheckCircle2 size={16} /> Điểm dừng nằm trong miền thiết kế [-1, 1]
+                </span>
+              ) : (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#d97706', fontWeight: '600' }}>
+                  <AlertTriangle size={16} /> Điểm dừng nằm ngoài miền khảo sát (Cần thận trọng ngoại suy)
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Metric Cards Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+            <div style={{ backgroundColor: '#f8fafc', padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
+              <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', marginBottom: '0.25rem' }}>
+                ĐÁP ỨNG DỰ ĐOÁN TẠI ĐIỂM DỪNG (ŷ₀)
+              </div>
+              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#0f766e' }}>
+                {canonical.predictedAtStationaryPoint.toFixed(4)} {currentCQA.unit || ''}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.2rem' }}>
+                ŷ₀ = b₀ + 0.5 · x₀ᵀa
+              </div>
+            </div>
+
+            <div style={{ backgroundColor: '#f8fafc', padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
+              <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', marginBottom: '0.25rem' }}>
+                ĐẶC TÍNH MẶT CONG
+              </div>
+              <div style={{ fontSize: '0.95rem', fontWeight: '600', color: '#1e293b' }}>
+                {canonical.surfaceNature === 'maximum' && 'Đỉnh đáp ứng - tất cả λᵢ < 0'}
+                {canonical.surfaceNature === 'minimum' && 'Đáy trũng - tất cả λᵢ > 0'}
+                {canonical.surfaceNature === 'saddle' && 'Yên ngựa - tồn tại λᵢ > 0 và λⱼ < 0'}
+                {canonical.surfaceNature === 'ridge' && 'Sống trâu - có λᵢ tiệm cận 0'}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
+                Dựa trên dấu của các trị riêng ma trận Hessian B
+              </div>
+            </div>
+
+            <div style={{ backgroundColor: '#f8fafc', padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
+              <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', marginBottom: '0.25rem' }}>
+                PHƯƠNG TRÌNH CHÍNH TẮC (CANONICAL FORM)
+              </div>
+              <div className="font-mono" style={{ fontSize: '0.85rem', fontWeight: '700', color: '#2563eb', overflowX: 'auto', whiteSpace: 'nowrap' }}>
+                {canonical.canonicalEquation}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.2rem' }}>
+                wᵢ là các trục tọa độ chính (Principal axes)
+              </div>
+            </div>
+          </div>
+
+          {/* Two column detail: Stationary point coordinates & Eigenvalues/Eigenvectors */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
+            {/* Stationary Point Coordinates Table */}
+            <div style={{ border: '1px solid #e2e8f0', borderRadius: '0.5rem', overflow: 'hidden' }}>
+              <div style={{ backgroundColor: '#f1f5f9', padding: '0.5rem 0.75rem', fontSize: '0.8rem', fontWeight: '700', color: '#334155' }}>
+                TỌA ĐỘ ĐIỂM DỪNG (STATIONARY POINT x₀ = -½ B⁻¹ a)
+              </div>
+              <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', textAlign: 'left' }}>
+                    <th style={{ padding: '0.4rem 0.75rem' }}>Yếu tố</th>
+                    <th style={{ padding: '0.4rem 0.75rem' }}>Giá trị mã hóa (Coded)</th>
+                    <th style={{ padding: '0.4rem 0.75rem' }}>Giá trị thực tế (Actual)</th>
+                    <th style={{ padding: '0.4rem 0.75rem' }}>Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {factors.map((f) => {
+                    const codedVal = canonical.stationaryPointCoded[f.code] ?? 0;
+                    const actualVal = canonical.stationaryPointActual[f.code] ?? f.center ?? 0;
+                    const inRange = Math.abs(codedVal) <= 1;
+                    return (
+                      <tr key={f.code} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '0.4rem 0.75rem', fontWeight: '600' }}>
+                          {f.code} ({f.name})
+                        </td>
+                        <td className="font-mono" style={{ padding: '0.4rem 0.75rem' }}>
+                          {codedVal.toFixed(3)}
+                        </td>
+                        <td className="font-mono" style={{ padding: '0.4rem 0.75rem', fontWeight: '600', color: '#0f766e' }}>
+                          {typeof actualVal === 'number' ? actualVal.toFixed(2) : actualVal} {f.unit || ''}
+                        </td>
+                        <td style={{ padding: '0.4rem 0.75rem' }}>
+                          <span
+                            style={{
+                              fontSize: '0.7rem',
+                              fontWeight: '600',
+                              padding: '0.1rem 0.4rem',
+                              borderRadius: '0.25rem',
+                              backgroundColor: inRange ? '#dcfce7' : '#fee2e2',
+                              color: inRange ? '#166534' : '#991b1b',
+                            }}
+                          >
+                            {inRange ? 'Trong miền' : 'Ngoại suy'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Eigenvalues & Eigenvectors Table */}
+            <div style={{ border: '1px solid #e2e8f0', borderRadius: '0.5rem', overflow: 'hidden' }}>
+              <div style={{ backgroundColor: '#f1f5f9', padding: '0.5rem 0.75rem', fontSize: '0.8rem', fontWeight: '700', color: '#334155' }}>
+                CÁC TRỤC CHÍNH & HỆ SỐ TRỊ RIÊNG (EIGENVALUES λᵢ & EIGENVECTORS)
+              </div>
+              <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', textAlign: 'left' }}>
+                    <th style={{ padding: '0.4rem 0.75rem' }}>Trục chính</th>
+                    <th style={{ padding: '0.4rem 0.75rem' }}>Trị riêng λᵢ</th>
+                    <th style={{ padding: '0.4rem 0.75rem' }}>Đặc tính</th>
+                    <th style={{ padding: '0.4rem 0.75rem' }}>Vectơ riêng (hướng biến)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {canonical.eigenvalues.map((lambda, idx) => {
+                    const vector = canonical.eigenvectors.map((row) => row[idx] ?? 0);
+                    const isDominant = Math.abs(lambda) === Math.max(...canonical.eigenvalues.map(Math.abs));
+                    return (
+                      <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td className="font-mono" style={{ padding: '0.4rem 0.75rem', fontWeight: '700' }}>
+                          w{idx + 1}
+                        </td>
+                        <td className="font-mono" style={{ padding: '0.4rem 0.75rem', fontWeight: '700', color: lambda > 0 ? '#1d4ed8' : '#b91c1c' }}>
+                          {lambda > 0 ? `+${lambda.toFixed(4)}` : lambda.toFixed(4)}
+                        </td>
+                        <td style={{ padding: '0.4rem 0.75rem', fontSize: '0.75rem' }}>
+                          {isDominant ? (
+                            <span style={{ color: '#b45309', fontWeight: '700' }}>Trục dốc nhất (Dominant)</span>
+                          ) : Math.abs(lambda) < 1e-3 ? (
+                            <span style={{ color: '#64748b' }}>Tiệm cận phẳng (Ridge)</span>
+                          ) : (
+                            <span style={{ color: '#475569' }}>{lambda < 0 ? 'Dốc úp' : 'Dốc ngửa'}</span>
+                          )}
+                        </td>
+                        <td className="font-mono" style={{ padding: '0.4rem 0.75rem', fontSize: '0.72rem', color: '#475569' }}>
+                          [{vector.map((v) => v.toFixed(3)).join(', ')}]
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

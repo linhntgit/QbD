@@ -30,7 +30,7 @@ import type {
 import { PlotlyChart } from '../PlotlyChart';
 import { DesirabilityProfiler } from '../DesirabilityProfiler';
 import {
-  runMonteCarloSimulation,
+  runMonteCarloSimulationAsync,
   generateControlStrategy,
 } from '../../services/statistics';
 import { codedToActual, actualToCoded, getConfiguredFactorCodes, getConfiguredFactorLevels, getFactorGridCodes, isDiscreteFactor } from '../../services/doeGenerator';
@@ -154,7 +154,10 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
   const simulationTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
     setIsSimulating(false);
-    return () => clearTimeout(simulationTimer.current);
+    const timer = simulationTimer.current;
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, [project.id, factors, cqas, models, monteCarloSeed]);
 
   const robustness = useMemo(
@@ -174,49 +177,44 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
     }
   }, [sharedOptimum, sharedMonteCarlo, monteCarloVariabilityPercent, monteCarloSimulations]);
 
-  // Execute Monte Carlo with non-blocking realistic simulation feedback
-  const executeSimulation = (
+  // Execute Monte Carlo with non-blocking async execution (PERF-01)
+  const executeSimulation = async (
     targetActual: Record<string, number | string>,
     batches: number,
     variability: number
   ) => {
-    clearTimeout(simulationTimer.current);
+    if (simulationTimer.current) clearTimeout(simulationTimer.current);
     setIsSimulating(true);
-    setSimProgress(15);
+    setSimProgress(0);
 
-    simulationTimer.current = setTimeout(() => {
-      setSimProgress(50);
-      simulationTimer.current = setTimeout(() => {
-        setSimProgress(85);
-        simulationTimer.current = setTimeout(() => {
-          try {
-            const mc = runMonteCarloSimulation(
-              targetActual,
-              factors,
-              cqas,
-              models,
-              variability,
-              batches,
-              monteCarloSeed,
-            );
-            setMcResult(mc);
-            onMonteCarloResult(mc);
-            setSimProgress(100);
-            try {
-              confetti({
-                particleCount: 50,
-                spread: 60,
-                origin: { y: 0.85 },
-              });
-            } catch {}
-          } catch (error) {
-            window.alert(`Không thể chạy Monte Carlo: ${error instanceof Error ? error.message : String(error)}`);
-          } finally {
-            setIsSimulating(false);
-          }
-        }, 120);
-      }, 140);
-    }, 100);
+    try {
+      const mc = await runMonteCarloSimulationAsync(
+        targetActual,
+        factors,
+        cqas,
+        models,
+        variability,
+        batches,
+        monteCarloSeed,
+        (progressPercent) => {
+          setSimProgress(progressPercent);
+        }
+      );
+      setMcResult(mc);
+      onMonteCarloResult(mc);
+      setSimProgress(100);
+      try {
+        confetti({
+          particleCount: 50,
+          spread: 60,
+          origin: { y: 0.85 },
+        });
+      } catch {}
+    } catch (error) {
+      window.alert(`Không thể chạy Monte Carlo: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setIsSimulating(false);
+    }
   };
 
   // Handle Apply Optimum from Desirability Profiler
@@ -1194,7 +1192,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
               </h3>
             </div>
             <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.2rem' }}>
-              Mô phỏng ngẫu nhiên hàng ngàn lô sản xuất ảo với sai số thông số thực tế để tính toán tỷ lệ lỗi (Defect Rate) và chỉ số năng lực quy trình (Cpk).
+              Mô phỏng ngẫu nhiên hàng ngàn lô sản xuất ảo với sai số thông số thực tế để tính toán tỷ lệ lỗi (Defect Rate) và chỉ số hiệu năng / năng lực quy trình (Ppk / Cpk).
             </p>
           </div>
 
@@ -1414,8 +1412,9 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
 
               {Object.entries(mcResult.cqaStats).map(([code, stats]) => {
                 const cqa = cqas.find((c) => c.code === code);
-                const isCpkGood = stats.cpk !== undefined && stats.cpk >= 1.33;
-                const isCpkAcceptable = stats.cpk !== undefined && stats.cpk >= 1.0;
+                const primaryCapability = stats.ppk ?? stats.cpk;
+                const isCapabilityGood = primaryCapability !== undefined && primaryCapability >= 1.33;
+                const isCapabilityAcceptable = primaryCapability !== undefined && primaryCapability >= 1.0;
 
                 return (
                   <div key={code} style={{ backgroundColor: '#ffffff', borderRadius: '0.5rem', padding: '0.85rem', border: '1px solid #e2e8f0' }}>
@@ -1423,20 +1422,28 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                       <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#1e3a8a' }}>
                         {cqa ? cqa.name : code} ({code})
                       </span>
-                      {stats.cpk !== undefined && (
+                      {primaryCapability !== undefined && (
                         <span
-                          className={`badge ${isCpkGood ? 'badge-success' : isCpkAcceptable ? 'badge-warning' : 'badge-danger'}`}
+                          className={`badge ${isCapabilityGood ? 'badge-success' : isCapabilityAcceptable ? 'badge-warning' : 'badge-danger'}`}
                           style={{ fontSize: '0.65rem', padding: '0.1rem 0.35rem' }}
                         >
-                          {isCpkGood ? 'Cpk ≥ 1.33' : isCpkAcceptable ? 'Cpk ≥ 1.00' : 'Cần đánh giá'}
+                          {isCapabilityGood ? 'Ppk ≥ 1.33' : isCapabilityAcceptable ? 'Ppk ≥ 1.00' : 'Cần đánh giá'}
                         </span>
                       )}
                     </div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#0f172a', margin: '0.15rem 0' }}>
-                      Cpk = {stats.cpk !== undefined ? stats.cpk : 'N/A'}
+                    <div style={{ fontSize: '1.2rem', fontWeight: '800', color: '#0f172a', margin: '0.15rem 0', display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+                      <span>Ppk = {stats.ppk !== undefined ? stats.ppk : 'N/A'}</span>
+                      {stats.cpk !== undefined && (
+                        <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>
+                          (Cpk: {stats.cpk})
+                        </span>
+                      )}
                     </div>
                     <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
                       TB: {stats.mean} ± {stats.sd} | Ngoài chuẩn: {stats.outOfSpecPercent}%
+                    </div>
+                    <div style={{ fontSize: '0.66rem', color: '#94a3b8', marginTop: '0.15rem' }}>
+                      Ppk: Hiệu năng mẫu mô phỏng (s) | Cpk: Năng lực quy trình
                     </div>
                   </div>
                 );

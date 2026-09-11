@@ -20,6 +20,7 @@ import { stableSeedFromText } from './services/random';
 import { Navbar } from './components/Navbar';
 import { TabNavigation, type TabKey } from './components/TabNavigation';
 import { HelpDrawer } from './components/HelpDrawer';
+import { ComponentErrorBoundary } from './components/ComponentErrorBoundary';
 import { trackTabChange, trackProjectAction, trackModelAction } from './services/analytics';
 
 const QTPPTab = lazy(() => import('./components/tabs/QTPPTab').then((module) => ({ default: module.QTPPTab })));
@@ -479,7 +480,8 @@ export function App() {
       >
         {storageWarning && <div className="qbd-card" role="alert" style={{ borderLeft: '4px solid #d97706', color: '#92400e', marginBottom: '1rem' }}>{storageWarning}</div>}
         <Suspense fallback={<div className="qbd-card" role="status" aria-live="polite">Đang tải mô-đun phân tích…</div>}>
-        {activeTab === 'qtpp' && (
+          <ComponentErrorBoundary key={activeTab} fallbackTitle={`Sự cố khi tải tab ${activeTab.toUpperCase()}`}>
+          {activeTab === 'qtpp' && (
           <QTPPTab project={project} onUpdateProject={handleUpdateProject} />
         )}
 
@@ -582,6 +584,7 @@ export function App() {
             onRestoreSnapshot={handleRestoreProject}
           />
         )}
+          </ComponentErrorBoundary>
         </Suspense>
       </main>
 

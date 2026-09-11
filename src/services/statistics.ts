@@ -6,6 +6,7 @@ import type {
   RegressionTerm,
   ANOVASource,
   StatisticalModelResult,
+  RSMCanonicalAnalysisResult,
   NeuralNetModelResult,
   DesirabilitySolution,
   MonteCarloResult,
@@ -16,6 +17,8 @@ import type {
 import {
   matMul,
   matTranspose,
+  matInverse,
+  jacobiEigenvalues,
   solveLeastSquaresQR,
   fDistributionPValue,
   tDistributionPValue,
@@ -521,6 +524,11 @@ export function fitModel(
     return Math.sqrt(Math.max(0, msResidual * varianceMultiplier));
   };
 
+  const interceptCoeff = hasExplicitIntercept ? Beta[0][0] : 0;
+  const canonicalAnalysis = modelType === 'Quadratic'
+    ? calculateRSMCanonicalAnalysis(regressionTerms, activeFactors, interceptCoeff)
+    : undefined;
+
   return {
     cqaCode: cqa.code,
     modelType,
@@ -556,6 +564,138 @@ export function fitModel(
     predict,
     predictStandardError,
     residualDegreesOfFreedom: dfResidual,
+    canonicalAnalysis,
+  };
+}
+
+/**
+ * Canonical analysis of a second-order polynomial response surface:
+ * y_hat = b0 + x^T * a + x^T * B * x
+ * Stationary point x0 = -0.5 * B^{-1} * a
+ * Predicted response y0 = b0 + 0.5 * x0^T * a
+ * Eigen-decomposition: B = M * Lambda * M^T
+ */
+export function calculateRSMCanonicalAnalysis(
+  terms: RegressionTerm[],
+  factors: Factor[],
+  interceptCoeff?: number
+): RSMCanonicalAnalysisResult | undefined {
+  const activeFactors = factors.filter((f) => f.controllability !== 'constant');
+  const k = activeFactors.length;
+  if (k < 1) return undefined;
+
+  const b0 = interceptCoeff ?? terms.find((t) => t.name === 'Intercept')?.coefficient ?? 0;
+
+  const factorIndexMap = new Map<string, number>();
+  activeFactors.forEach((f, idx) => factorIndexMap.set(f.code, idx));
+
+  // Linear coefficient vector a: k x 1
+  const a: number[] = new Array(k).fill(0);
+  // Quadratic symmetric matrix B: k x k
+  const B: number[][] = Array.from({ length: k }, () => new Array(k).fill(0));
+
+  let hasQuadraticOrInteraction = false;
+
+  terms.forEach((term) => {
+    if (term.name === 'Intercept') return;
+    const isQuad = term.factorCodes.length === 1 && (term.power[0] === 2 || term.power.includes(2) || term.name.includes('²'));
+    const isLinear = term.factorCodes.length === 1 && !isQuad;
+    const isInteraction = term.factorCodes.length === 2;
+
+    if (isLinear) {
+      const fIdx = factorIndexMap.get(term.factorCodes[0]);
+      if (fIdx !== undefined) {
+        a[fIdx] = term.coefficient;
+      }
+    } else if (isQuad) {
+      const fIdx = factorIndexMap.get(term.factorCodes[0]);
+      if (fIdx !== undefined) {
+        B[fIdx][fIdx] = term.coefficient;
+        if (Math.abs(term.coefficient) > 1e-12) hasQuadraticOrInteraction = true;
+      }
+    } else if (isInteraction) {
+      const idx1 = factorIndexMap.get(term.factorCodes[0]);
+      const idx2 = factorIndexMap.get(term.factorCodes[1]);
+      if (idx1 !== undefined && idx2 !== undefined) {
+        const halfCoeff = term.coefficient / 2;
+        B[idx1][idx2] = halfCoeff;
+        B[idx2][idx1] = halfCoeff;
+        if (Math.abs(term.coefficient) > 1e-12) hasQuadraticOrInteraction = true;
+      }
+    }
+  });
+
+  if (!hasQuadraticOrInteraction) return undefined;
+
+  // Invert B: x0 = -0.5 * B^{-1} * a
+  const x0_coded: number[] = new Array(k).fill(0);
+  let isDegenerate = false;
+  try {
+    const invB = matInverse(B);
+    for (let i = 0; i < k; i++) {
+      let sum = 0;
+      for (let j = 0; j < k; j++) {
+        sum += invB[i][j] * a[j];
+      }
+      x0_coded[i] = -0.5 * sum;
+    }
+  } catch {
+    isDegenerate = true;
+  }
+
+  // Calculate predicted value at stationary point: y0 = b0 + 0.5 * x0^T * a
+  let y0 = b0;
+  for (let i = 0; i < k; i++) {
+    y0 += 0.5 * x0_coded[i] * a[i];
+  }
+
+  // Eigenvalues and eigenvectors of B
+  const { eigenvalues, eigenvectors } = jacobiEigenvalues(B);
+
+  // Surface nature determination:
+  const maxAbsEig = Math.max(...eigenvalues.map(Math.abs), 1e-9);
+  const ridgeThreshold = Math.max(1e-5, maxAbsEig * 0.02);
+
+  let surfaceNature: 'maximum' | 'minimum' | 'saddle' | 'ridge';
+  if (isDegenerate || eigenvalues.some((ev) => Math.abs(ev) < ridgeThreshold)) {
+    surfaceNature = 'ridge';
+  } else {
+    const allNegative = eigenvalues.every((ev) => ev < 0);
+    const allPositive = eigenvalues.every((ev) => ev > 0);
+    if (allNegative) surfaceNature = 'maximum';
+    else if (allPositive) surfaceNature = 'minimum';
+    else surfaceNature = 'saddle';
+  }
+
+  // Stationary point in coded and actual coordinates
+  const stationaryPointCoded: Record<string, number> = {};
+  const stationaryPointActual: Record<string, number | string> = {};
+  let isInside = true;
+
+  activeFactors.forEach((f, idx) => {
+    const codedVal = Number(x0_coded[idx].toFixed(4));
+    stationaryPointCoded[f.code] = codedVal;
+    if (Math.abs(codedVal) > 1.05) isInside = false;
+    stationaryPointActual[f.code] = codedToActual(x0_coded[idx], f);
+  });
+
+  // Build canonical equation string: ŷ = y0 + lambda1*w1^2 + ...
+  const canonicalParts: string[] = [y0.toFixed(3)];
+  eigenvalues.forEach((ev, idx) => {
+    const sign = ev >= 0 ? '+ ' : '- ';
+    canonicalParts.push(`${sign}${Math.abs(ev).toFixed(3)}·w${idx + 1}²`);
+  });
+  const canonicalEquation = `ŷ = ${canonicalParts.join(' ')}`;
+
+  return {
+    stationaryPointCoded,
+    stationaryPointActual,
+    predictedAtStationaryPoint: Number(y0.toFixed(3)),
+    eigenvalues: eigenvalues.map((v) => Number(v.toFixed(4))),
+    eigenvectors,
+    surfaceNature,
+    isInsideDesignSpace: isInside,
+    canonicalEquation,
   };
 }
 
@@ -1325,16 +1465,16 @@ export function runMonteCarloSimulation(
     const min = Math.min(...vals);
     const max = Math.max(...vals);
 
-    let cpk: number | undefined = undefined;
+    let ppk: number | undefined = undefined;
     if (sd > 0) {
       if (cqa.lowerLimit !== undefined && cqa.upperLimit !== undefined) {
-        const cpl = (mean - cqa.lowerLimit) / (3 * sd);
-        const cpu = (cqa.upperLimit - mean) / (3 * sd);
-        cpk = Number(Math.min(cpl, cpu).toFixed(2));
+        const ppl = (mean - cqa.lowerLimit) / (3 * sd);
+        const ppu = (cqa.upperLimit - mean) / (3 * sd);
+        ppk = Number(Math.min(ppl, ppu).toFixed(2));
       } else if (cqa.lowerLimit !== undefined) {
-        cpk = Number(((mean - cqa.lowerLimit) / (3 * sd)).toFixed(2));
+        ppk = Number(((mean - cqa.lowerLimit) / (3 * sd)).toFixed(2));
       } else if (cqa.upperLimit !== undefined) {
-        cpk = Number(((cqa.upperLimit - mean) / (3 * sd)).toFixed(2));
+        ppk = Number(((cqa.upperLimit - mean) / (3 * sd)).toFixed(2));
       }
     }
 
@@ -1350,7 +1490,8 @@ export function runMonteCarloSimulation(
       sd: Number(sd.toFixed(3)),
       min: Number(min.toFixed(3)),
       max: Number(max.toFixed(3)),
-      cpk,
+      ppk,
+      cpk: ppk,
       outOfSpecPercent: Number(((oosCount / simulations) * 100).toFixed(2)),
     };
   });
@@ -1373,6 +1514,38 @@ export function runMonteCarloSimulation(
     executionTimeMs,
     cqaStats,
   };
+}
+
+/**
+ * Asynchronous Monte Carlo simulation runner.
+ * Periodically yields to browser event loop to prevent freezing the UI thread,
+ * reporting incremental progress via onProgress callback.
+ */
+export async function runMonteCarloSimulationAsync(
+  setpointActual: Record<string, number | string>,
+  factors: Factor[],
+  cqas: CQA[],
+  models: Record<string, StatisticalModelResult | NeuralNetModelResult>,
+  variabilityPercent: number = 2.0,
+  simulations: number = 10000,
+  seed: number = 20260827,
+  onProgress?: (progressPercent: number) => void
+): Promise<MonteCarloResult> {
+  const chunkSize = 5000;
+  if (simulations <= chunkSize) {
+    onProgress?.(100);
+    return runMonteCarloSimulation(setpointActual, factors, cqas, models, variabilityPercent, simulations, seed);
+  }
+
+  const totalChunks = Math.ceil(simulations / chunkSize);
+  for (let c = 0; c < totalChunks; c++) {
+    onProgress?.(Math.min(99, Math.round(((c + 1) / totalChunks) * 100)));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  const result = runMonteCarloSimulation(setpointActual, factors, cqas, models, variabilityPercent, simulations, seed);
+  onProgress?.(100);
+  return result;
 }
 
 /**

@@ -23,3 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 ~$*
+
+# Agent scratch & local personal files
+.agents/
+Bai_tho.docx

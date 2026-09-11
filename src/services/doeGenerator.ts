@@ -1235,7 +1235,7 @@ function calculateNumModelTermsForFactors(factors: Factor[], model: 'Linear' | '
 /**
  * Generate candidate pool for D-Optimal search
  */
-function generateCandidatePool(factors: Factor[]): number[][] {
+export function generateCandidatePool(factors: Factor[]): number[][] {
   const k = factors.length;
   if (k === 0) return [];
 
@@ -1282,11 +1282,15 @@ function generateCandidatePool(factors: Factor[]): number[][] {
     return combinedCandidates;
   }
 
-  // Standard process factors grid
+  // Standard process factors grid with dynamic level throttling to prevent 5^k OOM crashes
+  const continuousLevels = k <= 4
+    ? [-1, -0.5, 0, 0.5, 1] // 5 levels for fine exploration when k <= 4
+    : (k <= 6 ? [-1, 0, 1] : [-1, 1]); // 3 levels for k=5,6; 2 levels for k>=7
+
   const gridPerFactor: number[][] = factors.map((f) => {
     if (f.controllability === 'constant') return [0];
     if (f.dataType === 'qualitative' || f.dataType === 'quantitative_multilevel') return getConfiguredFactorCodes(f);
-    return [-1, -0.5, 0, 0.5, 1]; // 5 levels for smooth response exploration
+    return continuousLevels;
   });
 
   // Cartesian product of all factor levels

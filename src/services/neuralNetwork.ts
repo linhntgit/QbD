@@ -513,6 +513,9 @@ export function fitNeuralNetModel(
       bOut,
     };
 
+    let tourPatience = 0;
+    const maxPatience = 40;
+
     const lossHistory: { epoch: number; trainLoss: number; valLoss?: number }[] = [];
 
     // Training Epochs
@@ -692,12 +695,20 @@ export function fitNeuralNetModel(
         bOut -= (lr * mHat) / (Math.sqrt(vHat) + eps);
       }
 
-      const selectionLoss = networkTrainingLoss(X_all, Y_norm_all.map((value) => [value]),
-        Y_norm_all.map(() => [true]), trainIdx,
-        { W1, b1, W2: hasLayer2 ? W2 : undefined, b2: hasLayer2 ? b2 : undefined, WOut, bOut: [bOut] }, act, lambda);
+      const currentWeights = { W1, b1, W2: hasLayer2 ? W2 : undefined, b2: hasLayer2 ? b2 : undefined, WOut, bOut: [bOut] };
+      const trainLoss = networkTrainingLoss(X_all, Y_norm_all.map((value) => [value]),
+        Y_norm_all.map(() => [true]), trainIdx, currentWeights, act, lambda);
+
+      const hasVal = valIdx.length > 0;
+      const valLoss = hasVal ? networkTrainingLoss(X_all, Y_norm_all.map((value) => [value]),
+        Y_norm_all.map(() => [true]), valIdx, currentWeights, act, 0) : undefined;
+
+      const useEarlyStopping = Boolean(config.earlyStopping);
+      const selectionLoss = (useEarlyStopping && hasVal) ? valLoss! : trainLoss;
 
       if (selectionLoss < tourBestSelectionLoss) {
         tourBestSelectionLoss = selectionLoss;
+        tourPatience = 0;
         tourBestWeights = {
           W1: W1.map((r) => [...r]),
           b1: [...b1],
@@ -706,18 +717,26 @@ export function fitNeuralNetModel(
           WOut: WOut.map((r) => [...r]),
           bOut,
         };
+      } else {
+        tourPatience++;
       }
 
       // Sample loss history points (up to 50 points across epochs)
       if (epoch === 1 || epoch % Math.max(1, Math.floor(config.maxEpochs / 50)) === 0 || epoch === config.maxEpochs) {
         lossHistory.push({
           epoch,
-          trainLoss: selectionLoss,
+          trainLoss,
+          valLoss,
         });
+      }
+
+      // Early stopping if validation loss ceases to improve for patience epochs (STAT-07)
+      const patienceLimit = config.patience ?? maxPatience;
+      if (useEarlyStopping && hasVal && tourPatience >= patienceLimit && epoch >= patienceLimit) {
+        break;
       }
     }
 
-    // Validation observations never select an epoch or restart.
     const validationSelectionLoss = tourBestSelectionLoss;
 
     if (validationSelectionLoss < bestGlobalSelectionLoss) {
@@ -1148,6 +1167,9 @@ export function fitMultiOutputNeuralNet(
       bOut: [...bOut],
     };
 
+    let tourPatience = 0;
+    const maxPatience = 40;
+
     const lossHistory: { epoch: number; trainLoss: number; valLoss?: number }[] = [];
 
     for (let epoch = 1; epoch <= config.maxEpochs; epoch++) {
@@ -1336,10 +1358,20 @@ export function fitMultiOutputNeuralNet(
 
       // Select epochs and restarts only from the regularized training loss.
       // The fixed holdout remains untouched until final diagnostics below.
+      const currentWeights = { W1, b1, W2: hasLayer2 ? W2 : undefined, b2: hasLayer2 ? b2 : undefined, WOut, bOut };
       const totalTrainLoss = networkTrainingLoss(X_all, Y_norm_all, Y_valid_mask, trainIdx,
-        { W1, b1, W2: hasLayer2 ? W2 : undefined, b2: hasLayer2 ? b2 : undefined, WOut, bOut }, act, lambda);
-      if (totalTrainLoss < tourBestSelectionLoss) {
-        tourBestSelectionLoss = totalTrainLoss;
+        currentWeights, act, lambda);
+
+      const hasVal = valIdx.length > 0;
+      const valLoss = hasVal ? networkTrainingLoss(X_all, Y_norm_all, Y_valid_mask, valIdx,
+        currentWeights, act, 0) : undefined;
+
+      const useEarlyStopping = Boolean(config.earlyStopping);
+      const selectionLoss = (useEarlyStopping && hasVal) ? valLoss! : totalTrainLoss;
+
+      if (selectionLoss < tourBestSelectionLoss) {
+        tourBestSelectionLoss = selectionLoss;
+        tourPatience = 0;
         tourBestWeights = {
           W1: W1.map((r) => [...r]),
           b1: [...b1],
@@ -1348,13 +1380,22 @@ export function fitMultiOutputNeuralNet(
           WOut: WOut.map((r) => [...r]),
           bOut: [...bOut],
         };
+      } else {
+        tourPatience++;
       }
 
       if (epoch % 20 === 0 || epoch === config.maxEpochs) {
         lossHistory.push({
           epoch,
           trainLoss: totalTrainLoss,
+          valLoss,
         });
+      }
+
+      // Early stopping if validation loss ceases to improve for patience epochs (STAT-07)
+      const patienceLimit = config.patience ?? maxPatience;
+      if (useEarlyStopping && hasVal && tourPatience >= patienceLimit && epoch >= patienceLimit) {
+        break;
       }
     }
 

@@ -212,6 +212,17 @@ export interface ModelDiagnostics {
   }[];
 }
 
+export interface RSMCanonicalAnalysisResult {
+  stationaryPointCoded: Record<string, number>;
+  stationaryPointActual: Record<string, number | string>;
+  predictedAtStationaryPoint: number;
+  eigenvalues: number[];
+  eigenvectors: number[][]; // Columns are eigenvectors
+  surfaceNature: 'maximum' | 'minimum' | 'saddle' | 'ridge';
+  isInsideDesignSpace: boolean;
+  canonicalEquation: string;
+}
+
 export interface StatisticalModelResult {
   cqaCode: string;
   modelType: ModelType;
@@ -227,6 +238,7 @@ export interface StatisticalModelResult {
   /** Standard error of the estimated mean response at a coded factor point. */
   predictStandardError?: (codedFactors: Record<string, number>) => number;
   residualDegreesOfFreedom?: number;
+  canonicalAnalysis?: RSMCanonicalAnalysisResult;
 }
 
 export interface UpdatedRiskItem {
@@ -300,6 +312,7 @@ export interface MonteCarloResult {
     sd: number;
     min: number;
     max: number;
+    ppk?: number;
     cpk?: number;
     outOfSpecPercent: number;
   }>;

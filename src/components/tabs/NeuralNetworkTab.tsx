@@ -1514,6 +1514,23 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                 />
               </div>
             )}
+
+            {localConfig.validationMethod !== 'none' && (
+              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.75rem', fontWeight: '700', color: '#475569', marginTop: '0.6rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(localConfig.earlyStopping)}
+                    onChange={(e) => setLocalConfig({ ...localConfig, earlyStopping: e.target.checked, patience: localConfig.patience ?? 40 })}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <span>Dừng sớm (Early Stopping)</span>
+                </label>
+                <span style={{ fontSize: '0.68rem', color: '#64748b', marginLeft: '1.2rem' }}>
+                  Tránh overfit (patience = {localConfig.patience ?? 40})
+                </span>
+              </div>
+            )}
           </div>
         </div>
 

@@ -28,6 +28,8 @@ export interface NeuralNetConfig {
   kFolds: number; // default 5; each fold reserves approximately N / K runs for validation
   numTours: number; // default 10 (number of random tours/restarts)
   seed: number;
+  earlyStopping?: boolean; // Early stopping based on validation loss (STAT-07)
+  patience?: number; // Early stopping patience epochs (default: 40)
 }
 
 export interface NeuralResidual {

@@ -8,6 +8,19 @@ interface MathProps {
   style?: React.CSSProperties;
 }
 
+function escapeHtml(str: string): string {
+  return str.replace(/[&<>"']/g, (m) => {
+    switch (m) {
+      case '&': return '&amp;';
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '"': return '&quot;';
+      case "'": return '&#39;';
+      default: return m;
+    }
+  });
+}
+
 export const InlineMath: React.FC<MathProps> = ({ math, className, style }) => {
   const html = useMemo(() => {
     try {
@@ -16,7 +29,7 @@ export const InlineMath: React.FC<MathProps> = ({ math, className, style }) => {
         throwOnError: false,
       });
     } catch {
-      return math;
+      return `<span class="katex-error">${escapeHtml(math)}</span>`;
     }
   }, [math]);
 
@@ -42,7 +55,7 @@ export const BlockMath: React.FC<MathProps> = ({ math, className, style }) => {
         throwOnError: false,
       });
     } catch {
-      return math;
+      return `<span class="katex-error">${escapeHtml(math)}</span>`;
     }
   }, [math]);
 

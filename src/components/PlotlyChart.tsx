@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Plotly from '../services/plotlyCustom';
+import { ComponentErrorBoundary } from './ComponentErrorBoundary';
 
 interface PlotlyChartProps {
   data: any[];
@@ -292,7 +293,7 @@ function normaliseChart(data: any[], layout: any, compact = false) {
   return { data: data.map((trace) => normaliseTrace(trace, compact)), layout: normalisedLayout };
 }
 
-export const PlotlyChart: React.FC<PlotlyChartProps> = ({
+const PlotlyChartInner: React.FC<PlotlyChartProps> = ({
   data,
   layout,
   config,
@@ -318,7 +319,9 @@ export const PlotlyChart: React.FC<PlotlyChartProps> = ({
 
   useEffect(() => {
     if (!containerRef.current) return;
-    Plotly.react(containerRef.current, chart.data, chart.layout, chartConfig);
+    Plotly.react(containerRef.current, chart.data, chart.layout, chartConfig).catch((err: unknown) => {
+      console.warn('Plotly render error:', err);
+    });
   }, [chart, chartConfig]);
 
   useEffect(() => {
@@ -357,3 +360,9 @@ export const PlotlyChart: React.FC<PlotlyChartProps> = ({
 
   return <div ref={containerRef} style={{ minWidth: 0, ...style }} className={className} />;
 };
+
+export const PlotlyChart: React.FC<PlotlyChartProps> = (props) => (
+  <ComponentErrorBoundary compact fallbackTitle="Biểu đồ gặp sự cố hiển thị">
+    <PlotlyChartInner {...props} />
+  </ComponentErrorBoundary>
+);

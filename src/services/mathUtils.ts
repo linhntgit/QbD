@@ -5,7 +5,9 @@
  */
 export function matMul(A: number[][], B: number[][]): number[][] {
   const m = A.length;
+  if (m === 0 || !A[0] || A[0].length === 0) return [];
   const p = A[0].length;
+  if (B.length === 0 || !B[0] || B[0].length === 0) return [];
   const n = B[0].length;
   const C: number[][] = Array.from({ length: m }, () => new Array(n).fill(0));
 
@@ -25,6 +27,7 @@ export function matMul(A: number[][], B: number[][]): number[][] {
  */
 export function matTranspose(A: number[][]): number[][] {
   const m = A.length;
+  if (m === 0 || !A[0] || A[0].length === 0) return [];
   const n = A[0].length;
   const AT: number[][] = Array.from({ length: n }, () => new Array(m).fill(0));
   for (let i = 0; i < m; i++) {
@@ -401,8 +404,25 @@ export function calculateIndividualDesirability(
 
     case 'target': {
       // Tent / Trapezoid Shape (Slide 26, 27): d=0 outside [L, U], d=1 at Target T
-      const L = lowLimit !== undefined ? lowLimit : target !== undefined ? target * 0.9 : 0;
-      const U = highLimit !== undefined ? highLimit : target !== undefined ? target * 1.1 : 100;
+      let L: number;
+      let U: number;
+      if (lowLimit !== undefined && highLimit !== undefined) {
+        L = Math.min(lowLimit, highLimit);
+        U = Math.max(lowLimit, highLimit);
+      } else if (lowLimit !== undefined) {
+        L = lowLimit;
+        U = target !== undefined ? Math.max(target + Math.abs(target) * 0.1 || 1, target + 1) : L + 100;
+      } else if (highLimit !== undefined) {
+        U = highLimit;
+        L = target !== undefined ? Math.min(target - Math.abs(target) * 0.1 || -1, target - 1) : U - 100;
+      } else if (target !== undefined) {
+        const delta = Math.abs(target) > 1e-6 ? Math.abs(target) * 0.1 : 1.0;
+        L = target - delta;
+        U = target + delta;
+      } else {
+        L = 0;
+        U = 100;
+      }
       const T = target !== undefined ? target : (L + U) / 2;
       if (y < L || y > U) return 0.0;
       if (T <= L && U <= T) return y === T ? 1.0 : 0.0;
@@ -775,4 +795,99 @@ export function calculateCarpenterArchitecture(
     rules,
     recommendation,
   };
+}
+
+/**
+ * Jacobi eigenvalue algorithm for real symmetric matrices.
+ * Computes eigenvalues and eigenvectors: A * V = V * diag(eigenvalues)
+ */
+export function jacobiEigenvalues(
+  matrix: number[][],
+  maxSweeps: number = 50,
+  tol: number = 1e-12
+): { eigenvalues: number[]; eigenvectors: number[][] } {
+  const n = matrix.length;
+  if (n === 0) return { eigenvalues: [], eigenvectors: [] };
+  if (matrix.some((row) => row.length !== n)) {
+    throw new Error('Jacobi eigenvalue solver requires a square matrix.');
+  }
+
+  // Clone matrix to work on and enforce symmetry
+  const A: number[][] = Array.from({ length: n }, (_, i) =>
+    Array.from({ length: n }, (_, j) => (matrix[i][j] + matrix[j][i]) / 2)
+  );
+
+  // Initialize V to identity matrix
+  const V: number[][] = Array.from({ length: n }, (_, i) =>
+    Array.from({ length: n }, (_, j) => (i === j ? 1 : 0))
+  );
+
+  for (let sweep = 0; sweep < maxSweeps; sweep++) {
+    // Find maximum off-diagonal element
+    let maxOff = 0;
+    let p = 0;
+    let q = 1;
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const absVal = Math.abs(A[i][j]);
+        if (absVal > maxOff) {
+          maxOff = absVal;
+          p = i;
+          q = j;
+        }
+      }
+    }
+
+    if (maxOff < tol) break;
+
+    // Compute Jacobi rotation angles
+    const app = A[p][p];
+    const aqq = A[q][q];
+    const apq = A[p][q];
+
+    const tau = (aqq - app) / (2 * apq);
+    const t = tau >= 0 ? 1 / (tau + Math.sqrt(1 + tau * tau)) : -1 / (-tau + Math.sqrt(1 + tau * tau));
+    const c = 1 / Math.sqrt(1 + t * t);
+    const s = t * c;
+
+    // Update A
+    A[p][p] = app - t * apq;
+    A[q][q] = aqq + t * apq;
+    A[p][q] = 0;
+    A[q][p] = 0;
+
+    for (let r = 0; r < n; r++) {
+      if (r !== p && r !== q) {
+        const arp = A[r][p];
+        const arq = A[r][q];
+        A[r][p] = c * arp - s * arq;
+        A[p][r] = A[r][p];
+        A[r][q] = s * arp + c * arq;
+        A[q][r] = A[r][q];
+      }
+    }
+
+    // Update V
+    for (let i = 0; i < n; i++) {
+      const vip = V[i][p];
+      const viq = V[i][q];
+      V[i][p] = c * vip - s * viq;
+      V[i][q] = s * vip + c * viq;
+    }
+  }
+
+  // Extract eigenvalues from diagonal
+  const rawEigenvalues = A.map((row, i) => row[i]);
+
+  // Sort by eigenvalue descending
+  const indices = Array.from({ length: n }, (_, i) => i).sort(
+    (a, b) => rawEigenvalues[b] - rawEigenvalues[a]
+  );
+
+  const eigenvalues = indices.map((i) => rawEigenvalues[i]);
+  const eigenvectors = Array.from({ length: n }, (_, r) =>
+    indices.map((c) => V[r][c])
+  );
+
+  return { eigenvalues, eigenvectors };
 }

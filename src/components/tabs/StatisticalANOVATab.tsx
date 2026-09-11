@@ -189,6 +189,12 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
           },
         ];
 
+        const minX = xPred.length > 0 ? Math.min(...xPred) : 0;
+        const maxX = xPred.length > 0 ? Math.max(...xPred) : 1;
+        const spanX = Math.abs(maxX - minX) || 1;
+        const lineX0 = minX - 0.05 * spanX;
+        const lineX1 = maxX + 0.05 * spanX;
+
         const layout = {
           title: `Phần dư Chuẩn hóa vs. Giá trị Dự đoán - ${currentCQA.name} (${currentCQA.code})`,
           xaxis: {
@@ -211,9 +217,9 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
             automargin: true,
           },
           shapes: [
-            { type: 'line', x0: Math.min(...xPred) * 0.95, x1: Math.max(...xPred) * 1.05, y0: 0, y1: 0, line: { color: '#64748b', width: 1 } },
-            { type: 'line', x0: Math.min(...xPred) * 0.95, x1: Math.max(...xPred) * 1.05, y0: 3, y1: 3, line: { color: '#dc2626', width: 1, dash: 'dot' } },
-            { type: 'line', x0: Math.min(...xPred) * 0.95, x1: Math.max(...xPred) * 1.05, y0: -3, y1: -3, line: { color: '#dc2626', width: 1, dash: 'dot' } },
+            { type: 'line', x0: lineX0, x1: lineX1, y0: 0, y1: 0, line: { color: '#64748b', width: 1 } },
+            { type: 'line', x0: lineX0, x1: lineX1, y0: 3, y1: 3, line: { color: '#dc2626', width: 1, dash: 'dot' } },
+            { type: 'line', x0: lineX0, x1: lineX1, y0: -3, y1: -3, line: { color: '#dc2626', width: 1, dash: 'dot' } },
           ],
           margin: { l: 80, r: 40, t: 50, b: 70, pad: 4 },
         };

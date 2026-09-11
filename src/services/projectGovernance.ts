@@ -114,6 +114,14 @@ export function getProjectHistory(projectId: string): ProjectVersionSnapshot[] {
   }
 }
 
+export function pruneProjectForHistory(project: QBDProject): QBDProject {
+  const cloned = cloneProject(project);
+  if (cloned.analysisSettings?.neuralArtifacts) {
+    delete cloned.analysisSettings.neuralArtifacts;
+  }
+  return cloned;
+}
+
 export function recordProjectVersion(project: QBDProject, action: string): boolean {
   if (!storageAvailable()) return false;
   try {
@@ -124,10 +132,22 @@ export function recordProjectVersion(project: QBDProject, action: string): boole
       timestamp,
       action,
       versionLabel: project.version || 'working copy',
-      project: cloneProject(project),
+      project: pruneProjectForHistory(project),
     };
-    window.localStorage.setItem(historyKey(project.id), JSON.stringify([snapshot, ...history].slice(0, 25)));
-    return true;
+    let snapshots = [snapshot, ...history].slice(0, 10);
+    while (snapshots.length > 0) {
+      try {
+        window.localStorage.setItem(historyKey(project.id), JSON.stringify(snapshots));
+        return true;
+      } catch {
+        if (snapshots.length > 1) {
+          snapshots = snapshots.slice(0, Math.ceil(snapshots.length / 2));
+        } else {
+          return false;
+        }
+      }
+    }
+    return false;
   } catch {
     return false;
   }
