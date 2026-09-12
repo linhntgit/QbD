@@ -1227,6 +1227,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                 )}
                 {designConfig.category === 'Screening' && (
                   <>
+                    <option value="DefinitiveScreening">Definitive Screening Design (DSD - Jones & Nachtsheim 2011)</option>
                     <option value="FullFactorial2k">Yếu tố Toàn phần (Full Factorial 2^k)</option>
                     <option value="FractionalFactorial">Yếu tố Bán phần (Fractional Factorial 2^(k-p))</option>
                     <option value="PlackettBurman">Plackett-Burman Design (PBD)</option>
@@ -1271,32 +1272,30 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               <>
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', minHeight: '20px', gap: '0.35rem' }}>
-                    <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#0369a1', whiteSpace: 'nowrap' }}>
-                      Bậc Mô Hình Mục Tiêu
+                    <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#334155', whiteSpace: 'nowrap' }}>
+                      Mô hình Dự kiến (D-Optimal)
                     </label>
-                    <span style={{ fontSize: '0.7rem', color: '#0284c7', background: '#e0f2fe', padding: '1px 6px', borderRadius: '4px', fontWeight: '600', whiteSpace: 'nowrap' }}>
-                      p = {minRequiredTerms}
-                    </span>
+                    <span style={{ fontSize: '0.7rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>Assumed Model</span>
                   </div>
                   <select
                     className="input-field"
-                    style={{ height: '38px', borderRadius: '0.45rem', borderColor: '#7dd3fc', fontSize: '0.82rem', fontWeight: '500' }}
-                    value={selectedOptimalModel}
-                    onChange={(e) => setDesignConfig({ ...designConfig, dOptimalModel: e.target.value as 'Linear' | '2FI' | 'Quadratic' })}
+                    style={{ height: '38px', borderRadius: '0.45rem', fontSize: '0.82rem', fontWeight: '500' }}
+                    value={designConfig.dOptimalModel || (hasMixtureProcessFactors ? '2FI' : project.factors.filter((factor) => factor.controllability !== 'constant').length <= 3 ? 'Quadratic' : '2FI')}
+                    onChange={(e) => setDesignConfig({ ...designConfig, dOptimalModel: e.target.value as any })}
                   >
-                    <option value="Quadratic">Bậc 2 Toàn phần (Quadratic: Linear + 2FI + Quadratic)</option>
-                    <option value="2FI">Tương tác 2 yếu tố (2FI: Linear + Interactions)</option>
-                    <option value="Linear">Tuyến tính bậc 1 (mixture–process: gồm xᵢ·zⱼ)</option>
+                    <option value="Linear">Bậc 1 Tuyến tính (Linear - Main effects)</option>
+                    <option value="2FI">Tương tác 2 yếu tố (2FI - Interactions)</option>
+                    <option value="Quadratic">Bậc 2 Đầy đủ (Full Quadratic RSM)</option>
                   </select>
                 </div>
 
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', minHeight: '20px', gap: '0.35rem' }}>
                     <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#0369a1', whiteSpace: 'nowrap' }}>
-                      Số Lần Chạy (N)
+                      Số mẻ thực nghiệm (N)
                     </label>
                     <span
-                      title={`Số run tối thiểu: ${minRequiredTerms + 1}; Khuyến nghị: ${recommendedOptimalRuns}`}
+                      title="Số lượng mẻ thực nghiệm được tối ưu hóa theo thuật toán Fedorov"
                       style={{ fontSize: '0.7rem', color: '#0369a1', background: '#e0f2fe', padding: '1px 6px', borderRadius: '4px', fontWeight: '600', whiteSpace: 'nowrap' }}
                     >
                       Min: {minRequiredTerms + 1} · Gợi ý: {recommendedOptimalRuns}
@@ -1339,6 +1338,15 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                   value={designConfig.centerPoints}
                   onChange={(e) => setDesignConfig({ ...designConfig, centerPoints: Number(e.target.value) })}
                 />
+              </div>
+            )}
+
+            {designConfig.designType === 'DefinitiveScreening' && (
+              <div style={{ gridColumn: '1 / -1', fontSize: '0.76rem', color: '#1e40af', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '0.5rem', padding: '0.65rem 0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Info size={16} color="#2563eb" style={{ flexShrink: 0 }} />
+                <span>
+                  <strong>⭐ Definitive Screening Design (DSD - Jones &amp; Nachtsheim 2011):</strong> Thiết kế sàng lọc hiện đại 3 mức. Hiệu ứng chính trực giao tuyệt đối, không bị nhiễu chập với tương tác 2 yếu tố (2FI) và độ cong bậc hai. Ước lượng độ cong với số mẻ tối thiểu ({project.factors.filter((f) => f.controllability !== 'constant').length % 2 === 0 ? 2 * project.factors.filter((f) => f.controllability !== 'constant').length : 2 * (project.factors.filter((f) => f.controllability !== 'constant').length + 1)} mẻ chuẩn + {designConfig.centerPoints} mẻ tâm).
+                </span>
               </div>
             )}
           </div>

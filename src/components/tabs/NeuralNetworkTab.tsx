@@ -56,6 +56,16 @@ import {
   buildTernaryPlotlyTraces,
   getEvenContourSettings,
 } from '../../services/ternaryContour';
+import {
+  computeXAIImportance,
+  generateCQAImpactMatrix,
+  type XAIComprehensiveResult,
+  type CQAImpactMatrixItem,
+} from '../../services/explainableAI';
+import {
+  benchmarkCQAModels,
+  type CQAMultiModelBenchmark,
+} from '../../services/modelBenchmarking';
 
 interface NeuralNetworkTabProps {
   project: QBDProject;
@@ -119,6 +129,8 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
 
   const [localConfig, setLocalConfig] = useState<NeuralNetConfig>(currentConfig);
   const [activeDiagPlot, setActiveDiagPlot] = useState<'actPred' | 'resPred' | 'loss' | 'varImp'>('actPred');
+  const [xaiSubTab, setXaiSubTab] = useState<'beeswarm' | 'waterfall' | 'comparison' | 'matrix'>('beeswarm');
+  const [waterfallRunOrder, setWaterfallRunOrder] = useState<number>(1);
   const [copiedType, setCopiedType] = useState<'python' | 'excel' | 'formula' | null>(null);
 
   // Active inputs & architecture parameters
@@ -177,6 +189,39 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
   useEffect(() => {
     setProfilerCoded((previous) => normalizeMixtureCoded(previous, project.factors));
   }, [project.factors]);
+
+  // Explainable AI (XAI) and Multi-Model Benchmarking Memos
+  const xaiResult = useMemo<XAIComprehensiveResult | null>(() => {
+    if (!neuralModel || !currentCQA) return null;
+    return computeXAIImportance(neuralModel, project.runs, project.factors, currentCQA);
+  }, [neuralModel, project.runs, project.factors, currentCQA]);
+
+  const allXaiResults = useMemo<Record<string, XAIComprehensiveResult>>(() => {
+    const map: Record<string, XAIComprehensiveResult> = {};
+    project.cqas.forEach((c) => {
+      const nm = neuralModels[c.code];
+      if (nm) {
+        map[c.code] = computeXAIImportance(nm, project.runs, project.factors, c);
+      }
+    });
+    return map;
+  }, [neuralModels, project.runs, project.factors, project.cqas]);
+
+  const cqaImpactMatrix = useMemo<CQAImpactMatrixItem[]>(() => {
+    if (Object.keys(allXaiResults).length === 0) return [];
+    return generateCQAImpactMatrix(project.cqas, project.factors, allXaiResults);
+  }, [project.cqas, project.factors, allXaiResults]);
+
+  const cqaBenchmark = useMemo<CQAMultiModelBenchmark | null>(() => {
+    if (!currentCQA) return null;
+    return benchmarkCQAModels(
+      currentCQA,
+      project.factors,
+      project.runs,
+      anovaModel,
+      neuralModel,
+    );
+  }, [currentCQA, project.factors, project.runs, anovaModel, neuralModel]);
 
   // 3D/2D Surface Profiler factor axes
   const [xAxisFactor, setXAxisFactor] = useState<string>(project.factors[0]?.code || 'X1');
@@ -1145,45 +1190,500 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
       }
 
       case 'varImp': {
-        const sortedImp = [...diag.variableImportance];
-        const names = sortedImp.map((v) => {
-          const factor = project.factors.find((f) => f.code === v.factorCode);
-          return `${v.factorCode}: ${v.factorName}${factor?.unit ? ` [${factor.unit}]` : ''}`;
-        });
-        const rels = sortedImp.map((v) => v.relativeImportance);
+        if (!xaiResult) {
+          const sortedImp = [...diag.variableImportance];
+          const names = sortedImp.map((v) => {
+            const factor = project.factors.find((f) => f.code === v.factorCode);
+            return `${v.factorCode}: ${v.factorName}${factor?.unit ? ` [${factor.unit}]` : ''}`;
+          });
+          const rels = sortedImp.map((v) => v.relativeImportance);
 
-        const data = [
-          {
-            type: 'bar',
-            x: rels,
-            y: names,
-            orientation: 'h',
-            marker: { color: '#7c3aed' },
-            text: rels.map((r) => `${r.toFixed(1)}%`),
-            textposition: 'auto',
-          },
-        ];
-
-        const layout = {
-          title: `Mức Độ Quan Trọng Của Biến Đầu Vào (Independent Variable Importance)`,
-          xaxis: {
-            title: {
-              text: 'Tỷ Lệ Đóng Góp Ảnh Hưởng Tương Đối (Relative Importance %)',
-              font: { size: 12, color: '#1e293b' },
-              standoff: 10,
+          const data = [
+            {
+              type: 'bar',
+              x: rels,
+              y: names,
+              orientation: 'h',
+              marker: { color: '#7c3aed' },
+              text: rels.map((r) => `${r.toFixed(1)}%`),
+              textposition: 'auto',
             },
-            tickfont: { size: 10 },
-            automargin: true,
-          },
-          yaxis: {
-            autorange: 'reversed',
-            tickfont: { size: 11 },
-            automargin: true,
-          },
-          margin: { l: 280, r: 40, t: 65, b: 70, pad: 10 },
-        };
+          ];
 
-        return <PlotlyChart data={data} layout={layout} style={{ height: '360px' }} />;
+          const layout = {
+            title: `Mức Độ Quan Trọng Của Biến Đầu Vào (Independent Variable Importance)`,
+            xaxis: {
+              title: {
+                text: 'Tỷ Lệ Đóng Góp Ảnh Hưởng Tương Đối (Relative Importance %)',
+                font: { size: 12, color: '#1e293b' },
+                standoff: 10,
+              },
+              tickfont: { size: 10 },
+              automargin: true,
+            },
+            yaxis: {
+              autorange: 'reversed',
+              tickfont: { size: 11 },
+              automargin: true,
+            },
+            margin: { l: 280, r: 40, t: 65, b: 70, pad: 10 },
+          };
+
+          return <PlotlyChart data={data} layout={layout} style={{ height: '360px' }} />;
+        }
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {/* Sub-navigation bar for Explainable AI Studio */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '0.5rem',
+                backgroundColor: '#f8fafc',
+                padding: '0.5rem 0.75rem',
+                borderRadius: '0.5rem',
+                border: '1px solid #e2e8f0',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Sparkles size={16} color="#7c3aed" />
+                <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#1e293b' }}>
+                  XAI Studio (Hộp Kính AI Bào Chế):
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => setXaiSubTab('beeswarm')}
+                  className={`btn ${xaiSubTab === 'beeswarm' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{
+                    padding: '0.25rem 0.6rem',
+                    fontSize: '0.74rem',
+                    backgroundColor: xaiSubTab === 'beeswarm' ? '#7c3aed' : '#ffffff',
+                    borderColor: '#7c3aed',
+                    color: xaiSubTab === 'beeswarm' ? '#ffffff' : '#7c3aed',
+                    fontWeight: '600',
+                  }}
+                >
+                  🐝 SHAP Beeswarm (Toàn Cục)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setXaiSubTab('waterfall')}
+                  className={`btn ${xaiSubTab === 'waterfall' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{
+                    padding: '0.25rem 0.6rem',
+                    fontSize: '0.74rem',
+                    backgroundColor: xaiSubTab === 'waterfall' ? '#7c3aed' : '#ffffff',
+                    borderColor: '#7c3aed',
+                    color: xaiSubTab === 'waterfall' ? '#ffffff' : '#7c3aed',
+                    fontWeight: '600',
+                  }}
+                >
+                  💧 SHAP Waterfall (Cục Bộ)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setXaiSubTab('comparison')}
+                  className={`btn ${xaiSubTab === 'comparison' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{
+                    padding: '0.25rem 0.6rem',
+                    fontSize: '0.74rem',
+                    backgroundColor: xaiSubTab === 'comparison' ? '#7c3aed' : '#ffffff',
+                    borderColor: '#7c3aed',
+                    color: xaiSubTab === 'comparison' ? '#ffffff' : '#7c3aed',
+                    fontWeight: '600',
+                  }}
+                >
+                  ⚖️ Đối Chiếu 3 Thuật Toán (Garson - Olden - SHAP)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setXaiSubTab('matrix')}
+                  className={`btn ${xaiSubTab === 'matrix' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{
+                    padding: '0.25rem 0.6rem',
+                    fontSize: '0.74rem',
+                    backgroundColor: xaiSubTab === 'matrix' ? '#7c3aed' : '#ffffff',
+                    borderColor: '#7c3aed',
+                    color: xaiSubTab === 'matrix' ? '#ffffff' : '#7c3aed',
+                    fontWeight: '600',
+                  }}
+                >
+                  🎯 Ma Trận Ảnh Hưởng CPP - CQA
+                </button>
+              </div>
+            </div>
+
+            {/* View 1: SHAP Beeswarm Summary */}
+            {xaiSubTab === 'beeswarm' && (() => {
+              const globalShap = xaiResult.shap.globalImportance;
+              const factorCodes = globalShap.map((g) => g.factorCode);
+              const factorLabels = globalShap.map((g) => {
+                const f = project.factors.find((fac) => fac.code === g.factorCode);
+                return `${g.factorCode}: ${g.factorName}${f?.unit ? ` [${f.unit}]` : ''}`;
+              });
+
+              const xVals: number[] = [];
+              const yVals: string[] = [];
+              const colors: number[] = [];
+              const hoverTexts: string[] = [];
+
+              xaiResult.shap.runExplanations.forEach((run) => {
+                run.values.forEach((v) => {
+                  const labelIndex = factorCodes.indexOf(v.factorCode);
+                  if (labelIndex >= 0) {
+                    xVals.push(v.shapValue);
+                    yVals.push(factorLabels[labelIndex]);
+                    colors.push(v.codedValue);
+                    hoverTexts.push(
+                      `Run #${run.runOrder}<br>Yếu tố: ${v.factorName} (${v.factorCode})<br>Mức mã hóa: ${v.codedValue.toFixed(2)}<br>Giá trị thực: ${v.actualValue}<br>Giá trị SHAP: ${v.shapValue > 0 ? '+' : ''}${v.shapValue.toFixed(4)}`
+                    );
+                  }
+                });
+              });
+
+              const beeswarmData = [
+                {
+                  type: 'scatter',
+                  mode: 'markers',
+                  x: xVals,
+                  y: yVals,
+                  text: hoverTexts,
+                  hoverinfo: 'text',
+                  marker: {
+                    size: 11,
+                    color: colors,
+                    colorscale: [
+                      [0, '#2563eb'],
+                      [0.5, '#94a3b8'],
+                      [1, '#ef4444'],
+                    ],
+                    cmin: -1,
+                    cmax: 1,
+                    colorbar: {
+                      title: { text: 'Mức Yếu Tố<br>(Coded Level)', font: { size: 10 } },
+                      tickvals: [-1, 0, 1],
+                      ticktext: ['-1 (Thấp)', '0 (TB)', '+1 (Cao)'],
+                      len: 0.75,
+                      thickness: 14,
+                    },
+                    opacity: 0.82,
+                    line: { color: '#ffffff', width: 0.8 },
+                  },
+                },
+              ];
+
+              const beeswarmLayout = {
+                title: `SHAP Beeswarm Summary Plot - Tác Động Biên Của Yếu Tố Lên ${currentCQA.name}`,
+                xaxis: {
+                  title: {
+                    text: 'Giá Trị SHAP (Shapley Value φ) — Mức độ làm tăng (+) hoặc giảm (-) đáp ứng dự báo',
+                    font: { size: 11, color: '#1e293b' },
+                    standoff: 10,
+                  },
+                  zeroline: true,
+                  zerolinecolor: '#64748b',
+                  zerolinewidth: 2,
+                  automargin: true,
+                },
+                yaxis: {
+                  autorange: 'reversed',
+                  tickfont: { size: 11 },
+                  automargin: true,
+                },
+                margin: { l: 260, r: 50, t: 55, b: 65, pad: 8 },
+              };
+
+              return (
+                <div>
+                  <PlotlyChart data={beeswarmData} layout={beeswarmLayout} style={{ height: '370px' }} />
+                  <div
+                    style={{
+                      marginTop: '0.5rem',
+                      padding: '0.6rem 0.8rem',
+                      backgroundColor: '#f1f5f9',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.74rem',
+                      color: '#475569',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '0.5rem',
+                    }}
+                  >
+                    <span>
+                      💡 <strong>Hướng dẫn đọc đồ thị Beeswarm:</strong> Mỗi điểm biểu thị một công thức thực nghiệm. Điểm màu đỏ (mức yếu tố cao) nằm bên phải trục số 0 chứng minh yếu tố đó có tương quan thuận (+), làm tăng chỉ tiêu {currentCQA.name}. Điểm đỏ bên trái biểu thị tương quan nghịch (-).
+                    </span>
+                    <span className="badge" style={{ backgroundColor: '#7c3aed', color: '#ffffff' }}>
+                      Phương pháp: {xaiResult.shap.method === 'exact' ? 'Exact SHAP (2^k tập con)' : 'Permutation SHAP'}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* View 2: Local SHAP Waterfall */}
+            {xaiSubTab === 'waterfall' && (() => {
+              const runExps = xaiResult.shap.runExplanations;
+              const currentRunExp = runExps.find((r) => r.runOrder === waterfallRunOrder) || runExps[0];
+              if (!currentRunExp) return <div>Chưa có dữ liệu run</div>;
+
+              const sortedLocalValues = [...currentRunExp.values].sort((a, b) => Math.abs(b.shapValue) - Math.abs(a.shapValue));
+              const labels = ['E[f(X)] Cơ Sở', ...sortedLocalValues.map((v) => `${v.factorCode}: ${v.factorName}`), 'f(x) Dự Báo'];
+              const measures = ['absolute', ...sortedLocalValues.map(() => 'relative'), 'total'];
+              const values = [currentRunExp.baseValue, ...sortedLocalValues.map((v) => v.shapValue), currentRunExp.prediction];
+              const textLabels = [
+                currentRunExp.baseValue.toFixed(2),
+                ...sortedLocalValues.map((v) => `${v.shapValue > 0 ? '+' : ''}${v.shapValue.toFixed(2)}`),
+                currentRunExp.prediction.toFixed(2),
+              ];
+
+              const waterfallData = [
+                {
+                  type: 'waterfall',
+                  orientation: 'v',
+                  measure: measures,
+                  x: labels,
+                  y: values,
+                  text: textLabels,
+                  textposition: 'outside',
+                  connector: { line: { color: '#94a3b8', width: 1.5 } },
+                  decreasing: { marker: { color: '#ef4444' } },
+                  increasing: { marker: { color: '#10b981' } },
+                  totals: { marker: { color: '#7c3aed' } },
+                },
+              ];
+
+              const waterfallLayout = {
+                title: `Đồ Thị Waterfall Phân Rã Đóng Góp — Run #${currentRunExp.runOrder} (${currentCQA.name})`,
+                xaxis: { tickfont: { size: 10 }, automargin: true },
+                yaxis: {
+                  title: { text: `Giá trị đáp ứng ${currentCQA.name}${currentCQA.unit ? ` (${currentCQA.unit})` : ''}`, font: { size: 11 } },
+                  automargin: true,
+                },
+                margin: { l: 70, r: 40, t: 55, b: 85, pad: 8 },
+              };
+
+              return (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#1e293b' }}>Chọn Run Phân Tích:</span>
+                      <select
+                        value={currentRunExp.runOrder}
+                        onChange={(e) => setWaterfallRunOrder(Number(e.target.value))}
+                        className="form-select"
+                        style={{ fontSize: '0.78rem', padding: '0.25rem 0.6rem', borderRadius: '0.375rem', borderColor: '#cbd5e1' }}
+                      >
+                        {runExps.map((r) => (
+                          <option key={r.runOrder} value={r.runOrder}>
+                            Run #{r.runOrder} (Dự báo: {r.prediction.toFixed(2)}{r.actual !== undefined && r.actual !== null ? `, Thực tế: ${r.actual}` : ''})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span className="badge" style={{ backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #86efac', fontSize: '0.72rem' }}>
+                        ✓ Bảo toàn hiệu suất Shapley: Sai số = {currentRunExp.efficiencyError.toExponential(2)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <PlotlyChart data={waterfallData} layout={waterfallLayout} style={{ height: '370px' }} />
+
+                  <div style={{ marginTop: '0.5rem', padding: '0.5rem 0.8rem', backgroundColor: '#f8fafc', borderRadius: '0.375rem', fontSize: '0.74rem', color: '#64748b' }}>
+                    Định lý Lloyd Shapley (1953): Giá trị kỳ vọng nền E[f(X)] = <strong>{currentRunExp.baseValue.toFixed(3)}</strong>. Tổng đóng góp biên của các biến thực nghiệm = <strong>{currentRunExp.sumShap > 0 ? '+' : ''}{currentRunExp.sumShap.toFixed(3)}</strong>, dẫn tới giá trị dự báo cuối cùng f(x) = <strong>{currentRunExp.prediction.toFixed(3)}</strong>.
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* View 3: Multi-Method Comparison (Garson vs Olden vs SHAP) */}
+            {xaiSubTab === 'comparison' && (() => {
+              const comp = xaiResult.comparisonTable;
+              const names = comp.map((c) => {
+                const f = project.factors.find((fac) => fac.code === c.factorCode);
+                return `${c.factorCode}: ${c.factorName}${f?.unit ? ` [${f.unit}]` : ''}`;
+              });
+
+              const garsonX = comp.map((c) => c.garsonImportance);
+              const oldenX = comp.map((c) => c.oldenImportance);
+              const shapX = comp.map((c) => c.shapImportance);
+
+              const comparisonPlotData = [
+                {
+                  type: 'bar',
+                  orientation: 'h',
+                  name: "Garson's Algorithm (%)",
+                  y: names,
+                  x: garsonX,
+                  marker: { color: '#7c3aed' },
+                  text: garsonX.map((v) => `${v.toFixed(1)}%`),
+                  textposition: 'auto',
+                },
+                {
+                  type: 'bar',
+                  orientation: 'h',
+                  name: "Olden's Connection (%)",
+                  y: names,
+                  x: oldenX,
+                  marker: { color: '#2563eb' },
+                  text: oldenX.map((v) => `${v.toFixed(1)}%`),
+                  textposition: 'auto',
+                },
+                {
+                  type: 'bar',
+                  orientation: 'h',
+                  name: 'Exact SHAP Global (%)',
+                  y: names,
+                  x: shapX,
+                  marker: { color: '#f59e0b' },
+                  text: shapX.map((v) => `${v.toFixed(1)}%`),
+                  textposition: 'auto',
+                },
+              ];
+
+              const comparisonPlotLayout = {
+                title: `Đối Chiếu 3 Thuật Toán XAI — Garson vs Olden vs SHAP (${currentCQA.name})`,
+                barmode: 'group',
+                xaxis: {
+                  title: { text: 'Tỷ Lệ Đóng Góp Ảnh Hưởng Tương Đối (%)', font: { size: 11 } },
+                  automargin: true,
+                },
+                yaxis: { autorange: 'reversed', tickfont: { size: 11 }, automargin: true },
+                legend: { orientation: 'h', y: -0.22, yanchor: 'top', x: 0.5, xanchor: 'center' },
+                margin: { l: 260, r: 40, t: 55, b: 70, pad: 8 },
+              };
+
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <PlotlyChart data={comparisonPlotData} layout={comparisonPlotLayout} style={{ height: '360px' }} />
+
+                  <div className="table-container">
+                    <table className="qbd-table">
+                      <thead>
+                        <tr>
+                          <th>Yếu Tố Đầu Vào</th>
+                          <th style={{ textAlign: 'center' }}>Garson (Cấu Trúc)</th>
+                          <th style={{ textAlign: 'center' }}>Olden (Trọng Số & Chiều)</th>
+                          <th style={{ textAlign: 'center' }}>SHAP (Biên & Chiều)</th>
+                          <th style={{ textAlign: 'center' }}>Đồng Thuận (Consensus)</th>
+                          <th style={{ textAlign: 'center' }}>Mức Rủi Ro ICH Q8</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {comp.map((row) => {
+                          const badgeBg =
+                            row.riskCategory === 'High' ? '#fee2e2' : row.riskCategory === 'Medium' ? '#fef9c3' : '#f0fdf4';
+                          const badgeColor =
+                            row.riskCategory === 'High' ? '#b91c1c' : row.riskCategory === 'Medium' ? '#854d0e' : '#15803d';
+
+                          return (
+                            <tr key={row.factorCode}>
+                              <td style={{ fontWeight: '700' }}>
+                                {row.factorCode}: {row.factorName}
+                              </td>
+                              <td style={{ textAlign: 'center' }}>
+                                {row.garsonImportance.toFixed(1)}% <span style={{ color: '#64748b', fontSize: '0.72rem' }}>(#{row.garsonRank})</span>
+                              </td>
+                              <td style={{ textAlign: 'center' }}>
+                                {row.oldenImportance.toFixed(1)}% {row.oldenDirection === 'positive' ? '▲ (+)' : row.oldenDirection === 'negative' ? '▼ (-)' : '—'}{' '}
+                                <span style={{ color: '#64748b', fontSize: '0.72rem' }}>(#{row.oldenRank})</span>
+                              </td>
+                              <td style={{ textAlign: 'center', fontWeight: '700', color: '#7c3aed' }}>
+                                {row.shapImportance.toFixed(1)}% {row.shapDirection === 'positive' ? '▲ (+)' : row.shapDirection === 'negative' ? '▼ (-)' : '—'}{' '}
+                                <span style={{ color: '#64748b', fontSize: '0.72rem' }}>(#{row.shapRank})</span>
+                              </td>
+                              <td style={{ textAlign: 'center', fontWeight: '800' }}>
+                                #{row.consensusRank} ({row.consensusImportance.toFixed(1)}%)
+                              </td>
+                              <td style={{ textAlign: 'center' }}>
+                                <span className="badge" style={{ backgroundColor: badgeBg, color: badgeColor, fontSize: '0.72rem', fontWeight: '700' }}>
+                                  {row.riskCategory === 'High' ? '🔴 Cao (Critical)' : row.riskCategory === 'Medium' ? '🟡 Trung Bình' : '🟢 Thấp'}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* View 4: CQA vs CPP Impact Matrix */}
+            {xaiSubTab === 'matrix' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ fontSize: '0.8rem', color: '#475569' }}>
+                  Ma trận đánh giá tổng hợp mức độ ảnh hưởng của các Thông Số Quy Trình (CPP/KPP) lên tất cả các Chỉ Tiêu Chất Lượng (CQA) theo hướng dẫn ICH Q8(R2):
+                </div>
+
+                <div className="table-container">
+                  <table className="qbd-table">
+                    <thead>
+                      <tr>
+                        <th>Thông Số Quy Trình (Factor)</th>
+                        {project.cqas.map((c) => (
+                          <th key={c.code} style={{ textAlign: 'center' }}>
+                            {c.code}: {c.name}
+                          </th>
+                        ))}
+                        <th style={{ textAlign: 'center' }}>Ảnh Hưởng Lớn Nhất</th>
+                        <th style={{ textAlign: 'center' }}>Phân Loại ICH Q8</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cqaImpactMatrix.map((item) => {
+                        const critBadge =
+                          item.criticality === 'Critical'
+                            ? { text: '🔴 CPP (Critical)', bg: '#fee2e2', color: '#b91c1c' }
+                            : item.criticality === 'Key'
+                            ? { text: '🟡 KPP (Key)', bg: '#fef9c3', color: '#854d0e' }
+                            : { text: '🟢 Non-Critical', bg: '#f0fdf4', color: '#15803d' };
+
+                        return (
+                          <tr key={item.factorCode}>
+                            <td style={{ fontWeight: '700', color: '#1e293b' }}>
+                              {item.factorCode}: {item.factorName}
+                            </td>
+                            {project.cqas.map((c) => {
+                              const imp = item.cqaImpacts[c.code];
+                              if (!imp) return <td key={c.code} style={{ textAlign: 'center', color: '#94a3b8' }}>-</td>;
+                              const dirIcon = imp.direction === 'positive' ? '▲' : imp.direction === 'negative' ? '▼' : '●';
+                              const color = imp.riskCategory === 'High' ? '#b91c1c' : imp.riskCategory === 'Medium' ? '#d97706' : '#15803d';
+
+                              return (
+                                <td key={c.code} style={{ textAlign: 'center', color, fontWeight: imp.riskCategory === 'High' ? '700' : '500' }}>
+                                  {dirIcon} {imp.importance.toFixed(1)}%
+                                </td>
+                              );
+                            })}
+                            <td style={{ textAlign: 'center', fontWeight: '800' }}>
+                              {item.overallMaxImpact.toFixed(1)}%
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <span className="badge" style={{ backgroundColor: critBadge.bg, color: critBadge.color, fontSize: '0.72rem', fontWeight: '700' }}>
+                                {critBadge.text}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        );
       }
     }
   };
@@ -2038,77 +2538,144 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
 
           </div>
 
-          {/* Model Comparison Table: Polynomial ANOVA vs Neural Network (Slide 36) */}
+          {/* Multi-Model Benchmarking Arena (Polynomial RSM vs Neural Network vs SVR vs Ensemble Stacking) */}
           <div className="qbd-card">
-            <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <TrendingUp size={18} color="#1e3a8a" />
-              <span>Bảng So Sánh Hiệu Quả: Hồi Quy Đa Thức ANOVA vs. Mạng Nơ-ron AI (Model Comparison)</span>
-            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <TrendingUp size={18} color="#1e3a8a" />
+                <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
+                  Đấu Trường Đa Mô Hình (Multi-Model Benchmarking Arena) — {currentCQA.name} ({currentCQA.code})
+                </h3>
+              </div>
+              <div style={{ fontSize: '0.74rem', color: '#475569' }}>
+                Tiêu chuẩn tối ưu: <strong>AICc nhỏ nhất & Trọng số Akaike w_i cao nhất (Occam's Razor)</strong>
+              </div>
+            </div>
+
+            {cqaBenchmark?.summaryRecommendation && (
+              <div
+                style={{
+                  padding: '0.65rem 0.9rem',
+                  backgroundColor: '#f8fafc',
+                  borderLeft: '4px solid #7c3aed',
+                  borderRadius: '0.375rem',
+                  marginBottom: '1rem',
+                  fontSize: '0.76rem',
+                  color: '#334155',
+                  lineHeight: '1.45',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: '700', color: '#7c3aed', marginBottom: '0.2rem' }}>
+                  <Sparkles size={15} />
+                  <span>Khuyến Nghị Lựa Chọn Mô Hình Theo Thuyết Thông Tin Akaike & Hướng Dẫn ICH Q8:</span>
+                </div>
+                <div>{cqaBenchmark.summaryRecommendation}</div>
+              </div>
+            )}
 
             <div className="table-container">
               <table className="qbd-table">
                 <thead>
                   <tr>
                     <th>Phương Pháp Mô Hình Hóa</th>
-                    <th>Dạng Kiến Trúc</th>
+                    <th>Kiến Trúc / Tham Số</th>
+                    <th style={{ textAlign: 'center' }}>Tham Số (p) / df</th>
                     <th style={{ textAlign: 'center' }}>R² Train</th>
                     <th style={{ textAlign: 'center' }}>R²adj</th>
-                    <th style={{ textAlign: 'center' }}>Dự báo (Q² OLS / Validation R² ANN)</th>
-                    <th style={{ textAlign: 'center' }}>Sai Số RMSE</th>
+                    <th style={{ textAlign: 'center' }}>Dự Báo (Q² / Val R²)</th>
+                    <th style={{ textAlign: 'center' }}>RMSE</th>
                     <th style={{ textAlign: 'center' }}>AICc</th>
-                    <th>Đánh Giá Chuyên Môn Bào Chế</th>
+                    <th style={{ textAlign: 'center' }}>ΔAICc</th>
+                    <th style={{ textAlign: 'center' }}>Trọng Số Akaike (w_i)</th>
+                    <th style={{ textAlign: 'center' }}>Rủi Ro Overfit</th>
+                    <th style={{ textAlign: 'center' }}>Khuyến Nghị ICH Q8</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {/* ANOVA */}
-                  <tr style={{ backgroundColor: anovaModel && neuralModel && anovaModel.diagnostics.rSquared >= neuralModel.diagnostics.rSquaredOverall ? '#f0fdf4' : '#ffffff' }}>
-                    <td style={{ fontWeight: '700', color: '#1e3a8a' }}>1. Hồi Quy Đa Thức OLS (Classical ANOVA)</td>
-                    <td>Đa thức Bậc 2 (Quadratic RSM / 2FI)</td>
-                    <td style={{ textAlign: 'center', fontWeight: '700' }}>
-                      {anovaModel ? anovaModel.diagnostics.rSquared.toFixed(4) : '-'}
-                    </td>
-                    <td style={{ textAlign: 'center' }}>
-                      {anovaModel ? anovaModel.diagnostics.adjRSquared.toFixed(4) : '-'}
-                    </td>
-                    <td style={{ textAlign: 'center', fontWeight: '700', color: (anovaModel?.diagnostics.qSquared ?? anovaModel?.diagnostics.predRSquared ?? 0) > 0.7 ? '#15803d' : '#475569' }}>
-                      {anovaModel ? (anovaModel.diagnostics.qSquared ?? anovaModel.diagnostics.predRSquared).toFixed(4) : '-'}
-                    </td>
-                    <td style={{ textAlign: 'center' }}>
-                      {anovaModel ? anovaModel.diagnostics.stdDev.toFixed(3) : '-'}
-                    </td>
-                    <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
-                      {anovaModel?.diagnostics.aicc !== undefined ? anovaModel.diagnostics.aicc.toFixed(1) : '-'}
-                    </td>
-                    <td style={{ fontSize: '0.78rem' }}>
-                      Mô hình tường minh, hỗ trợ diễn giải hiệu ứng chính và tương tác trong quy trình phát triển tham chiếu ICH Q8.
-                    </td>
-                  </tr>
+                  {cqaBenchmark && cqaBenchmark.candidates.length > 0 ? (
+                    cqaBenchmark.candidates.map((cand) => {
+                      const isRec = cand.isRecommended;
+                      const rowBg = isRec
+                        ? '#f5f3ff'
+                        : cand.family === 'polynomial'
+                        ? '#f8fafc'
+                        : '#ffffff';
 
-                  {/* Neural Net */}
-                  <tr style={{ backgroundColor: neuralModel && (!anovaModel || neuralModel.diagnostics.rSquaredOverall > anovaModel.diagnostics.rSquared) ? '#faf5ff' : '#ffffff' }}>
-                    <td style={{ fontWeight: '700', color: '#7c3aed' }}>2. Mạng Nơ-ron AI (Neural Network MLP)</td>
-                    <td>
-                      MLP [{localConfig.hiddenNodes1}{localConfig.hiddenNodes2 > 0 ? `, ${localConfig.hiddenNodes2}` : ''}] ({localConfig.activation.toUpperCase()})
-                    </td>
-                    <td style={{ textAlign: 'center', fontWeight: '700', color: '#7c3aed' }}>
-                      {neuralModel.diagnostics.rSquaredTrain.toFixed(4)}
-                    </td>
-                    <td style={{ textAlign: 'center' }}>
-                      {neuralModel.diagnostics.adjRSquared?.toFixed(4) ?? neuralModel.diagnostics.rSquaredOverall.toFixed(4)}
-                    </td>
-                    <td style={{ textAlign: 'center', fontWeight: '700', color: neuralModel.diagnostics.rSquaredVal > 0.7 ? '#15803d' : '#7c3aed' }}>
-                      {neuralModel.diagnostics.rSquaredVal.toFixed(4)}
-                    </td>
-                    <td style={{ textAlign: 'center', fontWeight: '700' }}>
-                      {neuralModel.diagnostics.rmseOverall.toFixed(3)}
-                    </td>
-                    <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
-                      {neuralModel.diagnostics.aicc !== undefined ? neuralModel.diagnostics.aicc.toFixed(1) : '-'}
-                    </td>
-                    <td style={{ fontSize: '0.78rem' }}>
-                      Khả năng xấp xỉ phi tuyến tính vượt trội, nắm bắt tốt các tương tác phức tạp và hiện tượng bão hòa/cực trị.
-                    </td>
-                  </tr>
+                      const suitBadge =
+                        cand.ichQ8Suitability === 'Recommended'
+                          ? { text: '⭐ Khuyến Nghị', bg: '#dcfce7', color: '#15803d' }
+                          : cand.ichQ8Suitability === 'Acceptable'
+                          ? { text: '✓ Chấp Nhận', bg: '#e0f2fe', color: '#0369a1' }
+                          : cand.ichQ8Suitability === 'Caution'
+                          ? { text: '⚠️ Thận Trọng', bg: '#fef9c3', color: '#854d0e' }
+                          : { text: '✕ Không Đạt', bg: '#fee2e2', color: '#b91c1c' };
+
+                      const overfitBadge =
+                        cand.overfittingRisk === 'Low'
+                          ? { text: 'Thấp', color: '#15803d' }
+                          : cand.overfittingRisk === 'Moderate'
+                          ? { text: 'Trung Bình', color: '#d97706' }
+                          : { text: 'Cao', color: '#dc2626' };
+
+                      return (
+                        <tr
+                          key={cand.modelId}
+                          style={{
+                            backgroundColor: rowBg,
+                            fontWeight: isRec ? '600' : 'normal',
+                          }}
+                        >
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              {isRec && <CheckCircle2 size={15} color="#7c3aed" />}
+                              <strong style={{ color: isRec ? '#7c3aed' : '#1e293b' }}>{cand.name}</strong>
+                            </div>
+                          </td>
+                          <td style={{ fontSize: '0.75rem', color: '#475569' }}>
+                            {cand.architectureDescription}
+                          </td>
+                          <td style={{ textAlign: 'center', fontSize: '0.75rem', color: '#64748b' }}>
+                            p = {cand.parameterCount} (df = {cand.degreesOfFreedom})
+                          </td>
+                          <td style={{ textAlign: 'center', fontWeight: '700' }}>
+                            {cand.rSquared.toFixed(4)}
+                          </td>
+                          <td style={{ textAlign: 'center', fontWeight: isRec ? '700' : 'normal', color: isRec ? '#7c3aed' : 'inherit' }}>
+                            {cand.adjRSquared.toFixed(4)}
+                          </td>
+                          <td style={{ textAlign: 'center', fontWeight: '700', color: (cand.qSquared ?? 0) > 0.7 ? '#15803d' : '#64748b' }}>
+                            {cand.qSquared !== undefined ? cand.qSquared.toFixed(4) : '-'}
+                          </td>
+                          <td style={{ textAlign: 'center', fontWeight: '700' }}>
+                            {cand.rmse.toFixed(3)}
+                          </td>
+                          <td style={{ textAlign: 'center', fontFamily: 'monospace', fontWeight: '700' }}>
+                            {Number.isFinite(cand.aicc) ? cand.aicc.toFixed(1) : '∞'}
+                          </td>
+                          <td style={{ textAlign: 'center', fontFamily: 'monospace', color: cand.deltaAICc === 0 ? '#15803d' : '#64748b', fontWeight: cand.deltaAICc === 0 ? '700' : 'normal' }}>
+                            {cand.deltaAICc === 0 ? '0.0 (Best)' : `+${cand.deltaAICc.toFixed(1)}`}
+                          </td>
+                          <td style={{ textAlign: 'center', fontWeight: '800', color: cand.akaikeWeight > 0.5 ? '#15803d' : '#475569' }}>
+                            {(cand.akaikeWeight * 100).toFixed(1)}%
+                          </td>
+                          <td style={{ textAlign: 'center', fontSize: '0.75rem', color: overfitBadge.color, fontWeight: '600' }}>
+                            {overfitBadge.text}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <span className="badge" style={{ backgroundColor: suitBadge.bg, color: suitBadge.color, fontSize: '0.72rem', fontWeight: '700' }}>
+                              {suitBadge.text}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={12} style={{ textAlign: 'center', padding: '1rem', color: '#64748b' }}>
+                        Đang nạp dữ liệu so sánh mô hình...
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -2257,7 +2824,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                   className={`btn ${activeDiagPlot === 'varImp' ? 'btn-teal' : 'btn-secondary'}`}
                   style={{ padding: '0.3rem 0.65rem', fontSize: '0.78rem', border: 'none' }}
                 >
-                  Độ Quan Trọng (Variable Importance)
+                  Độ Quan Trọng & XAI (Explainable AI)
                 </button>
               </div>
             </div>

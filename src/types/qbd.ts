@@ -113,6 +113,7 @@ export type DoEDesignType =
   | 'FractionalFactorial'
   | 'PlackettBurman'
   | 'Taguchi'
+  | 'DefinitiveScreening'
   | 'BoxBehnken'
   | 'CCD_Full'
   | 'CCD_FaceCentered'
@@ -390,6 +391,49 @@ export interface AliasStructureResult {
   twoFactorAliases: AliasChainItem[];
   allTerms: string[];
   aliasChains: Record<string, string[]>;
+}
+
+export interface DSDGenerationResult {
+  matrix: number[][]; // Coded runs [-1, 0, +1]
+  standardRuns: number; // 2k runs (or 2(k+1) trimmed)
+  centerRuns: number;   // n0 center runs
+  totalRuns: number;
+  factorsCount: number;
+}
+
+export interface DoEExperimentalDesign {
+  runs: DoERun[];
+  designType: DoEDesignType;
+  factorsCount: number;
+  standardRuns: number;
+  centerRuns: number;
+  totalRuns: number;
+  codedMatrix?: number[][];
+  alpha?: number;
+}
+
+export interface GeneticOptimizerOptions {
+  populationSize?: number;
+  maxGenerations?: number;
+  tournamentSize?: number;
+  crossoverRate?: number;
+  mutationRate?: number;
+  crossoverDistributionIndex?: number;
+  mutationDistributionIndex?: number;
+  convergenceTolerance?: number;
+  polishWithNelderMead?: boolean;
+  nelderMeadMaxIterations?: number;
+  seed?: number;
+}
+
+export interface PiepelBoundsResult {
+  isFeasible: boolean;
+  effectiveLow: number[];
+  effectiveHigh: number[];
+  inconsistentIndices: number[];
+  unreachableLowerIndices: number[];
+  unreachableUpperIndices: number[];
+  messages: string[];
 }
 
 export * from './neuralNetwork';

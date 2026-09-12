@@ -13,6 +13,8 @@ import type {
   UpdatedRiskItem,
   ControlStrategyItem,
   QBDProject,
+  GeneticOptimizerOptions,
+  PiepelBoundsResult,
 } from '../types/qbd';
 import {
   matMul,
@@ -26,6 +28,8 @@ import {
   calculateIndividualDesirability,
   calculateInformationCriteria,
   sampleDistribution,
+  latinHypercubeSample,
+  nelderMeadSimplex,
 } from './mathUtils';
 import { buildModelTerms, getModelBlockCounts, type ModelTermDefinition } from './modelTerms';
 import { createSeededRandom } from './random';
@@ -939,12 +943,97 @@ export function getFeasibleMixtureComponentRange(
   };
 }
 
+/**
+ * Calculate Piepel (1983) effective bounds and test feasibility / consistency
+ * of a polyhedral mixture bounded simplex.
+ */
+export function validatePiepelBounds(
+  low: number[],
+  high: number[],
+  total: number = 1.0
+): PiepelBoundsResult {
+  const q = low.length;
+  const messages: string[] = [];
+  const unreachableLowerIndices: number[] = [];
+  const unreachableUpperIndices: number[] = [];
+  const inconsistentIndices: number[] = [];
+
+  const sumL = low.reduce((a, b) => a + b, 0);
+  const sumU = high.reduce((a, b) => a + b, 0);
+
+  if (sumL > total + 1e-8) {
+    messages.push(`Tổng cận dưới (${(sumL * (total === 100 ? 1 : 100)).toFixed(1)}%) vượt quá tổng tỉ lệ ${(total * (total === 100 ? 1 : 100)).toFixed(1)}%.`);
+    return {
+      isFeasible: false,
+      effectiveLow: [...low],
+      effectiveHigh: [...high],
+      inconsistentIndices: [],
+      unreachableLowerIndices,
+      unreachableUpperIndices,
+      messages,
+    };
+  }
+  if (sumU < total - 1e-8) {
+    messages.push(`Tổng cận trên (${(sumU * (total === 100 ? 1 : 100)).toFixed(1)}%) nhỏ hơn tổng tỉ lệ ${(total * (total === 100 ? 1 : 100)).toFixed(1)}%.`);
+    return {
+      isFeasible: false,
+      effectiveLow: [...low],
+      effectiveHigh: [...high],
+      inconsistentIndices: [],
+      unreachableLowerIndices,
+      unreachableUpperIndices,
+      messages,
+    };
+  }
+
+  const effectiveLow = new Array(q).fill(0);
+  const effectiveHigh = new Array(q).fill(0);
+
+  for (let i = 0; i < q; i++) {
+    const otherHighSum = sumU - high[i];
+    const otherLowSum = sumL - low[i];
+    const impliedLow = Math.max(low[i], total - otherHighSum);
+    const impliedHigh = Math.min(high[i], total - otherLowSum);
+
+    effectiveLow[i] = Number(impliedLow.toFixed(8));
+    effectiveHigh[i] = Number(impliedHigh.toFixed(8));
+
+    if (effectiveLow[i] > low[i] + 1e-6) {
+      unreachableLowerIndices.push(i);
+    }
+    if (effectiveHigh[i] < high[i] - 1e-6) {
+      unreachableUpperIndices.push(i);
+    }
+    if (effectiveLow[i] > effectiveHigh[i] + 1e-8) {
+      inconsistentIndices.push(i);
+      messages.push(`Thành phần ${i + 1}: Cận dưới hiệu dụng (${effectiveLow[i]}) lớn hơn cận trên hiệu dụng (${effectiveHigh[i]}).`);
+    }
+  }
+
+  const isFeasible = inconsistentIndices.length === 0;
+  return {
+    isFeasible,
+    effectiveLow,
+    effectiveHigh,
+    inconsistentIndices,
+    unreachableLowerIndices,
+    unreachableUpperIndices,
+    messages,
+  };
+}
+
 export function isFeasibleBoundedMixture(l: number[], u: number[], total: number = 1): boolean {
   if (l.length === 0 || l.length !== u.length || !Number.isFinite(total)) return false;
   if (l.some((value, index) => !Number.isFinite(value) || !Number.isFinite(u[index]) || value > u[index])) return false;
   const sumL = l.reduce((sum, value) => sum + value, 0);
   const sumU = u.reduce((sum, value) => sum + value, 0);
-  return sumL <= total + 1e-10 && sumU >= total - 1e-10;
+  if (sumL > total + 1e-10 || sumU < total - 1e-10) return false;
+  for (let i = 0; i < l.length; i++) {
+    const effL = Math.max(l[i], total - (sumU - u[i]));
+    const effU = Math.min(u[i], total - (sumL - l[i]));
+    if (effL > effU + 1e-10) return false;
+  }
+  return true;
 }
 
 /**
@@ -983,25 +1072,27 @@ export function isWithinSurveyBounds(
 }
 
 /**
- * Multi-Response Desirability Optimization (Derringer & Suich)
- * Finds the global optimum factor combination strictly within the survey region [L_i, U_i]
+ * Continuous Metaheuristic Multi-Response Desirability Optimization (Derringer & Suich 1980)
+ * Uses Hybrid Real-Coded Genetic Algorithm (RCGA) with SBX crossover, adaptive polynomial mutation,
+ * Latin Hypercube initialization, and Nelder-Mead simplex local search polishing.
  */
-export function optimizeDesirability(
+export function optimizeDesirabilityGA(
   factors: Factor[],
   cqas: CQA[],
   models: Record<string, StatisticalModelResult | NeuralNetModelResult>,
   lockedFactors?: Record<string, number>,
-  seed: number = 20260827,
+  options?: GeneticOptimizerOptions
 ): DesirabilitySolution | null {
   const validCQAs = cqas.filter((cqa) => models[cqa.code]);
   if (validCQAs.length === 0) return null;
 
   const totalWeight = validCQAs.reduce((sum, c) => sum + (c.weight || 1), 0);
+  const seed = options?.seed ?? 20260827;
   const random = createSeededRandom(seed);
   const k = factors.length;
 
   const evaluateOverallDesirability = (coded: Record<string, number>): { dOverall: number; dMap: Record<string, number> } => {
-    // 1. Strict Survey Boundary Check: Reject any point outside the experimental bounding box
+    // Strict Survey Boundary Check: Reject any point outside experimental bounding box
     if (!isWithinSurveyBounds(coded, factors)) {
       return { dOverall: 0, dMap: {} };
     }
@@ -1048,135 +1139,307 @@ export function optimizeDesirability(
       } else mixLowProps[index] = mixHighProps[index] = fixed;
     }
   });
+
   if (hasMixture && !isFeasibleBoundedMixture(mixLowProps, mixHighProps)) return null;
+
+  // Feasibility repair operator R(x)
+  const repairCandidate = (raw: Record<string, number>): Record<string, number> => {
+    const repaired: Record<string, number> = {};
+
+    factors.forEach((f) => {
+      if (f.controllability === 'uncontrollable_noise') {
+        repaired[f.code] = 0;
+      } else if (f.controllability === 'constant') {
+        repaired[f.code] = actualToCoded(f.constantValue ?? f.low, f);
+      } else if (lockedFactors && lockedFactors[f.code] !== undefined) {
+        repaired[f.code] = isDiscreteFactor(f) ? snapFactorCoded(lockedFactors[f.code], f) : lockedFactors[f.code];
+      } else if (isDiscreteFactor(f)) {
+        const val = raw[f.code] ?? 0;
+        repaired[f.code] = snapFactorCoded(val, f);
+      } else if (f.role !== 'mixture_component' && f.type !== 'Mixture') {
+        const val = raw[f.code] ?? 0;
+        repaired[f.code] = Math.max(-1.0, Math.min(1.0, val));
+      } else {
+        repaired[f.code] = raw[f.code] ?? 0;
+      }
+    });
+
+    if (hasMixture) {
+      const rawMix = mixFactors.map((f) => repaired[f.code] ?? (mixLowProps[0] + mixHighProps[0]) / 2);
+      const proj = projectToBoundedMixture(rawMix, mixLowProps, mixHighProps, 1.0);
+      mixFactors.forEach((f, i) => {
+        repaired[f.code] = proj[i];
+      });
+    } else if (mixFactors.length === 1) {
+      repaired[mixFactors[0].code] = 1.0;
+    }
+
+    return repaired;
+  };
 
   let bestD = -1;
   let bestCoded: Record<string, number> = {};
   let bestDMap: Record<string, number> = {};
 
-  // 1. Seed candidate with Feasible Polytope Centroid
-  const initialCandidate: Record<string, number> = {};
-  factors
-    .filter((f) => f.controllability === 'uncontrollable_noise')
-    .forEach((f) => { initialCandidate[f.code] = 0; });
+  // GA Hyperparameters
+  const popSize = Math.max(20, options?.populationSize ?? 80);
+  const maxGenerations = Math.max(10, options?.maxGenerations ?? 60);
+  const tourSize = options?.tournamentSize ?? 3;
+  const pCrossover = options?.crossoverRate ?? 0.90;
+  const pMutation = options?.mutationRate ?? (1.0 / Math.max(1, k));
+  const etaC = options?.crossoverDistributionIndex ?? 2;
+  const etaM = options?.mutationDistributionIndex ?? 20;
+
+  // 1. Strategic Seeding + Latin Hypercube Sampling
+  const population: Record<string, number>[] = [];
+
+  // Seed 0: Centroid / Center point
+  const seedCenter: Record<string, number> = {};
   procFactors.forEach((f) => {
-    const requested = lockedFactors && lockedFactors[f.code] !== undefined ? lockedFactors[f.code] : 0.0;
-    initialCandidate[f.code] = isDiscreteFactor(f) ? snapFactorCoded(requested, f) : requested;
+    seedCenter[f.code] = lockedFactors?.[f.code] ?? 0.0;
+  });
+  if (hasMixture) {
+    const rawMid = mixFactors.map((f, i) => lockedFactors?.[f.code] ?? (mixLowProps[i] + mixHighProps[i]) / 2);
+    const projMid = projectToBoundedMixture(rawMid, mixLowProps, mixHighProps, 1.0);
+    mixFactors.forEach((f, i) => { seedCenter[f.code] = projMid[i]; });
+  }
+  population.push(repairCandidate(seedCenter));
+
+  // Seed 1..2p: Axial points for continuous process factors
+  procFactors.filter((f) => !isDiscreteFactor(f)).forEach((f) => {
+    const axialPos = { ...seedCenter, [f.code]: 1.0 };
+    const axialNeg = { ...seedCenter, [f.code]: -1.0 };
+    population.push(repairCandidate(axialPos));
+    population.push(repairCandidate(axialNeg));
   });
 
-  if (hasMixture) {
-    const rawMid = mixFactors.map((f, i) => (lockedFactors && lockedFactors[f.code] !== undefined ? lockedFactors[f.code] : (mixLowProps[i] + mixHighProps[i]) / 2));
-    const projMid = projectToBoundedMixture(rawMid, mixLowProps, mixHighProps, 1.0);
-    mixFactors.forEach((f, i) => {
-      initialCandidate[f.code] = projMid[i];
+  // Seed for discrete factor combinations
+  const discreteFactors = procFactors.filter(isDiscreteFactor);
+  if (discreteFactors.length > 0 && discreteFactors.length <= 3) {
+    discreteFactors.forEach((df) => {
+      const codes = getConfiguredFactorCodes(df);
+      codes.forEach((code) => {
+        population.push(repairCandidate({ ...seedCenter, [df.code]: code }));
+      });
     });
-  } else if (mixFactors.length === 1) {
-    initialCandidate[mixFactors[0].code] = 1.0;
   }
 
-  const { dOverall: initD, dMap: initDMap } = evaluateOverallDesirability(initialCandidate);
-  if (initD > bestD) {
-    bestD = initD;
-    bestCoded = { ...initialCandidate };
-    bestDMap = { ...initDMap };
+  // Remaining slots filled with Latin Hypercube Sampling
+  const remainingSlots = Math.max(0, popSize - population.length);
+  if (remainingSlots > 0) {
+    const lhs = latinHypercubeSample(remainingSlots, factors.length, random);
+    for (let r = 0; r < remainingSlots; r++) {
+      const candidate: Record<string, number> = {};
+      factors.forEach((f, idx) => {
+        const u = lhs[r][idx]; // in [0, 1]
+        if (f.role === 'mixture_component' || f.type === 'Mixture') {
+          const mIdx = mixFactors.indexOf(f);
+          const low = mIdx >= 0 ? mixLowProps[mIdx] : 0;
+          const high = mIdx >= 0 ? mixHighProps[mIdx] : 1;
+          candidate[f.code] = low + u * (high - low);
+        } else if (isDiscreteFactor(f)) {
+          const codes = getConfiguredFactorCodes(f);
+          const cIdx = Math.min(codes.length - 1, Math.floor(u * codes.length));
+          candidate[f.code] = codes[cIdx];
+        } else {
+          candidate[f.code] = -1.0 + 2.0 * u;
+        }
+      });
+      population.push(repairCandidate(candidate));
+    }
   }
 
-  // 2. High-Density Grid Exploration inside the Survey Bounds [L_i, U_i]
-  const gridSteps = k <= 3 ? 18 : (k <= 4 ? 12 : 7);
-  const maxGridEvaluations = 100_000;
-  let gridEvaluations = 0;
+  // 2. Real-Coded Genetic Algorithm (RCGA) Main Loop
+  interface Individual {
+    genes: Record<string, number>;
+    fitness: number;
+    dMap: Record<string, number>;
+  }
 
-  const exploreGrid = (factorIdx: number, currentCoded: Record<string, number>) => {
-    if (gridEvaluations >= maxGridEvaluations) return;
-    if (factorIdx >= k) {
-      gridEvaluations++;
-      let evalCoded = { ...currentCoded };
-      if (hasMixture) {
-        const rawVals = mixFactors.map((f) => evalCoded[f.code] ?? 0);
-        const projVals = projectToBoundedMixture(rawVals, mixLowProps, mixHighProps, 1.0);
-        mixFactors.forEach((f, i) => {
-          evalCoded[f.code] = projVals[i];
-        });
-      }
-      const { dOverall, dMap } = evaluateOverallDesirability(evalCoded);
-      if (dOverall > bestD) {
-        bestD = dOverall;
-        bestCoded = { ...evalCoded };
-        bestDMap = { ...dMap };
-      }
-      return;
-    }
-
-    const factor = factors[factorIdx];
-    if (lockedFactors && lockedFactors[factor.code] !== undefined) {
-      currentCoded[factor.code] = lockedFactors[factor.code];
-      exploreGrid(factorIdx + 1, currentCoded);
-    } else if (factor.controllability !== 'controllable') {
-      currentCoded[factor.code] = 0;
-      exploreGrid(factorIdx + 1, currentCoded);
-    } else {
-      const isMix = factor.role === 'mixture_component' || factor.type === 'Mixture';
-      if (isDiscreteFactor(factor)) {
-        for (const val of getConfiguredFactorCodes(factor)) {
-          if (gridEvaluations >= maxGridEvaluations) break;
-          currentCoded[factor.code] = val;
-          exploreGrid(factorIdx + 1, currentCoded);
-        }
-        return;
-      }
-      const lowVal = isMix ? (factor.high <= 1.0 && factor.unit !== '%' ? factor.low : factor.low / 100) : -1.0;
-      const highVal = isMix ? (factor.high <= 1.0 && factor.unit !== '%' ? factor.high : factor.high / 100) : 1.0;
-
-      for (let step = 0; step < gridSteps; step++) {
-        if (gridEvaluations >= maxGridEvaluations) break;
-        const val = lowVal + (step / (gridSteps - 1)) * (highVal - lowVal);
-        currentCoded[factor.code] = Number(val.toFixed(4));
-        exploreGrid(factorIdx + 1, currentCoded);
-      }
-    }
-  };
-
-  exploreGrid(0, {});
-
-  // 3. Multi-Start Local Fine-Tuning strictly inside Bounded Simplex
-  const numStarts = 400;
-  for (let iter = 0; iter < numStarts; iter++) {
-    const candidateCoded: Record<string, number> = { ...initialCandidate };
-    procFactors.forEach((f) => {
-      if (lockedFactors && lockedFactors[f.code] !== undefined) {
-        candidateCoded[f.code] = isDiscreteFactor(f) ? snapFactorCoded(lockedFactors[f.code], f) : lockedFactors[f.code];
-      } else if (isDiscreteFactor(f)) {
-        const codes = getConfiguredFactorCodes(f);
-        candidateCoded[f.code] = codes[Math.min(codes.length - 1, Math.floor(random() * codes.length))] ?? 0;
-      } else {
-        const current = bestCoded[f.code] ?? 0;
-        const jitter = (random() - 0.5) * 0.25;
-        candidateCoded[f.code] = Math.max(-1.0, Math.min(1.0, Number((current + jitter).toFixed(4))));
-      }
-    });
-
-    if (hasMixture) {
-      const rawJittered = mixFactors.map((f, i) => {
-        if (lockedFactors && lockedFactors[f.code] !== undefined) {
-          return lockedFactors[f.code];
-        }
-        const current = bestCoded[f.code] ?? (mixLowProps[i] + mixHighProps[i]) / 2;
-        const range = mixHighProps[i] - mixLowProps[i];
-        const jitter = (random() - 0.5) * range * 0.4;
-        return current + jitter;
-      });
-
-      const proj = projectToBoundedMixture(rawJittered, mixLowProps, mixHighProps, 1.0);
-      mixFactors.forEach((f, i) => {
-        candidateCoded[f.code] = proj[i];
-      });
-    }
-
-    const { dOverall, dMap } = evaluateOverallDesirability(candidateCoded);
+  let currentPop: Individual[] = population.map((genes) => {
+    const { dOverall, dMap } = evaluateOverallDesirability(genes);
     if (dOverall > bestD) {
       bestD = dOverall;
-      bestCoded = { ...candidateCoded };
+      bestCoded = { ...genes };
       bestDMap = { ...dMap };
+    }
+    return { genes, fitness: dOverall, dMap };
+  });
+
+  let stagnationCount = 0;
+  let prevBestFitness = bestD;
+
+  for (let gen = 0; gen < maxGenerations; gen++) {
+    // Sort descending by fitness
+    currentPop.sort((a, b) => b.fitness - a.fitness);
+
+    if (currentPop[0].fitness > bestD) {
+      bestD = currentPop[0].fitness;
+      bestCoded = { ...currentPop[0].genes };
+      bestDMap = { ...currentPop[0].dMap };
+    }
+
+    // Stagnation early stopping check
+    if (Math.abs(currentPop[0].fitness - prevBestFitness) < 1e-7) {
+      stagnationCount++;
+      if (stagnationCount >= 15) break;
+    } else {
+      stagnationCount = 0;
+      prevBestFitness = currentPop[0].fitness;
+    }
+
+    // Elitism: Preserve top 4 individuals
+    const nextPop: Individual[] = currentPop.slice(0, Math.min(4, currentPop.length)).map((ind) => ({
+      genes: { ...ind.genes },
+      fitness: ind.fitness,
+      dMap: { ...ind.dMap },
+    }));
+
+    // Tournament selection helper
+    const selectParent = (): Individual => {
+      let bestInd = currentPop[Math.floor(random() * currentPop.length)];
+      for (let t = 1; t < tourSize; t++) {
+        const candidate = currentPop[Math.floor(random() * currentPop.length)];
+        if (candidate.fitness > bestInd.fitness) {
+          bestInd = candidate;
+        }
+      }
+      return bestInd;
+    };
+
+    while (nextPop.length < popSize) {
+      const p1 = selectParent();
+      const p2 = selectParent();
+
+      let c1Genes: Record<string, number> = { ...p1.genes };
+      let c2Genes: Record<string, number> = { ...p2.genes };
+
+      // Simulated Binary Crossover (SBX)
+      if (random() < pCrossover) {
+        factors.forEach((f) => {
+          if (lockedFactors && lockedFactors[f.code] !== undefined) return;
+          if (f.controllability !== 'controllable') return;
+
+          if (isDiscreteFactor(f)) {
+            // Uniform discrete crossover
+            if (random() < 0.5) {
+              const temp = c1Genes[f.code];
+              c1Genes[f.code] = c2Genes[f.code];
+              c2Genes[f.code] = temp;
+            }
+          } else {
+            // SBX on continuous genes
+            const v1 = p1.genes[f.code] ?? 0;
+            const v2 = p2.genes[f.code] ?? 0;
+            const u = random();
+            let betaQ: number;
+            if (u <= 0.5) {
+              betaQ = Math.pow(2.0 * u, 1.0 / (etaC + 1.0));
+            } else {
+              betaQ = Math.pow(1.0 / (2.0 * (1.0 - u)), 1.0 / (etaC + 1.0));
+            }
+            c1Genes[f.code] = 0.5 * ((1.0 + betaQ) * v1 + (1.0 - betaQ) * v2);
+            c2Genes[f.code] = 0.5 * ((1.0 - betaQ) * v1 + (1.0 + betaQ) * v2);
+          }
+        });
+      }
+
+      // Polynomial Mutation
+      [c1Genes, c2Genes].forEach((child) => {
+        factors.forEach((f) => {
+          if (lockedFactors && lockedFactors[f.code] !== undefined) return;
+          if (f.controllability !== 'controllable') return;
+
+          if (random() < pMutation) {
+            if (isDiscreteFactor(f)) {
+              const codes = getConfiguredFactorCodes(f);
+              child[f.code] = codes[Math.floor(random() * codes.length)];
+            } else if (f.role === 'mixture_component' || f.type === 'Mixture') {
+              const mIdx = mixFactors.indexOf(f);
+              const low = mIdx >= 0 ? mixLowProps[mIdx] : 0;
+              const high = mIdx >= 0 ? mixHighProps[mIdx] : 1;
+              const range = Math.max(1e-4, high - low);
+              const r = random();
+              const deltaQ = r < 0.5
+                ? Math.pow(2.0 * r, 1.0 / (etaM + 1.0)) - 1.0
+                : 1.0 - Math.pow(2.0 * (1.0 - r), 1.0 / (etaM + 1.0));
+              child[f.code] += deltaQ * range;
+            } else {
+              const r = random();
+              const deltaQ = r < 0.5
+                ? Math.pow(2.0 * r, 1.0 / (etaM + 1.0)) - 1.0
+                : 1.0 - Math.pow(2.0 * (1.0 - r), 1.0 / (etaM + 1.0));
+              child[f.code] += deltaQ * 2.0; // range [-1, 1] is 2.0
+            }
+          }
+        });
+      });
+
+      // Feasibility repair and evaluate
+      const rep1 = repairCandidate(c1Genes);
+      const eval1 = evaluateOverallDesirability(rep1);
+      nextPop.push({ genes: rep1, fitness: eval1.dOverall, dMap: eval1.dMap });
+
+      if (nextPop.length < popSize) {
+        const rep2 = repairCandidate(c2Genes);
+        const eval2 = evaluateOverallDesirability(rep2);
+        nextPop.push({ genes: rep2, fitness: eval2.dOverall, dMap: eval2.dMap });
+      }
+    }
+
+    currentPop = nextPop;
+  }
+
+  // 3. Local Search Polishing via Nelder-Mead Simplex
+  if (options?.polishWithNelderMead !== false) {
+    const contFactors = factors.filter(
+      (f) => f.controllability === 'controllable' &&
+        (lockedFactors === undefined || lockedFactors[f.code] === undefined) &&
+        !isDiscreteFactor(f)
+    );
+
+    if (contFactors.length > 0) {
+      const nmObj = (pt: number[]): number => {
+        const candidate: Record<string, number> = { ...bestCoded };
+        contFactors.forEach((f, i) => {
+          candidate[f.code] = pt[i];
+        });
+        const repaired = repairCandidate(candidate);
+        const { dOverall } = evaluateOverallDesirability(repaired);
+        return -dOverall; // Nelder-Mead minimizes
+      };
+
+      const nmRepair = (pt: number[]): number[] => {
+        const candidate: Record<string, number> = { ...bestCoded };
+        contFactors.forEach((f, i) => {
+          candidate[f.code] = pt[i];
+        });
+        const repaired = repairCandidate(candidate);
+        return contFactors.map((f) => repaired[f.code]);
+      };
+
+      const initialVector = contFactors.map((f) => bestCoded[f.code] ?? 0.0);
+      const nmResult = nelderMeadSimplex(nmObj, initialVector, {
+        maxIterations: options?.nelderMeadMaxIterations ?? 80,
+        tolerance: 1e-6,
+        stepSize: 0.05,
+        repair: nmRepair,
+      });
+
+      const polishedD = -nmResult.value;
+      if (polishedD > bestD) {
+        const polishedCoded: Record<string, number> = { ...bestCoded };
+        contFactors.forEach((f, i) => {
+          polishedCoded[f.code] = nmResult.point[i];
+        });
+        const finalRep = repairCandidate(polishedCoded);
+        const finalEval = evaluateOverallDesirability(finalRep);
+        if (finalEval.dOverall > bestD) {
+          bestD = finalEval.dOverall;
+          bestCoded = { ...finalRep };
+          bestDMap = { ...finalEval.dMap };
+        }
+      }
     }
   }
 
@@ -1208,14 +1471,12 @@ export function optimizeDesirability(
     const val = model.predict(bestCoded);
     const statisticalModel = 'predictStandardError' in model ? model : undefined;
     const se = statisticalModel?.predictStandardError?.(bestCoded)
-      ?? (model.diagnostics as any).stdDev
-      ?? (model.diagnostics as any).rmseVal
-      ?? (model.diagnostics as any).rmseOverall
+      ?? (model as any).diagnostics?.stdDev
+      ?? (model as any).diagnostics?.rmseVal
+      ?? (model as any).diagnostics?.rmseOverall
       ?? 0;
     const df = statisticalModel?.residualDegreesOfFreedom;
     const critical = df && df > 0 ? tDistributionCritical(0.05, df) : Number.NaN;
-    // Neural-network residual RMSE is not a parameter-estimation CI.  Preserve
-    // the field for UI compatibility but do not label its interval as a CI.
     const ciHalfWidth = Number.isFinite(critical) && statisticalModel?.predictStandardError ? critical * se : Number.NaN;
     predictedResponses[cqa.code] = {
       value: Number(val.toFixed(3)),
@@ -1232,6 +1493,21 @@ export function optimizeDesirability(
     predictedResponses,
     overallDesirability: Number(Math.max(0, bestD).toFixed(4)),
   };
+}
+
+/**
+ * Multi-Response Desirability Optimization (Derringer & Suich)
+ * Delegates to continuous metaheuristic optimization (Real-Coded GA + Nelder-Mead).
+ */
+export function optimizeDesirability(
+  factors: Factor[],
+  cqas: CQA[],
+  models: Record<string, StatisticalModelResult | NeuralNetModelResult>,
+  lockedFactors?: Record<string, number>,
+  seed: number = 20260827,
+  options?: GeneticOptimizerOptions
+): DesirabilitySolution | null {
+  return optimizeDesirabilityGA(factors, cqas, models, lockedFactors, { ...options, seed: options?.seed ?? seed });
 }
 
 /**

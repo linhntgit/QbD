@@ -1,4 +1,5 @@
 // Numerical and statistical mathematical utilities for QbD DoE
+import type { Factor } from '../types/qbd';
 
 /**
  * Matrix multiplication A (m x p) * B (p x n) -> (m x n)
@@ -978,4 +979,240 @@ export function sampleDistribution(
       return mean + drawStandardNormal() * sd;
     }
   }
+}
+
+/**
+ * Generate Latin Hypercube Sample of size n in dimensions d, scaled to [0, 1]^d.
+ */
+export function latinHypercubeSample(
+  n: number,
+  dimensions: number,
+  rng: () => number = Math.random
+): number[][] {
+  if (n <= 0 || dimensions <= 0) return [];
+  const samples: number[][] = Array.from({ length: n }, () => new Array(dimensions).fill(0));
+
+  for (let d = 0; d < dimensions; d++) {
+    // Generate n stratified points in [0, 1]
+    const column: number[] = [];
+    for (let i = 0; i < n; i++) {
+      column.push((i + rng()) / n);
+    }
+    // Fisher-Yates shuffle
+    for (let i = n - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      const temp = column[i];
+      column[i] = column[j];
+      column[j] = temp;
+    }
+    for (let i = 0; i < n; i++) {
+      samples[i][d] = column[i];
+    }
+  }
+
+  return samples;
+}
+
+export interface NelderMeadOptions {
+  maxIterations?: number;
+  tolerance?: number;
+  stepSize?: number;
+  repair?: (point: number[]) => number[];
+}
+
+export interface NelderMeadResult {
+  point: number[];
+  value: number;
+  iterations: number;
+}
+
+/**
+ * Multidimensional unconstrained / bound-repaired direct search optimization
+ * via Nelder-Mead simplex algorithm (Nelder & Mead 1965).
+ */
+export function nelderMeadSimplex(
+  objective: (point: number[]) => number,
+  initialPoint: number[],
+  options?: NelderMeadOptions
+): NelderMeadResult {
+  const d = initialPoint.length;
+  if (d === 0) {
+    return { point: [], value: objective([]), iterations: 0 };
+  }
+
+  const repair = options?.repair ?? ((p: number[]) => [...p]);
+  const maxIterations = options?.maxIterations ?? 100;
+  const tolerance = options?.tolerance ?? 1e-6;
+  const stepSize = options?.stepSize ?? 0.05;
+
+  const alpha = 1.0; // reflection
+  const gamma = 2.0; // expansion
+  const rho = 0.5;   // contraction
+  const sigma = 0.5; // shrink
+
+  interface Vertex {
+    p: number[];
+    f: number;
+  }
+
+  const simplex: Vertex[] = [];
+  const v0_p = repair([...initialPoint]);
+  simplex.push({ p: v0_p, f: objective(v0_p) });
+
+  for (let i = 0; i < d; i++) {
+    const p = [...v0_p];
+    const delta = Math.abs(p[i]) > 1e-4 ? stepSize * Math.abs(p[i]) : stepSize;
+    p[i] += delta;
+    const repaired = repair(p);
+    simplex.push({ p: repaired, f: objective(repaired) });
+  }
+
+  let iterations = 0;
+
+  while (iterations < maxIterations) {
+    iterations++;
+
+    // Sort ascending by objective value (minimization)
+    simplex.sort((a, b) => a.f - b.f);
+
+    // Compute standard deviation of function values
+    const meanF = simplex.reduce((sum, v) => sum + v.f, 0) / (d + 1);
+    const varianceF = simplex.reduce((sum, v) => sum + Math.pow(v.f - meanF, 2), 0) / (d + 1);
+    if (Math.sqrt(varianceF) < tolerance) {
+      break;
+    }
+
+    // Centroid of best d points (excluding worst vertex d)
+    const centroid: number[] = new Array(d).fill(0);
+    for (let i = 0; i < d; i++) {
+      for (let j = 0; j < d; j++) {
+        centroid[j] += simplex[i].p[j];
+      }
+    }
+    for (let j = 0; j < d; j++) {
+      centroid[j] /= d;
+    }
+    const c = repair(centroid);
+
+    const worst = simplex[d];
+    const best = simplex[0];
+    const secondWorst = simplex[d - 1];
+
+    // Reflection: x_r = c + alpha * (c - worst)
+    const xr_p = repair(c.map((val, j) => val + alpha * (val - worst.p[j])));
+    const xr_f = objective(xr_p);
+
+    if (xr_f < secondWorst.f && xr_f >= best.f) {
+      // Accept reflection
+      simplex[d] = { p: xr_p, f: xr_f };
+    } else if (xr_f < best.f) {
+      // Expansion: x_e = c + gamma * (xr - c)
+      const xe_p = repair(c.map((val, j) => val + gamma * (xr_p[j] - val)));
+      const xe_f = objective(xe_p);
+      if (xe_f < xr_f) {
+        simplex[d] = { p: xe_p, f: xe_f };
+      } else {
+        simplex[d] = { p: xr_p, f: xr_f };
+      }
+    } else {
+      // Contraction: xr_f >= secondWorst.f
+      if (xr_f < worst.f) {
+        // Outside contraction
+        const xc_p = repair(c.map((val, j) => val + rho * (xr_p[j] - val)));
+        const xc_f = objective(xc_p);
+        if (xc_f <= xr_f) {
+          simplex[d] = { p: xc_p, f: xc_f };
+        } else {
+          // Shrink towards best
+          for (let i = 1; i <= d; i++) {
+            const sh_p = repair(best.p.map((val, j) => val + sigma * (simplex[i].p[j] - val)));
+            simplex[i] = { p: sh_p, f: objective(sh_p) };
+          }
+        }
+      } else {
+        // Inside contraction
+        const xc_p = repair(c.map((val, j) => val - rho * (val - worst.p[j])));
+        const xc_f = objective(xc_p);
+        if (xc_f < worst.f) {
+          simplex[d] = { p: xc_p, f: xc_f };
+        } else {
+          // Shrink towards best
+          for (let i = 1; i <= d; i++) {
+            const sh_p = repair(best.p.map((val, j) => val + sigma * (simplex[i].p[j] - val)));
+            simplex[i] = { p: sh_p, f: objective(sh_p) };
+          }
+        }
+      }
+    }
+  }
+
+  simplex.sort((a, b) => a.f - b.f);
+  return {
+    point: simplex[0].p,
+    value: simplex[0].f,
+    iterations,
+  };
+}
+
+/**
+ * Calculate Piepel (1983) effective bounds for mixture components
+ * and test consistency of the bounded mixture simplex.
+ */
+export function calculateEffectiveMixtureBounds(components: Factor[]): {
+  isConsistent: boolean;
+  effectiveBounds: { min: number; max: number }[];
+  reason?: string;
+} {
+  const q = components.length;
+  if (q === 0) return { isConsistent: true, effectiveBounds: [] };
+
+  const isPercentage = !components.every((f) => f.high <= 1.0 && f.unit !== '%');
+  const total = isPercentage ? 100 : 1.0;
+
+  const L = components.map((f) => (isPercentage && f.high <= 1.0 && f.unit !== '%' ? f.low * 100 : f.low));
+  const U = components.map((f) => (isPercentage && f.high <= 1.0 && f.unit !== '%' ? f.high * 100 : f.high));
+
+  const sumL = L.reduce((a, b) => a + b, 0);
+  const sumU = U.reduce((a, b) => a + b, 0);
+
+  if (sumL > total + 1e-6) {
+    return {
+      isConsistent: false,
+      effectiveBounds: L.map((min, i) => ({ min, max: U[i] })),
+      reason: `Tổng cận dưới (${sumL.toFixed(2)}) vượt quá tổng tỉ lệ (${total}).`,
+    };
+  }
+  if (sumU < total - 1e-6) {
+    return {
+      isConsistent: false,
+      effectiveBounds: L.map((min, i) => ({ min, max: U[i] })),
+      reason: `Tổng cận trên (${sumU.toFixed(2)}) nhỏ hơn tổng tỉ lệ (${total}).`,
+    };
+  }
+
+  const effectiveBounds: { min: number; max: number }[] = [];
+  for (let i = 0; i < q; i++) {
+    const otherHigh = sumU - U[i];
+    const otherLow = sumL - L[i];
+    const effL = Math.max(L[i], total - otherHigh);
+    const effU = Math.min(U[i], total - otherLow);
+
+    if (effL > effU + 1e-6) {
+      return {
+        isConsistent: false,
+        effectiveBounds: L.map((min, idx) => ({ min, max: U[idx] })),
+        reason: `Thành phần ${components[i].name || components[i].code}: Cận dưới hiệu dụng (${effL.toFixed(2)}) lớn hơn cận trên hiệu dụng (${effU.toFixed(2)}).`,
+      };
+    }
+
+    effectiveBounds.push({
+      min: Number(effL.toFixed(4)),
+      max: Number(effU.toFixed(4)),
+    });
+  }
+
+  return {
+    isConsistent: true,
+    effectiveBounds,
+  };
 }

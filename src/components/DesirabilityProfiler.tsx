@@ -736,6 +736,22 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                 >
                   Derringer-Suich Multi-Response
                 </span>
+                <span
+                  style={{
+                    fontSize: '0.7rem',
+                    padding: '0.15rem 0.5rem',
+                    borderRadius: '1rem',
+                    backgroundColor: '#10b981',
+                    color: '#ffffff',
+                    fontWeight: '600',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.25rem',
+                  }}
+                  title="Thuật toán Di truyền mã hóa thực (RCGA) kết hợp Nelder-Mead Simplex local search hội tụ liên tục"
+                >
+                  ⚡ RCGA + Nelder-Mead (Tol 10⁻⁵)
+                </span>
               </div>
               <p style={{ fontSize: '0.8rem', color: '#bfdbfe', margin: '0.25rem 0 0 0' }}>
                 Khảo sát tương tác độ nhạy, khóa thông số quy trình và tối đa hóa đồng thời tất cả các chỉ tiêu chất lượng.

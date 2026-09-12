@@ -15,6 +15,8 @@ import {
   Activity,
   FileSpreadsheet,
   CheckCircle2,
+  ShieldCheck,
+  FileText,
 } from 'lucide-react';
 import type {
   QBDProject,
@@ -26,12 +28,19 @@ import type {
 } from '../../types/qbd';
 import type { NeuralTrainingMode } from '../../types/neuralNetwork';
 import { exportQBDWordReport } from '../../services/reportGenerator';
+import { downloadRegulatoryPDFA } from '../../services/pdfReportGenerator';
 import { calculateDesignEfficiency } from '../../services/doeGenerator';
 import { generateUpdatedRiskAssessment, generateControlStrategy } from '../../services/statistics';
 import { calculateNeuralArchitectureMetrics } from '../../services/neuralNetwork';
 import { NeuralNetworkTopologyDiagram } from '../NeuralNetworkTopologyDiagram';
 import { ProjectGovernancePanel } from '../ProjectGovernancePanel';
-import { getReportReadiness, getTraceabilitySummary } from '../../services/projectGovernance';
+import {
+  getReportReadiness,
+  getTraceabilitySummary,
+  getProjectHistory,
+  verifyAuditTrailIntegrity,
+  computeProjectPayloadHash,
+} from '../../services/projectGovernance';
 
 interface ReportTabProps {
   project: QBDProject;
@@ -161,6 +170,33 @@ export const ReportTab: React.FC<ReportTabProps> = ({
     setActiveSection('sec-metadata');
   };
 
+  const [isExportingPdf, setIsExportingPdf] = useState<boolean>(false);
+
+  const auditHistory = useMemo(() => getProjectHistory(project.id), [project]);
+  const auditVerification = useMemo(() => verifyAuditTrailIntegrity(auditHistory, project), [auditHistory, project]);
+  const rootChecksum = useMemo(() => auditVerification.rootHash || computeProjectPayloadHash(project), [auditVerification, project]);
+
+  const handleDownloadPDFA = async () => {
+    if (!reportReadiness.readyForScientificReport) {
+      window.alert(`Chưa thể xuất báo cáo pháp lý PDF/A.\n${[...reportReadiness.errors, ...reportReadiness.warnings].slice(0, 8).join('\n')}`);
+      return;
+    }
+    setIsExportingPdf(true);
+    try {
+      await downloadRegulatoryPDFA(project, {
+        models,
+        optimum,
+        monteCarlo,
+        neuralModels,
+        modelingEngine,
+      });
+    } catch (err) {
+      window.alert(`Lỗi khi xuất PDF/A: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
   const handleDownloadWord = () => {
     if (!reportReadiness.readyForScientificReport) {
       window.alert(`Chưa thể xuất bản thảo báo cáo phát triển.\n${[...reportReadiness.errors, ...reportReadiness.warnings].slice(0, 8).join('\n')}`);
@@ -230,6 +266,25 @@ export const ReportTab: React.FC<ReportTabProps> = ({
           </button>
 
           <button
+            onClick={handleDownloadPDFA}
+            disabled={!reportReadiness.readyForScientificReport || isExportingPdf}
+            className={`btn ${reportReadiness.readyForScientificReport ? 'btn-primary' : 'btn-secondary'}`}
+            style={{
+              fontSize: '0.82rem',
+              padding: '0.4rem 1rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              backgroundColor: reportReadiness.readyForScientificReport ? '#1e3a8a' : undefined,
+              color: '#ffffff',
+            }}
+            title="Xuất tệp PDF/A-1b lưu trữ pháp lý (ISO 19005) có nhúng mã băm kiểm toán SHA-256"
+          >
+            <FileText size={16} />
+            <span>{isExportingPdf ? 'Đang tạo PDF/A...' : 'Xuất PDF/A Pháp Lý (ISO 19005)'}</span>
+          </button>
+
+          <button
             onClick={handleDownloadWord}
             className={`btn ${reportReadiness.readyForScientificReport ? 'btn-teal' : 'btn-secondary'}`}
             disabled={!reportReadiness.readyForScientificReport}
@@ -239,6 +294,64 @@ export const ReportTab: React.FC<ReportTabProps> = ({
             <Download size={16} />
             <span>Tải Bản Thảo Word (.docx)</span>
           </button>
+        </div>
+      </div>
+
+      {/* 21 CFR Part 11 Tamper-Evident SHA-256 Checksum Display Banner */}
+      <div
+        className="qbd-card no-print"
+        style={{
+          padding: '0.65rem 1rem',
+          backgroundColor: auditVerification.isValid ? '#f0fdf4' : '#fef2f2',
+          border: `1px solid ${auditVerification.isValid ? '#bbf7d0' : '#fecaca'}`,
+          borderRadius: '0.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.75rem',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+          <ShieldCheck size={18} color={auditVerification.isValid ? '#16a34a' : '#dc2626'} />
+          <span style={{ fontSize: '0.82rem', fontWeight: '700', color: auditVerification.isValid ? '#166534' : '#991b1b' }}>
+            {auditVerification.isValid
+              ? 'Mã Băm Kiểm Toán Mật Mã Học (21 CFR Part 11 Tamper-Evident Root Checksum):'
+              : 'Cảnh Báo Toàn Vẹn Kiểm Toán (Audit Trail Integrity Alert):'}
+          </span>
+          <code
+            className="font-mono"
+            style={{
+              fontSize: '0.78rem',
+              backgroundColor: '#ffffff',
+              padding: '0.2rem 0.55rem',
+              borderRadius: '0.25rem',
+              border: '1px solid #cbd5e1',
+              color: '#0f172a',
+              fontWeight: '600',
+              letterSpacing: '0.5px',
+            }}
+          >
+            {rootChecksum}
+          </code>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span
+            style={{
+              fontSize: '0.74rem',
+              fontWeight: '700',
+              padding: '0.2rem 0.55rem',
+              borderRadius: '1rem',
+              backgroundColor: auditVerification.isValid ? '#dcfce7' : '#fee2e2',
+              color: auditVerification.isValid ? '#15803d' : '#b91c1c',
+              border: `1px solid ${auditVerification.isValid ? '#86efac' : '#fca5a5'}`,
+            }}
+          >
+            {auditVerification.isValid ? '✓ Chuỗi Hash Bất Biến Hợp Lệ' : '⚠ Dữ Liệu Bị Can Thiệp'}
+          </span>
+          <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+            ({auditHistory.length} bản ghi phiên bản)
+          </span>
         </div>
       </div>
 

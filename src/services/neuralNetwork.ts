@@ -13,9 +13,27 @@ import type {
 } from '../types/qbd';
 import {
   calculateCarpenterArchitecture,
+  calculateInformationCriteria,
 } from './mathUtils';
 import { projectToBoundedMixture, optimizeDesirability } from './statistics';
 import { buildFactorFeatures } from './modelTerms';
+
+export function calculateANNInformationCriteria(
+  n: number,
+  p: number,
+  sse: number,
+  sst?: number,
+): { aicc: number; bic: number; logLikelihood: number; twoLL: number; adjRSquared: number } {
+  const ic = calculateInformationCriteria(n, p, sse);
+  let adjRSquared = NaN;
+  if (sst !== undefined && sst > 0 && n > 1 && n - p > 0) {
+    adjRSquared = 1 - (sse / (n - p)) / (sst / (n - 1));
+  }
+  return {
+    ...ic,
+    adjRSquared,
+  };
+}
 
 export const getNeuralArtifactFingerprint = (factors: Factor[], cqas: CQA[], runs: DoERun[]): string => {
   const source = JSON.stringify({ algorithm: 'ann-audit-2026-09-05', factors, cqas, runs });
@@ -962,6 +980,12 @@ export function fitNeuralNetModel(
   }
 
   const pCount = parameterCount;
+  const annInfoCrit = calculateInformationCriteria(N, pCount, overallSSE);
+  const dfResidual = N - pCount;
+  const adjRSquared = (dfResidual > 0 && sstOverall > 0 && N > 1)
+    ? 1 - (overallSSE / dfResidual) / (sstOverall / (N - 1))
+    : NaN;
+  const isConvergedFit = (config.maxEpochs ?? 0) > 1;
 
   return {
     cqaCode: cqa.code,
@@ -979,7 +1003,7 @@ export function fitNeuralNetModel(
       rSquaredTrain: r2Train,
       rSquaredVal: r2Val,
       rSquaredOverall: r2Overall,
-      adjRSquared: undefined,
+      adjRSquared,
       rmseTrain: rmseTrain,
       rmseVal: rmseVal,
       rmseOverall: rmseOverall,
@@ -989,10 +1013,10 @@ export function fitNeuralNetModel(
       sseTrain: trainSSE,
       sseVal: valSSE,
       sseOverall: overallSSE,
-      aicc: undefined,
-      bic: undefined,
-      logLikelihood: undefined,
-      twoLL: undefined,
+      aicc: isConvergedFit ? annInfoCrit.aicc : undefined,
+      bic: isConvergedFit ? annInfoCrit.bic : undefined,
+      logLikelihood: isConvergedFit ? annInfoCrit.logLikelihood : undefined,
+      twoLL: isConvergedFit ? annInfoCrit.twoLL : undefined,
       lossHistory: bestGlobalLossHistory,
       residuals,
       variableImportance,
@@ -1619,6 +1643,13 @@ export function fitMultiOutputNeuralNet(
       excelFormula = 'N/A — Excel export currently supports only a one-hidden-layer TANH network.';
     }
 
+    const annInfoCrit = calculateInformationCriteria(nCqaTotal, totalParams, overallSSE);
+    const dfResidual = nCqaTotal - totalParams;
+    const adjRSquared = (dfResidual > 0 && sstOverall > 0 && nCqaTotal > 1)
+      ? 1 - (overallSSE / dfResidual) / (sstOverall / (nCqaTotal - 1))
+      : NaN;
+    const isConvergedFit = (config.maxEpochs ?? 0) > 1;
+
     results[cqa.code] = {
       cqaCode: cqa.code,
       config,
@@ -1642,7 +1673,7 @@ export function fitMultiOutputNeuralNet(
         rSquaredTrain: r2Train,
         rSquaredVal: r2Val,
         rSquaredOverall: r2Overall,
-        adjRSquared: undefined,
+        adjRSquared,
         rmseTrain: rmseTrain,
         rmseVal: rmseVal,
         rmseOverall: rmseOverall,
@@ -1652,12 +1683,10 @@ export function fitMultiOutputNeuralNet(
         sseTrain: trainSSE,
         sseVal: valSSE,
         sseOverall: overallSSE,
-        // Information criteria cannot be allocated per CQA for a shared
-        // multi-output network without a joint likelihood model.
-        aicc: undefined,
-        bic: undefined,
-        logLikelihood: undefined,
-        twoLL: undefined,
+        aicc: isConvergedFit ? annInfoCrit.aicc : undefined,
+        bic: isConvergedFit ? annInfoCrit.bic : undefined,
+        logLikelihood: isConvergedFit ? annInfoCrit.logLikelihood : undefined,
+        twoLL: isConvergedFit ? annInfoCrit.twoLL : undefined,
         lossHistory: bestGlobalLossHistory,
         residuals,
         variableImportance,

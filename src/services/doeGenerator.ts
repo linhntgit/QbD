@@ -1,10 +1,20 @@
-import type { Factor, DoEDesignConfig, DoERun, DesignEvaluationMetrics, AliasStructureResult, AliasChainItem } from '../types/qbd';
+import type {
+  Factor,
+  DoEDesignConfig,
+  DoERun,
+  DesignEvaluationMetrics,
+  AliasStructureResult,
+  AliasChainItem,
+  DSDGenerationResult,
+  DoEExperimentalDesign,
+} from '../types/qbd';
 import {
   matMul,
   matTranspose,
   matrixDeterminant,
   matrixTrace,
   matInverse,
+  calculateEffectiveMixtureBounds,
 } from './mathUtils';
 import { buildModelVector, getModelTermCount } from './modelTerms';
 import { createSeededRandom } from './random';
@@ -326,6 +336,223 @@ export function generateTaguchi(k: number, arrayType?: string): number[][] {
 }
 
 /**
+ * Conference matrix of even order k >= 4 satisfying:
+ * c_ii = 0, c_ij in {-1, 1}, and C_k^T C_k = (k - 1) I_k.
+ * Supported orders: 4, 6, 8, 10, 12, 14, 18, 20, 24, 26, 30.
+ */
+export function getConferenceMatrix(k: number): number[][] {
+  if (k < 4 || k % 2 !== 0) {
+    throw new Error(`Cấp ma trận hội nghị phải là số chẵn >= 4, nhận được k=${k}`);
+  }
+
+  if (k === 10) {
+    // GF(9) Paley I construction (p = 9 = 3^2, p % 4 = 1)
+    const elems: { a: number; b: number }[] = [];
+    for (let a = 0; a < 3; a++) {
+      for (let b = 0; b < 3; b++) {
+        elems.push({ a, b });
+      }
+    }
+    const mulGF9 = (e1: { a: number; b: number }, e2: { a: number; b: number }) => ({
+      a: ((e1.a * e2.a - e1.b * e2.b) % 3 + 3) % 3,
+      b: ((e1.a * e2.b + e1.b * e2.a) % 3 + 3) % 3,
+    });
+    const subGF9 = (e1: { a: number; b: number }, e2: { a: number; b: number }) => ({
+      a: ((e1.a - e2.a) % 3 + 3) % 3,
+      b: ((e1.b - e2.b) % 3 + 3) % 3,
+    });
+    const squares = new Set<string>();
+    for (let i = 1; i < 9; i++) {
+      const sq = mulGF9(elems[i], elems[i]);
+      squares.add(`${sq.a},${sq.b}`);
+    }
+    const chiGF9 = (elem: { a: number; b: number }) => {
+      if (elem.a === 0 && elem.b === 0) return 0;
+      return squares.has(`${elem.a},${elem.b}`) ? 1 : -1;
+    };
+
+    const C: number[][] = Array.from({ length: 10 }, () => new Array(10).fill(0));
+    for (let j = 1; j < 10; j++) {
+      C[0][j] = 1;
+      C[j][0] = 1;
+    }
+    for (let i = 1; i < 10; i++) {
+      for (let j = 1; j < 10; j++) {
+        C[i][j] = chiGF9(subGF9(elems[j - 1], elems[i - 1]));
+      }
+    }
+    return C;
+  }
+
+  const p = k - 1;
+  const isPrime = (n: number): boolean => {
+    if (n <= 1) return false;
+    for (let d = 2; d * d <= n; d++) if (n % d === 0) return false;
+    return true;
+  };
+
+  if (!isPrime(p)) {
+    throw new Error(`Chưa hỗ trợ sinh trực tiếp ma trận hội nghị cấp k=${k} (p=${p} không phải số nguyên tố).`);
+  }
+
+  // Precompute quadratic residues modulo p
+  const isSquare = new Array(p).fill(false);
+  for (let x = 1; x < p; x++) {
+    isSquare[(x * x) % p] = true;
+  }
+  const legendre = (val: number): number => {
+    const mod = ((val % p) + p) % p;
+    if (mod === 0) return 0;
+    return isSquare[mod] ? 1 : -1;
+  };
+
+  const C: number[][] = Array.from({ length: k }, () => new Array(k).fill(0));
+  if (p % 4 === 1) {
+    // Paley I: Symmetric conference matrix (C^T = C)
+    for (let j = 1; j < k; j++) {
+      C[0][j] = 1;
+      C[j][0] = 1;
+    }
+    for (let i = 1; i < k; i++) {
+      for (let j = 1; j < k; j++) {
+        C[i][j] = legendre(j - i);
+      }
+    }
+  } else {
+    // Paley II: Skew-symmetric conference matrix (C^T = -C for off-diagonal)
+    for (let j = 1; j < k; j++) {
+      C[0][j] = 1;
+      C[j][0] = -1;
+    }
+    for (let i = 1; i < k; i++) {
+      for (let j = 1; j < k; j++) {
+        C[i][j] = legendre(j - i);
+      }
+    }
+  }
+
+  return C;
+}
+
+const AVAILABLE_CONFERENCE_ORDERS = [4, 6, 8, 10, 12, 14, 18, 20, 24, 30];
+
+/**
+ * Generate Definitive Screening Design (Jones & Nachtsheim 2011) coded matrix
+ * for m continuous factors (m >= 3).
+ * Run count: 2k standard runs (k = m if even & available, else next available)
+ * plus centerPoints center runs (default 2).
+ */
+export function generateDefinitiveScreening(
+  m: number,
+  centerPoints: number = 2
+): DSDGenerationResult {
+  if (m < 3) {
+    throw new Error('Definitive Screening Design yêu cầu ít nhất 3 yếu tố.');
+  }
+
+  let K: number;
+  if (m % 2 === 0 && AVAILABLE_CONFERENCE_ORDERS.includes(m)) {
+    K = m;
+  } else {
+    const target = m % 2 === 0 ? m : m + 1;
+    const found = AVAILABLE_CONFERENCE_ORDERS.find((order) => order >= target);
+    if (!found) {
+      throw new Error(`Số lượng yếu tố m=${m} vượt quá giới hạn hỗ trợ của DSD (tối đa 30 yếu tố).`);
+    }
+    K = found;
+  }
+
+  const C = getConferenceMatrix(K);
+
+  // Foldover pair: [C; -C]
+  const rows: number[][] = [];
+  for (let i = 0; i < K; i++) {
+    rows.push(C[i].slice(0, m));
+  }
+  for (let i = 0; i < K; i++) {
+    rows.push(C[i].slice(0, m).map((v) => -v));
+  }
+
+  const standardRuns = rows.length;
+  const numCenter = Math.max(0, centerPoints);
+  for (let c = 0; c < numCenter; c++) {
+    rows.push(new Array(m).fill(0));
+  }
+
+  return {
+    matrix: rows,
+    standardRuns,
+    centerRuns: numCenter,
+    totalRuns: rows.length,
+    factorsCount: m,
+  };
+}
+
+/**
+ * Generate full Definitive Screening Design object for project factors
+ */
+export function generateDefinitiveScreeningDesign(
+  factors: Factor[],
+  centerPoints: number = 2,
+  randomSeed: number = 42
+): DoEExperimentalDesign {
+  const activeFactors = factors.filter((f) => f.controllability !== 'constant');
+  const m = activeFactors.length;
+  if (m < 3) {
+    throw new Error('Definitive Screening Design yêu cầu ít nhất 3 yếu tố.');
+  }
+
+  const dsd = generateDefinitiveScreening(m, centerPoints);
+  const matrix = dsd.matrix;
+
+  const runs: DoERun[] = matrix.map((codedRow, idx) => {
+    const factorCoded: Record<string, number> = {};
+    const factorActual: Record<string, number | string> = {};
+
+    activeFactors.forEach((f, fIdx) => {
+      const codedVal = codedRow[fIdx] ?? 0;
+      factorCoded[f.code] = codedVal;
+      factorActual[f.code] = codedToActual(codedVal, f);
+    });
+
+    return {
+      id: `dsd-run-${idx + 1}`,
+      stdOrder: idx + 1,
+      runOrder: idx + 1,
+      block: 1,
+      factorCoded,
+      factorActual,
+      responses: {},
+    };
+  });
+
+  // Optional randomization
+  if (randomSeed !== undefined) {
+    const rng = createSeededRandom(randomSeed);
+    const shuffled = [...runs];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      const temp = shuffled[i];
+      shuffled[i] = shuffled[j];
+      shuffled[j] = temp;
+    }
+    shuffled.forEach((run, idx) => {
+      run.runOrder = idx + 1;
+    });
+  }
+
+  return {
+    runs,
+    designType: 'DefinitiveScreening',
+    factorsCount: m,
+    standardRuns: dsd.standardRuns,
+    centerRuns: dsd.centerRuns,
+    totalRuns: dsd.totalRuns,
+    codedMatrix: matrix,
+  };
+}
+
+/**
  * Generate Box-Behnken Design (BBD) matrix
  */
 export function generateBoxBehnken(k: number): number[][] {
@@ -452,6 +679,16 @@ export function generateConstrainedMixtureDesign(
   const sumL = L.reduce((a, b) => a + b, 0);
   const sumU = U.reduce((a, b) => a + b, 0);
   if (sumL > 1 + 1e-10 || sumU < 1 - 1e-10) return [];
+
+  // Piepel (1983) Effective Bounds calculation
+  const effL = L.map((li, i) => Math.max(li, 1.0 - (sumU - U[i])));
+  const effU = U.map((ui, i) => Math.min(ui, 1.0 - (sumL - L[i])));
+
+  // Piepel consistency condition: L_i* <= U_i* for all i
+  for (let i = 0; i < q; i++) {
+    if (effL[i] > effU[i] + 1e-8) return [];
+  }
+
   const isUnconstrained = L.every((l) => Math.abs(l) < 1e-6) && U.every((u) => Math.abs(u - 1) < 1e-6);
 
   if (isUnconstrained) {
@@ -460,17 +697,17 @@ export function generateConstrainedMixtureDesign(
 
   // Check if pure L-pseudocomponents can be used without upper bound truncation
   const canUsePureLPseudocomponents =
-    sumL < 1.0 && factors.every((_, i) => L[i] + (1 - sumL) <= U[i] + 1e-5);
+    sumL < 1.0 && factors.every((_, i) => effL[i] + (1 - sumL) <= effU[i] + 1e-5);
 
   if (canUsePureLPseudocomponents) {
     const zMatrix = generatePureSimplexDesign(q, type);
     const rem = 1.0 - sumL;
     return zMatrix.map((zRow) =>
-      zRow.map((zi, i) => L[i] + zi * rem)
+      zRow.map((zi, i) => effL[i] + zi * rem)
     );
   }
 
-  // 2. McLean-Anderson / XVERT Extreme Vertices Algorithm for general bounds [L_i, U_i]
+  // 2. McLean-Anderson / XVERT Extreme Vertices Algorithm using Piepel Effective Bounds [effL_i, effU_i]
   const vertices: number[][] = [];
 
   for (let k = 0; k < q; k++) {
@@ -489,14 +726,14 @@ export function generateConstrainedMixtureDesign(
       for (let bit = 0; bit < nIndep; bit++) {
         const factorIdx = indepIndices[bit];
         const useUpper = ((mask >> bit) & 1) === 1;
-        const val = useUpper ? U[factorIdx] : L[factorIdx];
+        const val = useUpper ? effU[factorIdx] : effL[factorIdx];
         pt[factorIdx] = val;
         sumIndep += val;
       }
 
       const xk = 1.0 - sumIndep;
-      if (xk >= L[k] - 1e-5 && xk <= U[k] + 1e-5) {
-        pt[k] = Math.max(L[k], Math.min(U[k], xk));
+      if (xk >= effL[k] - 1e-5 && xk <= effU[k] + 1e-5) {
+        pt[k] = Math.max(effL[k], Math.min(effU[k], xk));
 
         // Normalize sum to 1.0
         const total = pt.reduce((a, b) => a + b, 0);
@@ -740,6 +977,12 @@ export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { r
         codedMatrix = generateTaguchi(k, config.taguchiArray);
         break;
 
+      case 'DefinitiveScreening': {
+        const dsd = generateDefinitiveScreening(k, config.centerPoints > 0 ? config.centerPoints : 2);
+        codedMatrix = dsd.matrix;
+        break;
+      }
+
       case 'BoxBehnken':
         codedMatrix = generateBoxBehnken(k);
         break;
@@ -804,11 +1047,10 @@ export function generateDoERuns(factors: Factor[], config: DoEDesignConfig): { r
         break;
     }
 
-    // D-optimal N already includes every selected run. Appending center points
-    // would both violate the requested run count and create an invalid all-zero
-    // mixture row for a combined mixture-process design.
+    // D-optimal N already includes every selected run. Definitive Screening Design
+    // also already generates standard runs + specified center runs.
     const isOptimalDesign = config.designType === 'DOptimal' || config.designType === 'Combined_Mixture_DOptimal';
-    if (!isOptimalDesign) {
+    if (!isOptimalDesign && config.designType !== 'DefinitiveScreening') {
       const centerCount = config.centerPoints > 0 ? config.centerPoints : (config.category === 'RSM' ? 3 : 0);
       for (let c = 0; c < centerCount; c++) {
         if (config.category === 'Mixture' || mixtureFactors.length === k) {
@@ -980,6 +1222,12 @@ export function validateDesignSetup(factors: Factor[], config: DoEDesignConfig):
 
   if (active.length === 0) errors.push('Cần ít nhất một yếu tố không cố định để tạo thiết kế.');
   if (config.designType === 'BoxBehnken' && active.length < 3) errors.push('Box–Behnken cần ít nhất 3 yếu tố.');
+  if (config.designType === 'DefinitiveScreening') {
+    if (active.length < 3) errors.push('Definitive Screening Design cần ít nhất 3 yếu tố.');
+    if (active.some((f) => f.role === 'mixture_component' || f.type === 'Mixture')) {
+      errors.push('Definitive Screening Design không áp dụng cho biến hỗn hợp (Mixture).');
+    }
+  }
   active.forEach((factor) => {
     if (factor.dataType === 'qualitative' || factor.dataType === 'quantitative_multilevel') {
       const levels = (factor.categories ?? []).map((level) => level.trim()).filter(Boolean);
@@ -1009,11 +1257,15 @@ export function validateDesignSetup(factors: Factor[], config: DoEDesignConfig):
     if (sumLower > 1 + 1e-10 || sumUpper < 1 - 1e-10) {
       errors.push('Giới hạn mixture không khả thi: tổng cận dưới phải ≤ 100% và tổng cận trên phải ≥ 100%.');
     }
+    const piepel = calculateEffectiveMixtureBounds(mixture);
+    if (!piepel.isConsistent && piepel.reason) {
+      errors.push(`Giới hạn mixture không khả thi theo định lý Piepel: ${piepel.reason}`);
+    }
   }
 
   const isOptimal = config.designType === 'DOptimal' || config.designType === 'Combined_Mixture_DOptimal';
   const twoLevelDesigns: DoEDesignConfig['designType'][] = ['FullFactorial2k', 'FractionalFactorial', 'PlackettBurman'];
-  const threeLevelDesigns: DoEDesignConfig['designType'][] = ['BoxBehnken', 'CCD_Full', 'CCD_FaceCentered', 'CCD_Rotatable', 'Doehlert'];
+  const threeLevelDesigns: DoEDesignConfig['designType'][] = ['BoxBehnken', 'CCD_Full', 'CCD_FaceCentered', 'CCD_Rotatable', 'Doehlert', 'DefinitiveScreening'];
   active.filter(isDiscreteFactor).forEach((factor) => {
     const levelCount = getConfiguredFactorLevels(factor).length;
     const isL9 = config.designType === 'Taguchi' && config.taguchiArray === 'L9';
