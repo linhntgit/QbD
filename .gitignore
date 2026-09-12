@@ -27,3 +27,10 @@ dist-ssr
 # Agent scratch & local personal files
 .agents/
 Bai_tho.docx
+
+# Audit markdown documents and reports
+*[aA][uU][dD][iI][tT]*.md
+*audit*.md
+*AUDIT*.md
+AUDIT.md
+AUDIT_REPORT.md
