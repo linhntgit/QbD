@@ -241,7 +241,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
     { key: 'doe', label: '3. Thiết kế DoE', short: 'Ma trận DoE & DSD', icon: LayoutGrid, standard: 'DoE & DSD (Jones 2011)' },
     { key: 'anova', label: '4. Thống kê ANOVA', short: 'ANOVA Models', icon: Calculator, standard: 'MLR & Diagnostics' },
     { key: 'neural', label: '5. Mạng Nơ-ron', short: 'Neural & XAI', icon: BrainCircuit, standard: 'ANN & XAI (SHAP)' },
-    { key: 'rsm', label: '6. Mặt đáp RSM', short: 'RSM & Contour', icon: Compass, standard: '3D/2D/Ternary' },
+    { key: 'rsm', label: '6. Mặt đáp', short: 'Response Surface & 3D', icon: Compass, standard: 'ICH Q8(R2) & 3D' },
     { key: 'design_space', label: '7. Không gian Thiết kế', short: 'Design Space & 3D', icon: Boxes, standard: 'ICH Q8/Q9/Q10 & 3D' },
     { key: 'report', label: '8. Báo Cáo Hồ Sơ', short: 'CTD & PDF/A', icon: FileCheck2, standard: 'CTD & ISO 19005 PDF/A' },
   ];
@@ -267,6 +267,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   <br />2. Bấm <strong>"+ Thêm Yếu tố QTPP"</strong> để khai báo các chỉ tiêu lâm sàng đích.
                   <br />3. Bấm <strong>"+ Thêm CQA (Đáp ứng Y)"</strong> để khai báo các biến đầu ra cần kiểm soát và khoảng chấp nhận LSL–USL.
                   <br />4. Bấm <strong>"+ Thêm Yếu Tố (X)"</strong> để khai báo các biến công thức/quy trình sẽ đưa vào nghiên cứu thực nghiệm.
+                  <br />5. Bấm nút <strong>"Tiếp Tục: Đánh Giá Rủi Ro Ban Đầu FMEA (Bước 2)"</strong> ở chân trang để chuyển tiếp sang bước đánh giá rủi ro.
                 </div>
               </div>
             ),
@@ -482,7 +483,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   <br />2. Bấm <strong>"+ Thêm Hàng Đánh Giá Rủi Ro"</strong> để bổ sung cặp tương tác [Biến đầu vào &times; CQA].
                   <br />3. Cho điểm từ 1–10 cho 3 chỉ số <strong>S</strong> (Mức nghiêm trọng), <strong>O</strong> (Khả năng xảy ra / Tần suất), <strong>D</strong> (Khả năng phát hiện).
                   <br />4. Quan sát hệ thống tự tính <strong>RPN</strong> và phân loại mức độ rủi ro (Cao / Trung bình / Thấp).
-                  <br />5. Bấm nút <strong>"Chuyển sang DoE"</strong> ở góc phải để tiến hành thiết kế ma trận thí nghiệm.
+                  <br />5. Bấm nút <strong>"Bắt Đầu Thiết Kế Thí Nghiệm DoE (Bước 3)"</strong> ở chân trang (hoặc nút "Chuyển sang DoE" trên header) để tiến hành thiết kế ma trận thí nghiệm.
                 </div>
               </div>
             ),
@@ -498,7 +499,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
                     <li><strong>Nút "Ma trận FMEA":</strong> Hiển thị bảng tính chấm điểm S, O, D và tính chỉ số RPN.</li>
                     <li><strong>Nút "Sơ đồ Xương cá (Ishikawa)":</strong> Trực quan hóa sơ đồ nguyên nhân - kết quả theo 6 nhóm: <em>Material, Machine, Method, Measurement, Environment, People</em>.</li>
-                    <li><strong>Nút "Chuyển sang DoE":</strong> Chuyển nhanh sang Tab 3 (DoE Designer).</li>
+                    <li><strong>Nút "Bắt Đầu Thiết Kế Thí Nghiệm DoE (Bước 3)" &amp; "Chuyển sang DoE":</strong> Chuyển nhanh sang Tab 3 (DoE Designer).</li>
                   </ul>
                 </div>
 
@@ -647,7 +648,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   <br />4. (Tùy chọn) Bấm <strong>"+ Thêm run thông tin nhất"</strong> nếu cần bổ sung tuần tự (Sequential DoE).
                   <br />5. Xem chẩn đoán ma trận: tính khả định (rank/term), bậc tự do phần dư, đòn bẩy Leverage, Condition Number và D-efficiency.
                   <br />6. Nhập số liệu thực nghiệm vào các cột CQA màu xanh ngọc (hoặc bấm <strong>"Điền Mô Phỏng"</strong> / dán từ Excel bằng <strong>"📥 Dán Dữ Liệu (Ctrl+V)"</strong>).
-                  <br />7. Bấm <strong>"Phân Tích ANOVA"</strong> để chuyển sang bước tính toán thống kê.
+                  <br />7. Bấm <strong>"Tiếp Tục: Phân Tích ANOVA (Bước 4)"</strong> ở thanh điều hướng chân trang (hoặc nút "Phân Tích ANOVA" trên header) để chuyển sang bước tính toán thống kê.
                 </div>
               </div>
             ),
@@ -662,7 +663,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   <strong style={{ color: '#1e3a8a' }}>1. Khung Điều Khiển Đầu Trang &amp; Kiểu Thiết Kế DoE:</strong>
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
                     <li><strong>Nút "Tạo Ma Trận Thí Nghiệm":</strong> Khởi tạo toàn bộ ma trận thí nghiệm theo cấu hình đã chọn.</li>
-                    <li><strong>Nút "Phân Tích ANOVA":</strong> Chuyển sang Tab 4 để phân tích mô hình.</li>
+                    <li><strong>Nút "Tiếp Tục: Phân Tích ANOVA (Bước 4)" &amp; "Phân Tích ANOVA":</strong> Chuyển sang Tab 4 để phân tích mô hình hồi quy OLS và bảng ANOVA.</li>
                     <li><strong>Definitive Screening Design (DSD - Jones &amp; Nachtsheim 2011):</strong> Thiết kế sàng lọc hiện đại 3 mức. Hiệu ứng chính trực giao tuyệt đối, hoàn toàn không bị nhiễu chập với tương tác 2 yếu tố (2FI) và độ cong bậc hai. Ước lượng độ cong với số mẻ tối thiểu (<InlineMath math="2k+1" /> hoặc <InlineMath math="2k+3" /> mẻ).</li>
                     <li><strong>Ràng buộc Hỗn hợp Đa giác (Piepel Bounds):</strong> Tự động kiểm tra tính nhất quán (<InlineMath math="\sum L_i \le 1 \le \sum U_i" />) và sinh các đỉnh cực trị (extreme vertices) bên trong miền khả thi.</li>
                     <li><strong>Design Wizard:</strong> Nhập <em>Mục tiêu nghiên cứu</em> và <em>Ngân sách tối đa (run)</em> &rarr; Bấm nút <strong>"Chọn phương án"</strong> tương ứng.</li>
@@ -846,7 +847,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   <br />2. Xem gợi ý của <strong>Analysis Wizard</strong> &rarr; Bấm <strong>"Áp dụng"</strong> mô hình đề xuất (hoặc chọn thủ công từ dropdown <em>Dạng mô hình</em>: Quadratic, 2FI, Linear).
                   <br />3. (Tùy chọn) Bấm <strong>"Áp dụng [Mô hình] cho tất cả Y"</strong> để đồng bộ nhanh dạng mô hình cho các CQA còn lại.
                   <br />4. Đọc <strong>Bảng ANOVA</strong> cùng <InlineMath math="R^2, R^2_{adj}, Q^2" />, Lack of Fit, VIF và 4 biểu đồ chẩn đoán (Pareto, phần dư–dự đoán, Normal Plot, Cook's Distance).
-                  <br />5. Chỉ chọn <strong>"Tiếp Tục Với Đa Thức (Bước 6, 7, 8)"</strong> sau khi mô hình phù hợp mục đích sử dụng, không có dấu hiệu chẩn đoán nghiêm trọng và đã lập kế hoạch run xác nhận.
+                  <br />5. Lựa chọn hướng đi tiếp theo: Bấm <strong>"Tiếp Tục: Huấn Luyện Mạng Nơ-ron AI (Bước 5)"</strong> nếu muốn thử nghiệm mô hình học máy phi tuyến cao cấp, hoặc bấm <strong>"Bỏ Qua AI: Xem Mặt Đáp Đa Thức (Bước 6)"</strong> để chuyển thẳng sang xem mặt đáp 3D với mô hình hồi quy đa thức hiện tại.
                 </div>
               </div>
             ),
@@ -858,12 +859,14 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
             content: (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', fontSize: '0.78rem' }}>
                 <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
-                  <strong style={{ color: '#1e3a8a' }}>1. Khung Điều Khiển Đầu Trang:</strong>
+                  <strong style={{ color: '#1e3a8a' }}>1. Khung Điều Khiển Đầu Trang &amp; Điều Hướng:</strong>
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
                     <li><strong>Dropdown "Đáp ứng CQA":</strong> Chọn CQA đang phân tích.</li>
                     <li><strong>Dropdown "Dạng mô hình":</strong> Chọn giữa <em>Đa thức Bậc 2 (Quadratic)</em>, <em>Tương tác 2 Yếu tố (2FI)</em>, <em>Tuyến tính (Linear)</em>.</li>
-                    <li><strong>Nút "Thử Mạng Nơ-ron":</strong> Chuyển nhanh sang Tab 5 (Neural Network Tab) để so sánh với AI.</li>
-                    <li><strong>Nút "Tiếp Tục Với Đa Thức (Bước 6, 7, 8)":</strong> Khóa mô hình Hồi quy Đa thức bậc &le; 2 làm phương pháp chính cho toàn bộ các bước tiếp theo.</li>
+                    <li><strong>Nút "Thử Mạng Nơ-ron (Bước 5)":</strong> Chuyển nhanh sang Bước 5 để huấn luyện mô hình Mạng Nơ-ron AI.</li>
+                    <li><strong>Nút "Xem Mặt Đáp Đa Thức (Bước 6)":</strong> Chuyển sang Bước 6 để khảo sát đồ thị mặt đáp 3D và phân tích chính tắc (Canonical Analysis) cho mô hình đa thức.</li>
+                    <li><strong>Thanh điều hướng chân trang:</strong> Cung cấp 2 lựa chọn song song: <em>"Tiếp Tục: Huấn Luyện Mạng Nơ-ron AI (Bước 5)"</em> hoặc <em>"Bỏ Qua AI: Xem Mặt Đáp Đa Thức (Bước 6)"</em>.</li>
+                    <li><em>Lưu ý phương pháp luận:</em> Tại Bước 4, bảng đối chiếu ứng viên tập trung vào các dạng mô hình hồi quy đa thức (Linear, 2FI, Quadratic) theo phương pháp OLS truyền thống. Mạng Nơ-ron AI sẽ được khởi tạo và huấn luyện từ Bước 5.</li>
                   </ul>
                 </div>
 
@@ -1057,8 +1060,9 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   <br />3. Kiểm tra tỷ lệ <strong>N/P</strong> (số mẫu huấn luyện/số tham số). App dùng <InlineMath math="N/P \ge 2" /> như cảnh báo sàng lọc.
                   <br />4. Bấm nút <strong>"Huấn Luyện Lại (Train Network)"</strong> để tiến hành huấn luyện mạng nơ-ron với thanh tiến trình trực quan.
                   <br />5. Khám phá <strong>Explainable AI Studio</strong>: Chuyển đổi giữa <em>🐝 SHAP Beeswarm</em> (toàn cục), <em>📊 SHAP Waterfall</em> (từng mẻ thử nghiệm) và <em>⚖️ Đối Chiếu 3 Thuật Toán</em> (Garson - Olden - SHAP).
-                  <br />6. Tham khảo bảng <strong>Đấu Trường Đa Mô Hình (Multi-Model Benchmarking)</strong>: So sánh đối đầu giữa Polynomial RSM, ANN MLP, SVR (SMO) và Akaike Ensemble Stacking với các chỉ số <InlineMath math="R^2, R^2_{\text{adj}}" />, RMSE, AICc, BIC.
-                  <br />7. Bấm nút <strong>"Tiếp Tục Với Mạng Nơ-ron (Bước 6, 7, 8)"</strong> để khóa mô hình AI làm phương pháp chính cho Design Space.
+                  <br />6. Tham khảo bảng <strong>Đấu Trường Đa Mô Hình (Multi-Model Benchmarking)</strong>: So sánh đối đầu giữa Polynomial RSM, ANN MLP, SVR (RBF) và Akaike Ensemble Stacking với các chỉ số <InlineMath math="R^2, R^2_{\text{adj}}" />, RMSE, AICc, BIC.
+                  <br /><em>* Vai trò của SVR và Ensemble Stacking:</em> Đóng vai trò là <strong>Mô hình Thẩm định &amp; Đối chuẩn Độc lập (Challenger / Benchmarking Models)</strong>. Cung cấp cơ sở khoa học khách quan để chứng minh mô hình bạn chọn (Đa thức hoặc Mạng nơ-ron) không bị thiên lệch bởi một thuật toán đơn lẻ trước khi chuyển sang Bước 6 (Mặt đáp) và Bước 7 (Không gian thiết kế).
+                  <br />7. Bấm nút <strong>"Tiếp Tục Với Mạng Nơ-ron (Bước 6: Mặt Đáp)"</strong> (hành động chính) để chuyển sang khảo sát mặt đáp 3D/Contour, hoặc bấm nút phụ <strong>"Đi Thẳng Đến Tối Ưu Hóa &amp; Không Gian Thiết Kế (Bước 7)"</strong>.
                 </div>
               </div>
             ),
@@ -1070,13 +1074,15 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
             content: (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', fontSize: '0.78rem' }}>
                 <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
-                  <strong style={{ color: '#6b21a8' }}>1. Khung Điều Khiển Huấn Luyện &amp; Các Nút Bấm:</strong>
+                  <strong style={{ color: '#6b21a8' }}>1. Khung Điều Khiển Huấn Luyện &amp; Các Nút Bấm Điều Hướng:</strong>
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
                     <li><strong>Nút "Huấn Luyện Lại (Train Network)":</strong> Bắt đầu huấn luyện mô hình mạng nơ-ron cho CQA hiện tại.</li>
                     <li><strong>Nút "Huấn Luyện Tất Cả CQAs":</strong> Huấn luyện đồng loạt tất cả các mạng nơ-ron độc lập cho toàn bộ các CQA.</li>
                     <li><strong>Nút "Sao Chép Cấu Hình Sang Tất Cả Y":</strong> Đồng bộ bộ siêu tham số hiện tại sang tất cả các CQA khác.</li>
                     <li><strong>Nút "Khôi Phục Mặc Định (Reset)":</strong> Đặt lại các siêu tham số về giá trị khuyến nghị chuẩn của dược phẩm.</li>
-                    <li><strong>Nút "Tiếp Tục Với Mạng Nơ-ron (Bước 6, 7, 8)":</strong> Khóa mô hình Mạng Nơ-ron AI làm engine chính cho các bước tiếp theo.</li>
+                    <li><strong>Nút "Tiếp Tục Với Mạng Nơ-ron (Bước 6: Mặt Đáp)":</strong> Nút hành động chính, khóa mô hình Mạng Nơ-ron AI và chuyển sang Bước 6 để khảo sát trực quan bề mặt đáp ứng phi tuyến 3D.</li>
+                    <li><strong>Nút "Đi Thẳng Đến Bước 7 (Không Gian Thiết Kế)":</strong> Nút phụ cho phép chuyển thẳng sang bộ tối ưu hóa đa mục tiêu Desirability và tính toán Không gian Thiết kế.</li>
+                    <li><strong>Thanh điều hướng chân trang:</strong> Cung cấp 2 nút điều hướng liền mạch: <em>"Tiếp Tục Với Mạng Nơ-ron (Bước 6: Mặt Đáp)"</em> và <em>"Đi Thẳng Đến Tối Ưu Hóa &amp; Không Gian Thiết Kế (Bước 7)"</em>.</li>
                   </ul>
                 </div>
 
@@ -1092,9 +1098,19 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
                   <strong style={{ color: '#1e40af' }}>3. Đấu Trường Đa Mô Hình (Multi-Model Benchmarking Arena):</strong>
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
-                    <li><strong>Bảng So Sánh Đối Đầu:</strong> Đặt cạnh nhau 4 họ mô hình: Hồi quy đa thức RSM (Linear, 2FI, Quadratic), Mạng Nơ-ron (ANN MLP), Máy Vector Hỗ Trợ (SVR - SMO), và Mô hình Xếp Chồng Trọng Số Akaike (Ensemble Stacking).</li>
+                    <li><strong>Bảng So Sánh Đối Đầu:</strong> Đặt cạnh nhau 4 họ mô hình: Hồi quy đa thức RSM (Linear, 2FI, Quadratic), Mạng Nơ-ron (ANN MLP), Máy Vector Hỗ Trợ (SVR RBF), và Mô hình Xếp Chồng Trọng Số Akaike (Ensemble Stacking).</li>
+                    <li><strong>Vai trò của SVR &amp; Ensemble Stacking:</strong> Đóng vai trò là <em>Mô hình Thẩm định &amp; Đối chuẩn Độc lập (Challenger / Benchmarking Models)</em>. Mục đích là cung cấp cơ sở khoa học khách quan để chứng minh mô hình người dùng chọn (Đa thức hoặc Mạng nơ-ron) không bị thiên lệch bởi một thuật toán đơn lẻ trước khi chuyển sang Bước 6 (Mặt đáp) và Bước 7 (Không gian thiết kế).</li>
                     <li><strong>Các Tiêu Chí Xếp Hạng:</strong> <InlineMath math="R^2, R^2_{\text{adj}}" />, RMSE, Hurvich-Tsai AICc, Schwarz BIC, và Trọng số Akaike (<InlineMath math="w_i" />).</li>
                     <li><strong>Gợi Ý Khuyến Nghị (Summary Recommendation):</strong> Tự động đánh giá mô hình nào đạt độ cân bằng tối ưu giữa năng lực dự báo và độ phức tạp theo chuẩn AICc/BIC.</li>
+                  </ul>
+                </div>
+
+                <div style={{ backgroundColor: '#f0fdf4', padding: '0.6rem', borderRadius: '0.375rem', border: '1px solid #bbf7d0' }}>
+                  <strong style={{ color: '#166534' }}>4. Thẻ Hướng Dẫn Khảo Sát (Guidance Cards) &amp; Tập Trung Tối Ưu Hóa Tại Bước 7:</strong>
+                  <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#14532d', lineHeight: 1.5 }}>
+                    <li><strong>Hợp nhất tính năng tìm điểm tối ưu tại Bước 7:</strong> Tính năng tìm điểm tối ưu đã được tập trung hoàn toàn tại Bước 7 (Không Gian Thiết Kế &amp; Tối Ưu Hóa) thay vì phân tán ở Bước 5. Điều này đảm bảo tính nhất quán phương pháp luận khoa học, cho phép so sánh khách quan điểm tối ưu toàn cục Derringer-Suich giữa hai engine (Đa thức vs Mạng nơ-ron) trong cùng một môi trường thuật toán RCGA + Nelder-Mead.</li>
+                    <li><strong>Thẻ điều hướng Mặt đáp 3D:</strong> Hướng dẫn người dùng sang Bước 6 để tương tác với đồ thị xoay 3D, đường đồng mức 2D Contour và tam giác Ternary của mạng nơ-ron.</li>
+                    <li><strong>Thẻ điều hướng Không gian thiết kế:</strong> Hướng dẫn người dùng sang Bước 7 để xây dựng miền Sweet Spot, điều chỉnh lát cắt động X3 và thẩm định độ bền bằng Monte Carlo.</li>
                   </ul>
                 </div>
               </div>
@@ -1292,41 +1308,54 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
             content: (
               <div>
                 <p style={{ marginBottom: '0.6rem' }}>
-                  Trực quan hóa giá trị <em>mô hình dự báo</em> trong không gian 3D/2D tại lát cắt đang chọn. Dùng đồ thị để nhận biết chiều tác động, tương tác và vùng gần giới hạn; không suy diễn ngoài miền DoE hoặc xem đồ thị là bằng chứng xác nhận.
+                  Khảo sát trực quan hóa hình học mặt đáp ứng (<strong>Response Surface Methodology - RSM</strong>) trong không gian 3D/2D và phân tích chính tắc (<strong>Canonical Analysis</strong>) theo chuẩn <strong>ICH Q8(R2)</strong>. Hỗ trợ hiển thị linh hoạt cho cả mô hình Hồi quy Đa thức cổ điển và Mạng Nơ-ron Nhân Tạo AI (ANN).
                 </p>
                 <div style={{ backgroundColor: '#f0fdf4', padding: '0.6rem 0.8rem', borderRadius: '0.4rem', border: '1px solid #bbf7d0', fontSize: '0.78rem', color: '#166534', lineHeight: 1.6 }}>
                   <strong>Thứ tự thao tác chuẩn:</strong>
-                  <br />1. Chọn <strong>Đáp ứng CQA</strong> và <strong>Dạng đồ thị</strong> (3D Surface, 2D Contour, hoặc Tam giác Ternary).
-                  <br />2. Chọn 2 biến cho <strong>Trục hoành X</strong> và <strong>Trục tung Y</strong> (hoặc 3 đỉnh tam giác <InlineMath math="A, B, C" />).
-                  <br />3. Điều chỉnh các biến phụ ở thanh bên phải: Bấm <strong>"🎯 Đặt theo Điểm Tối Ưu"</strong> hoặc <strong>"🔄 Đặt về Tâm (0)"</strong>.
-                  <br />4. Quan sát các đường cắt giới hạn tiêu chuẩn <strong>LSL, USL, Target</strong> trên mặt đáp cong.
-                  <br />5. Bấm nút <strong>"Tiếp Tục Sang Không Gian Thiết Kế"</strong> để chuyển sang Tab 7.
+                  <br />1. Chọn <strong>Công cụ mô hình hóa (Engine)</strong>: Bấm chọn <em>📐 Đa Thức (ANOVA)</em> hoặc <em>🧠 Mạng Nơ-ron AI</em> tại thanh công cụ đầu trang.
+                  <br />2. Chọn <strong>Đáp ứng CQA</strong> và <strong>Dạng đồ thị</strong> (3D Surface, 2D Contour, hoặc Tam giác Ternary).
+                  <br />3. Chọn 2 biến cho <strong>Trục hoành X</strong> và <strong>Trục tung Y</strong> (hoặc 3 đỉnh tam giác <InlineMath math="A, B, C" /> đối với hệ hỗn hợp).
+                  <br />4. Điều chỉnh các biến phụ ở thanh bên phải: Bấm <strong>"🎯 Đặt theo Điểm Tối Ưu"</strong> hoặc <strong>"🔄 Đặt về Tâm (0)"</strong>.
+                  <br />5. Đọc kết quả <strong>Phân Tích Chính Tắc (Canonical Analysis)</strong> ở bảng phía dưới: Nhận diện tọa độ điểm dừng <InlineMath math="\mathbf{x}_0" />, bản chất mặt cong (Cực đại, Cực tiểu, Yên ngựa, Sống trâu) và các trị riêng Hessian <InlineMath math="\lambda_i" />.
+                  <br />6. Bấm nút <strong>"Tiếp Tục: Tối Ưu Hóa &amp; Không Gian Thiết Kế (Bước 7)"</strong> ở chân trang để chuyển sang Tab 7.
                 </div>
               </div>
             ),
           },
           {
             id: 'inputs',
-            title: 'Chi Tiết Từng Nút Bấm, Menu Thao Tác & Điều Khiển Đồ Thị',
+            title: 'Chi Tiết Từng Nút Bấm, Menu Thao Tác, Điều Khiển Đồ Thị & Bảng Chính Tắc',
             icon: Sliders,
             content: (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', fontSize: '0.78rem' }}>
                 <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
-                  <strong style={{ color: '#1e3a8a' }}>1. Khung Điều Khiển Đầu Trang &amp; Dạng Đồ Thị:</strong>
+                  <strong style={{ color: '#1e3a8a' }}>1. Khung Điều Khiển Đầu Trang &amp; Engine Switcher:</strong>
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
-                    <li><strong>Nút "Mặt Đáp 3D (3D Surface)":</strong> Đồ thị 3 chiều có thể xoay chuột, zoom, chiếu đường đồng mức xuống đáy.</li>
-                    <li><strong>Nút "Đường Đồng Mức 2D (2D Contour)":</strong> Bản đồ đường đồng mức trên hệ tọa độ Descartes (X–Y) với con trỏ rà soát giá trị (Hover Probe).</li>
-                    <li><strong>Nút "Tam Giác Hỗn Hợp (Ternary Contour)":</strong> Đồ thị tọa độ tam giác đều Barycentric chuyên biệt cho 3 thành phần hỗn hợp (<InlineMath math="X_A + X_B + X_C = 100\%" />).</li>
-                    <li><strong>Nút "Tiếp Tục Sang Không Gian Thiết Kế":</strong> Chuyển sang Tab 7 (Design Space).</li>
+                    <li><strong>Công Tắc Chuyển Đổi Engine (Đa thức / Mạng nơ-ron):</strong> Luôn hiển thị cố định ở đầu trang, cho phép chuyển đổi tức thì góc nhìn giữa bề mặt đa thức OLS và bề mặt phi tuyến của Mạng Nơ-ron AI.</li>
+                    <li><strong>Cơ chế bảo vệ an toàn:</strong> Nếu chuyển sang engine Mạng Nơ-ron khi chưa huấn luyện ở Bước 5, hệ thống hiển thị thẻ cảnh báo thân thiện kèm nút bấm chuyển nhanh về Đa thức, tuyệt đối không gây lỗi hay làm ẩn thanh điều khiển.</li>
+                    <li><strong>Nút "Mặt Đáp 3D (3D Surface)":</strong> Đồ thị 3 chiều tương tác (xoay chuột, zoom, chiếu bóng contour xuống mặt đáy).</li>
+                    <li><strong>Nút "Đường Đồng Mức 2D (2D Contour)":</strong> Bản đồ đẳng trị 2 chiều (X–Y) kèm con trỏ rà soát giá trị (Hover Probe).</li>
+                    <li><strong>Nút "Tam Giác Hỗn Hợp (Ternary Contour)":</strong> Đồ thị tam giác đều Barycentric chuyên biệt cho 3 cấu tử hỗn hợp (<InlineMath math="X_A + X_B + X_C = 100\%" />).</li>
+                    <li><strong>Nút "Tiếp Tục: Tối Ưu Hóa &amp; Không Gian Thiết Kế (Bước 7)":</strong> Chuyển sang Tab 7.</li>
                   </ul>
                 </div>
 
                 <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
                   <strong style={{ color: '#0f766e' }}>2. Bảng Cố Định Biến Phụ (Fixed Factors Slicing Panel):</strong>
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
-                    <li><strong>Nút "🎯 Đặt theo Điểm Tối Ưu":</strong> Tự động gán tất cả các biến phụ về giá trị tối ưu Desirability.</li>
+                    <li><strong>Nút "🎯 Đặt theo Điểm Tối Ưu":</strong> Tự động gán tất cả các biến phụ về giá trị tối ưu Desirability toàn cục.</li>
                     <li><strong>Nút "🔄 Đặt về Tâm (0)":</strong> Đặt lại tất cả các biến phụ về điểm tâm thực nghiệm.</li>
-                    <li><strong>Thanh trượt &amp; Ô nhập số:</strong> Cho phép tùy biến giá trị cố định của từng biến phụ theo ý muốn.</li>
+                    <li><strong>Thanh trượt &amp; Ô nhập số:</strong> Cho phép tùy biến giá trị cố định của từng biến phụ theo ý muốn để quan sát từng lát cắt cụ thể.</li>
+                  </ul>
+                </div>
+
+                <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
+                  <strong style={{ color: '#7c3aed' }}>3. Bảng Phân Tích Chính Tắc Mặt Đáp Ứng (Canonical Analysis - RSM):</strong>
+                  <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
+                    <li><strong>Tọa Độ Điểm Dừng (<InlineMath math="\mathbf{x}_0 = -\frac{1}{2} \mathbf{B}^{-1} \mathbf{a}" />):</strong> Hiển thị giá trị mã hóa (Coded) và thực tế (Actual) của từng yếu tố tại điểm dừng. Kèm nhãn đánh giá <em>Trong miền [-1, 1]</em> hay <em>Ngoại suy</em> ngoài miền DoE.</li>
+                    <li><strong>Bản Chất Hình Học Mặt Cong:</strong> Tự động phân loại dựa trên dấu các trị riêng <InlineMath math="\lambda_i" />: Cực đại (tất cả <InlineMath math="\lambda_i < 0" />), Cực tiểu (tất cả <InlineMath math="\lambda_i > 0" />), Điểm yên ngựa (tồn tại cả <InlineMath math="\lambda_i > 0" /> và <InlineMath math="\lambda_j < 0" />), hoặc Sống trâu (có <InlineMath math="\lambda_i \approx 0" />).</li>
+                    <li><strong>Phương Trình Chính Tắc (Canonical Form):</strong> Biểu diễn dạng chuẩn tắc <InlineMath math="\hat{y} = \hat{y}_0 + \sum \lambda_i w_i^2" /> trên hệ trục tọa độ chính <InlineMath math="w_i" />.</li>
+                    <li><strong>Bảng Trị Riêng &amp; Vectơ Riêng:</strong> Chỉ rõ trục dốc nhất (Dominant axis), trục phẳng (Ridge), và hướng vectơ biến thiên của từng trục.</li>
                   </ul>
                 </div>
               </div>
@@ -1334,25 +1363,41 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
           },
           {
             id: 'algorithms',
-            title: 'Thuật Toán Cắt Lớp Đường Giới Hạn & Tam Giác Barycentric',
+            title: 'Thuật Toán Phân Tích Chính Tắc (Canonical Analysis) & Tọa Độ Barycentric',
             icon: Calculator,
             content: (
               <div style={{ fontSize: '0.78rem', color: '#334155', lineHeight: 1.6 }}>
-                <p><strong>1. Phép Biến Đổi Tọa Độ Tam Giác Barycentric:</strong></p>
+                <p><strong>1. Thuật Toán Phân Tích Chính Tắc (Canonical Analysis - Box &amp; Wilson 1951):</strong></p>
+                <p>Phương trình hồi quy đa thức bậc hai dạng ma trận:</p>
+                <BlockMath math="\hat{y} = b_0 + \mathbf{x}^T \mathbf{a} + \mathbf{x}^T \mathbf{B} \mathbf{x}" />
+                <p>Trong đó <InlineMath math="\mathbf{a}" /> là vectơ hệ số tuyến tính bậc 1, và <InlineMath math="\mathbf{B}" /> là ma trận đối xứng Hessian chứa các hệ số bậc hai thuần nhất (<InlineMath math="b_{ii}" />) trên đường chéo chính và nửa hệ số tương tác (<InlineMath math="0.5 b_{ij}" />) ngoài đường chéo.</p>
+                <p>Tọa độ điểm dừng <InlineMath math="\mathbf{x}_0" /> và đáp ứng dự đoán tại điểm dừng <InlineMath math="\hat{y}_0" /> được tính bằng:</p>
+                <BlockMath math="\mathbf{x}_0 = -\frac{1}{2} \mathbf{B}^{-1} \mathbf{a}, \quad \hat{y}_0 = b_0 + \frac{1}{2} \mathbf{x}_0^T \mathbf{a}" />
+                <p>Thông qua phép phân tích phổ trị riêng (Spectral Eigen-decomposition) <InlineMath math="\mathbf{B} = \mathbf{M} \mathbf{\Lambda} \mathbf{M}^T" />, phương trình được chuyển về hệ trục chính <InlineMath math="\mathbf{w} = \mathbf{M}^T (\mathbf{x} - \mathbf{x}_0)" />:</p>
+                <BlockMath math="\hat{y} = \hat{y}_0 + \sum_{i=1}^k \lambda_i w_i^2" />
+                <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem' }}>
+                  <li><strong>Tất cả <InlineMath math="\lambda_i < 0" />:</strong> Mặt đáp có dạng chỏm cầu úp, điểm dừng là <strong>Cực đại toàn cục (Maximum)</strong>.</li>
+                  <li><strong>Tất cả <InlineMath math="\lambda_i > 0" />:</strong> Mặt đáp có dạng lòng chảo ngửa, điểm dừng là <strong>Cực tiểu toàn cục (Minimum)</strong>.</li>
+                  <li><strong>Tồn tại cả <InlineMath math="\lambda_i > 0" /> và <InlineMath math="\lambda_j < 0" />:</strong> Mặt đáp uốn lượn theo hai chiều ngược nhau, điểm dừng là <strong>Điểm yên ngựa (Saddle point)</strong>.</li>
+                  <li><strong>Có ít nhất một <InlineMath math="\lambda_i \approx 0" />:</strong> Độ cong theo trục đó tiệm cận 0, mặt đáp có dạng <strong>Sống trâu tĩnh tại hoặc dốc (Stationary / Rising Ridge)</strong>.</li>
+                </ul>
+
+                <p style={{ marginTop: '0.6rem' }}><strong>2. Phép Biến Đổi Tọa Độ Tam Giác Barycentric:</strong></p>
                 <BlockMath math="X_{\text{cartesian}} = X_B + 0.5 X_C, \quad Y_{\text{cartesian}} = \frac{\sqrt{3}}{2} X_C" />
                 <p>Với ràng buộc bảo toàn nồng độ hỗn hợp: <InlineMath math="X_A + X_B + X_C = 1.0 \quad (100\%)" />.</p>
-                <p style={{ marginTop: '0.4rem' }}><strong>2. Đường cắt LSL/USL/Target:</strong> Đường đồng mức được nội suy trên lưới dự báo để biểu diễn nơi CQA bằng một ngưỡng. Độ chính xác của đường phụ thuộc mô hình, độ phân giải lưới và các biến đang bị cố định.</p>
+                <p style={{ marginTop: '0.4rem' }}><strong>3. Đường cắt LSL/USL/Target:</strong> Đường đồng mức được nội suy trên lưới dự báo để biểu diễn nơi CQA bằng một ngưỡng tiêu chuẩn kỹ thuật.</p>
               </div>
             ),
           },
           {
             id: 'tips',
-            title: 'Mẹo Quan Sát Mặt Đáp RSM',
+            title: 'Mẹo Quan Sát Mặt Đáp & Đọc Kết Quả Chính Tắc',
             icon: Lightbulb,
             content: (
               <ul style={{ paddingLeft: '1.2rem', fontSize: '0.78rem', color: '#334155', lineHeight: 1.6 }}>
+                <li><strong>Kiểm tra tọa độ điểm dừng trong miền thiết kế:</strong> Nếu điểm dừng có giá trị mã hóa vượt ngoài khoảng <InlineMath math="[-1, 1]" />, việc dự báo tại điểm dừng mang tính chất ngoại suy. Hãy ưu tiên sử dụng giải thuật tối ưu hóa có ràng buộc Derringer-Suich ở Bước 7 để tìm điểm vận hành an toàn trong miền khả thi.</li>
+                <li><strong>Nhận diện trục dốc nhất:</strong> Trục chính <InlineMath math="w_i" /> có giá trị tuyệt đối <InlineMath math="|\lambda_i|" /> lớn nhất là hướng mà đáp ứng biến thiên nhạy cảm nhất. Cần kiểm soát chặt chẽ các yếu tố đóng góp lớn vào vectơ riêng của trục này.</li>
                 <li><strong>Đổi trục tọa độ X và Y:</strong> Hãy thử đổi vị trí giữa các biến để quan sát góc nhìn trực quan và dễ hiểu nhất của các điểm cực trị.</li>
-                <li><strong>Đường LSL/USL:</strong> Cho biết biên đạt/không đạt <em>theo mô hình</em> trên lát cắt. Thay đổi biến cố định rồi kiểm tra lại, đặc biệt khi có tương tác giữa các factor.</li>
               </ul>
             ),
           },
@@ -1360,9 +1405,41 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
             id: 'glossary',
             title: 'Giải Thích Thuật Ngữ (Glossary & Terminology)',
             icon: BookOpen,
-            keywords: ['RSM', 'Surface', 'Contour', 'Ternary', 'Simplex', 'Slicing', 'Fixed Factors', 'Curvature', 'Barycentric'],
+            keywords: ['RSM', 'Surface', 'Contour', 'Ternary', 'Simplex', 'Slicing', 'Fixed Factors', 'Curvature', 'Barycentric', 'Canonical', 'Stationary Point', 'Eigenvalue', 'Saddle Point'],
             content: (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+                <GlossaryTermCard
+                  term="Canonical Analysis"
+                  vietnamese="Phân tích chính tắc mặt đáp"
+                  tag="RSM Toán Học"
+                  tagColor="purple"
+                  definition="Phương pháp toán học chuyển đổi phương trình bề mặt đáp ứng bậc hai về hệ trục tọa độ chính (Principal axes) thông qua ma trận Hessian và phân tích phổ trị riêng, nhằm xác định chính xác vị trí và bản chất hình học của điểm dừng (cực đại, cực tiểu, yên ngựa, sống trâu)."
+                />
+                <GlossaryTermCard
+                  term="Stationary Point (x₀)"
+                  vietnamese="Điểm dừng mặt đáp"
+                  tag="Điểm Dừng"
+                  tagColor="teal"
+                  definition={
+                    <>
+                      Điểm tại đó đạo hàm bậc nhất của hàm đáp ứng triệt tiêu hoàn toàn (<InlineMath math="\nabla \hat{y} = \mathbf{0}" />), tương ứng với công thức <InlineMath math="\mathbf{x}_0 = -\frac{1}{2} \mathbf{B}^{-1} \mathbf{a}" />. Điểm dừng có thể nằm bên trong hoặc bên ngoài miền thực nghiệm DoE.
+                    </>
+                  }
+                />
+                <GlossaryTermCard
+                  term="Eigenvalues (λᵢ)"
+                  vietnamese="Trị riêng ma trận Hessian"
+                  tag="Độ Cong Trục Chính"
+                  tagColor="primary"
+                  definition="Các hệ số đại số đo lường độ cong của bề mặt đáp ứng dọc theo các trục tọa độ chính mới. Dấu của các trị riêng quyết định hình thái lồi/lõm, còn độ lớn quyết định độ dốc biến thiên của đáp ứng."
+                />
+                <GlossaryTermCard
+                  term="Saddle Point"
+                  vietnamese="Điểm yên ngựa"
+                  tag="Bản Chất Mặt Cong"
+                  tagColor="warning"
+                  definition="Điểm dừng có đặc tính uốn cong ngược chiều (tồn tại cả trị riêng dương và âm), nơi đáp ứng đạt cực đại theo hướng trục này nhưng lại đạt cực tiểu theo hướng trục khác. Thường đòi hỏi di chuyển dọc theo trục dốc nhất để tìm miền tối ưu thực sự."
+                />
                 <GlossaryTermCard
                   term="RSM (Response Surface Methodology)"
                   vietnamese="Phương pháp mặt đáp"
@@ -1439,7 +1516,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   <br />3. Chọn chế độ xem: <strong>"2D Contour"</strong> hoặc bấm <strong>"3D Surface"</strong> để quan sát bề mặt biên an toàn chất lượng (<InlineMath math="Z = \text{Margin}_{\min}" />) và mặt phẳng chuẩn <InlineMath math="Z = 0" />.
                   <br />4. Tương tác với <strong>Thanh Trượt Lát Cắt Động Yếu Tố Thứ 3 (Dynamic Slicing X3)</strong>: Di chuyển thanh trượt để quét liên tục các lát cắt, quan sát dải màu <strong>PAR / NOR Range Bar</strong> và huy hiệu trạng thái khả thi của lát cắt.
                   <br />5. Nhập <em>Số lô mô phỏng</em> (vd: 10.000) và <em>Độ biến thiên RSD%</em> (vd: &plusmn;2.0%) &rarr; Bấm <strong>"▶ Chạy Mô Phỏng Monte Carlo"</strong> để thẩm định độ bền vững (Reliability %, PPM, Cpk).
-                  <br />6. Bấm nút <strong>"Tiếp Tục Sang Báo Cáo Hồ Sơ"</strong> để chuyển sang Tab 8.
+                  <br />6. Bấm nút <strong>"Tiếp Tục: Xuất Báo Cáo Hồ Sơ QbD (Bước 8)"</strong> ở chân trang để chuyển sang Tab 8.
                 </div>
               </div>
             ),
@@ -1451,7 +1528,16 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
             content: (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', fontSize: '0.78rem' }}>
                 <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
-                  <strong style={{ color: '#1e3a8a' }}>1. Khung "Prediction Profiler &amp; Desirability Optimization" (Thanh màu xanh đậm):</strong>
+                  <strong style={{ color: '#1e3a8a' }}>1. Khung Điều Khiển Đầu Trang &amp; Engine Switcher:</strong>
+                  <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
+                    <li><strong>Công Tắc Chuyển Đổi Engine (Đa thức / Mạng nơ-ron):</strong> Luôn hiển thị ở đầu tab, cho phép tối ưu hóa Desirability và xây dựng Design Space bằng engine Hồi quy Đa thức hoặc Mạng Nơ-ron AI.</li>
+                    <li><strong>Cơ chế bảo vệ:</strong> Khi chuyển sang Mạng Nơ-ron mà chưa huấn luyện đủ ở Bước 5, hệ thống hiển thị cảnh báo chi tiết các CQA còn thiếu kèm nút bấm chuyển nhanh về Đa thức.</li>
+                    <li><strong>Thanh điều hướng chân trang:</strong> Nút <em>"Tiếp Tục: Xuất Báo Cáo Hồ Sơ QbD (Bước 8)"</em> giúp chuyển tiếp mượt mà sang bước tạo tài liệu pháp lý.</li>
+                  </ul>
+                </div>
+
+                <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
+                  <strong style={{ color: '#1e3a8a' }}>2. Khung "Prediction Profiler &amp; Desirability Optimization" (Thanh màu xanh đậm):</strong>
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
                     <li><strong>Đồng hồ OVERALL D:</strong> Trung bình nhân có trọng số của các desirability (<InlineMath math="D \in [0, 1]" />). Tự động bằng 0 nếu bất kỳ CQA nào bị vi phạm giới hạn.</li>
                     <li><strong>Nút "✨ Tối Đa Hóa Thỏa Dụng (Max D)":</strong> Chạy bộ giải thuật di truyền số thực liên tục <strong>RCGA</strong> đa khởi tạo, sau đó tinh chỉnh cục bộ bằng thuật toán <strong>Nelder-Mead simplex</strong> để tìm ra điểm cực đại toàn cục mượt mà và chính xác.</li>
@@ -1690,7 +1776,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 </div>
 
                 <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
-                  <strong style={{ color: '#0f766e' }}>3. 10 Chương Mục Chuẩn Trong Báo Cáo CTD Module 3.2.P.2:</strong>
+                  <strong style={{ color: '#0f766e' }}>3. Các Chương Mục Chuẩn Trong Báo Cáo CTD Module 3.2.P.2:</strong>
                   <ol style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
                     <li><strong>Thông tin Dự Án:</strong> Mã dự án, phiên bản, đơn vị nghiên cứu, tác giả, ngày tạo và tóm tắt phương pháp luận.</li>
                     <li><strong>0. Protocol &amp; Traceability:</strong> Lịch sử truy xuất nguồn gốc, mã băm payload và thông tin kiểm toán khởi thủy.</li>
@@ -1698,11 +1784,15 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                     <li><strong>2. Thuộc Tính CQAs &amp; Desirability:</strong> Tiêu chuẩn kỹ thuật chấp nhận, hàm thỏa dụng Derringer-Suich và trọng số ưu tiên.</li>
                     <li><strong>3. Rủi Ro Ban Đầu (FMEA - ICH Q9):</strong> Bảng ma trận rủi ro ban đầu (Severity, Occurrence, Detectability) và phân loại biến số CMA/CPP.</li>
                     <li><strong>4. Thiết Kế DoE &amp; Hiệu Suất Ma Trận:</strong> Chi tiết loại thiết kế (DSD, CCD, Box-Behnken, Mixture), số lượng runs, độ trực giao và chỉ số D-Efficiency.</li>
-                    <li><strong>5. Phân Tích Mô Hình Hóa:</strong> Bảng ANOVA đa thức đầy đủ kèm kiểm định Lack-of-Fit / Kiến trúc mạng Nơ-ron AI kèm siêu tham số và chỉ số MSE, R².</li>
-                    <li><strong>6. Tối Ưu Hóa &amp; Rủi Ro Cập Nhật:</strong> Điểm vận hành tối ưu toàn cục (Overall Desirability), Không gian Thiết kế 3D và đánh giá cập nhật rủi ro FMEA sau DoE.</li>
+                    <li><strong>5a. ANOVA &amp; Hồi Quy Đa Thức:</strong> Bảng mô hình OLS đầy đủ kèm kiểm định ý nghĩa thống kê và Lack-of-Fit.</li>
+                    <li><strong>5b. Mạng Nơ-ron AI (ANN):</strong> Sơ đồ topo mạng nơ-ron đa tầng MLP, siêu tham số huấn luyện, ma trận chẩn đoán và phân tích đóng góp biến.</li>
+                    <li><strong>5c. Mặt Đáp &amp; Phân Tích Điểm Dừng (Canonical Analysis):</strong> Bảng tọa độ điểm dừng x₀ (coded &amp; actual), bản chất mặt cong (Cực đại/Cực tiểu/Yên ngựa/Sống trâu), phương trình chính tắc và các trị riêng λᵢ ma trận Hessian; kèm đặc tính mặt đáp phi tuyến ANN.</li>
+                    <li><strong>6a. Tối Ưu Hóa Desirability:</strong> Điểm vận hành tối ưu toàn cục Derringer-Suich (Overall D) và setpoint các yếu tố.</li>
+                    <li><strong>6b. Đánh Giá Rủi Ro Sau DoE:</strong> Bảng cập nhật rủi ro FMEA dựa trên bằng chứng thực nghiệm đã thu được.</li>
                     <li><strong>7. Chiến Lược Kiểm Soát Toàn Diện (ICH Q10):</strong> Phân loại CMA, CPP, IPC, tiêu chuẩn xuất xưởng thành phẩm, dải vận hành thường quy (NOR) và dải chứng minh chấp nhận được (PAR).</li>
                     <li><strong>8. Độ Bền Vững Quy Trình (Monte Carlo):</strong> Kết quả mô phỏng 10.000 lô ảo, độ tin cậy phần trăm (Reliability %), chỉ số năng lực quy trình Cpk và tỷ lệ lỗi PPM.</li>
                     <li><strong>9. Ký Duyệt Điện Tử &amp; Audit Trail:</strong> Bảng biểu chữ ký điện tử 3 cấp độ (Analyst, Reviewer, Approver) tuân thủ 21 CFR Part 11 và sổ cái chuỗi khối bất biến.</li>
+                    <li><strong>Quản Trị Dự Án &amp; Lịch Sử Phiên Bản:</strong> Tạo snapshot lưu trữ, đối chiếu sai khác và kiểm tra tính toàn vẹn chuỗi kiểm toán.</li>
                   </ol>
                 </div>
               </div>

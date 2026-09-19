@@ -16,6 +16,7 @@ import {
   Activity,
   Clock,
   Zap,
+  AlertTriangle,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import type {
@@ -860,19 +861,6 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
   const missingModelCodes = cqas
     .filter((cqa) => !cqa.dataType?.startsWith('qualitative') && cqa.objective !== 'pass_category' && !models[cqa.code])
     .map((cqa) => cqa.code);
-  if (missingModelCodes.length > 0 || !optimum) {
-    return (
-      <div className="qbd-card" role="alert" style={{ borderLeft: '4px solid #d97706', color: '#92400e' }}>
-        <h2 style={{ fontSize: '1rem', marginBottom: '0.35rem' }}>Design Space chưa thể được tính</h2>
-        <p style={{ margin: 0, fontSize: '0.82rem' }}>
-          {missingModelCodes.length > 0
-            ? `Thiếu mô hình khả định cho: ${missingModelCodes.join(', ')}. Hãy chọn mô hình đơn giản hơn, bổ sung run hoặc xử lý block trước khi tạo overlay/PAR.`
-            : 'Chưa tìm được nghiệm desirability khả thi cho toàn bộ CQA.'}
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       
@@ -945,7 +933,31 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
         </div>
       )}
 
-      {/* 1. Prediction Profiler & Desirability Optimization */}
+      {missingModelCodes.length > 0 || !optimum ? (
+        <div className="qbd-card" role="alert" style={{ borderLeft: '4px solid #d97706', color: '#92400e', padding: '2.5rem 1.5rem', textAlign: 'center' }}>
+          <AlertTriangle size={36} color="#d97706" style={{ margin: '0 auto 0.75rem' }} />
+          <h2 style={{ fontSize: '1.05rem', fontWeight: '700', marginBottom: '0.35rem' }}>Design Space chưa thể được tính</h2>
+          <p style={{ margin: '0 auto 1.25rem', fontSize: '0.82rem', maxWidth: '620px', lineHeight: 1.5 }}>
+            {missingModelCodes.length > 0
+              ? `Thiếu mô hình khả định cho: ${missingModelCodes.join(', ')}. ${modelingEngine === 'neural' ? 'Vui lòng sang Bước 5 để huấn luyện Mạng Nơ-ron cho các CQA này, hoặc bấm nút bên dưới để quay lại mô hình Đa thức (ANOVA).' : 'Hãy chọn mô hình đơn giản hơn, bổ sung run hoặc xử lý block trước khi tạo overlay/PAR.'}`
+              : 'Chưa tìm được nghiệm desirability khả thi cho toàn bộ CQA.'}
+          </p>
+          {onToggleEngine && modelingEngine === 'neural' && (
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem' }}>
+              <button
+                onClick={() => onToggleEngine('polynomial')}
+                className="btn btn-teal"
+                style={{ fontSize: '0.85rem', padding: '0.5rem 1.25rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.45rem' }}
+              >
+                <Calculator size={16} />
+                <span>Quay Lại Mô Hình Đa Thức (ANOVA)</span>
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          {/* 1. Prediction Profiler & Desirability Optimization */}
       <DesirabilityProfiler
         factors={factors}
         cqas={cqas}
@@ -2069,6 +2081,23 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
           </table>
         </div>
       </div>
+
+          {/* Bottom Navigation */}
+          {onNavigateToReport && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '0.5rem' }}>
+              <button
+                onClick={onNavigateToReport}
+                className="btn btn-teal"
+                style={{ fontSize: '0.85rem', padding: '0.5rem 1.25rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.45rem' }}
+                title="Chuyển sang Bước 8 để xem báo cáo hồ sơ phát triển dược phẩm CTD 3.2.P.2"
+              >
+                <span>Xem Báo Cáo Hồ Sơ QbD (Bước 8)</span>
+                <ArrowRight size={16} />
+              </button>
+            </div>
+          )}
+        </>
+      )}
 
     </div>
   );

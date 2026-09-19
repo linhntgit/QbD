@@ -475,6 +475,26 @@ export const FMEATab: React.FC<FMEATabProps> = ({
         </div>
       )}
 
+      {onNavigateToDoE && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '0.5rem' }}>
+          <button
+            onClick={onNavigateToDoE}
+            className="btn btn-primary"
+            style={{
+              fontSize: '0.85rem',
+              padding: '0.5rem 1.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              fontWeight: '700',
+            }}
+          >
+            <span>Chuyển Sang Bước 3: Thiết Kế DoE (Ma Trận Thí Nghiệm)</span>
+            <ArrowRight size={16} />
+          </button>
+        </div>
+      )}
+
     </div>
   );
 };

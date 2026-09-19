@@ -174,6 +174,12 @@ export function App() {
     return modelingEngine === 'neural' ? neuralModels : models;
   }, [modelingEngine, models, neuralModels]);
 
+  const hasTrainedNeuralModels = useMemo(() => {
+    return Object.values(neuralModels).some(
+      (m) => Boolean(m?.diagnostics && Number.isFinite(m.diagnostics.rSquaredTrain))
+    );
+  }, [neuralModels]);
+
   // Handle Training Shared Neural Network model (fits all CQAs at once)
   const handleTrainSharedNeuralModel = (config: NeuralNetConfig) => {
     trackModelAction('neural', 'train_shared', {
@@ -467,6 +473,7 @@ export function App() {
         project={project}
         modelingEngine={modelingEngine}
         onToggleEngine={handleModelingEngineChange}
+        hasTrainedNeuralModels={hasTrainedNeuralModels}
         onLoadProject={handleLoadProject}
         onSaveJSON={handleSaveJSON}
         onNewProject={handleNewProject}
@@ -497,7 +504,11 @@ export function App() {
         <Suspense fallback={<div className="qbd-card" role="status" aria-live="polite">Đang tải mô-đun phân tích…</div>}>
           <ComponentErrorBoundary key={activeTab} fallbackTitle={`Sự cố khi tải tab ${activeTab.toUpperCase()}`}>
           {activeTab === 'qtpp' && (
-          <QTPPTab project={project} onUpdateProject={handleUpdateProject} />
+          <QTPPTab
+            project={project}
+            onUpdateProject={handleUpdateProject}
+            onNavigateToFMEA={() => handleTabChange('fmea')}
+          />
         )}
 
         {activeTab === 'fmea' && (

@@ -7,6 +7,7 @@ import {
   BrainCircuit,
   ShieldCheck,
   Share2,
+  Info,
 } from 'lucide-react';
 import type {
   QBDProject,
@@ -67,6 +68,14 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
       : null,
     [currentCQA, model, project.runs],
   );
+
+  const hasTrainedNeuralModels = useMemo(() => {
+    if (!neuralModels || Object.keys(neuralModels).length === 0) return false;
+    return project.cqas.some((cqa) => {
+      const nm = neuralModels[cqa.code];
+      return Boolean(nm && nm.diagnostics && typeof nm.diagnostics.rSquaredTrain === 'number');
+    });
+  }, [project.cqas, neuralModels]);
 
   if (!currentCQA) {
     return (
@@ -818,131 +827,183 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
             {renderDiagnosticPlot()}
           </div>
 
-          {/* Model Comparison Dashboard (Đa Thức vs Mạng Nơ-ron) */}
-          <div className="qbd-card" style={{ borderLeft: '4px solid #7c3aed' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <BrainCircuit size={20} color="#7c3aed" />
-                <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a' }}>
-                  Bảng So Sánh Đối Chiếu Hiệu Năng: Mô Hình Đa Thức vs Mạng Nơ-ron
-                </h3>
+          {/* Model Comparison / Next Step Guidance */}
+          {!hasTrainedNeuralModels ? (
+            <div className="qbd-card" style={{ borderLeft: '4px solid #7c3aed', backgroundColor: '#faf5ff' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <BrainCircuit size={20} color="#7c3aed" />
+                  <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
+                    Gợi Ý Bước Tiếp Theo: Mô Hình Hóa Phi Tuyến Bằng Mạng Nơ-ron (Bước 5)
+                  </h3>
+                </div>
+                <span className="badge" style={{ backgroundColor: '#e9d5ff', color: '#6b21a8', fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}>
+                  Khởi tạo tại Bước 5
+                </span>
               </div>
-              <span className="badge badge-purple" style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}>
-                Model Comparison
-              </span>
+
+              <p style={{ fontSize: '0.78rem', color: '#475569', lineHeight: '1.55', margin: '0 0 0.85rem 0' }}>
+                Tại Bước 4 này, bạn đang xây dựng và đánh giá các mô hình Hồi quy Đa thức (Tuyến tính, Tương tác 2 yếu tố 2FI, hoặc Đa thức bậc hai Quadratic) theo tiêu chuẩn ANOVA chuẩn mực của <strong>ICH Q8(R2)</strong>. Nếu hệ thống thử nghiệm có độ uốn cong phức tạp hoặc tương tác phi tuyến tính cao mà mô hình đa thức chưa bao quát trọn vẹn, bạn có thể chuyển tiếp sang <strong>Bước 5 (Mạng Nơ-ron)</strong> để khởi tạo và huấn luyện mô hình học sâu nhân tạo (ANN MLP).
+              </p>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.65rem', backgroundColor: '#ffffff', padding: '0.65rem 0.9rem', borderRadius: '0.375rem', border: '1px solid #e9d5ff' }}>
+                <div style={{ fontSize: '0.76rem', color: '#6b21a8', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Info size={15} color="#7c3aed" />
+                  <span>
+                    Bảng đối chiếu hiệu năng chi tiết (Đa thức vs Mạng nơ-ron) sẽ tự động kích hoạt tại đây ngay sau khi bạn thực hiện huấn luyện ở Bước 5.
+                  </span>
+                </div>
+                {onNavigateToNeural && (
+                  <button
+                    onClick={onNavigateToNeural}
+                    className="btn btn-primary"
+                    style={{ fontSize: '0.78rem', padding: '0.35rem 0.8rem', backgroundColor: '#7c3aed', borderColor: '#7c3aed', fontWeight: '600' }}
+                  >
+                    <BrainCircuit size={15} />
+                    <span>Chuyển Sang Bước 5: Thử Mạng Nơ-ron</span>
+                    <ArrowRight size={14} />
+                  </button>
+                )}
+              </div>
             </div>
+          ) : (
+            <div className="qbd-card" style={{ borderLeft: '4px solid #7c3aed' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <BrainCircuit size={20} color="#7c3aed" />
+                  <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
+                    Bảng So Sánh Đối Chiếu Hiệu Năng: Mô Hình Đa Thức vs Mạng Nơ-ron
+                  </h3>
+                </div>
+                <span className="badge" style={{ backgroundColor: '#dcfce7', color: '#15803d', fontSize: '0.75rem', padding: '0.25rem 0.6rem', fontWeight: '700' }}>
+                  ✓ Đã kết nối kết quả từ Bước 5
+                </span>
+              </div>
 
-            <div style={{ fontSize: '0.78rem', color: '#475569', marginBottom: '0.75rem' }}>
-              Đối chiếu song song các chỉ số thống kê then chốt (R², R²adj, Q², RMSE, AICc, BIC) giữa phương pháp Hồi quy Đa thức Cổ điển và Mạng Nơ-ron Nhân tạo (ANN) để lựa chọn mô hình dự đoán tối ưu cho từng chỉ tiêu chất lượng CQA.
-            </div>
+              <div style={{ fontSize: '0.78rem', color: '#475569', marginBottom: '0.75rem', lineHeight: '1.5' }}>
+                Đối chiếu song song các chỉ số thống kê then chốt giữa phương pháp Hồi quy Đa thức hiện tại (Bước 4) và Mạng Nơ-ron Nhân tạo (đã huấn luyện ở Bước 5) để hỗ trợ lựa chọn công cụ mô hình hóa tối ưu cho từng chỉ tiêu chất lượng CQA.
+              </div>
 
-            <div className="table-container">
-              <table className="qbd-table">
-                <thead>
-                  <tr style={{ backgroundColor: '#f8fafc' }}>
-                    <th rowSpan={2} style={{ verticalAlign: 'middle' }}>Chỉ Tiêu (CQA)</th>
-                    <th colSpan={5} style={{ textAlign: 'center', backgroundColor: '#eff6ff', color: '#1e40af', borderBottom: '2px solid #bfdbfe' }}>
-                      📐 Mô Hình Đa Thức (MLR / OLS)
-                    </th>
-                    <th colSpan={5} style={{ textAlign: 'center', backgroundColor: '#faf5ff', color: '#6b21a8', borderBottom: '2px solid #e9d5ff' }}>
-                      🧠 Mạng Nơ-ron (ANN)
-                    </th>
-                    <th rowSpan={2} style={{ textAlign: 'center', verticalAlign: 'middle' }}>Khuyến Nghị Tối Ưu</th>
-                  </tr>
-                  <tr style={{ fontSize: '0.75rem', backgroundColor: '#f1f5f9' }}>
-                    {/* MLR subheaders */}
-                    <th style={{ textAlign: 'center' }}>R²</th>
-                    <th style={{ textAlign: 'center' }}>R²adj</th>
-                    <th style={{ textAlign: 'center' }}>Q² (PRESS)</th>
-                    <th style={{ textAlign: 'center' }}>RMSE</th>
-                    <th style={{ textAlign: 'center' }}>AICc</th>
-                    {/* ANN subheaders */}
-                    <th style={{ textAlign: 'center' }}>R² Train</th>
-                    <th style={{ textAlign: 'center' }}>R² Val</th>
-                    <th style={{ textAlign: 'center' }}>Validation R² (hold-out)</th>
-                    <th style={{ textAlign: 'center' }}>RMSE</th>
-                    <th style={{ textAlign: 'center' }}>AICc</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {project.cqas.map((cqa) => {
-                    const ols = models[cqa.code];
-                    const ann = neuralModels[cqa.code];
+              <div className="table-container">
+                <table className="qbd-table">
+                  <thead>
+                    <tr style={{ backgroundColor: '#f8fafc' }}>
+                      <th rowSpan={2} style={{ verticalAlign: 'middle' }}>Chỉ Tiêu (CQA)</th>
+                      <th colSpan={5} style={{ textAlign: 'center', backgroundColor: '#eff6ff', color: '#1e40af', borderBottom: '2px solid #bfdbfe' }}>
+                        📐 Mô Hình Đa Thức (MLR / OLS)
+                      </th>
+                      <th colSpan={4} style={{ textAlign: 'center', backgroundColor: '#faf5ff', color: '#6b21a8', borderBottom: '2px solid #e9d5ff' }}>
+                        🧠 Mạng Nơ-ron (ANN - Bước 5)
+                      </th>
+                      <th rowSpan={2} style={{ textAlign: 'center', verticalAlign: 'middle' }}>Khuyến Nghị Tối Ưu</th>
+                    </tr>
+                    <tr style={{ fontSize: '0.75rem', backgroundColor: '#f1f5f9' }}>
+                      {/* MLR subheaders */}
+                      <th style={{ textAlign: 'center' }}>R²</th>
+                      <th style={{ textAlign: 'center' }}>R²adj</th>
+                      <th style={{ textAlign: 'center' }}>Q² (PRESS)</th>
+                      <th style={{ textAlign: 'center' }}>RMSE</th>
+                      <th style={{ textAlign: 'center' }}>AICc</th>
+                      {/* ANN subheaders */}
+                      <th style={{ textAlign: 'center' }}>R² Train</th>
+                      <th style={{ textAlign: 'center' }}>R² Val (Hold-out)</th>
+                      <th style={{ textAlign: 'center' }}>RMSE</th>
+                      <th style={{ textAlign: 'center' }}>AICc</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {project.cqas.map((cqa) => {
+                      const ols = models[cqa.code];
+                      const ann = neuralModels[cqa.code];
 
-                    const olsQ2 = ols?.diagnostics.qSquared ?? ols?.diagnostics.predRSquared ?? 0;
-                    const annValidationR2 = ann?.diagnostics.rSquaredVal ?? 0;
-                    const olsAIC = ols?.diagnostics.aicc ?? 9999;
-                    const annAIC = ann?.diagnostics.aicc ?? 9999;
+                      const olsQ2 = ols?.diagnostics.qSquared ?? ols?.diagnostics.predRSquared ?? 0;
+                      const annValidationR2 = ann?.diagnostics.rSquaredVal ?? 0;
+                      const olsAIC = ols?.diagnostics.aicc ?? 9999;
+                      const annAIC = ann?.diagnostics.aicc ?? 9999;
 
-                    let recommendation = 'Đang chờ dữ liệu';
-                    let recBadge = 'badge-secondary';
+                      let recommendation = 'Đang chờ dữ liệu';
+                      let recBadge = 'badge-secondary';
 
-                    if (ols && ann) {
-                      if (annValidationR2 > olsQ2 + 0.05 || (annAIC < olsAIC - 2 && annValidationR2 >= olsQ2)) {
-                        recommendation = '🧠 Ưu tiên Mạng Nơ-ron (ANN)';
-                        recBadge = 'badge-purple';
-                      } else {
-                        recommendation = '📐 Ưu tiên Đa thức (MLR)';
+                      if (ols && ann) {
+                        if (annValidationR2 > olsQ2 + 0.05 || (annAIC < olsAIC - 2 && annValidationR2 >= olsQ2)) {
+                          recommendation = '🧠 Ưu tiên Mạng Nơ-ron (ANN)';
+                          recBadge = 'badge-purple';
+                        } else {
+                          recommendation = '📐 Ưu tiên Đa thức (MLR)';
+                          recBadge = 'badge-blue';
+                        }
+                      } else if (ols) {
+                        recommendation = '📐 Đa thức (MLR)';
                         recBadge = 'badge-blue';
+                      } else if (ann) {
+                        recommendation = '🧠 Mạng Nơ-ron (ANN)';
+                        recBadge = 'badge-purple';
                       }
-                    } else if (ols) {
-                      recommendation = '📐 Đa thức (MLR)';
-                      recBadge = 'badge-blue';
-                    } else if (ann) {
-                      recommendation = '🧠 Mạng Nơ-ron (ANN)';
-                      recBadge = 'badge-purple';
-                    }
 
-                    return (
-                      <tr key={cqa.code}>
-                        <td style={{ fontWeight: '600' }}>
-                          {cqa.name} <span style={{ color: '#64748b' }}>({cqa.code})</span>
-                        </td>
-                        {/* MLR Values */}
-                        <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
-                          {ols ? ols.diagnostics.rSquared.toFixed(3) : '-'}
-                        </td>
-                        <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
-                          {ols ? ols.diagnostics.adjRSquared.toFixed(3) : '-'}
-                        </td>
-                        <td style={{ textAlign: 'center', fontFamily: 'monospace', fontWeight: '700', color: olsQ2 > 0.7 ? '#15803d' : '#475569' }}>
-                          {ols ? olsQ2.toFixed(3) : '-'}
-                        </td>
-                        <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
-                          {ols ? ols.diagnostics.stdDev.toFixed(3) : '-'}
-                        </td>
-                        <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
-                          {ols?.diagnostics.aicc !== undefined ? ols.diagnostics.aicc.toFixed(1) : '-'}
-                        </td>
-                        {/* ANN Values */}
-                        <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
-                          {ann ? ann.diagnostics.rSquaredTrain.toFixed(3) : '-'}
-                        </td>
-                        <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
-                          {ann ? ann.diagnostics.rSquaredVal.toFixed(3) : '-'}
-                        </td>
-                        <td style={{ textAlign: 'center', fontFamily: 'monospace', fontWeight: '700', color: annValidationR2 > 0.7 ? '#15803d' : '#475569' }}>
-                          {ann ? annValidationR2.toFixed(3) : '-'}
-                        </td>
-                        <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
-                          {ann ? ann.diagnostics.rmseOverall.toFixed(3) : '-'}
-                        </td>
-                        <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
-                          {ann?.diagnostics.aicc !== undefined ? ann.diagnostics.aicc.toFixed(1) : '-'}
-                        </td>
-                        {/* Recommendation */}
-                        <td style={{ textAlign: 'center' }}>
-                          <span className={`badge ${recBadge}`} style={{ fontSize: '0.76rem', padding: '0.25rem 0.5rem' }}>
-                            {recommendation}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                      return (
+                        <tr key={cqa.code}>
+                          <td style={{ fontWeight: '600' }}>
+                            {cqa.name} <span style={{ color: '#64748b' }}>({cqa.code})</span>
+                          </td>
+                          {/* MLR Values */}
+                          <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
+                            {ols ? ols.diagnostics.rSquared.toFixed(3) : '-'}
+                          </td>
+                          <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
+                            {ols ? ols.diagnostics.adjRSquared.toFixed(3) : '-'}
+                          </td>
+                          <td style={{ textAlign: 'center', fontFamily: 'monospace', fontWeight: '700', color: olsQ2 > 0.7 ? '#15803d' : '#475569' }}>
+                            {ols ? olsQ2.toFixed(3) : '-'}
+                          </td>
+                          <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
+                            {ols ? ols.diagnostics.stdDev.toFixed(3) : '-'}
+                          </td>
+                          <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
+                            {ols?.diagnostics.aicc !== undefined ? ols.diagnostics.aicc.toFixed(1) : '-'}
+                          </td>
+                          {/* ANN Values */}
+                          <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
+                            {ann ? ann.diagnostics.rSquaredTrain.toFixed(3) : '-'}
+                          </td>
+                          <td style={{ textAlign: 'center', fontFamily: 'monospace', fontWeight: '700', color: annValidationR2 > 0.7 ? '#15803d' : '#475569' }}>
+                            {ann ? annValidationR2.toFixed(3) : '-'}
+                          </td>
+                          <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
+                            {ann ? ann.diagnostics.rmseOverall.toFixed(3) : '-'}
+                          </td>
+                          <td style={{ textAlign: 'center', fontFamily: 'monospace' }}>
+                            {ann?.diagnostics.aicc !== undefined ? ann.diagnostics.aicc.toFixed(1) : '-'}
+                          </td>
+                          {/* Recommendation */}
+                          <td style={{ textAlign: 'center' }}>
+                            <span className={`badge ${recBadge}`} style={{ fontSize: '0.76rem', padding: '0.25rem 0.5rem' }}>
+                              {recommendation}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', fontSize: '0.76rem', color: '#64748b' }}>
+                <span>
+                  💡 Để tinh chỉnh siêu tham số nơ-ron, phân tích độ quan trọng biến XAI (SHAP) hoặc xem Đấu trường Đa mô hình toàn diện (kèm SVR &amp; Ensemble), vui lòng mở <strong>Bước 5</strong>.
+                </span>
+                {onNavigateToNeural && (
+                  <button
+                    onClick={onNavigateToNeural}
+                    className="btn btn-secondary"
+                    style={{ fontSize: '0.74rem', padding: '0.25rem 0.6rem', color: '#7c3aed', borderColor: '#c4b5fd' }}
+                  >
+                    <BrainCircuit size={14} />
+                    <span>Mở Bước 5 (Mạng Nơ-ron)</span>
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Updated Risk Assessment Card (ICH Q9 & US FDA ANDA Standard) */}
           <div className="qbd-card" style={{ borderLeft: '4px solid #15803d' }}>
@@ -1005,6 +1066,34 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* Bottom Navigation Actions */}
+            <div style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', flexWrap: 'wrap' }}>
+              {onNavigateToNeural && (
+                <button
+                  onClick={onNavigateToNeural}
+                  className="btn btn-secondary"
+                  style={{ fontSize: '0.85rem', padding: '0.5rem 1.1rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#7c3aed', borderColor: '#c4b5fd' }}
+                  title="Chuyển sang Bước 5 để thử nghiệm mô hình mạng nơ-ron phi tuyến"
+                >
+                  <BrainCircuit size={16} color="#7c3aed" />
+                  <span>Chuyển Sang Bước 5: Thử Mạng Nơ-ron AI</span>
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  onSelectEngine?.('polynomial');
+                  onNavigateToRSM();
+                }}
+                className="btn btn-teal"
+                style={{ fontSize: '0.85rem', padding: '0.5rem 1.25rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.45rem' }}
+                title="Khóa mô hình đa thức và chuyển sang Bước 6: Mặt đáp phản ứng"
+              >
+                <span>Tiếp Tục Với Đa Thức (Bước 6: Mặt Đáp)</span>
+                <ArrowRight size={16} />
+              </button>
             </div>
           </div>
         </>

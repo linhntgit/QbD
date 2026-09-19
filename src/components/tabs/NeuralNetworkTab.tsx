@@ -14,7 +14,6 @@ import {
   Loader2,
   Cpu,
   CheckCircle2,
-  FlaskConical,
   Network,
   AlertTriangle,
   AlertOctagon,
@@ -22,6 +21,7 @@ import {
   Target,
   Zap,
   RotateCcw,
+  Info,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import type {
@@ -31,31 +31,17 @@ import type {
   NeuralNetModelResult,
   NeuralTrainingMode,
   NeuralActivation,
-  DesirabilitySolution,
   ModelingEngine,
-  Factor,
 } from '../../types/qbd';
 import { PlotlyChart } from '../PlotlyChart';
 import { NeuralNetworkTopologyDiagram } from '../NeuralNetworkTopologyDiagram';
-import { codedToActual, getConfiguredFactorCodes, getConfiguredFactorLevels, getFactorGridCodes, isDiscreteFactor } from '../../services/doeGenerator';
 import {
-  optimizeNeuralDesirability,
   calculateNeuralArchitectureMetrics,
   DEFAULT_NEURAL_CONFIG,
   getNeuralTrainingSampleCount,
 } from '../../services/neuralNetwork';
-import { formatAxisTitle, extract2DContourSegments, calculateCQAMargin } from '../../services/mathUtils';
-import {
-  getFeasibleMixtureComponentRange,
-  normalizeMixtureCoded,
-  setBoundedMixtureComponent,
-} from '../../services/statistics';
 import { buildFactorFeatures } from '../../services/modelTerms';
-import {
-  generateTernaryContour,
-  buildTernaryPlotlyTraces,
-  getEvenContourSettings,
-} from '../../services/ternaryContour';
+import { formatAxisTitle } from '../../services/mathUtils';
 import {
   computeXAIImportance,
   generateCQAImpactMatrix,
@@ -171,25 +157,6 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
   const [lastTrainedNotice, setLastTrainedNotice] = useState<string | null>(null);
   const [configActionNotice, setConfigActionNotice] = useState<string | null>(null);
 
-  // Profiler values always remain on the bounded mixture simplex.
-  const [profilerCoded, setProfilerCoded] = useState<Record<string, number>>(() => {
-    const init: Record<string, number> = {};
-    project.factors.forEach((f) => {
-      init[f.code] = 0;
-    });
-    return normalizeMixtureCoded(init, project.factors);
-  });
-
-  // Mixture factors filter
-  const mixtureFactors = useMemo(() => {
-    return project.factors.filter((f) => f.role === 'mixture_component' || f.type === 'Mixture');
-  }, [project.factors]);
-  const hasMixture = mixtureFactors.length >= 3;
-
-  useEffect(() => {
-    setProfilerCoded((previous) => normalizeMixtureCoded(previous, project.factors));
-  }, [project.factors]);
-
   // Explainable AI (XAI) and Multi-Model Benchmarking Memos
   const xaiResult = useMemo<XAIComprehensiveResult | null>(() => {
     if (!neuralModel || !currentCQA) return null;
@@ -222,608 +189,6 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
       neuralModel,
     );
   }, [currentCQA, project.factors, project.runs, anovaModel, neuralModel]);
-
-  // 3D/2D Surface Profiler factor axes
-  const [xAxisFactor, setXAxisFactor] = useState<string>(project.factors[0]?.code || 'X1');
-  const [yAxisFactor, setYAxisFactor] = useState<string>(project.factors[1]?.code || 'X2');
-  const [plotType, setPlotType] = useState<'3d' | 'contour' | 'ternary'>(() =>
-    hasMixture ? 'ternary' : '3d'
-  );
-  const [colorScale, setColorScale] = useState<string>('Plasma');
-
-  // Only ternary requires a three-component mixture. Cartesian views are also
-  // valid for a mixture–process pair, but never for two mixture components.
-  useEffect(() => {
-    if (!hasMixture && plotType === 'ternary') {
-      setPlotType('3d');
-    }
-  }, [project.id, hasMixture, plotType]);
-
-  // Selected Vertices for 3-Component Mixture Triangle
-  const [ternaryA, setTernaryA] = useState<string>(() => mixtureFactors[0]?.code || project.factors[0]?.code || 'X1');
-  const [ternaryB, setTernaryB] = useState<string>(() => mixtureFactors[1]?.code || project.factors[1]?.code || 'X2');
-  const [ternaryC, setTernaryC] = useState<string>(() => mixtureFactors[2]?.code || project.factors[2]?.code || 'X3');
-
-  // Sync ternary factors when project or factors change
-  useEffect(() => {
-    if (mixtureFactors.length >= 3) {
-      setTernaryA(mixtureFactors[0].code);
-      setTernaryB(mixtureFactors[1].code);
-      setTernaryC(mixtureFactors[2].code);
-    }
-  }, [project.id, project.factors, mixtureFactors]);
-
-  // Ternary Contour Options
-  const [ternaryDisplayMode, setTernaryDisplayMode] = useState<'both' | 'lines_only' | 'heatmap'>('both');
-  const [ternaryLevels, setTernaryLevels] = useState<number>(12);
-  const [contourLineWidth, setContourLineWidth] = useState<number>(1.5);
-  const [showContourLabels, setShowContourLabels] = useState<boolean>(true);
-  const [showDoERuns, setShowDoERuns] = useState<boolean>(true);
-  const [showOptimum, setShowOptimum] = useState<boolean>(true);
-  const [showConstraints, setShowConstraints] = useState<boolean>(true);
-  const [showRegionPolygon, setShowRegionPolygon] = useState<boolean>(true);
-  const [showSpecLimits, setShowSpecLimits] = useState<boolean>(true);
-  const [ternaryResolution, setTernaryResolution] = useState<number>(180);
-  const [ternarySmoothness, setTernarySmoothness] = useState<number>(1.0);
-
-  // Active factors for Ternary
-  const factorA = project.factors.find((f) => f.code === ternaryA) || mixtureFactors[0] || project.factors[0];
-  const factorB = project.factors.find((f) => f.code === ternaryB) || mixtureFactors[1] || project.factors[1];
-  const factorC = project.factors.find((f) => f.code === ternaryC) || mixtureFactors[2] || project.factors[2];
-
-  // Neural Optimum State
-  const [neuralOptimum, setNeuralOptimum] = useState<DesirabilitySolution | null>(null);
-
-  // Surface Grid Data from Neural Model (Unconditional Hooks for React Rules of Hooks)
-  const factorX = project.factors.find((f) => f.code === xAxisFactor) || project.factors[0];
-  const factorY = project.factors.find((f) => f.code === yAxisFactor) || project.factors[1];
-  const isMixtureFactor = (factor?: Factor) => Boolean(factor && (factor.role === 'mixture_component' || factor.type === 'Mixture'));
-  const cartesianAxesValid = Boolean(factorX && factorY) && !(isMixtureFactor(factorX) && isMixtureFactor(factorY));
-  const hasCartesianPair = project.factors.some((x) => project.factors.some((y) => x.code !== y.code && !(isMixtureFactor(x) && isMixtureFactor(y))));
-
-  useEffect(() => {
-    if (!factorX || !factorY || !isMixtureFactor(factorX) || !isMixtureFactor(factorY)) return;
-    const replacement = project.factors.find((factor) => factor.code !== factorX.code && !isMixtureFactor(factor));
-    if (replacement) setYAxisFactor(replacement.code);
-  }, [project.factors, factorX, factorY]);
-
-  const surfaceGrid = useMemo(() => {
-    if (!cartesianAxesValid || !neuralModel || !factorX || !factorY) return null;
-
-    const xActualArr: number[] = [];
-    const yActualArr: number[] = [];
-    const xCodedArr = getFactorGridCodes(factorX, 35);
-    const yCodedArr = getFactorGridCodes(factorY, 35);
-    const xDisplayArr: Array<number | string> = [];
-    const yDisplayArr: Array<number | string> = [];
-
-    xCodedArr.forEach((coded, index) => {
-      const actual = codedToActual(coded, factorX);
-      xDisplayArr.push(actual);
-      xActualArr.push(typeof actual === 'number' ? actual : index);
-    });
-    yCodedArr.forEach((coded, index) => {
-      const actual = codedToActual(coded, factorY);
-      yDisplayArr.push(actual);
-      yActualArr.push(typeof actual === 'number' ? actual : index);
-    });
-
-    const zGrid: number[][] = [];
-    const hoverX: Array<number | string> = [];
-    const hoverY: Array<number | string> = [];
-    const hoverText: string[] = [];
-
-    for (let j = 0; j < yCodedArr.length; j++) {
-      const row: number[] = [];
-      const yCoded = yCodedArr[j];
-      const yAct = yDisplayArr[j];
-
-      for (let i = 0; i < xCodedArr.length; i++) {
-        const xCoded = xCodedArr[i];
-        const xAct = xDisplayArr[i];
-        const pointCoded: Record<string, number> = { ...profilerCoded };
-        pointCoded[factorX.code] = xCoded;
-        pointCoded[factorY.code] = yCoded;
-
-        const pred = neuralModel.predict(pointCoded);
-        // Preserve raw neural-network predictions in the surface grid.  Rounding
-        // here produces artificial steps for responses such as PDI.
-        row.push(pred);
-
-        const cqaMargin = calculateCQAMargin(
-          pred,
-          currentCQA.objective,
-          currentCQA.lowerLimit,
-          currentCQA.upperLimit,
-          currentCQA.target
-        );
-        const isPass = cqaMargin >= 0;
-
-        hoverX.push(xAct);
-        hoverY.push(yAct);
-
-        const statusBadge = isPass
-          ? `<span style="color:#16a34a;font-weight:700">✓ ĐẠT TIÊU CHUẨN (${currentCQA.lowerLimit !== undefined ? `>= ${currentCQA.lowerLimit}` : ''}${currentCQA.lowerLimit !== undefined && currentCQA.upperLimit !== undefined ? ', ' : ''}${currentCQA.upperLimit !== undefined ? `<= ${currentCQA.upperLimit}` : ''} ${currentCQA.unit || ''})</span>`
-          : `<span style="color:#dc2626;font-weight:700">⚠ NGOÀI TIÊU CHUẨN (Không đạt tiêu chuẩn ${currentCQA.code})</span>`;
-
-        hoverText.push(
-          `<b>${factorX.name} (${factorX.code})</b>: ${typeof xAct === 'number' ? xAct.toFixed(2) : xAct} ${factorX.unit || ''}<br>` +
-          `<b>${factorY.name} (${factorY.code})</b>: ${typeof yAct === 'number' ? yAct.toFixed(2) : yAct} ${factorY.unit || ''}<br>` +
-          `-------------------------<br>` +
-          `${statusBadge}<br>` +
-          `<span style="color:#7c3aed;font-weight:700">Dự đoán Nơ-ron ${currentCQA.name} (${currentCQA.code}): ${pred.toFixed(3)} ${currentCQA.unit || ''}</span>`
-        );
-      }
-      zGrid.push(row);
-    }
-
-    return { xActualArr, yActualArr, zGrid, hoverX, hoverY, hoverText, xDisplayArr, yDisplayArr };
-  }, [cartesianAxesValid, neuralModel, factorX, factorY, profilerCoded, currentCQA]);
-
-  // Ternary Mesh & Contour Calculation for Neural Model
-  const ternaryResult = useMemo(() => {
-    if (plotType !== 'ternary' || !neuralModel || !factorA || !factorB || !factorC || !currentCQA) {
-      return null;
-    }
-
-    return generateTernaryContour(
-      factorA,
-      factorB,
-      factorC,
-      project.factors,
-      profilerCoded,
-      neuralModel,
-      currentCQA,
-      ternaryResolution,
-      ternaryLevels
-    );
-  }, [
-    plotType,
-    neuralModel,
-    factorA,
-    factorB,
-    factorC,
-    project.factors,
-    profilerCoded,
-    currentCQA,
-    ternaryResolution,
-    ternaryLevels,
-  ]);
-
-  const surfacePlotData = useMemo(() => {
-    if (plotType === 'ternary') {
-      if (!ternaryResult || !factorA || !factorB || !factorC || !currentCQA) return [];
-      const { traces } = buildTernaryPlotlyTraces(
-        ternaryResult,
-        factorA,
-        factorB,
-        factorC,
-        currentCQA,
-        {
-          colorScale,
-          displayMode: ternaryDisplayMode,
-          showDoERuns,
-          doeRuns: project.runs,
-          showOptimum,
-          optimum: neuralOptimum,
-          showConstraints,
-          showRegionPolygon,
-          showSpecLimits,
-          ternaryLevels,
-          smoothness: ternarySmoothness,
-          contourLineWidth,
-          showContourLabels,
-        }
-      );
-      return traces;
-    }
-
-    if (!surfaceGrid || !factorX || !factorY || !currentCQA) return [];
-    const traces: any[] = [];
-
-    if (plotType === '3d') {
-      traces.push({
-        type: 'surface',
-        x: surfaceGrid.xActualArr,
-        y: surfaceGrid.yActualArr,
-        z: surfaceGrid.zGrid,
-        colorscale: colorScale,
-        colorbar: {
-          title: {
-            text: `${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
-            side: 'right',
-            font: { size: 11, color: '#1e293b' },
-          },
-          len: 0.85,
-          thickness: 18,
-        },
-        contours: {
-          z: { show: true, usecolormap: true, highlightcolor: '#ffffff', project: { z: true } },
-        },
-        hoverinfo: 'x+y+z',
-      });
-
-      // 3D Spec Limit Horizontal Planes & Intersection Curves
-      if (showSpecLimits && !isDiscreteFactor(factorX) && !isDiscreteFactor(factorY)) {
-        const xMin = surfaceGrid.xActualArr[0];
-        const xMax = surfaceGrid.xActualArr[surfaceGrid.xActualArr.length - 1];
-        const yMin = surfaceGrid.yActualArr[0];
-        const yMax = surfaceGrid.yActualArr[surfaceGrid.yActualArr.length - 1];
-
-        // LSL Plane & Curve
-        if (currentCQA.lowerLimit !== undefined) {
-          const LSL = currentCQA.lowerLimit;
-          traces.push({
-            type: 'surface',
-            name: `🔴 Giới Hạn Dưới (LSL = ${LSL} ${currentCQA.unit || ''})`,
-            x: [xMin, xMax],
-            y: [yMin, yMax],
-            z: [
-              [LSL, LSL],
-              [LSL, LSL],
-            ],
-            opacity: 0.35,
-            showscale: false,
-            colorscale: [
-              [0, 'rgba(239, 68, 68, 0.45)'],
-              [1, 'rgba(239, 68, 68, 0.45)'],
-            ],
-            hoverinfo: 'name',
-            showlegend: true,
-          });
-
-          const lslSegs = extract2DContourSegments(
-            surfaceGrid.xActualArr,
-            surfaceGrid.yActualArr,
-            surfaceGrid.zGrid,
-            LSL
-          );
-          if (lslSegs.length > 0) {
-            traces.push({
-              type: 'scatter3d',
-              mode: 'lines',
-              name: `🔴 Đường Cắt LSL = ${LSL} ${currentCQA.unit || ''}`,
-              x: lslSegs.flatMap((s) => [s.x1, s.x2, null]),
-              y: lslSegs.flatMap((s) => [s.y1, s.y2, null]),
-              z: lslSegs.flatMap(() => [LSL, LSL, null]),
-              line: { color: '#dc2626', width: 6 },
-              hoverinfo: 'name',
-              showlegend: false,
-            });
-          }
-        }
-
-        // USL Plane & Curve
-        if (currentCQA.upperLimit !== undefined) {
-          const USL = currentCQA.upperLimit;
-          traces.push({
-            type: 'surface',
-            name: `🔴 Giới Hạn Trên (USL = ${USL} ${currentCQA.unit || ''})`,
-            x: [xMin, xMax],
-            y: [yMin, yMax],
-            z: [
-              [USL, USL],
-              [USL, USL],
-            ],
-            opacity: 0.35,
-            showscale: false,
-            colorscale: [
-              [0, 'rgba(185, 28, 28, 0.45)'],
-              [1, 'rgba(185, 28, 28, 0.45)'],
-            ],
-            hoverinfo: 'name',
-            showlegend: true,
-          });
-
-          const uslSegs = extract2DContourSegments(
-            surfaceGrid.xActualArr,
-            surfaceGrid.yActualArr,
-            surfaceGrid.zGrid,
-            USL
-          );
-          if (uslSegs.length > 0) {
-            traces.push({
-              type: 'scatter3d',
-              mode: 'lines',
-              name: `🔴 Đường Cắt USL = ${USL} ${currentCQA.unit || ''}`,
-              x: uslSegs.flatMap((s) => [s.x1, s.x2, null]),
-              y: uslSegs.flatMap((s) => [s.y1, s.y2, null]),
-              z: uslSegs.flatMap(() => [USL, USL, null]),
-              line: { color: '#b91c1c', width: 6 },
-              hoverinfo: 'name',
-              showlegend: false,
-            });
-          }
-        }
-
-        // Target Plane
-        if (currentCQA.target !== undefined) {
-          const T = currentCQA.target;
-          traces.push({
-            type: 'surface',
-            name: `🟢 Mục Tiêu (Target = ${T} ${currentCQA.unit || ''})`,
-            x: [xMin, xMax],
-            y: [yMin, yMax],
-            z: [
-              [T, T],
-              [T, T],
-            ],
-            opacity: 0.25,
-            showscale: false,
-            colorscale: [
-              [0, 'rgba(5, 150, 105, 0.35)'],
-              [1, 'rgba(5, 150, 105, 0.35)'],
-            ],
-            hoverinfo: 'name',
-            showlegend: true,
-          });
-        }
-      }
-    } else {
-      // 2D Contour
-      const zValues = surfaceGrid.zGrid.flat().filter(Number.isFinite);
-      const evenContours = getEvenContourSettings(Math.min(...zValues), Math.max(...zValues), ternaryLevels);
-      traces.push({
-        type: isDiscreteFactor(factorX) || isDiscreteFactor(factorY) ? 'heatmap' : 'contour',
-        x: surfaceGrid.xActualArr,
-        y: surfaceGrid.yActualArr,
-        z: surfaceGrid.zGrid,
-        colorscale: colorScale,
-        autocontour: !evenContours,
-        ncontours: ternaryLevels,
-        colorbar: {
-          title: {
-            text: `${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
-            side: 'right',
-            font: { size: 11, color: '#1e293b' },
-          },
-          len: 0.85,
-          thickness: 18,
-        },
-        contours: { coloring: 'heatmap', showlabels: showContourLabels, ...evenContours },
-        line: { width: contourLineWidth, color: '#334155' },
-        hoverinfo: 'none',
-      });
-
-      // 2D Fine Hover Probing Layer
-      if (surfaceGrid.hoverX && surfaceGrid.hoverX.length > 0) {
-        traces.push({
-          type: 'scatter',
-          mode: 'markers',
-          name: 'Hover Probe',
-          x: surfaceGrid.hoverX,
-          y: surfaceGrid.hoverY,
-          text: surfaceGrid.hoverText,
-          hoverinfo: 'text',
-          marker: {
-            size: 10,
-            opacity: 0.001,
-            color: '#000000',
-          },
-          showlegend: false,
-        });
-      }
-
-      // 2D Spec Limit Isolines
-      if (showSpecLimits && !isDiscreteFactor(factorX) && !isDiscreteFactor(factorY)) {
-        const addSpecLabel = (
-          segments: Array<{ x1: number; x2: number; y1: number; y2: number }>,
-          text: string,
-          color: string
-        ) => {
-          const segment = segments.reduce((longest, candidate) => {
-            const candidateLength = (candidate.x2 - candidate.x1) ** 2 + (candidate.y2 - candidate.y1) ** 2;
-            const longestLength = (longest.x2 - longest.x1) ** 2 + (longest.y2 - longest.y1) ** 2;
-            return candidateLength > longestLength ? candidate : longest;
-          }, segments[0]);
-          traces.push({
-            type: 'scatter',
-            mode: 'text',
-            x: [(segment.x1 + segment.x2) / 2],
-            y: [(segment.y1 + segment.y2) / 2],
-            text: [text],
-            textposition: 'middle center',
-            textfont: { family: 'Inter', size: 11, color },
-            hoverinfo: 'skip',
-            showlegend: false,
-          });
-        };
-        if (currentCQA.lowerLimit !== undefined) {
-          const LSL = currentCQA.lowerLimit;
-          const lslSegs = extract2DContourSegments(
-            surfaceGrid.xActualArr,
-            surfaceGrid.yActualArr,
-            surfaceGrid.zGrid,
-            LSL
-          );
-          if (lslSegs.length > 0) {
-            traces.push({
-              type: 'scatter',
-              mode: 'lines',
-              name: `🔴 Giới Hạn Dưới (LSL = ${LSL} ${currentCQA.unit || ''})`,
-              x: lslSegs.flatMap((s) => [s.x1, s.x2, null]),
-              y: lslSegs.flatMap((s) => [s.y1, s.y2, null]),
-              line: { color: '#dc2626', width: contourLineWidth + 1, dash: 'dash' },
-              hoverinfo: 'name',
-              showlegend: true,
-            });
-            if (showContourLabels) addSpecLabel(lslSegs, `LSL: ${LSL}`, '#dc2626');
-          }
-        }
-
-        if (currentCQA.upperLimit !== undefined) {
-          const USL = currentCQA.upperLimit;
-          const uslSegs = extract2DContourSegments(
-            surfaceGrid.xActualArr,
-            surfaceGrid.yActualArr,
-            surfaceGrid.zGrid,
-            USL
-          );
-          if (uslSegs.length > 0) {
-            traces.push({
-              type: 'scatter',
-              mode: 'lines',
-              name: `🔴 Giới Hạn Trên (USL = ${USL} ${currentCQA.unit || ''})`,
-              x: uslSegs.flatMap((s) => [s.x1, s.x2, null]),
-              y: uslSegs.flatMap((s) => [s.y1, s.y2, null]),
-              line: { color: '#b91c1c', width: contourLineWidth + 1, dash: 'dash' },
-              hoverinfo: 'name',
-              showlegend: true,
-            });
-            if (showContourLabels) addSpecLabel(uslSegs, `USL: ${USL}`, '#b91c1c');
-          }
-        }
-
-        if (currentCQA.target !== undefined) {
-          const T = currentCQA.target;
-          const targetSegs = extract2DContourSegments(
-            surfaceGrid.xActualArr,
-            surfaceGrid.yActualArr,
-            surfaceGrid.zGrid,
-            T
-          );
-          if (targetSegs.length > 0) {
-            traces.push({
-              type: 'scatter',
-              mode: 'lines',
-              name: `🟢 Mục Tiêu (Target = ${T} ${currentCQA.unit || ''})`,
-              x: targetSegs.flatMap((s) => [s.x1, s.x2, null]),
-              y: targetSegs.flatMap((s) => [s.y1, s.y2, null]),
-              line: { color: '#059669', width: contourLineWidth + 1, dash: 'solid' },
-              hoverinfo: 'name',
-              showlegend: true,
-            });
-            if (showContourLabels) addSpecLabel(targetSegs, `Target: ${T}`, '#059669');
-          }
-        }
-      }
-    }
-
-    return traces;
-  }, [
-    plotType,
-    ternaryResult,
-    factorA,
-    factorB,
-    factorC,
-    currentCQA,
-    colorScale,
-    ternaryDisplayMode,
-    showDoERuns,
-    project.runs,
-    showOptimum,
-    neuralOptimum,
-    showConstraints,
-    showRegionPolygon,
-    showSpecLimits,
-    surfaceGrid,
-    factorX,
-    factorY,
-    ternaryLevels,
-    ternarySmoothness,
-    contourLineWidth,
-    showContourLabels,
-  ]);
-
-  const surfaceLayout = useMemo(() => {
-    if (plotType === 'ternary') {
-      if (!ternaryResult || !factorA || !factorB || !factorC || !currentCQA) return {};
-      const { layout } = buildTernaryPlotlyTraces(
-        ternaryResult,
-        factorA,
-        factorB,
-        factorC,
-        currentCQA,
-        {
-          colorScale,
-          displayMode: ternaryDisplayMode,
-          showDoERuns,
-          doeRuns: project.runs,
-          showOptimum,
-          optimum: neuralOptimum,
-          showConstraints,
-          showRegionPolygon,
-        }
-      );
-      return {
-        ...layout,
-        title: {
-          text: `Mặt Đáp Tam Giác Mô Phỏng Bởi Mạng Nơ-ron: ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
-          font: { size: 13, color: '#0f172a', family: 'Inter, sans-serif' },
-        },
-      };
-    }
-
-    return {
-      title: `${plotType === '3d' ? 'Mặt Đáp Mạng Nơ-ron 3D' : 'Đường Đồng Mức 2D'}: ${currentCQA?.name || ''} (${currentCQA?.code || ''})${currentCQA?.unit ? ` [${currentCQA.unit}]` : ''}`,
-      autosize: true,
-      margin: plotType === '3d' ? { l: 40, r: 40, b: 40, t: 50 } : { l: 85, r: 60, t: 60, b: 75, pad: 4 },
-      scene: {
-        xaxis: {
-          title: {
-            text: factorX ? formatAxisTitle(factorX.name, factorX.code, factorX.unit) : '',
-            font: { size: 12, color: '#1e293b' },
-          },
-          tickfont: { size: 10 },
-          ...(factorX?.dataType === 'qualitative' && surfaceGrid ? { tickmode: 'array', tickvals: surfaceGrid.xActualArr, ticktext: surfaceGrid.xDisplayArr.map(String) } : {}),
-        },
-        yaxis: {
-          title: {
-            text: factorY ? formatAxisTitle(factorY.name, factorY.code, factorY.unit) : '',
-            font: { size: 12, color: '#1e293b' },
-          },
-          tickfont: { size: 10 },
-          ...(factorY?.dataType === 'qualitative' && surfaceGrid ? { tickmode: 'array', tickvals: surfaceGrid.yActualArr, ticktext: surfaceGrid.yDisplayArr.map(String) } : {}),
-        },
-        zaxis: {
-          title: {
-            text: currentCQA ? formatAxisTitle(currentCQA.name, currentCQA.code, currentCQA.unit) : '',
-            font: { size: 12, color: '#1e293b' },
-          },
-          tickfont: { size: 10 },
-        },
-        camera: { eye: { x: 1.6, y: 1.6, z: 1.2 } },
-      },
-      xaxis: {
-        title: {
-          text: factorX ? formatAxisTitle(factorX.name, factorX.code, factorX.unit) : '',
-          font: { size: 13, color: '#1e293b' },
-          standoff: 12,
-        },
-        tickfont: { size: 11 },
-        ...(factorX?.dataType === 'qualitative' && surfaceGrid ? { tickmode: 'array', tickvals: surfaceGrid.xActualArr, ticktext: surfaceGrid.xDisplayArr.map(String) } : {}),
-        automargin: true,
-      },
-      yaxis: {
-        title: {
-          text: factorY ? formatAxisTitle(factorY.name, factorY.code, factorY.unit) : '',
-          font: { size: 13, color: '#1e293b' },
-          standoff: 12,
-        },
-        tickfont: { size: 11 },
-        ...(factorY?.dataType === 'qualitative' && surfaceGrid ? { tickmode: 'array', tickvals: surfaceGrid.yActualArr, ticktext: surfaceGrid.yDisplayArr.map(String) } : {}),
-        automargin: true,
-      },
-    };
-  }, [
-    plotType,
-    ternaryResult,
-    factorA,
-    factorB,
-    factorC,
-    currentCQA,
-    colorScale,
-    ternaryDisplayMode,
-    showDoERuns,
-    project.runs,
-    showOptimum,
-    neuralOptimum,
-    showConstraints,
-    showRegionPolygon,
-    factorX,
-    factorY,
-    surfaceGrid,
-  ]);
 
   // Keep local config in sync when switching CQA or training mode
   useEffect(() => {
@@ -965,21 +330,6 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
     if (onCopyConfigToAll) {
       onCopyConfigToAll(localConfig);
       setConfigActionNotice(`Đã sao chép cấu hình [${localConfig.hiddenNodes1}, ${localConfig.hiddenNodes2}, ${localConfig.activation}] sang tất cả ${project.cqas.length} CQA.`);
-    }
-  };
-
-  const handleSolveNeuralOptimum = () => {
-    const opt = optimizeNeuralDesirability(
-      project.factors,
-      project.cqas,
-      neuralModels,
-      project.analysisProvenance?.optimizerSeed,
-    );
-    if (opt) {
-      setNeuralOptimum(opt);
-      try {
-        confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
-      } catch {}
     }
   };
 
@@ -1709,7 +1059,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                   )}
                 </div>
                 <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.2rem' }}>
-                  Mô phỏng phi tuyến tính cao cấp • Multi-Layer Perceptron (MLP) • Khảo sát mặt đáp và tối ưu hóa Desirability.
+                  Mô phỏng phi tuyến tính cao cấp • Multi-Layer Perceptron (MLP) • Khảo sát mô hình phi tuyến &amp; XAI Studio.
                 </div>
               </div>
             </div>
@@ -1734,26 +1084,29 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             </div>
 
             <button
-              onClick={handleSolveNeuralOptimum}
-              className="btn btn-primary"
-              style={{ fontSize: '0.82rem', padding: '0.4rem 0.9rem' }}
-              title="Tìm bộ thông số cài đặt tối ưu (X*) thỏa mãn đồng thời tất cả các chỉ tiêu chất lượng (CQAs) dựa trên hàm dự đoán của Mạng Nơ-ron AI theo thuật toán độ thỏa dụng Desirability (Derringer-Suich)."
-            >
-              <Sparkles size={16} />
-              <span>Tìm Điểm Tối Ưu Bằng Mạng Nơ-ron</span>
-            </button>
-
-            <button
               onClick={() => {
                 onSelectEngine?.('neural');
                 onNavigateToRSM();
               }}
               className="btn btn-primary"
               style={{ fontSize: '0.82rem', padding: '0.4rem 0.95rem', backgroundColor: '#7c3aed', borderColor: '#7c3aed', fontWeight: '700' }}
-              title="Chọn mô hình Mạng Nơ-ron AI làm phương pháp chính cho các bước tiếp theo (Bước 6: Mặt đáp, Bước 7: Không gian thiết kế, Bước 8: Báo cáo)"
+              title="Khóa mô hình Mạng Nơ-ron AI và chuyển tuần tự sang Bước 6: Mặt đáp phản ứng"
             >
-              <span>Tiếp Tục Với Mạng Nơ-ron (Bước 6, 7, 8)</span>
+              <span>Tiếp Tục Với Mạng Nơ-ron (Bước 6: Mặt Đáp)</span>
               <ArrowRight size={16} />
+            </button>
+
+            <button
+              onClick={() => {
+                onSelectEngine?.('neural');
+                onNavigateToDesignSpace();
+              }}
+              className="btn btn-secondary"
+              style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem', color: '#6d28d9', borderColor: '#e9d5ff', fontWeight: '500' }}
+              title="Bỏ qua khảo sát mặt đáp để sang thẳng Bước 7: Không gian thiết kế & Tối ưu hóa Desirability"
+            >
+              <span>Bỏ qua mặt đáp, sang thẳng Bước 7</span>
+              <ArrowRight size={14} />
             </button>
           </div>
         </div>
@@ -2679,6 +2032,30 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                 </tbody>
               </table>
             </div>
+
+            {/* Explanatory Note on SVR & Ensemble Stacking Roles */}
+            <div
+              style={{
+                marginTop: '0.85rem',
+                padding: '0.65rem 0.85rem',
+                backgroundColor: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderLeft: '4px solid #0284c7',
+                borderRadius: '0.375rem',
+                fontSize: '0.76rem',
+                color: '#334155',
+                lineHeight: '1.5',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '0.55rem',
+              }}
+            >
+              <Info size={16} color="#0284c7" style={{ flexShrink: 0, marginTop: '0.15rem' }} />
+              <div>
+                <strong style={{ color: '#0369a1' }}>Vai trò của SVR và Ensemble Stacking:</strong>{' '}
+                Đóng vai trò là <em>Mô hình Thẩm định &amp; Đối chuẩn Độc lập (Challenger / Benchmarking Models)</em>. Mục đích là cung cấp cơ sở khoa học khách quan để chứng minh mô hình người dùng chọn (Đa thức hoặc Mạng nơ-ron) không bị thiên lệch bởi một thuật toán đơn lẻ trước khi chuyển sang Bước 6 (Mặt đáp) và Bước 7 (Không gian thiết kế).
+              </div>
+            </div>
           </div>
 
           {/* Multi-CQA Neural Performance Summary Table */}
@@ -2832,612 +2209,69 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             {renderDiagnosticPlot()}
           </div>
 
-          {/* Interactive Prediction Profiler */}
-          <div className="qbd-card">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
-              <div>
-                <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Sliders size={18} color="#b45309" />
-                  <span>Bộ Dự Báo Tương Tác (Interactive Prediction Profiler)</span>
-                </h3>
-                <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.2rem' }}>
-                  Kéo thanh trượt từng thông số để quan sát sự thay đổi phản ứng CQA thời gian thực theo mô hình mạng nơ-ron.
+          {/* Transition Card 1: Response Surface at Step 6 */}
+          <div className="qbd-card" style={{ borderLeft: '4px solid #0f766e', background: 'linear-gradient(to right, #f0fdfa, #ffffff)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+              <div style={{ maxWidth: '800px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                  <Compass size={20} color="#0f766e" />
+                  <h3 style={{ fontSize: '1.02rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
+                    Khảo Sát Mặt Đáp Mô Phỏng Bằng Mạng Nơ-ron (Bước 6)
+                  </h3>
+                  <span className="badge badge-teal" style={{ fontSize: '0.72rem' }}>3D Surface &amp; Contour</span>
+                </div>
+                <p style={{ fontSize: '0.82rem', color: '#334155', margin: 0, lineHeight: 1.5 }}>
+                  Mô hình mạng nơ-ron cho <strong>{currentCQA.name} ({currentCQA.code})</strong> đã sẵn sàng. Toàn bộ không gian tương tác phi tuyến tính 3D, đường đồng mức 2D và biểu đồ tam giác hỗn hợp (Ternary Mixture) được hiển thị chuyên sâu tại <strong>Bước 6: Mặt Đáp</strong>.
                 </p>
               </div>
 
-              {/* Real-time Predicted Value Badge */}
-              {(() => {
-                const currentPred = neuralModel.predict(profilerCoded);
-                const rmse = neuralModel.diagnostics.rmseOverall;
-                return (
-                  <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '0.5rem', padding: '0.5rem 1rem' }}>
-                    <div style={{ fontSize: '0.72rem', color: '#1e40af', fontWeight: '700' }}>
-                      KẾT QUẢ DỰ BÁO {currentCQA.code} HIỆN TẠI:
-                    </div>
-                    <div style={{ fontSize: '1.3rem', fontWeight: '800', color: '#1e3a8a' }}>
-                      {currentPred.toFixed(3)} {currentCQA.unit}
-                      <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b', marginLeft: '0.4rem' }}>
-                        RMSE huấn luyện: {rmse.toFixed(2)} (không phải 95% CI)
-                      </span>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* Profiler Traces Grid */}
-            {(() => {
-              // Tính toán dải trục tung đồng bộ (Uniform Y-Range) trên tất cả các yếu tố X để so sánh trực quan độ dốc/độ nhạy
-              const allYValues: number[] = [];
-              project.factors.forEach((f) => {
-                const isMixtureFactor = f.role === 'mixture_component' || f.type === 'Mixture';
-                const mixtureRange = isMixtureFactor ? getFeasibleMixtureComponentRange(project.factors, f.code) : null;
-                const traceLow = isMixtureFactor ? (mixtureRange?.low ?? 0) : -1;
-                const traceHigh = isMixtureFactor ? (mixtureRange?.high ?? 1) : 1;
-                const traceCodes = isDiscreteFactor(f)
-                  ? getFactorGridCodes(f, 21)
-                  : Array.from({ length: 21 }, (_, step) => traceLow + ((traceHigh - traceLow) * step) / 20);
-                traceCodes.forEach((c) => {
-                  const tempCoded = isMixtureFactor
-                    ? setBoundedMixtureComponent(profilerCoded, project.factors, f.code, c)
-                    : { ...profilerCoded, [f.code]: c };
-                  allYValues.push(neuralModel.predict(tempCoded));
-                });
-              });
-              allYValues.push(neuralModel.predict(profilerCoded));
-              const minY = Math.min(...allYValues);
-              const maxY = Math.max(...allYValues);
-              const spanY = maxY - minY;
-              const padY = spanY > 1e-6 ? spanY * 0.12 : Math.max(0.1, Math.abs(maxY) * 0.1);
-              const yRangeShared: [number, number] = [minY - padY, maxY + padY];
-
-              return (
-                <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(${Math.max(220, Math.floor(1000 / project.factors.length))}px, 1fr))`, gap: '1rem', alignItems: 'stretch' }}>
-                  {project.factors.map((f) => {
-                    const coded = profilerCoded[f.code] ?? 0;
-                    const actual = codedToActual(coded, f);
-                    const isMixtureFactor = f.role === 'mixture_component' || f.type === 'Mixture';
-                    const mixtureRange = isMixtureFactor ? getFeasibleMixtureComponentRange(project.factors, f.code) : null;
-                    const traceLow = isMixtureFactor ? (mixtureRange?.low ?? 0) : -1;
-                    const traceHigh = isMixtureFactor ? (mixtureRange?.high ?? 1) : 1;
-                    const traceCodes = isDiscreteFactor(f)
-                      ? getFactorGridCodes(f, 21)
-                      : Array.from({ length: 21 }, (_, step) => traceLow + ((traceHigh - traceLow) * step) / 20);
-
-                    // Compute 1D sensitivity trace curve for this factor
-                    const xTraceActual: number[] = [];
-                    const xTraceDisplay: Array<number | string> = [];
-                    const yTracePred: number[] = [];
-
-                    traceCodes.forEach((c, step) => {
-                      const actVal = codedToActual(c, f);
-                      xTraceDisplay.push(actVal);
-                      xTraceActual.push(typeof actVal === 'number' ? actVal : step);
-
-                      const tempCoded = isMixtureFactor
-                        ? setBoundedMixtureComponent(profilerCoded, project.factors, f.code, c)
-                        : { ...profilerCoded, [f.code]: c };
-                      yTracePred.push(neuralModel.predict(tempCoded));
-                    });
-
-                    const tracePlotData: any[] = [
-                      {
-                        type: 'scatter',
-                        mode: 'lines',
-                        x: xTraceActual,
-                        y: yTracePred,
-                        line: { color: '#7c3aed', width: 2.5 },
-                        name: `${f.name} (${f.code}) vs ${currentCQA.name} (${currentCQA.code})`,
-                        text: xTraceActual.map(
-                          (x, i) =>
-                            `${f.name} (${f.code}): ${x} ${f.unit || ''}<br>${currentCQA.name} (${currentCQA.code}): ${yTracePred[i].toFixed(2)} ${currentCQA.unit || ''}`
-                        ),
-                        hoverinfo: 'text',
-                      },
-                      {
-                        type: 'scatter',
-                        mode: 'markers',
-                        x: [typeof actual === 'number' ? actual : Number(actual) || coded],
-                        y: [neuralModel.predict(profilerCoded)],
-                        marker: { size: 9, color: '#dc2626' },
-                        name: `Hiện tại: ${actual} ${f.unit || ''} → ${neuralModel.predict(profilerCoded).toFixed(2)} ${currentCQA.unit || ''}`,
-                        hoverinfo: 'name',
-                      },
-                    ];
-
-                    const traceLayout = {
-                      autosize: true,
-                      height: 160,
-                      margin: { l: 50, r: 10, t: 8, b: 34, pad: 1 },
-                      xaxis: {
-                        title: {
-                          text: `${f.code} [${f.unit || ''}]`,
-                          font: { size: 10, color: '#475569' },
-                          standoff: 4,
-                        },
-                        tickfont: { size: 9 },
-                        ...(f.dataType === 'qualitative' ? { tickmode: 'array', tickvals: xTraceActual, ticktext: xTraceDisplay.map(String) } : {}),
-                        showgrid: true,
-                        gridcolor: '#f1f5f9',
-                      },
-                      yaxis: {
-                        title: {
-                          text: `${currentCQA.code} [${currentCQA.unit || ''}]`,
-                          font: { size: 10, color: '#475569' },
-                          standoff: 4,
-                        },
-                        range: yRangeShared,
-                        nticks: 4,
-                        tickformat: '~g',
-                        tickfont: { size: 9 },
-                        showgrid: true,
-                        gridcolor: '#f1f5f9',
-                      },
-                      showlegend: false,
-                    };
-
-                    return (
-                      <div
-                        key={f.code}
-                        style={{
-                          backgroundColor: '#f8fafc',
-                          borderRadius: '0.5rem',
-                          padding: '0.75rem',
-                          border: '1px solid #e2e8f0',
-                          display: 'grid',
-                          gridTemplateRows: 'minmax(3.2rem, auto) 160px minmax(5.4rem, 1fr)',
-                          minHeight: '350px',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.4rem', marginBottom: '0.4rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.3rem', minHeight: '2.5rem' }}>
-                          <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#1e3a8a' }}>
-                            {f.name} ({f.code})
-                          </span>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600' }}>
-                            [{f.unit || '-'}]
-                          </span>
-                        </div>
-
-                        <div style={{ height: '160px' }}>
-                          <PlotlyChart
-                            data={tracePlotData}
-                            layout={traceLayout}
-                            config={{ responsive: true, displayModeBar: false, compact: true }}
-                            style={{ width: '100%', height: '100%' }}
-                          />
-                        </div>
-
-                        <div style={{ marginTop: '0.5rem', display: 'grid', gridTemplateRows: '1.4rem 2.15rem 1.35rem', rowGap: '0.2rem' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.2rem' }}>
-                            <span style={{ fontWeight: '600', color: '#334155' }}>Giá trị cài đặt:</span>
-                            <span className="font-mono" style={{ fontWeight: '700', color: '#1e3a8a' }}>
-                              {actual} {f.unit}
-                            </span>
-                          </div>
-
-                          {isDiscreteFactor(f) ? (
-                            <select className="input-field" style={{ width: '100%', minHeight: '2.15rem' }} value={String(actual)} onChange={(event) => {
-                              const levels = getConfiguredFactorLevels(f);
-                              const codes = getConfiguredFactorCodes(f);
-                              const index = levels.findIndex((level) => String(level) === event.target.value);
-                              setProfilerCoded({ ...profilerCoded, [f.code]: codes[index] ?? codes[0] ?? 0 });
-                            }}>
-                              {getConfiguredFactorLevels(f).map((level) => <option key={String(level)} value={String(level)}>{String(level)} {f.unit}</option>)}
-                            </select>
-                          ) : <input
-                            type="range"
-                            min={traceLow}
-                            max={traceHigh}
-                            step={isMixtureFactor ? 0.001 : 0.05}
-                            value={coded}
-                            onChange={(e) => {
-                              const nextValue = Number(e.target.value);
-                              setProfilerCoded(isMixtureFactor
-                                ? setBoundedMixtureComponent(profilerCoded, project.factors, f.code, nextValue)
-                                : { ...profilerCoded, [f.code]: nextValue });
-                            }}
-                            style={{ width: '100%', cursor: 'pointer', alignSelf: 'center' }}
-                          />}
-
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', fontSize: '0.7rem', color: '#94a3b8' }}>
-                            <span>{codedToActual(traceLow, f)} {f.unit}</span>
-                            <span>{codedToActual(traceHigh, f)} {f.unit}</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })()}
-          </div>
-
-          {/* 3D Response Surface, 2D Contour & Ternary Mixture (Neural Net Engine) */}
-          <div className="qbd-card">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
-              <div>
-                <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Compass size={18} color="#0f766e" />
-                  <span>Mặt Đáp Mô Phỏng Bởi Mạng Nơ-ron (Neural Response Surface & Ternary Mixture)</span>
-                </h3>
-                <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.2rem' }}>
-                  {plotType === 'ternary'
-                    ? 'Khảo sát không gian 3 thành phần hỗn hợp trên đồ thị tam giác (Simplex Ternary Contour).'
-                    : 'Khảo sát miền không gian tương tác phi tuyến tính giữa 2 yếu tố đầu vào bất kỳ.'}
-                </p>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                {/* Plot Type Mode Toggle */}
-                <div style={{ display: 'flex', backgroundColor: '#f1f5f9', borderRadius: '0.5rem', padding: '0.2rem', gap: '0.2rem' }}>
-                  <button
-                    onClick={() => setPlotType('3d')}
-                    disabled={!hasCartesianPair}
-                    className={`btn ${plotType === '3d' ? 'btn-primary' : 'btn-secondary'}`}
-                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', border: 'none' }}
-                    title={hasCartesianPair ? 'Mặt đáp 3D' : 'Cần một cặp trục không phải đồng thời là hai thành phần hỗn hợp.'}
-                  >
-                    3D
-                  </button>
-                  <button
-                    onClick={() => setPlotType('contour')}
-                    disabled={!hasCartesianPair}
-                    className={`btn ${plotType === 'contour' ? 'btn-primary' : 'btn-secondary'}`}
-                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', border: 'none' }}
-                    title={hasCartesianPair ? 'Đường đồng mức 2D' : 'Cần một cặp trục không phải đồng thời là hai thành phần hỗn hợp.'}
-                  >
-                    2D
-                  </button>
-                  {hasMixture && (
-                    <button
-                      onClick={() => setPlotType('ternary')}
-                      className={`btn ${plotType === 'ternary' ? 'btn-teal' : 'btn-secondary'}`}
-                      style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem', border: 'none', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
-                      title="Vẽ đồ thị tam giác hỗn hợp 3 thành phần"
-                    >
-                      <FlaskConical size={13} />
-                      <span>Tam Giác Hỗn Hợp</span>
-                    </button>
-                  )}
-                </div>
-
-                {/* Color Scale */}
-                <select
-                  className="input-field"
-                  style={{ width: '110px', fontSize: '0.78rem' }}
-                  value={colorScale}
-                  onChange={(e) => setColorScale(e.target.value)}
-                >
-                  <option value="Plasma">Plasma</option>
-                  <option value="Viridis">Viridis</option>
-                  <option value="Turbo">Turbo</option>
-                  <option value="Jet">Jet</option>
-                  <option value="Hot">Hot</option>
-                </select>
-
-              </div>
-            </div>
-
-            {/* Controls Bar for 2D/3D vs Ternary */}
-            {plotType === 'ternary' ? (
-              <div
-                style={{
-                  marginBottom: '1rem',
-                  padding: '0.85rem 1rem',
-                  backgroundColor: '#f0fdfa',
-                  borderRadius: '0.5rem',
-                  border: '1px solid #ccfbf1',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.75rem',
+              <button
+                onClick={() => {
+                  onSelectEngine?.('neural');
+                  onNavigateToRSM();
                 }}
+                className="btn btn-teal"
+                style={{ fontSize: '0.85rem', padding: '0.55rem 1.25rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.45rem' }}
+                title="Chuyển sang Bước 6 để xem mặt đáp 3D và 2D Contour của Mạng Nơ-ron"
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-                  {/* Vertex Selectors */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      <label style={{ fontSize: '0.75rem', fontWeight: '700', color: '#0f766e' }}>Đỉnh A (Top):</label>
-                      <select
-                        className="input-field"
-                        style={{ width: '150px', fontSize: '0.78rem', borderColor: '#0f766e' }}
-                        value={ternaryA}
-                        onChange={(e) => setTernaryA(e.target.value)}
-                      >
-                        {mixtureFactors.map((f) => (
-                          <option key={f.code} value={f.code} disabled={f.code === ternaryB || f.code === ternaryC}>
-                            {f.name} ({f.code})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      <label style={{ fontSize: '0.75rem', fontWeight: '700', color: '#0f766e' }}>Đỉnh B (Trái):</label>
-                      <select
-                        className="input-field"
-                        style={{ width: '150px', fontSize: '0.78rem', borderColor: '#0f766e' }}
-                        value={ternaryB}
-                        onChange={(e) => setTernaryB(e.target.value)}
-                      >
-                        {mixtureFactors.map((f) => (
-                          <option key={f.code} value={f.code} disabled={f.code === ternaryA || f.code === ternaryC}>
-                            {f.name} ({f.code})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      <label style={{ fontSize: '0.75rem', fontWeight: '700', color: '#0f766e' }}>Đỉnh C (Phải):</label>
-                      <select
-                        className="input-field"
-                        style={{ width: '150px', fontSize: '0.78rem', borderColor: '#0f766e' }}
-                        value={ternaryC}
-                        onChange={(e) => setTernaryC(e.target.value)}
-                      >
-                        {mixtureFactors.map((f) => (
-                          <option key={f.code} value={f.code} disabled={f.code === ternaryA || f.code === ternaryB}>
-                            {f.name} ({f.code})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Display Mode & Resolution */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', backgroundColor: '#ffffff', borderRadius: '0.375rem', border: '1px solid #99f6e4', padding: '0.15rem' }}>
-                      <button
-                        onClick={() => setTernaryDisplayMode('both')}
-                        className={`btn ${ternaryDisplayMode === 'both' ? 'btn-teal' : 'btn-secondary'}`}
-                        style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
-                      >
-                        Đường + Màu
-                      </button>
-                      <button
-                        onClick={() => setTernaryDisplayMode('lines_only')}
-                        className={`btn ${ternaryDisplayMode === 'lines_only' ? 'btn-teal' : 'btn-secondary'}`}
-                        style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
-                      >
-                        Chỉ Đường
-                      </button>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                      <span style={{ fontSize: '0.7rem', color: '#475569', fontWeight: '600' }}>Số mức:</span>
-                      <select
-                        className="input-field"
-                        style={{ width: '80px', fontSize: '0.7rem', padding: '0.2rem 0.3rem' }}
-                        value={ternaryLevels}
-                        onChange={(e) => setTernaryLevels(Number(e.target.value))}
-                      >
-                        {[8, 12, 16, 20].map((lvl) => (
-                          <option key={lvl} value={lvl}>
-                            {lvl} mức
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                      <span style={{ fontSize: '0.7rem', color: '#475569', fontWeight: '600' }}>Lưới:</span>
-                      {[
-                        { label: 'Nhanh', val: 100, desc: '100x100' },
-                        { label: 'Chuẩn', val: 180, desc: '180x180' },
-                        { label: 'Mịn', val: 260, desc: '260x260' },
-                        { label: 'Cực Mịn', val: 320, desc: '320x320' },
-                      ].map((preset) => (
-                        <button
-                          key={preset.val}
-                          onClick={() => setTernaryResolution(preset.val)}
-                          className={`btn ${ternaryResolution === preset.val ? 'btn-teal' : 'btn-secondary'}`}
-                          style={{ fontSize: '0.68rem', padding: '0.2rem 0.35rem' }}
-                          title={preset.desc}
-                        >
-                          {preset.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <span style={{ fontSize: '0.7rem', color: '#475569', fontWeight: '600' }}>Độ mượt:</span>
-                      <input
-                        type="range"
-                        min={0}
-                        max={1.3}
-                        step={0.05}
-                        value={ternarySmoothness}
-                        onChange={(e) => setTernarySmoothness(Number(e.target.value))}
-                        style={{ width: '60px', cursor: 'pointer' }}
-                      />
-                      <span className="font-mono" style={{ fontSize: '0.72rem', fontWeight: '700', color: '#0f766e', minWidth: '22px' }}>
-                        {ternarySmoothness.toFixed(2)}
-                      </span>
-                    </div>
-
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.7rem', color: '#475569', fontWeight: '600' }}>
-                      Độ dày:
-                      <input type="range" min={0.5} max={4} step={0.5} value={contourLineWidth} onChange={(e) => setContourLineWidth(Number(e.target.value))} style={{ width: '64px', cursor: 'pointer' }} />
-                      <span className="font-mono" style={{ color: '#0f766e' }}>{contourLineWidth.toFixed(1)}px</span>
-                    </label>
-
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', color: '#475569', cursor: 'pointer' }}>
-                      <input type="checkbox" checked={showContourLabels} onChange={(e) => setShowContourLabels(e.target.checked)} />
-                      Nhãn đường mức
-                    </label>
-
-                  </div>
-                </div>
-
-                {/* Constraint and Feature Checkboxes */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap', fontSize: '0.75rem', borderTop: '1px dashed #99f6e4', paddingTop: '0.5rem' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={showConstraints}
-                      onChange={(e) => setShowConstraints(e.target.checked)}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    <span>
-                      📏 <strong>Vạch giới hạn biến X</strong> ({factorA.low} ≤ {factorA.code} ≤ {factorA.high}...)
-                    </span>
-                  </label>
-
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={showRegionPolygon}
-                      onChange={(e) => setShowRegionPolygon(e.target.checked)}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    <span>🔷 Đa giác miền thực nghiệm</span>
-                  </label>
-
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={showSpecLimits}
-                      onChange={(e) => setShowSpecLimits(e.target.checked)}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    <span>
-                      🏷️ <strong>Vạch giới hạn CQA ({currentCQA.code})</strong>
-                      {currentCQA.lowerLimit !== undefined || currentCQA.upperLimit !== undefined ? (
-                        <span style={{ color: '#dc2626', marginLeft: '0.25rem', fontWeight: '700' }}>
-                          ({currentCQA.lowerLimit !== undefined ? `${currentCQA.lowerLimit} ≤ ` : ''}{currentCQA.code}{currentCQA.upperLimit !== undefined ? ` ≤ ${currentCQA.upperLimit}` : ''} {currentCQA.unit || ''})
-                        </span>
-                      ) : ''}
-                    </span>
-                  </label>
-
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={showDoERuns}
-                      onChange={(e) => setShowDoERuns(e.target.checked)}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    <span>🔵 Điểm DoE Thực Nghiệm</span>
-                  </label>
-
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={showOptimum}
-                      onChange={(e) => setShowOptimum(e.target.checked)}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    <span>⭐ Điểm Tối Ưu Desirability</span>
-                  </label>
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: '600' }}>Trục X:</label>
-                    <select className="input-field" style={{ width: '180px', fontSize: '0.78rem' }} value={xAxisFactor} onChange={(e) => setXAxisFactor(e.target.value)}>
-                      {project.factors.map((f) => (
-                        <option key={f.code} value={f.code} disabled={f.code === yAxisFactor || (isMixtureFactor(f) && isMixtureFactor(factorY))}>
-                          {f.name} ({f.code}) {f.unit ? `[${f.unit}]` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: '600' }}>Trục Y:</label>
-                    <select className="input-field" style={{ width: '180px', fontSize: '0.78rem' }} value={yAxisFactor} onChange={(e) => setYAxisFactor(e.target.value)}>
-                      {project.factors.map((f) => (
-                        <option key={f.code} value={f.code} disabled={f.code === xAxisFactor || (isMixtureFactor(f) && isMixtureFactor(factorX))}>
-                          {f.name} ({f.code}) {f.unit ? `[${f.unit}]` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.78rem' }}>
-                  <input
-                    type="checkbox"
-                    checked={showSpecLimits}
-                    onChange={(e) => setShowSpecLimits(e.target.checked)}
-                    style={{ cursor: 'pointer' }}
-                  />
-                  <span>
-                    🔴 <strong>Vạch đường / mặt phẳng giới hạn CQA</strong> ({currentCQA.lowerLimit !== undefined ? `${currentCQA.lowerLimit} ≤ ` : ''}{currentCQA.code}{currentCQA.upperLimit !== undefined ? ` ≤ ${currentCQA.upperLimit}` : ''} {currentCQA.unit || ''})
-                  </span>
-                </label>
-
-                {plotType === 'contour' && <>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem', color: '#475569', fontWeight: '600' }}>
-                    Độ dày:
-                    <input type="range" min={0.5} max={4} step={0.5} value={contourLineWidth} onChange={(e) => setContourLineWidth(Number(e.target.value))} style={{ width: '76px', cursor: 'pointer' }} />
-                    <span className="font-mono" style={{ color: '#0f766e' }}>{contourLineWidth.toFixed(1)}px</span>
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', color: '#475569', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={showContourLabels} onChange={(e) => setShowContourLabels(e.target.checked)} />
-                    Nhãn đường mức
-                  </label>
-                </>}
-              </div>
-            )}
-
-            <div style={{ height: plotType === 'ternary' ? '680px' : '520px' }}>
-              <PlotlyChart data={surfacePlotData} layout={surfaceLayout} style={{ width: '100%', height: '100%' }} />
+                <span>Mở Mặt Đáp Mạng Nơ-ron Tại Bước 6</span>
+                <ArrowRight size={16} />
+              </button>
             </div>
           </div>
 
-          {/* Neural Desirability Optimum Results (if solved) */}
-          {neuralOptimum && (
-            <div className="qbd-card" style={{ backgroundColor: '#faf5ff', border: '1px solid #e9d5ff' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Sparkles size={20} color="#7c3aed" />
-                  <span style={{ fontWeight: '800', fontSize: '1rem', color: '#6b21a8' }}>
-                    Điểm Vận Hành Tối Ưu Bằng Mạng Nơ-ron (Overall Desirability D = {neuralOptimum.overallDesirability})
+          {/* Transition Card 2: Design Space & Profiler at Step 7 */}
+          <div className="qbd-card" style={{ borderLeft: '4px solid #7c3aed', background: 'linear-gradient(to right, #faf5ff, #ffffff)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+              <div style={{ maxWidth: '800px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                  <Sliders size={20} color="#7c3aed" />
+                  <h3 style={{ fontSize: '1.02rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
+                    Tối Ưu Hóa Đa Mục Tiêu &amp; Không Gian Thiết Kế (Bước 7)
+                  </h3>
+                  <span className="badge" style={{ backgroundColor: '#f3e8ff', color: '#6b21a8', border: '1px solid #e9d5ff', fontSize: '0.72rem' }}>
+                    Desirability Profiler &amp; Design Space
                   </span>
                 </div>
-                <button onClick={onNavigateToDesignSpace} className="btn btn-teal" style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}>
-                  <span>Áp Dụng Cho Không Gian Thiết Kế</span>
-                  <ArrowRight size={15} />
-                </button>
+                <p style={{ fontSize: '0.82rem', color: '#334155', margin: 0, lineHeight: 1.5 }}>
+                  Để tìm điểm vận hành tối ưu đồng thời cho tất cả {project.cqas.length} chỉ tiêu chất lượng CQA theo hàm thỏa dụng Derringer-Suich và xây dựng không gian thiết kế (Design Space / NOR / PAR) dựa trên Mạng Nơ-ron, vui lòng chuyển sang <strong>Bước 7</strong>.
+                </p>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-                <div style={{ backgroundColor: '#ffffff', borderRadius: '0.375rem', padding: '0.75rem', border: '1px solid #f3e8ff' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#6b21a8', marginBottom: '0.4rem' }}>
-                    THÔNG SỐ CÀI ĐẶT TỐI ƯU (SETPOINTS):
-                  </div>
-                  {project.factors.map((f) => (
-                    <div key={f.code} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.2rem' }}>
-                      <span style={{ color: '#475569' }}>{f.name} ({f.code}):</span>
-                      <strong className="font-mono" style={{ color: '#0f172a' }}>
-                        {neuralOptimum.actualFactors[f.code]} {f.unit}
-                      </strong>
-                    </div>
-                  ))}
-                </div>
-
-                <div style={{ backgroundColor: '#ffffff', borderRadius: '0.375rem', padding: '0.75rem', border: '1px solid #f3e8ff' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#0f766e', marginBottom: '0.4rem' }}>
-                    DỰ BÁO CÁC CHỈ TIÊU CQAS TẠI ĐIỂM TỐI ƯU:
-                  </div>
-                  {project.cqas.map((c) => {
-                    const p = neuralOptimum.predictedResponses[c.code];
-                    return (
-                      <div key={c.code} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.2rem' }}>
-                        <span style={{ color: '#475569' }}>{c.name}:</span>
-                        <strong className="font-mono" style={{ color: '#0f766e' }}>
-                          {p ? `${p.value} ${c.unit} (d=${p.desirability})` : '-'}
-                        </strong>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              <button
+                onClick={() => {
+                  onSelectEngine?.('neural');
+                  onNavigateToDesignSpace();
+                }}
+                className="btn btn-primary"
+                style={{ fontSize: '0.85rem', padding: '0.55rem 1.25rem', backgroundColor: '#7c3aed', borderColor: '#7c3aed', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.45rem' }}
+                title="Chuyển sang Bước 7 để tối ưu hóa và xây dựng Design Space bằng Mạng Nơ-ron"
+              >
+                <span>Mở Không Gian Thiết Kế Tại Bước 7</span>
+                <ArrowRight size={16} />
+              </button>
             </div>
-          )}
+          </div>
 
           {/* Model Formula & Code Export Box */}
           <div className="qbd-card">
@@ -3484,6 +2318,35 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               }}
             >
               {neuralModel.pythonCode}
+            </div>
+
+            {/* Bottom Navigation Actions */}
+            <div style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => {
+                  onSelectEngine?.('neural');
+                  onNavigateToRSM();
+                }}
+                className="btn btn-primary"
+                style={{ fontSize: '0.85rem', padding: '0.5rem 1.25rem', backgroundColor: '#7c3aed', borderColor: '#7c3aed', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.45rem' }}
+                title="Khóa mô hình Mạng Nơ-ron AI và chuyển sang Bước 6: Mặt đáp phản ứng"
+              >
+                <span>Tiếp Tục Với Mạng Nơ-ron (Bước 6: Mặt Đáp)</span>
+                <ArrowRight size={16} />
+              </button>
+
+              <button
+                onClick={() => {
+                  onSelectEngine?.('neural');
+                  onNavigateToDesignSpace();
+                }}
+                className="btn btn-secondary"
+                style={{ fontSize: '0.85rem', padding: '0.5rem 1.1rem', color: '#6d28d9', borderColor: '#e9d5ff', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                title="Bỏ qua khảo sát mặt đáp để sang thẳng Bước 7: Không gian thiết kế & Tối ưu hóa Desirability"
+              >
+                <span>Sang Bước 7: Không Gian Thiết Kế</span>
+                <ArrowRight size={14} />
+              </button>
             </div>
           </div>
         </>

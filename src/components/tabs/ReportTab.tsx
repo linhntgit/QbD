@@ -15,6 +15,7 @@ import {
   Activity,
   FileSpreadsheet,
   CheckCircle2,
+  AlertTriangle,
   ShieldCheck,
   FileText,
 } from 'lucide-react';
@@ -87,6 +88,13 @@ export const ReportTab: React.FC<ReportTabProps> = ({
         subtitle: hasNeural ? 'MLP Architecture & Metrics' : 'Chưa kích hoạt / huấn luyện',
         icon: BrainCircuit,
         badge: hasNeural ? 'ANN' : 'Optional',
+      },
+      {
+        id: 'sec-5c',
+        title: '5c. Mặt Đáp & Phân Tích Điểm Dừng',
+        subtitle: 'Response Surface & Canonical Analysis',
+        icon: Activity,
+        badge: 'RSM',
       },
       {
         id: 'sec-6',
@@ -974,6 +982,250 @@ export const ReportTab: React.FC<ReportTabProps> = ({
             </div>
           </div>
         )}
+
+        {/* 5c. Response Surface & Canonical Analysis */}
+        <div id="sec-5c" className="report-section" style={{ marginBottom: '2rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#0f766e', margin: 0 }}>
+              5c. Khảo Sát Mặt Đáp Phản Ứng &amp; Phân Tích Điểm Dừng (Response Surface &amp; Canonical Analysis)
+            </h2>
+            <span className="badge" style={{ backgroundColor: '#0f766e', color: '#ffffff', fontSize: '0.74rem', padding: '0.25rem 0.55rem' }}>
+              ICH Q8 (R2) RSM
+            </span>
+          </div>
+
+          <div style={{ fontSize: '0.8rem', color: '#475569', marginBottom: '1rem', lineHeight: 1.5 }}>
+            Phân tích chính tắc (Canonical Analysis) chuyển đổi mô hình bề mặt đáp ứng bậc hai về hệ trục tọa độ chính (Principal axes), giúp xác định bản chất hình học của điểm dừng (cực đại, cực tiểu, điểm yên ngựa hoặc sống trâu) và định lượng độ cong mặt đáp theo từng hướng biến thiên yếu tố.
+          </div>
+
+          {project.cqas.map((cqa) => {
+            const statModel = models[cqa.code];
+            const canonical = statModel?.canonicalAnalysis;
+            const neuralModel = neuralModels ? neuralModels[cqa.code] : undefined;
+
+            return (
+              <div key={cqa.code} style={{ border: '1px solid #e2e8f0', borderRadius: '0.5rem', padding: '1rem', marginBottom: '1.25rem', backgroundColor: '#ffffff' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ fontWeight: '700', color: '#0f766e', fontSize: '0.95rem' }}>
+                    🎯 {cqa.name} ({cqa.code}) {cqa.unit ? `[${cqa.unit}]` : ''}
+                  </div>
+                  {canonical && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span
+                        style={{
+                          fontSize: '0.75rem',
+                          padding: '0.2rem 0.6rem',
+                          borderRadius: '9999px',
+                          fontWeight: '600',
+                          backgroundColor:
+                            canonical.surfaceNature === 'maximum' ? '#dcfce7' :
+                            canonical.surfaceNature === 'minimum' ? '#dbeafe' :
+                            canonical.surfaceNature === 'saddle' ? '#fef3c7' : '#f1f5f9',
+                          color:
+                            canonical.surfaceNature === 'maximum' ? '#166534' :
+                            canonical.surfaceNature === 'minimum' ? '#1e40af' :
+                            canonical.surfaceNature === 'saddle' ? '#92400e' : '#475569',
+                        }}
+                      >
+                        {canonical.surfaceNature === 'maximum' ? 'Cực đại (Maximum)' :
+                         canonical.surfaceNature === 'minimum' ? 'Cực tiểu (Minimum)' :
+                         canonical.surfaceNature === 'saddle' ? 'Điểm yên ngựa (Saddle Point)' :
+                         'Sống trâu (Ridge Surface)'}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: '0.75rem',
+                          padding: '0.2rem 0.6rem',
+                          borderRadius: '9999px',
+                          fontWeight: '600',
+                          backgroundColor: canonical.isInsideDesignSpace ? '#dcfce7' : '#fee2e2',
+                          color: canonical.isInsideDesignSpace ? '#166534' : '#991b1b',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                        }}
+                      >
+                        {canonical.isInsideDesignSpace ? (
+                          <>
+                            <CheckCircle2 size={12} /> Trong miền thiết kế [-1, 1]
+                          </>
+                        ) : (
+                          <>
+                            <AlertTriangle size={12} /> Ngoại suy ngoài miền khảo sát
+                          </>
+                        )}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Canonical Analysis for Polynomial Model */}
+                {canonical ? (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                      <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem 0.8rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
+                        <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '600' }}>
+                          ĐÁP ỨNG DỰ ĐOÁN TẠI ĐIỂM DỪNG (ŷ₀)
+                        </div>
+                        <div style={{ fontSize: '1.1rem', fontWeight: '700', color: '#0f766e', marginTop: '0.15rem' }}>
+                          {canonical.predictedAtStationaryPoint.toFixed(4)} {cqa.unit || ''}
+                        </div>
+                        <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
+                          ŷ₀ = b₀ + 0.5 · x₀ᵀa
+                        </div>
+                      </div>
+
+                      <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem 0.8rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
+                        <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '600' }}>
+                          ĐẶC TÍNH HÌNH HỌC MẶT CONG
+                        </div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: '600', color: '#1e293b', marginTop: '0.15rem' }}>
+                          {canonical.surfaceNature === 'maximum' && 'Đỉnh đáp ứng — Tất cả λᵢ < 0'}
+                          {canonical.surfaceNature === 'minimum' && 'Đáy trũng — Tất cả λᵢ > 0'}
+                          {canonical.surfaceNature === 'saddle' && 'Yên ngựa — Tồn tại λᵢ > 0 và λⱼ < 0'}
+                          {canonical.surfaceNature === 'ridge' && 'Sống trâu — Có λᵢ tiệm cận 0'}
+                        </div>
+                        <div style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                          Dựa trên dấu các trị riêng ma trận Hessian B
+                        </div>
+                      </div>
+
+                      <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem 0.8rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
+                        <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '600' }}>
+                          PHƯƠNG TRÌNH CHÍNH TẮC (CANONICAL FORM)
+                        </div>
+                        <div className="font-mono" style={{ fontSize: '0.78rem', fontWeight: '700', color: '#2563eb', marginTop: '0.15rem', overflowX: 'auto', whiteSpace: 'nowrap' }}>
+                          {canonical.canonicalEquation}
+                        </div>
+                        <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
+                          wᵢ là các trục tọa độ chính (Principal axes)
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.75rem' }}>
+                      {/* Stationary coordinates */}
+                      <div style={{ border: '1px solid #e2e8f0', borderRadius: '0.375rem', overflow: 'hidden' }}>
+                        <div style={{ backgroundColor: '#f1f5f9', padding: '0.4rem 0.6rem', fontSize: '0.75rem', fontWeight: '700', color: '#334155' }}>
+                          TỌA ĐỘ ĐIỂM DỪNG (STATIONARY POINT x₀ = -½ B⁻¹ a)
+                        </div>
+                        <table style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', textAlign: 'left' }}>
+                              <th style={{ padding: '0.3rem 0.5rem' }}>Yếu tố</th>
+                              <th style={{ padding: '0.3rem 0.5rem' }}>Coded</th>
+                              <th style={{ padding: '0.3rem 0.5rem' }}>Actual</th>
+                              <th style={{ padding: '0.3rem 0.5rem' }}>Vị trí</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {project.factors.map((f) => {
+                              const codedVal = canonical.stationaryPointCoded[f.code] ?? 0;
+                              const actualVal = canonical.stationaryPointActual[f.code] ?? f.center ?? 0;
+                              const inRange = Math.abs(codedVal) <= 1;
+                              return (
+                                <tr key={f.code} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                  <td style={{ padding: '0.3rem 0.5rem', fontWeight: '600' }}>
+                                    {f.code} ({f.name})
+                                  </td>
+                                  <td className="font-mono" style={{ padding: '0.3rem 0.5rem' }}>
+                                    {codedVal.toFixed(3)}
+                                  </td>
+                                  <td className="font-mono" style={{ padding: '0.3rem 0.5rem', fontWeight: '600', color: '#0f766e' }}>
+                                    {typeof actualVal === 'number' ? actualVal.toFixed(2) : actualVal} {f.unit || ''}
+                                  </td>
+                                  <td style={{ padding: '0.3rem 0.5rem' }}>
+                                    <span
+                                      style={{
+                                        fontSize: '0.68rem',
+                                        fontWeight: '600',
+                                        padding: '0.05rem 0.35rem',
+                                        borderRadius: '0.2rem',
+                                        backgroundColor: inRange ? '#dcfce7' : '#fee2e2',
+                                        color: inRange ? '#166534' : '#991b1b',
+                                      }}
+                                    >
+                                      {inRange ? 'Trong miền' : 'Ngoại suy'}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Eigenvalues */}
+                      <div style={{ border: '1px solid #e2e8f0', borderRadius: '0.375rem', overflow: 'hidden' }}>
+                        <div style={{ backgroundColor: '#f1f5f9', padding: '0.4rem 0.6rem', fontSize: '0.75rem', fontWeight: '700', color: '#334155' }}>
+                          CÁC TRỤC CHÍNH &amp; HỆ SỐ TRỊ RIÊNG (EIGENVALUES λᵢ)
+                        </div>
+                        <table style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', textAlign: 'left' }}>
+                              <th style={{ padding: '0.3rem 0.5rem' }}>Trục</th>
+                              <th style={{ padding: '0.3rem 0.5rem' }}>Trị riêng λᵢ</th>
+                              <th style={{ padding: '0.3rem 0.5rem' }}>Đặc tính</th>
+                              <th style={{ padding: '0.3rem 0.5rem' }}>Vectơ riêng</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {canonical.eigenvalues.map((lambda, idx) => {
+                              const vector = canonical.eigenvectors.map((row) => row[idx] ?? 0);
+                              const isDominant = Math.abs(lambda) === Math.max(...canonical.eigenvalues.map(Math.abs));
+                              return (
+                                <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                  <td className="font-mono" style={{ padding: '0.3rem 0.5rem', fontWeight: '700' }}>
+                                    w{idx + 1}
+                                  </td>
+                                  <td className="font-mono" style={{ padding: '0.3rem 0.5rem', fontWeight: '700', color: lambda > 0 ? '#1d4ed8' : '#b91c1c' }}>
+                                    {lambda > 0 ? `+${lambda.toFixed(4)}` : lambda.toFixed(4)}
+                                  </td>
+                                  <td style={{ padding: '0.3rem 0.5rem', fontSize: '0.7rem' }}>
+                                    {isDominant ? (
+                                      <span style={{ color: '#b45309', fontWeight: '700' }}>Dốc nhất</span>
+                                    ) : Math.abs(lambda) < 1e-3 ? (
+                                      <span style={{ color: '#64748b' }}>Phẳng</span>
+                                    ) : (
+                                      <span style={{ color: '#475569' }}>{lambda < 0 ? 'Dốc úp' : 'Dốc ngửa'}</span>
+                                    )}
+                                  </td>
+                                  <td className="font-mono" style={{ padding: '0.3rem 0.5rem', fontSize: '0.68rem', color: '#475569' }}>
+                                    [{vector.map((v) => v.toFixed(2)).join(', ')}]
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ padding: '0.65rem', backgroundColor: '#f8fafc', borderRadius: '0.375rem', fontSize: '0.78rem', color: '#64748b', border: '1px dashed #cbd5e1' }}>
+                    {statModel ? (
+                      <span>Mô hình hồi quy đa thức của CQA này là mô hình tuyến tính (Linear / 2FI) không có thành phần bậc hai thuần nhất (xᵢ²), do đó mặt đáp ứng có dạng mặt phẳng nghiêng (Planar gradient) và không có điểm dừng chính tắc.</span>
+                    ) : (
+                      <span>Chưa có mô hình hồi quy đa thức cho biến đáp ứng này. Vui lòng hoàn thành phân tích ANOVA tại Bước 4.</span>
+                    )}
+                  </div>
+                )}
+
+                {/* Neural Surface Note if Neural Model exists */}
+                {neuralModel && (
+                  <div style={{ marginTop: '0.75rem', padding: '0.6rem 0.8rem', backgroundColor: '#faf5ff', borderRadius: '0.375rem', border: '1px solid #e9d5ff', fontSize: '0.75rem', color: '#6b21a8' }}>
+                    <div style={{ fontWeight: '700', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <BrainCircuit size={14} /> Khảo sát mặt đáp phi tuyến qua Mạng Nơ-ron AI (ANN MLP):
+                    </div>
+                    <div>
+                      Bề mặt đáp ứng phi tuyến tính được ước lượng bởi mạng nơ-ron MLP [{neuralModel.config.hiddenNodes1}{neuralModel.config.hiddenNodes2 > 0 ? `, ${neuralModel.config.hiddenNodes2}` : ''}] ({neuralModel.config.activation.toUpperCase()}) với Train R² = {neuralModel.diagnostics.rSquaredTrain}, Val R² = {neuralModel.diagnostics.rSquaredVal}. Mặt đáp mạng nơ-ron có khả năng mô tả các vùng uốn lượn phi tuyến phức tạp vượt ra ngoài dạng paraboloid cổ điển.
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
 
         {/* 6a. Optimum & Prediction Profiler */}
         <div id="sec-6" className="report-section" style={{ marginBottom: '2rem' }}>

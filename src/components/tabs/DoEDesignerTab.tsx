@@ -2871,12 +2871,29 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                 )}
               </div>
 
-              <div style={{ color: '#475569', fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ color: '#475569', fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <span>Tổng cộng: <strong style={{ color: '#0f172a' }}>{project.runs.length}</strong> lần chạy thí nghiệm</span>
                 <span style={{ color: '#94a3b8' }}>|</span>
                 <span style={{ color: '#16a34a', fontWeight: '600' }}>
                   ✓ Tự động đồng bộ sang ANOVA &amp; Mạng Nơ-ron AI
                 </span>
+                <button
+                  onClick={onNavigateToANOVA}
+                  className="btn btn-teal"
+                  style={{
+                    fontSize: '0.76rem',
+                    padding: '0.3rem 0.75rem',
+                    fontWeight: '700',
+                    marginLeft: '0.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                  }}
+                  title="Chuyển sang Bước 4 để phân tích phương sai ANOVA và xây dựng mô hình"
+                >
+                  <span>Tiếp Tục: Phân Tích ANOVA (Bước 4)</span>
+                  <ArrowRight size={14} />
+                </button>
               </div>
             </div>
           </div>

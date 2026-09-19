@@ -16,6 +16,7 @@ interface NavbarProps {
   project: QBDProject;
   modelingEngine?: ModelingEngine;
   onToggleEngine?: (engine: ModelingEngine) => void;
+  hasTrainedNeuralModels?: boolean;
   onLoadProject: (project: QBDProject) => void;
   onSaveJSON: () => void;
   onNewProject: () => void;
@@ -27,6 +28,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   project,
   modelingEngine = 'polynomial',
   onToggleEngine,
+  hasTrainedNeuralModels = true,
   onLoadProject,
   onSaveJSON,
   onNewProject,
@@ -143,7 +145,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <span>Đa Thức</span>
                 </button>
                 <button
-                  onClick={() => onToggleEngine('neural')}
+                  disabled={!hasTrainedNeuralModels}
+                  onClick={() => {
+                    if (hasTrainedNeuralModels) {
+                      onToggleEngine('neural');
+                    }
+                  }}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -153,11 +160,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                     fontWeight: '700',
                     border: 'none',
                     borderRadius: '0.25rem',
-                    cursor: 'pointer',
+                    cursor: hasTrainedNeuralModels ? 'pointer' : 'not-allowed',
+                    opacity: hasTrainedNeuralModels ? 1 : 0.45,
                     backgroundColor: modelingEngine === 'neural' ? '#7c3aed' : 'transparent',
                     color: modelingEngine === 'neural' ? '#ffffff' : '#64748b',
                   }}
-                  title="Chuyển toàn bộ phân tích sang Mạng Nơ-ron Nhân Tạo"
+                  title={
+                    hasTrainedNeuralModels
+                      ? 'Chuyển toàn bộ phân tích sang Mạng Nơ-ron Nhân Tạo'
+                      : 'Cần huấn luyện Mạng Nơ-ron tại Bước 5 trước khi kích hoạt'
+                  }
                 >
                   <BrainCircuit size={12} />
                   <span>Mạng Nơ-ron</span>

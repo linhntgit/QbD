@@ -67,8 +67,8 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({
     },
     {
       key: 'rsm' as TabKey,
-      label: '6. Mặt đáp RSM',
-      subtitle: '3D Surface & Contour',
+      label: '6. Mặt đáp',
+      subtitle: 'Response Surface & 3D Plots',
       icon: Compass,
       tag: '3D Plots',
     },

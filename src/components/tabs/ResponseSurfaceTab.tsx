@@ -293,14 +293,6 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
     ternaryLevels,
   ]);
 
-  if (!model) {
-    return (
-      <div className="qbd-card" style={{ textAlign: 'center', padding: '3rem' }}>
-        <p>Vui lòng tạo mô hình ANOVA hoặc Mạng Nơ-ron trước khi xem mặt đáp.</p>
-      </div>
-    );
-  }
-
   // Generate Plotly Data & Layout
   let plotlyData: any[] = [];
   let plotlyLayout: any = {};
@@ -825,8 +817,36 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
         </div>
       </div>
 
-      {/* Main Layout Grid: Left Sidebar Controls + Right Plotly Viewer */}
-      <div className="rsm-workspace-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(340px, 100%), 1fr))', gap: '1.5rem' }}>
+      {!model ? (
+        <div className="qbd-card" style={{ textAlign: 'center', padding: '3.5rem 1.5rem', borderLeft: '4px solid #f59e0b' }}>
+          <AlertTriangle size={40} color="#d97706" style={{ margin: '0 auto 0.75rem' }} />
+          <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#92400e', marginBottom: '0.4rem' }}>
+            {modelingEngine === 'neural'
+              ? `Chưa có mô hình Mạng Nơ-ron cho đáp ứng ${currentCQA?.name || selectedCQA}`
+              : `Chưa có mô hình Đa thức cho đáp ứng ${currentCQA?.name || selectedCQA}`}
+          </h3>
+          <p style={{ fontSize: '0.85rem', color: '#475569', maxWidth: '620px', margin: '0 auto 1.5rem', lineHeight: 1.5 }}>
+            {modelingEngine === 'neural'
+              ? 'Vui lòng sang Bước 5 để khởi tạo và huấn luyện mạng nơ-ron trước khi khảo sát mặt đáp phi tuyến, hoặc bấm nút bên dưới để quay lại sử dụng mô hình Đa thức (ANOVA).'
+              : 'Vui lòng kiểm tra lại ma trận DoE ở Bước 3 và kết quả hồi quy ANOVA ở Bước 4.'}
+          </p>
+          {onToggleEngine && modelingEngine === 'neural' && (
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem' }}>
+              <button
+                onClick={() => onToggleEngine('polynomial')}
+                className="btn btn-teal"
+                style={{ fontSize: '0.85rem', padding: '0.5rem 1.25rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.45rem' }}
+              >
+                <Calculator size={16} />
+                <span>Quay Lại Mô Hình Đa Thức (ANOVA)</span>
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          {/* Main Layout Grid: Left Sidebar Controls + Right Plotly Viewer */}
+          <div className="rsm-workspace-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(340px, 100%), 1fr))', gap: '1.5rem' }}>
         
         {/* Left Control Panel */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -1590,6 +1610,23 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+          {/* Bottom Navigation Actions */}
+          {onNavigateToDesignSpace && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '0.5rem' }}>
+              <button
+                onClick={onNavigateToDesignSpace}
+                className="btn btn-primary"
+                style={{ fontSize: '0.85rem', padding: '0.5rem 1.25rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.45rem' }}
+                title="Chuyển sang Bước 7 để tối ưu hóa và xây dựng Design Space"
+              >
+                <span>Chuyển Sang Bước 7: Không Gian Thiết Kế</span>
+                <ArrowRight size={16} />
+              </button>
+            </div>
+          )}
+        </>
       )}
 
     </div>

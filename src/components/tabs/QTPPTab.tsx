@@ -7,6 +7,7 @@ import {
   Target,
   FlaskConical,
   Lock,
+  ArrowRight,
 } from 'lucide-react';
 import type {
   QBDProject,
@@ -22,6 +23,7 @@ import type {
 interface QTPPTabProps {
   project: QBDProject;
   onUpdateProject: (updated: Partial<QBDProject>) => void;
+  onNavigateToFMEA?: () => void;
 }
 
 const MIN_LEVELS = 2;
@@ -86,7 +88,11 @@ const LevelEditor: React.FC<LevelEditorProps> = ({ ariaPrefix, values, numeric =
   );
 };
 
-export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) => {
+export const QTPPTab: React.FC<QTPPTabProps> = ({
+  project,
+  onUpdateProject,
+  onNavigateToFMEA,
+}) => {
   // 1. QTPP Management
   const handleAddQTPP = () => {
     const newItem: QTPPItem = {
@@ -846,6 +852,26 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({ project, onUpdateProject }) =>
             <span>🔒 <strong>Hằng Số Cố Định (Constant):</strong> Thông số được giữ nguyên không đổi trong toàn bộ nghiên cứu.</span>
           </div>
         </div>
+
+        {onNavigateToFMEA && (
+          <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              onClick={onNavigateToFMEA}
+              className="btn btn-primary"
+              style={{
+                fontSize: '0.85rem',
+                padding: '0.5rem 1.25rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                fontWeight: '700',
+              }}
+            >
+              <span>Chuyển Sang Bước 2: Đánh Giá Rủi Ro FMEA</span>
+              <ArrowRight size={16} />
+            </button>
+          </div>
+        )}
 
       </div>
 
