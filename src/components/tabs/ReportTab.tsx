@@ -987,7 +987,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
         <div id="sec-5c" className="report-section" style={{ marginBottom: '2rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#0f766e', margin: 0 }}>
-              5c. Khảo Sát Mặt Đáp Phản Ứng &amp; Phân Tích Điểm Dừng (Response Surface &amp; Canonical Analysis)
+              5c. Khảo Sát Mặt Đáp &amp; Phân Tích Điểm Dừng (Response Surface &amp; Canonical Analysis)
             </h2>
             <span className="badge" style={{ backgroundColor: '#0f766e', color: '#ffffff', fontSize: '0.74rem', padding: '0.25rem 0.55rem' }}>
               ICH Q8 (R2) RSM

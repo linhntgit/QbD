@@ -1090,7 +1090,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               }}
               className="btn btn-primary"
               style={{ fontSize: '0.82rem', padding: '0.4rem 0.95rem', backgroundColor: '#7c3aed', borderColor: '#7c3aed', fontWeight: '700' }}
-              title="Khóa mô hình Mạng Nơ-ron AI và chuyển tuần tự sang Bước 6: Mặt đáp phản ứng"
+              title="Khóa mô hình Mạng Nơ-ron AI và chuyển tuần tự sang Bước 6: Mặt đáp"
             >
               <span>Tiếp Tục Với Mạng Nơ-ron (Bước 6: Mặt Đáp)</span>
               <ArrowRight size={16} />
@@ -2329,7 +2329,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                 }}
                 className="btn btn-primary"
                 style={{ fontSize: '0.85rem', padding: '0.5rem 1.25rem', backgroundColor: '#7c3aed', borderColor: '#7c3aed', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.45rem' }}
-                title="Khóa mô hình Mạng Nơ-ron AI và chuyển sang Bước 6: Mặt đáp phản ứng"
+                title="Khóa mô hình Mạng Nơ-ron AI và chuyển sang Bước 6: Mặt đáp"
               >
                 <span>Tiếp Tục Với Mạng Nơ-ron (Bước 6: Mặt Đáp)</span>
                 <ArrowRight size={16} />
