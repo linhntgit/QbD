@@ -10,6 +10,7 @@ import {
   Compass,
   Boxes,
   FileCheck2,
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
   BookOpen,
@@ -1515,8 +1516,9 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   <br />2. (Tùy chọn) Bấm <strong>"💾 Lưu Kịch Bản (n)"</strong> để lưu lại các kịch bản cài đặt ứng viên cần so sánh, hoặc <strong>"🔄 Về Tâm (0)"</strong> để đặt lại điểm tâm, hoặc <strong>"⚙️ Mục Tiêu &amp; Trọng Số ∨"</strong> để sửa nhanh LSL/Target/USL/Trọng số.
                   <br />3. Chọn chế độ xem: <strong>"2D Contour"</strong> hoặc bấm <strong>"3D Surface"</strong> để quan sát bề mặt biên an toàn chất lượng (<InlineMath math="Z = \text{Margin}_{\min}" />) và mặt phẳng chuẩn <InlineMath math="Z = 0" />.
                   <br />4. Tương tác với <strong>Thanh Trượt Lát Cắt Động Yếu Tố Thứ 3 (Dynamic Slicing X3)</strong>: Di chuyển thanh trượt để quét liên tục các lát cắt, quan sát dải màu <strong>PAR / NOR Range Bar</strong> và huy hiệu trạng thái khả thi của lát cắt.
-                  <br />5. Nhập <em>Số lô mô phỏng</em> (vd: 10.000) và <em>Độ biến thiên RSD%</em> (vd: &plusmn;2.0%) &rarr; Bấm <strong>"▶ Chạy Mô Phỏng Monte Carlo"</strong> để thẩm định độ bền vững (Reliability %, PPM, Cpk).
-                  <br />6. Bấm nút <strong>"Tiếp Tục: Xuất Báo Cáo Hồ Sơ QbD (Bước 8)"</strong> ở chân trang để chuyển sang Tab 8.
+                  <br />5. Tại <strong>Thí nghiệm xác nhận phương án tối ưu</strong>, ngay phía trên Bảng Chiến Lược Kiểm Soát ICH Q10, bấm <strong>"Tạo thí nghiệm xác nhận"</strong>. Chốt điều kiện thực hiện, số mẻ độc lập và ngưỡng sai lệch trước khi nhập kết quả thực nghiệm.
+                  <br />6. Nhập giá trị yếu tố và CQA thực tế theo từng mẻ; xem sai lệch giữa dự đoán và quan sát, sau đó nhập <em>Số lô mô phỏng</em> và <em>Độ biến thiên RSD%</em> để chạy Monte Carlo nếu cần.
+                  <br />7. Chuyển sang <strong>Bước 8</strong> để rà soát mục 6c của báo cáo và xuất tài liệu.
                 </div>
               </div>
             ),
@@ -1723,19 +1725,31 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
       case 'report':
         return [
           {
+            id: 'confirmation',
+            title: 'Đọc kết quả thí nghiệm xác nhận phương án tối ưu',
+            icon: CheckCircle2,
+            content: (
+              <div style={{ fontSize: '0.78rem', lineHeight: 1.6, color: '#334155' }}>
+                <p>Tạo kế hoạch ở Bước 7, ngay trên Bảng Chiến Lược Kiểm Soát ICH Q10. Chốt số mẻ độc lập, mức tin cậy, tiêu chuẩn theo từng mẻ hoặc trung bình và ngưỡng sai lệch chấp nhận được trước khi thu thập số liệu. Nhập giá trị X và Y theo từng mẻ trong ma trận; dán nhiều ô từ Excel vào ô đầu tiên, dùng “Sao chép bảng” để lấy dữ liệu dạng tab, và nút + / × để thêm hoặc xóa dòng. Bảng tự thêm dòng khi dán vượt số mẻ hiện có.</p>
+                <p>Trong Bước 8, mục 6c hiển thị cả kế hoạch và kết quả. <strong>Bias</strong> là trung bình (thực tế − dự đoán tại điều kiện đã thực hiện); <strong>RMSE</strong> tổng hợp độ lớn sai số từng mẻ. Sai lệch so với dự đoán kế hoạch có thể khác bias nếu điều kiện thực hiện đã được làm tròn hoặc thay đổi. Đọc riêng bốn kết luận: đạt tiêu chuẩn CQA, đạt ngưỡng sai lệch thực tiễn, phù hợp khoảng dự đoán (PI), và đủ bằng chứng tương đương.</p>
+                <p>“Chưa đủ cơ sở” có thể do thiếu mẻ hợp lệ, chưa đặt ngưỡng, hoặc không có ước lượng bất định phù hợp. Mô hình ANN và một số mô hình nhiều block không có PI hợp lệ trong chức năng này. CQA phân loại được đánh giá theo mức đích từng mẻ, không tính bias/RMSE số học. Một thí nghiệm ở điểm tối ưu chỉ hỗ trợ đánh giá điểm đã thử, không chứng minh toàn bộ Design Space hoặc PAR.</p>
+              </div>
+            ),
+          },
+          {
             id: 'workflow',
             title: 'Quy Trình Xuất Báo Cáo & Phê Duyệt GxP (Workflow)',
             icon: FileCheck2,
             content: (
               <div>
                 <p style={{ marginBottom: '0.6rem' }}>
-                  Tổng hợp toàn diện dữ liệu từ QTPP, FMEA, thiết kế DoE (bao gồm DSD/Mixture), mô hình hóa (Đa thức OLS/Mạng Nơ-ron AI), tối ưu hóa Desirability đa mục tiêu, Không gian Thiết kế 3D và mô phỏng độ bền Monte Carlo thành <strong>Hồ Sơ Phát Triển Dược Phẩm</strong> chuẩn hóa tham khảo theo cấu trúc ICH M4Q / CTD Module 3.2.P.2.
+                  Tổng hợp dữ liệu QTPP, FMEA, DoE, mô hình, tối ưu hóa, thí nghiệm xác nhận tại điểm tối ưu và mô phỏng Monte Carlo thành bản thảo Hồ Sơ Phát Triển Dược Phẩm tham khảo cấu trúc CTD Module 3.2.P.2.
                 </p>
                 <div style={{ backgroundColor: '#f0fdf4', padding: '0.65rem 0.85rem', borderRadius: '0.4rem', border: '1px solid #bbf7d0', fontSize: '0.78rem', color: '#166534', lineHeight: 1.6 }}>
                   <strong>Thứ tự thao tác chuẩn (Standard Operating Procedure):</strong>
                   <br />1. <strong>Kiểm tra Cổng Sẵn Sàng Khoa Học (Scientific Readiness Gate):</strong> Xác nhận hệ thống đã thỏa mãn 4 điều kiện cốt lõi (dữ liệu thực nghiệm đầy đủ, mô hình hợp lệ, điểm tối ưu Desirability &gt; 0, và hoàn thành mô phỏng Monte Carlo).
                   <br />2. <strong>Chọn công cụ mô hình hóa nguồn:</strong> Bấm nút <em>"Đa Thức (ANOVA)"</em> hoặc <em>"Mạng Nơ-ron AI"</em> để chỉ định tập mô hình sẽ đưa vào bảng biểu và kết luận của báo cáo.
-                  <br />3. <strong>Rà soát trực quan 10 chương mục tài liệu:</strong> Sử dụng Mục lục thông minh bên trái để đối chiếu dữ liệu QTPP, CQAs, DoE, phân tích ANOVA/ANN, PAR/NOR và Chiến lược kiểm soát ICH Q10.
+                  <br />3. <strong>Rà soát các mục báo cáo:</strong> Dùng mục lục bên trái, đặc biệt mục <strong>6c. Thí nghiệm xác nhận phương án tối ưu</strong>, để đối chiếu điều kiện kế hoạch, giá trị dự đoán, giá trị thực tế và từng kết luận riêng.
                   <br />4. <strong>Thực hiện Ký Duyệt Điện Tử 3 Cấp (21 CFR Part 11 Sign-off):</strong> Ký theo phân quyền nghiêm ngặt <em>Analyst (Tác giả)</em> &rarr; <em>Reviewer (Thẩm định kỹ thuật)</em> &rarr; <em>Approver (Phê duyệt pháp lý)</em>. Sau khi Approver ký, hồ sơ được khóa mật mã học (Cryptographic Record Lock).
                   <br />5. <strong>Xuất báo cáo lưu trữ pháp lý:</strong>
                   <ul style={{ paddingLeft: '1.2rem', margin: '0.2rem 0' }}>
@@ -1789,6 +1803,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                     <li><strong>5c. Mặt Đáp &amp; Phân Tích Điểm Dừng (Canonical Analysis):</strong> Bảng tọa độ điểm dừng x₀ (coded &amp; actual), bản chất mặt cong (Cực đại/Cực tiểu/Yên ngựa/Sống trâu), phương trình chính tắc và các trị riêng λᵢ ma trận Hessian; kèm đặc tính mặt đáp phi tuyến ANN.</li>
                     <li><strong>6a. Tối Ưu Hóa Desirability:</strong> Điểm vận hành tối ưu toàn cục Derringer-Suich (Overall D) và setpoint các yếu tố.</li>
                     <li><strong>6b. Đánh Giá Rủi Ro Sau DoE:</strong> Bảng cập nhật rủi ro FMEA dựa trên bằng chứng thực nghiệm đã thu được.</li>
+                    <li><strong>6c. Thí nghiệm xác nhận phương án tối ưu:</strong> Điều kiện thực hiện, nguồn mô hình, số mẻ; dự đoán và trung bình thực tế ± SD, bias, RMSE; kết luận riêng về tiêu chuẩn, ngưỡng sai lệch thực tiễn, khoảng dự đoán và tương đương. Có chi tiết và cảnh báo theo từng mẻ; nếu chưa tạo hồ sơ, báo cáo ghi rõ chưa có dữ liệu xác nhận.</li>
                     <li><strong>7. Chiến Lược Kiểm Soát Toàn Diện (ICH Q10):</strong> Phân loại CMA, CPP, IPC, tiêu chuẩn xuất xưởng thành phẩm, dải vận hành thường quy (NOR) và dải chứng minh chấp nhận được (PAR).</li>
                     <li><strong>8. Độ Bền Vững Quy Trình (Monte Carlo):</strong> Kết quả mô phỏng 10.000 lô ảo, độ tin cậy phần trăm (Reliability %), chỉ số năng lực quy trình Cpk và tỷ lệ lỗi PPM.</li>
                     <li><strong>9. Ký Duyệt Điện Tử &amp; Audit Trail:</strong> Bảng biểu chữ ký điện tử 3 cấp độ (Analyst, Reviewer, Approver) tuân thủ 21 CFR Part 11 và sổ cái chuỗi khối bất biến.</li>

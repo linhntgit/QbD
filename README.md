@@ -12,6 +12,7 @@
 - Phân tích hồi quy đa thức và ANOVA, bao gồm kiểm tra thiếu bậc tự do, đa cộng tuyến và tính khả định của mô hình.
 - Huấn luyện mô hình mạng nơ-ron theo từng CQA hoặc đa đầu ra.
 - Hiển thị response surface, contour/ternary plot, profiler, desirability và Design Space qua mô phỏng Monte Carlo.
+- Xác nhận phương án tối ưu bằng các mẻ/thí nghiệm độc lập: chốt điều kiện và ngưỡng sai lệch, nhập kết quả trực tiếp hoặc dán bảng tab từ Excel, so sánh thực nghiệm với dự đoán tại điều kiện thực tế, PI của mô hình OLS và giới hạn chất lượng. Hồ sơ được lưu cùng project và đưa vào báo cáo Word.
 - Tạo báo cáo phát triển theo cấu trúc CTD 3.2.P.2 và xuất Word.
 
 ## Case Study đi kèm
@@ -74,3 +75,11 @@ Kho đã có GitHub Actions để build và triển khai GitHub Pages khi có th
 Kết quả thống kê và Design Space phụ thuộc vào chất lượng, cỡ mẫu, thiết kế, phương pháp phân tích và giả định mô hình. Trước khi sử dụng cho mục đích GxP hoặc hồ sơ đăng ký, cần có đánh giá độc lập của chuyên gia phát triển dược phẩm và thống kê.
 
 Các dải được lưu từ Prediction Profiler là **provisional screening ranges**, không phải PAR đã xác nhận. PAR/Design Space chính thức cần đánh giá đa biến, uncertainty phù hợp, confirmation run độc lập và phê duyệt theo hệ thống chất lượng. OLS/ANOVA có biến giả cho hiệu ứng block cố định; đây không phải mô hình random-effects. Xem [báo cáo đối chiếu thống kê](STATISTICAL_AUDIT.md) để biết phạm vi kiểm chứng và giới hạn.
+
+## Thí nghiệm xác nhận phương án tối ưu
+
+Trong bước **7. Không gian Thiết kế**, chọn một điều kiện trong Profiler hoặc một kịch bản đã lưu rồi bấm **Tạo thí nghiệm xác nhận**. Điều chỉnh thông số thực hiện sau làm tròn nếu cần; app kiểm tra miền thiết kế và tính lại dự đoán tại điều kiện này. Chọn số mẻ độc lập, mức PI, cách kiểm tra specification và ngưỡng sai lệch riêng cho từng đáp ứng **trước khi** chốt kế hoạch.
+
+Sau khi chốt, nhập mỗi mẻ trên một dòng hoặc dán bảng tab từ Excel với tiêu đề `batch`, các mã X, rồi các mã Y. Các phép đo lặp trên cùng một mẫu cần được tổng hợp trước khi nhập; chúng không được tính là các mẻ độc lập. App báo cáo bias, độ lệch tuyệt đối, lệch tương đối, SD, RMSE, PI của từng mẻ và trung bình nếu mô hình OLS có đủ thông tin. Với đáp ứng phân loại, app so sánh mức thực tế với mức đích và không tính PI số học. Với ANN hoặc mô hình chưa có phương sai dự đoán hợp lệ, app vẫn đánh giá specification nhưng ghi rõ PI chưa có. Kết quả nằm trong PI không tự chứng minh tương đương và xác nhận tại một điểm không xác nhận toàn bộ Design Space/PAR.
+
+Hồ sơ giữ nguyên mô hình/dự đoán ban đầu khi dữ liệu DoE được thay đổi. Dữ liệu xác nhận chỉ được thêm vào tập xây dựng mô hình khi người dùng chọn thao tác đó sau khi hoàn tất đánh giá; app đưa các mẻ này vào block mới và lưu dấu thời gian. Từ lúc đó, chúng không còn là tập xác nhận độc lập cho mô hình mới.

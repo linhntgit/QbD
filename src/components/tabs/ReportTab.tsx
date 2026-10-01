@@ -29,6 +29,7 @@ import type {
 } from '../../types/qbd';
 import type { NeuralTrainingMode } from '../../types/neuralNetwork';
 import { exportQBDWordReport } from '../../services/reportGenerator';
+import { evaluateConfirmation, formatConfirmationNumber, verdictLabel } from '../../services/confirmation';
 import { downloadRegulatoryPDFA } from '../../services/pdfReportGenerator';
 import { calculateDesignEfficiency } from '../../services/doeGenerator';
 import { generateUpdatedRiskAssessment, generateControlStrategy } from '../../services/statistics';
@@ -110,6 +111,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
         icon: ShieldAlert,
         badge: 'ICH Q9',
       },
+      { id: 'sec-6c', title: '6c. Thí Nghiệm Xác Nhận', subtitle: `${project.confirmationStudies?.length ?? 0} hồ sơ`, icon: CheckCircle2, badge: 'Confirm' },
       {
         id: 'sec-7',
         title: '7. Chiến Lược Kiểm Soát',
@@ -141,7 +143,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
     ];
 
     return list;
-  }, [project.doeConfig.designType, project.runs.length, neuralModels, optimum, monteCarlo]);
+  }, [project.doeConfig.designType, project.runs.length, project.confirmationStudies, neuralModels, optimum, monteCarlo]);
 
   // Scroll Spy logic to highlight active TOC item
   useEffect(() => {
@@ -1329,6 +1331,32 @@ export const ReportTab: React.FC<ReportTabProps> = ({
               </tbody>
             </table>
           </div>
+        </div>
+
+        <div id="sec-6c" className="report-section" style={{ marginBottom: '2rem' }}>
+          <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
+            6c. Thí nghiệm xác nhận phương án tối ưu
+          </h2>
+          {project.confirmationStudies?.length ? project.confirmationStudies.map(study => (
+            <div key={study.id} style={{ marginBottom: '1rem', padding: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '0.4rem' }}>
+              <strong>{study.name}</strong> — {study.status === 'complete' ? 'Đã hoàn tất' : study.status === 'collecting' ? 'Đang thu thập' : 'Bản nháp'}; {study.plannedReplicates} mẻ dự kiến; nguồn {study.sourceVersion}; SHA-256 {study.sourceHash}
+              <p>Điều kiện kế hoạch: {study.factors.map(f => `${f.code} = ${formatConfirmationNumber(study.solution.actualFactors[f.code])} ${f.unit}`).join('; ')}. Đánh giá tiêu chuẩn theo {study.specificationBasis === 'mean' ? 'trung bình' : 'từng mẻ'}.</p>
+              <div className="table-container"><table className="qbd-table"><thead><tr><th>CQA</th><th>Dự đoán kế hoạch</th><th>Thực tế TB ± SD</th><th>Bias; RMSE</th><th>Tiêu chuẩn</th><th>Sai lệch thực tiễn</th><th>Dự báo (PI)</th><th>Tương đương</th></tr></thead><tbody>
+                {study.responses.map(response => { const result = evaluateConfirmation(study, response); return <tr key={response.cqa.code}>
+                  <td>{response.cqa.code} ({response.cqa.name})</td>
+                  <td>{formatConfirmationNumber(response.predicted)} {response.cqa.unit}</td>
+                  <td>{formatConfirmationNumber(result.mean)} ± {formatConfirmationNumber(result.sd)} {response.cqa.unit}; n={result.n}/{study.plannedReplicates}</td>
+                  <td>{formatConfirmationNumber(result.bias)}; RMSE={formatConfirmationNumber(result.rmse)}</td>
+                  <td>{verdictLabel(result.specification)}</td><td>{verdictLabel(result.practical)}</td><td>{verdictLabel(result.predictive)}</td><td>{verdictLabel(result.equivalence)}</td>
+                </tr>; })}
+              </tbody></table></div>
+              {study.responses.map(response => { const result = evaluateConfirmation(study, response); return <details key={response.cqa.code} style={{ marginTop: '0.5rem', fontSize: '0.78rem' }}><summary>Chi tiết {response.cqa.code}: từng mẻ và lưu ý</summary>
+                {result.rows.map(row => <div key={row.run.id}>{row.run.batch} ({row.run.date}): thực tế {formatConfirmationNumber(row.actual)}, dự đoán {formatConfirmationNumber(row.predicted)}, sai lệch {formatConfirmationNumber(row.error)}, PI cá thể {verdictLabel(row.pi)}{row.errors.length ? `; ${row.errors.join('; ')}` : ''}</div>)}
+                {result.warnings.map((warning, index) => <div key={index}>• {warning}</div>)}
+              </details>; })}
+            </div>
+          )) : <p>Chưa có thí nghiệm xác nhận. Tạo kế hoạch tại Bước 7 sau khi chọn phương án tối ưu.</p>}
+          <p style={{ fontSize: '0.78rem', color: '#475569' }}>Kết quả chỉ đánh giá các điều kiện đã thực hiện; không xác nhận toàn bộ Design Space/PAR. “Chưa đủ cơ sở” không đồng nghĩa với “Đạt”.</p>
         </div>
 
         {/* 7. Comprehensive Control Strategy (ICH Q10) */}

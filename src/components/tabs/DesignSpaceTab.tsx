@@ -31,6 +31,8 @@ import type {
 } from '../../types/qbd';
 import { PlotlyChart } from '../PlotlyChart';
 import { DesirabilityProfiler } from '../DesirabilityProfiler';
+import { ConfirmationPanel } from '../ConfirmationPanel';
+import { createConfirmationStudy } from '../../services/confirmation';
 import {
   runMonteCarloSimulationAsync,
   generateControlStrategy,
@@ -243,6 +245,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
 
   // Desirability Optimum State
   const [optimum, setOptimum] = useState<DesirabilitySolution | null>(sharedOptimum);
+  const [profilerSolution, setProfilerSolution] = useState<DesirabilitySolution | null>(null);
 
   // Sliced / Fixed Factors state for 2D/3D Design Space cross-section
   const [sliceFactorsCoded, setSliceFactorsCoded] = useState<Record<string, number>>(() => {
@@ -429,6 +432,13 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
 
     // Run Monte Carlo with visual animation
     executeSimulation(solution.actualFactors, mcSimulations, mcVariability);
+  };
+
+  const handleCreateConfirmation = (solution: DesirabilitySolution) => {
+    if (project.isLocked) return;
+    const study = createConfirmationStudy(project, solution, models);
+    onUpdateProject({ confirmationStudies: [...(project.confirmationStudies ?? []), study] });
+    document.getElementById('confirmation')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   // Run Monte Carlo simulation manually
@@ -863,7 +873,6 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
     .map((cqa) => cqa.code);
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      
       {/* Modeling Paradigm Banner & Switcher */}
       {onToggleEngine && (
         <div
@@ -934,6 +943,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
       )}
 
       {missingModelCodes.length > 0 || !optimum ? (
+        <>
         <div className="qbd-card" role="alert" style={{ borderLeft: '4px solid #d97706', color: '#92400e', padding: '2.5rem 1.5rem', textAlign: 'center' }}>
           <AlertTriangle size={36} color="#d97706" style={{ margin: '0 auto 0.75rem' }} />
           <h2 style={{ fontSize: '1.05rem', fontWeight: '700', marginBottom: '0.35rem' }}>Design Space chưa thể được tính</h2>
@@ -955,6 +965,8 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
             </div>
           )}
         </div>
+        {(project.confirmationStudies?.length ?? 0) > 0 && <ConfirmationPanel project={project} onUpdateProject={onUpdateProject} />}
+        </>
       ) : (
         <>
           {/* 1. Prediction Profiler & Desirability Optimization */}
@@ -964,6 +976,8 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
         models={models}
         onUpdateCQAs={(updatedCQAs) => onUpdateProject({ cqas: updatedCQAs })}
         onApplyOptimum={handleApplyOptimumFromProfiler}
+        onCreateConfirmation={project.isLocked ? undefined : handleCreateConfirmation}
+        onCurrentSolutionChange={setProfilerSolution}
       />
 
       {/* 2. Sweet Spot / Design Space Overlay Plot */}
@@ -2004,6 +2018,12 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
           </div>
         )}
       </div>
+
+      <ConfirmationPanel
+        project={project}
+        onUpdateProject={onUpdateProject}
+        onCreate={profilerSolution && !project.isLocked ? () => handleCreateConfirmation(profilerSolution) : undefined}
+      />
 
       {/* 4. Comprehensive Control Strategy Table (ICH Q10 & FDA Table 105/106/107) */}
       <div className="qbd-card" style={{ borderLeft: '4px solid #0f766e' }}>

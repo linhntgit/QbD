@@ -15,6 +15,7 @@
  */
 
 import { saveAs } from 'file-saver';
+import { confirmationReportLines } from './confirmation';
 import type {
   QBDProject,
   StatisticalModelResult,
@@ -759,6 +760,16 @@ export function generateRegulatoryPDFABuffer(
   }
 
   // =========================================================================
+  // Confirmation evidence at the selected optimum, before the control strategy.
+  doc.addSectionHeader('6c. Thi nghiem xac nhan phuong an toi uu', 'Doi chieu du doan voi ket qua thuc nghiem tai dieu kien da thuc hien.');
+  if (project.confirmationStudies?.length) {
+    project.confirmationStudies.forEach(study => {
+      confirmationReportLines(study).forEach(line => doc.addParagraph(line, 'F1', 8, 10, 0.2, 0.2, 0.2));
+    });
+  } else {
+    doc.addParagraph('Chua co thi nghiem xac nhan. Ket qua toi uu hien chi la du doan tu mo hinh.', 'F1', 8, 12, 0.5, 0.5, 0.5);
+  }
+
   // SECTION 8: CONTROL STRATEGY & MONTE CARLO ROBUSTNESS
   // =========================================================================
   doc.addSectionHeader(

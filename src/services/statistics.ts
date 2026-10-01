@@ -537,6 +537,7 @@ export function fitModel(
   return {
     cqaCode: cqa.code,
     modelType,
+    predictionCovariance: invXTX.slice(0, terms.length).map((row) => row.slice(0, terms.length).map((value) => value * msResidual)),
     terms: regressionTerms,
     anova,
     curvatureTest,

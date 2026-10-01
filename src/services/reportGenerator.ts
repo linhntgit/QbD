@@ -12,6 +12,7 @@ import {
   ShadingType,
 } from 'docx';
 import { saveAs } from 'file-saver';
+import { confirmationReportLines } from './confirmation';
 import type {
   QBDProject,
   StatisticalModelResult,
@@ -982,6 +983,17 @@ export async function exportQBDWordReport(
     }),
     new Paragraph({ text: '', spacing: { after: 250 } })
   );
+
+  // SECTION 6c: Confirmation is reported before the control strategy.
+  sections.push(new Paragraph({ text: '6c. Thí nghiệm xác nhận phương án tối ưu', heading: HeadingLevel.HEADING_1 }));
+  if (project.confirmationStudies?.length) {
+    for (const study of project.confirmationStudies) {
+      sections.push(new Paragraph({ text: study.name, heading: HeadingLevel.HEADING_2 }));
+      sections.push(...confirmationReportLines(study).map(text => new Paragraph({ text, spacing: { after: 100 } })));
+    }
+  } else {
+    sections.push(new Paragraph({ text: 'Chưa có thí nghiệm xác nhận. Kết quả tối ưu hiện chỉ là dự đoán từ mô hình.' }));
+  }
 
   // SECTION 7: Comprehensive Control Strategy Table (ICH Q10 & FDA Table 105/106/107)
   const controlStrategyItems = generateControlStrategy(project, optimum);

@@ -237,6 +237,8 @@ export interface RSMCanonicalAnalysisResult {
 }
 
 export interface StatisticalModelResult {
+  /** Covariance of the non-block coefficients, in buildModelTerms order. */
+  predictionCovariance?: number[][];
   cqaCode: string;
   modelType: ModelType;
   terms: RegressionTerm[];
@@ -356,6 +358,7 @@ export interface AnalysisSettings {
 }
 
 export interface QBDProject {
+  confirmationStudies?: import('./confirmation').ConfirmationStudy[];
   id: string;
   name: string;
   moleculeName: string;

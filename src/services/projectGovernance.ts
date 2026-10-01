@@ -217,7 +217,44 @@ export const lockDetailsSchema = z.object({
   reason: z.string(),
 }).passthrough();
 
+const confirmationOLS = z.object({
+  kind: z.literal('ols'), modelType: z.enum(['Linear', '2FI', 'Quadratic', 'Reduced']),
+  coefficients: z.array(z.number()).min(1).max(2000),
+  covariance: z.array(z.array(z.number()).max(2000)).max(2000).optional(),
+  residualSD: z.number().nonnegative(), df: z.number().int().nonnegative(),
+}).refine(m => !m.covariance || (m.covariance.length === m.coefficients.length && m.covariance.every(row=>row.length === m.coefficients.length)), 'Ma trận covariance không đúng kích thước');
+const confirmationANN = z.object({
+  kind: z.literal('ann'), artifact: z.object({
+    config: z.object({ activation: z.enum(['tanh', 'sigmoid', 'relu', 'linear', 'gaussian']) }).passthrough(),
+    inputFactorCodes: z.array(z.string()).max(2000),
+    weights: z.object({ W1: z.array(z.array(z.number())), b1: z.array(z.number()), W2: z.array(z.array(z.number())).optional(), b2: z.array(z.number()).optional(), WOut: z.array(z.array(z.number())), bOut: z.number() }),
+    normParams: z.object({ yMean: z.number(), ySd: z.number(), xMeans: z.array(z.number()), xSds: z.array(z.number()) }).passthrough(),
+  }).passthrough().refine(a => {
+    const w = a.weights;
+    const last = w.b2?.length ?? w.b1.length;
+    return w.b1.length>0 && w.W1.length===a.inputFactorCodes.length && w.W1.every(row=>row.length===w.b1.length)
+      && Boolean(w.W2)===Boolean(w.b2) && (!w.W2 || (w.W2.length===w.b1.length && w.W2.every(row=>row.length===last)))
+      && w.WOut.length===last && w.WOut.every(row=>row.length===1);
+  }, 'Trọng số ANN không đúng kích thước'),
+});
+const confirmationStudySchema = z.object({
+  id: z.string(), name: z.string(), createdAt: z.string(), sourceHash: z.string(), sourceVersion: z.string(),
+  factors: z.array(factorSchema).max(50), sourceBlocks: z.array(z.number().int().positive()),
+  solution: z.object({ codedFactors: z.record(z.string(),z.number()), actualFactors: z.record(z.string(),z.union([z.number(),z.string()])),
+    predictedResponses: z.record(z.string(),z.unknown()), overallDesirability: z.number() }),
+  originalSolution: z.object({ codedFactors: z.record(z.string(),z.number()), actualFactors: z.record(z.string(),z.union([z.number(),z.string()])),
+    predictedResponses: z.record(z.string(),z.unknown()), overallDesirability: z.number() }).optional(),
+  responses: z.array(z.object({ cqa: cqaSchema, predicted: z.number().nullable(), model: z.union([confirmationOLS,confirmationANN]).optional(),
+    tolerance: z.number().nonnegative().optional(), toleranceMode: z.enum(['absolute','relative']) })).max(50),
+  plannedReplicates: z.number().int().min(1).max(500), confidence: z.union([z.literal(0.9),z.literal(0.95),z.literal(0.99)]),
+  specificationBasis: z.enum(['individual','mean']), status: z.enum(['draft','collecting','complete']),
+  runs: z.array(z.object({ id: z.string(), batch: z.string(), date: z.string(), notes: z.string(),
+    actualFactors: z.record(z.string(),z.union([z.number(),z.string()])), responses: z.record(z.string(),z.union([z.number(),z.string()]).nullable()) })).max(500),
+  history: z.array(z.object({ at: z.string(), action: z.string(), before: z.string().optional() })), addedToTrainingAt: z.string().optional(),
+});
+
 export const qbdProjectSchema = z.object({
+  confirmationStudies: z.array(confirmationStudySchema).max(100).optional(),
   id: z.string(),
   name: z.string(),
   moleculeName: z.string(),

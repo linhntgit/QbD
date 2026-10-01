@@ -64,6 +64,8 @@ interface DesirabilityProfilerProps {
   models: Record<string, StatisticalModelResult | NeuralNetModelResult>;
   onUpdateCQAs?: (updatedCQAs: CQA[]) => void;
   onApplyOptimum?: (solution: DesirabilitySolution) => void;
+  onCreateConfirmation?: (solution: DesirabilitySolution) => void;
+  onCurrentSolutionChange?: (solution: DesirabilitySolution | null) => void;
 }
 
 export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
@@ -72,6 +74,8 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
   models,
   onUpdateCQAs,
   onApplyOptimum,
+  onCreateConfirmation,
+  onCurrentSolutionChange,
 }) => {
   const validCQAs = useMemo(() => cqas.filter((c) => models[c.code]), [cqas, models]);
 
@@ -168,6 +172,15 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
       actualFactors,
     };
   }, [currentCoded, validCQAs, models, factors]);
+
+  useEffect(() => {
+    onCurrentSolutionChange?.(currentEvaluation ? {
+      codedFactors: { ...currentCoded },
+      actualFactors: { ...currentEvaluation.actualFactors },
+      predictedResponses: { ...currentEvaluation.predictions },
+      overallDesirability: currentEvaluation.overallD,
+    } : null);
+  }, [currentCoded, currentEvaluation, onCurrentSolutionChange]);
 
   // Maximize Desirability (Global Optimizer)
   const handleMaximizeDesirability = () => {
@@ -1692,6 +1705,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                         >
                           Tải Lại
                         </button>
+                        {onCreateConfirmation && <button className="btn btn-secondary" onClick={() => onCreateConfirmation(s)}>Xác nhận</button>}
                         <button
                           onClick={() => handleDeleteSetting(s.id)}
                           style={{
