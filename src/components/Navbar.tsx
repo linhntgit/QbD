@@ -8,6 +8,7 @@ import {
   Calculator,
   BrainCircuit,
   HelpCircle,
+  ChevronDown,
 } from 'lucide-react';
 import type { QBDProject, ModelingEngine } from '../types/qbd';
 import { CASE_STUDIES } from '../data/caseStudies';
@@ -20,6 +21,7 @@ interface NavbarProps {
   onLoadProject: (project: QBDProject) => void;
   onSaveJSON: () => void;
   onNewProject: () => void;
+  onRenameProject: (name: string) => void;
   onToggleHelp?: () => void;
   isHelpOpen?: boolean;
 }
@@ -32,10 +34,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLoadProject,
   onSaveJSON,
   onNewProject,
+  onRenameProject,
   onToggleHelp,
   isHelpOpen = false,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const projectNameRef = useRef<HTMLInputElement>(null);
 
   const handleJSONUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -185,26 +189,41 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Action Buttons */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {/* Case Study Selector */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <BookOpen size={16} color="#0f766e" />
+            {/* Project name and case study templates */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', minWidth: 0 }}>
+              <BookOpen size={16} color="#0f766e" style={{ flex: 'none' }} />
+              <div style={{ display: 'flex', alignItems: 'center', width: 'min(360px, 48vw)', minWidth: '210px', border: '1px solid #cbd5e1', borderRadius: '0.5rem', background: '#fff', overflow: 'hidden' }}>
+                <input
+                  ref={projectNameRef}
+                  aria-label="Tên dự án và tên file"
+                  title="Đặt tên dự án; tên này được dùng khi lưu file JSON"
+                  value={project.name}
+                  disabled={Boolean(project.isLocked)}
+                  onChange={(event) => onRenameProject(event.target.value)}
+                  onBlur={() => { if (!project.name.trim()) onRenameProject('Untitled project'); }}
+                  style={{ flex: 1, minWidth: 0, height: '36px', padding: '0.35rem 0.65rem', border: 0, outlineOffset: '-2px', fontSize: '0.8rem', color: '#0f172a' }}
+                />
+                <div style={{ position: 'relative', width: '32px', height: '36px', flex: 'none', borderLeft: '1px solid #e2e8f0' }}>
               <select
                 aria-label="Chọn case study mẫu"
-                className="input-field"
-                style={{ width: '200px', padding: '0.35rem 0.5rem', fontSize: '0.8rem' }}
-                value={project.id}
+                title="Mở danh sách case study mẫu"
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                value=""
                 onChange={(e) => {
                   const selected = CASE_STUDIES.find((cs) => cs.id === e.target.value);
                   if (selected) onLoadProject(selected);
                 }}
               >
-                <option value="" disabled>-- Chọn Case Study mẫu --</option>
+                <option value="" disabled>Chọn case study mẫu</option>
                 {CASE_STUDIES.map((cs) => (
                   <option key={cs.id} value={cs.id}>
                     {cs.moleculeName} ({cs.doeConfig.designType})
                   </option>
                 ))}
               </select>
+                  <ChevronDown size={17} color="#334155" style={{ position: 'absolute', top: 9, left: 7, pointerEvents: 'none' }} />
+                </div>
+              </div>
             </div>
 
             {/* Save JSON */}
@@ -239,7 +258,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {/* New Project */}
             <button
-              onClick={onNewProject}
+              onClick={() => { onNewProject(); requestAnimationFrame(() => { projectNameRef.current?.focus(); projectNameRef.current?.select(); }); }}
               className="btn btn-secondary"
               style={{ fontSize: '0.82rem', padding: '0.4rem 0.65rem' }}
               title="Tạo dự án thiết kế mới"

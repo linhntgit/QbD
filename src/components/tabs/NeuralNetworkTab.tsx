@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   BrainCircuit,
   Sliders,
@@ -155,6 +155,9 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
     phase: string;
   } | null>(null);
   const [lastTrainedNotice, setLastTrainedNotice] = useState<string | null>(null);
+  const [trainingNoticeIsError, setTrainingNoticeIsError] = useState(false);
+  const neuralModelsRef = useRef(neuralModels);
+  neuralModelsRef.current = neuralModels;
   const [configActionNotice, setConfigActionNotice] = useState<string | null>(null);
 
   // Explainable AI (XAI) and Multi-Model Benchmarking Memos
@@ -207,7 +210,42 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
     }
   }, [neuralTrainingMode, selectedCQA, sharedNeuralConfig, neuralConfigs]);
 
+  const validResponseCount = (codes: string[]) => project.runs.filter((run) => codes.some((code) => {
+    const raw = run.responses[code];
+    return raw !== null && raw !== undefined && String(raw).trim() !== '' && Number.isFinite(Number(raw));
+  })).length;
+
+  const trainingCapacity = (codes: string[], config: NeuralNetConfig) => {
+    const observations = validResponseCount(codes);
+    const trainingSamples = observations > 0 ? getNeuralTrainingSampleCount(observations, config) : 0;
+    const parameters = calculateNeuralArchitectureMetrics(
+      numInputs, config.hiddenNodes1, config.hiddenNodes2, codes.length, trainingSamples,
+    ).totalParameters;
+    return { observations, trainingSamples, parameters };
+  };
+
+  const capacityWarning = (label: string, codes: string[], config: NeuralNetConfig) => {
+    const { observations, trainingSamples, parameters } = trainingCapacity(codes, config);
+    if (trainingSamples > parameters) return null;
+    return `${label}: có ${observations} dòng có kết quả hợp lệ; sau khi chia ${config.validationMethod === 'kfold' ? 'K-fold' : config.validationMethod === 'holdout' ? 'hold-out' : 'dữ liệu'} còn ${trainingSamples} mẫu huấn luyện, trong khi mạng có ${parameters} tham số. Cần số mẫu huấn luyện lớn hơn số tham số. Hãy bấm “Áp Dụng Gợi Ý Kiến Trúc” để giảm số nơ-ron (hoặc tự giảm H1/H2), rồi huấn luyện lại; nếu vẫn chưa đủ, bổ sung thí nghiệm có kết quả Y hoặc điều chỉnh phương pháp validation.`;
+  };
+
+  const showTrainingError = (message: string) => {
+    setIsTraining(false);
+    setTrainingProgress(null);
+    setTrainingNoticeIsError(true);
+    setLastTrainedNotice(message);
+  };
+
   const handleTrain = async () => {
+    const warning = neuralTrainingMode === 'shared'
+      ? capacityWarning('Mạng chung', project.cqas.map((cqa) => cqa.code), localConfig)
+      : currentCQA && capacityWarning(`${currentCQA.code} (${currentCQA.name})`, [currentCQA.code], localConfig);
+    if (warning) {
+      showTrainingError(warning);
+      return;
+    }
+    setTrainingNoticeIsError(false);
     if (neuralTrainingMode === 'shared') {
       setIsTraining(true);
       setLastTrainedNotice(null);
@@ -244,6 +282,11 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
       setTimeout(() => {
         setIsTraining(false);
         setTrainingProgress(null);
+        const trained = project.cqas.filter((cqa) => neuralModelsRef.current[cqa.code]).length;
+        if (trained !== project.cqas.length) {
+          showTrainingError(`Mạng chung chưa tạo đủ mô hình: ${trained}/${project.cqas.length} chỉ tiêu. Kiểm tra số mẫu và số tham số, giảm H1/H2 hoặc bổ sung dữ liệu Y rồi huấn luyện lại.`);
+          return;
+        }
         setLastTrainedNotice(`✓ Huấn luyện thành công mạng nơ-ron hợp nhất (Multi-Output MLP) cho toàn bộ ${project.cqas.length} biến Y!`);
         try {
           confetti({ particleCount: 75, spread: 60, origin: { y: 0.6 } });
@@ -287,6 +330,10 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
       setTimeout(() => {
         setIsTraining(false);
         setTrainingProgress(null);
+        if (!neuralModelsRef.current[currentCQA.code]) {
+          showTrainingError(`Chưa tạo được mô hình cho ${currentCQA.code} (${currentCQA.name}). Kiểm tra dữ liệu Y, giảm H1/H2 hoặc bổ sung thí nghiệm rồi huấn luyện lại.`);
+          return;
+        }
         setLastTrainedNotice(`✓ Huấn luyện thành công ${totalTours} Tours cho ${currentCQA.name} (${currentCQA.code})!`);
         try {
           confetti({ particleCount: 65, spread: 55, origin: { y: 0.6 } });
@@ -296,6 +343,15 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
   };
 
   const handleTrainAllIndependent = async () => {
+    const warnings = project.cqas.flatMap((cqa) => {
+      const warning = capacityWarning(`${cqa.code} (${cqa.name})`, [cqa.code], neuralConfigs[cqa.code] || DEFAULT_NEURAL_CONFIG);
+      return warning ? [warning] : [];
+    });
+    if (warnings.length > 0) {
+      showTrainingError(`Chưa thể huấn luyện tất cả chỉ tiêu. ${warnings.join(' ')}`);
+      return;
+    }
+    setTrainingNoticeIsError(false);
     setIsTraining(true);
     setLastTrainedNotice(null);
     const totalCQAs = project.cqas.length;
@@ -319,6 +375,12 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
     setTimeout(() => {
       setIsTraining(false);
       setTrainingProgress(null);
+      const trained = project.cqas.filter((cqa) => neuralModelsRef.current[cqa.code]).length;
+      if (trained !== totalCQAs) {
+        const missing = project.cqas.filter((cqa) => !neuralModelsRef.current[cqa.code]).map((cqa) => cqa.code).join(', ');
+        showTrainingError(`Chỉ tạo được ${trained}/${totalCQAs} mô hình. Chưa có mô hình cho ${missing}; hãy kiểm tra dữ liệu Y và cấu hình từng chỉ tiêu rồi huấn luyện lại.`);
+        return;
+      }
       setLastTrainedNotice(`✓ Đã huấn luyện đồng loạt tất cả ${totalCQAs} biến Y với các mạng nơ-ron độc lập!`);
       try {
         confetti({ particleCount: 80, spread: 65, origin: { y: 0.6 } });
@@ -1790,27 +1852,27 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
         </div>
       )}
 
-      {/* Success Notice Banner */}
+      {/* Training outcome */}
       {lastTrainedNotice && !isTraining && (
         <div
           className="qbd-card animate-fade-in"
           style={{
-            backgroundColor: '#f0fdf4',
-            border: '1px solid #86efac',
+            backgroundColor: trainingNoticeIsError ? '#fff7ed' : '#f0fdf4',
+            border: `1px solid ${trainingNoticeIsError ? '#fdba74' : '#86efac'}`,
             padding: '0.75rem 1rem',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            color: '#15803d',
+            color: trainingNoticeIsError ? '#9a3412' : '#15803d',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: '700', fontSize: '0.85rem' }}>
-            <CheckCircle2 size={18} color="#16a34a" />
+            {trainingNoticeIsError ? <AlertTriangle size={18} color="#c2410c" /> : <CheckCircle2 size={18} color="#16a34a" />}
             <span>{lastTrainedNotice}</span>
           </div>
           <button
             onClick={() => setLastTrainedNotice(null)}
-            style={{ fontSize: '0.75rem', color: '#15803d', background: 'none', border: 'none', cursor: 'pointer' }}
+            style={{ fontSize: '0.75rem', color: trainingNoticeIsError ? '#9a3412' : '#15803d', background: 'none', border: 'none', cursor: 'pointer' }}
           >
             ✕ Đóng
           </button>

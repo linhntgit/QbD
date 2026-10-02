@@ -41,6 +41,7 @@ import { codedToActual, actualToCoded, getConfiguredFactorCodes, getConfiguredFa
 import { formatAxisTitle, calculateCQAMargin } from '../../services/mathUtils';
 import { generateTernaryDesignSpace } from '../../services/ternaryContour';
 import { assessDesignSpaceRobustness } from '../../services/designSpaceRobustness';
+import './DesignSpaceTab.css';
 
 interface DesignSpaceTabProps {
   project: QBDProject;
@@ -332,6 +333,12 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
   const [simProgress, setSimProgress] = useState<number>(0);
 
   const [mcResult, setMcResult] = useState<MonteCarloResult | null>(sharedMonteCarlo);
+  const lastSharedMonteCarlo = useRef<MonteCarloResult | null>(sharedMonteCarlo);
+  const [lastSimulationKey, setLastSimulationKey] = useState<string | null>(() => sharedMonteCarlo && sharedOptimum
+    ? JSON.stringify([sharedOptimum.actualFactors, monteCarloSimulations, monteCarloVariabilityPercent, modelingEngine]) : null);
+  const currentSimulationKey = optimum
+    ? JSON.stringify([optimum.actualFactors, mcSimulations, mcVariability, modelingEngine]) : null;
+  const simulationNeedsRefresh = Boolean(mcResult && currentSimulationKey !== lastSimulationKey);
   const simulationTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
     setIsSimulating(false);
@@ -342,8 +349,8 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
   }, [project.id, factors, cqas, models, monteCarloSeed]);
 
   const robustness = useMemo(
-    () => optimum ? assessDesignSpaceRobustness(optimum.actualFactors, factors, cqas, models, mcResult) : null,
-    [optimum, factors, cqas, models, mcResult],
+    () => optimum ? assessDesignSpaceRobustness(optimum.actualFactors, factors, cqas, models, simulationNeedsRefresh ? null : mcResult) : null,
+    [optimum, factors, cqas, models, mcResult, simulationNeedsRefresh],
   );
 
   // The App owns the scientific result. This tab only mirrors it for interactive
@@ -351,12 +358,17 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
   useEffect(() => {
     setOptimum(sharedOptimum);
     setMcResult(sharedMonteCarlo);
+    if (sharedMonteCarlo && sharedOptimum && sharedMonteCarlo !== lastSharedMonteCarlo.current) {
+      setLastSimulationKey(JSON.stringify([sharedOptimum.actualFactors, monteCarloSimulations, monteCarloVariabilityPercent, modelingEngine]));
+    }
+    if (!sharedMonteCarlo) setLastSimulationKey(null);
+    lastSharedMonteCarlo.current = sharedMonteCarlo;
     setMcVariability(monteCarloVariabilityPercent);
     setMcSimulations(monteCarloSimulations);
     if (sharedOptimum) {
       setSliceFactorsCoded({ ...sharedOptimum.codedFactors });
     }
-  }, [sharedOptimum, sharedMonteCarlo, monteCarloVariabilityPercent, monteCarloSimulations]);
+  }, [sharedOptimum, sharedMonteCarlo, monteCarloVariabilityPercent, monteCarloSimulations, modelingEngine]);
 
   // Execute Monte Carlo with non-blocking async execution (PERF-01)
   const executeSimulation = async (
@@ -382,6 +394,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
         }
       );
       setMcResult(mc);
+      setLastSimulationKey(JSON.stringify([targetActual, batches, variability, modelingEngine]));
       onMonteCarloResult(mc);
       setSimProgress(100);
       try {
@@ -430,8 +443,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
     });
     onUpdateProject({ designSpace: newDesignSpace });
 
-    // Run Monte Carlo with visual animation
-    executeSimulation(solution.actualFactors, mcSimulations, mcVariability);
+    // The selected setpoint is ready for an explicit robustness run.
   };
 
   const handleCreateConfirmation = (solution: DesirabilitySolution) => {
@@ -451,6 +463,14 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
     onMonteCarloConfigChange(rsd, batches);
     executeSimulation(optimum.actualFactors, batches, rsd);
   };
+
+  const latestConfirmation = project.confirmationStudies?.at(-1);
+  const confirmationProgress = latestConfirmation
+    ? `${latestConfirmation.runs.filter(run => latestConfirmation.responses.every(response => run.responses[response.cqa.code] !== null && run.responses[response.cqa.code] !== undefined && run.responses[response.cqa.code] !== '')).length}/${latestConfirmation.plannedReplicates} mẻ có kết quả`
+    : 'Chưa lập kế hoạch';
+  const selectedSetpoint = Boolean(project.analysisSettings?.appliedOptimum);
+  const profilerMatchesSelection = Boolean(profilerSolution && optimum &&
+    JSON.stringify(profilerSolution.actualFactors) === JSON.stringify(optimum.actualFactors));
 
   // Sweet Spot / Design Space Overlay Grid Computation (2D Cartesian)
   const sweetSpotGrid = useMemo(() => {
@@ -942,9 +962,30 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
         </div>
       )}
 
+      <section className="step7-overview" aria-label="Tiến trình Bước 7">
+        <div className="step7-overview-heading">
+          <div><h2>Bước 7 · Chọn, kiểm tra và xác nhận phương án</h2><p>Đi theo từng chặng hoặc quay lại đúng phần đang cần làm.</p></div>
+          <span className="step7-engine">Mô hình: {modelingEngine === 'neural' ? 'Mạng nơ-ron' : 'Hồi quy đa thức'}</span>
+        </div>
+        <nav className="step7-journey" aria-label="Các chặng Bước 7">
+          <a href="#step7-optimize"><strong>1. Chọn phương án</strong><small>{selectedSetpoint ? 'Đã chọn' : 'Chưa chọn'}</small></a>
+          {missingModelCodes.length || !optimum ? <span className="step7-journey-disabled"><strong>2. Khảo sát vùng</strong><small>Cần mô hình khả định</small></span> : <a href="#step7-design-space"><strong>2. Khảo sát vùng</strong><small>Đồ thị & lát cắt</small></a>}
+          {missingModelCodes.length || !optimum ? <span className="step7-journey-disabled"><strong>3. Độ bền dự báo</strong><small>Cần phương án</small></span> : <a href="#step7-monte-carlo"><strong>3. Độ bền dự báo</strong><small>{simulationNeedsRefresh ? 'Cần chạy lại' : mcResult ? 'Đã mô phỏng' : 'Chưa mô phỏng'}</small></a>}
+          <a href="#confirmation"><strong>4. Thí nghiệm xác nhận</strong><small>{latestConfirmation?.status === 'complete' ? 'Đã hoàn tất' : confirmationProgress}</small></a>
+          {missingModelCodes.length || !optimum ? <span className="step7-journey-disabled"><strong>5. Chiến lược kiểm soát</strong><small>Cần phương án</small></span> : <a href="#step7-control"><strong>5. Chiến lược kiểm soát</strong><small>Rà soát bằng chứng</small></a>}
+        </nav>
+        {optimum && <div className="step7-selected">
+          <div><strong>{selectedSetpoint ? 'Phương án đã chọn' : 'Phương án tối ưu do mô hình đề xuất'}</strong><span>Overall D = {optimum.overallDesirability}</span></div>
+          <div className="step7-values">{factors.map(f => <span key={f.code}>{f.code}: <b>{String(optimum.actualFactors[f.code] ?? '—')} {f.unit}</b></span>)}</div>
+          <div className="step7-values">{cqas.map(cqa => <span key={cqa.code}>{cqa.code} dự đoán: <b>{optimum.predictedResponses[cqa.code]?.value ?? '—'} {cqa.unit}</b></span>)}</div>
+          {profilerSolution && !profilerMatchesSelection && <p>Điểm đang khảo sát trong Profiler khác phương án trên. Hãy chọn điểm đó nếu muốn dùng cho mô phỏng và chiến lược kiểm soát.</p>}
+          {latestConfirmation && <p>Hồ sơ xác nhận “{latestConfirmation.name}” giữ điều kiện và mô hình riêng tại thời điểm lập kế hoạch.</p>}
+        </div>}
+      </section>
+
       {missingModelCodes.length > 0 || !optimum ? (
         <>
-        <div className="qbd-card" role="alert" style={{ borderLeft: '4px solid #d97706', color: '#92400e', padding: '2.5rem 1.5rem', textAlign: 'center' }}>
+        <div id="step7-optimize" className="qbd-card" role="alert" style={{ borderLeft: '4px solid #d97706', color: '#92400e', padding: '2.5rem 1.5rem', textAlign: 'center' }}>
           <AlertTriangle size={36} color="#d97706" style={{ margin: '0 auto 0.75rem' }} />
           <h2 style={{ fontSize: '1.05rem', fontWeight: '700', marginBottom: '0.35rem' }}>Design Space chưa thể được tính</h2>
           <p style={{ margin: '0 auto 1.25rem', fontSize: '0.82rem', maxWidth: '620px', lineHeight: 1.5 }}>
@@ -965,11 +1006,12 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
             </div>
           )}
         </div>
-        {(project.confirmationStudies?.length ?? 0) > 0 && <ConfirmationPanel project={project} onUpdateProject={onUpdateProject} />}
+        <ConfirmationPanel project={project} onUpdateProject={onUpdateProject} />
         </>
       ) : (
         <>
           {/* 1. Prediction Profiler & Desirability Optimization */}
+      <section id="step7-optimize" className="step7-section"><div className="step7-section-heading"><span>1</span><div><h2>Chọn phương án tối ưu</h2><p>Đặt mục tiêu CQA, khảo sát điểm vận hành rồi chọn phương án sẽ đánh giá.</p></div></div>
       <DesirabilityProfiler
         factors={factors}
         cqas={cqas}
@@ -978,9 +1020,10 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
         onApplyOptimum={handleApplyOptimumFromProfiler}
         onCreateConfirmation={project.isLocked ? undefined : handleCreateConfirmation}
         onCurrentSolutionChange={setProfilerSolution}
-      />
+      /></section>
 
       {/* 2. Sweet Spot / Design Space Overlay Plot */}
+      <section id="step7-design-space" className="step7-section"><div className="step7-section-heading"><span>2</span><div><h2>Khảo sát vùng vận hành</h2><p>Quan sát miền đạt chất lượng và thay đổi trục hoặc lát cắt khi cần.</p></div></div>
       <div className="design-space-workspace-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(340px, 100%), 1fr))', gap: '1.5rem' }}>
         
         {/* Main Plot Area */}
@@ -1345,7 +1388,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                       borderRight: '1px solid #f59e0b',
                       borderRadius: '2px',
                     }}
-                    title={`Vùng Chấp Nhận Đã Chứng Minh (PAR): [${sliceParLow} - ${sliceParHigh}]`}
+                    title={`Khoảng PAR sàng lọc từ mô hình (chưa chứng minh): [${sliceParLow} - ${sliceParHigh}]`}
                   />
 
                   {/* NOR Band (Green) */}
@@ -1382,9 +1425,9 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
 
                 {/* Range Bar Sub-Labels */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', margin: '0 45px', marginTop: '0.2rem', fontSize: '0.68rem', color: '#64748b' }}>
-                  <span>PAR Low: {sliceParLow.toFixed(2)}</span>
+                  <span>PAR sàng lọc: {sliceParLow.toFixed(2)}</span>
                   <span style={{ color: '#166534', fontWeight: '600' }}>NOR: [{sliceNorLow.toFixed(2)} - {sliceNorHigh.toFixed(2)}]</span>
-                  <span>PAR High: {sliceParHigh.toFixed(2)}</span>
+                  <span>{sliceParHigh.toFixed(2)}</span>
                 </div>
               </div>
 
@@ -1403,7 +1446,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                       border: `1px solid ${isCurrentInNOR ? '#86efac' : isCurrentInPAR ? '#fcd34d' : '#fca5a5'}`,
                     }}
                   >
-                    {isCurrentInNOR ? '✓ Trong Khoảng NOR' : isCurrentInPAR ? '✓ Trong Khoảng PAR' : '⚠ Ngoài Khoảng PAR'}
+                    {isCurrentInNOR ? 'Trong NOR đề xuất' : isCurrentInPAR ? 'Trong PAR sàng lọc' : 'Ngoài PAR sàng lọc'}
                   </span>
 
                   {/* Slice Feasibility Status Badge */}
@@ -1705,49 +1748,10 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
 
         </div>
       </div>
-
-      {robustness && (
-        <div className="qbd-card" style={{ borderLeft: '4px solid #0284c7' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: '0.8rem' }}>
-            <div>
-              <h3 style={{ fontSize: '1rem', margin: 0, color: '#0c4a6e' }}>Robust setpoint, acceptance region & PAR</h3>
-              <p style={{ fontSize: '0.75rem', color: '#475569', margin: '0.2rem 0 0' }}>Kết hợp probability-of-failure từ Monte Carlo với sensitivity cục bộ và PAR sàng lọc quanh setpoint tối ưu.</p>
-            </div>
-            <span className={`badge ${robustness.probabilityOfFailurePercent !== null && robustness.probabilityOfFailurePercent <= 1 ? 'badge-success' : 'badge-warning'}`}>
-              P(failure) {robustness.probabilityOfFailurePercent === null ? '—' : `${robustness.probabilityOfFailurePercent}%`}
-            </span>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.7rem', marginBottom: '0.75rem' }}>
-            <div style={{ background: '#f0f9ff', borderRadius: '0.45rem', padding: '0.65rem', fontSize: '0.75rem', color: '#334155' }}>
-              <strong>Acceptance region tại setpoint</strong><br />
-              {robustness.acceptance.map((item) => <div key={item.code} style={{ color: item.accepted ? '#15803d' : '#b91c1c' }}>{item.accepted ? '✓' : '⚠'} {item.code}: dự đoán {item.predicted.toFixed(3)} · margin {(item.normalizedMargin * 100).toFixed(1)}%</div>)}
-            </div>
-            <div style={{ background: '#f0fdfa', borderRadius: '0.45rem', padding: '0.65rem', fontSize: '0.75rem', color: '#334155' }}>
-              <strong>Uncertainty của risk estimate</strong><br />
-              {robustness.probabilityInterval95 ? `95% MC interval: ${robustness.probabilityInterval95.low}%–${robustness.probabilityInterval95.high}%` : 'Chạy Monte Carlo để ước lượng xác suất thất bại.'}<br />
-              RSD hiện chọn: ±{mcVariability}% · {mcResult?.simulations.toLocaleString() ?? 0} lô ảo.
-            </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(340px, 100%), 1fr))', gap: '0.85rem' }}>
-            <div style={{ minHeight: '250px' }}>
-              <PlotlyChart
-                data={[{ type: 'bar', orientation: 'h', y: robustness.sensitivities.map((item) => item.factorCode).reverse(), x: robustness.sensitivities.map((item) => item.relativeImpact).reverse(), marker: { color: '#0284c7' }, hovertemplate: '%{y}: %{x:.2f}%<extra></extra>' }]}
-                layout={{ title: 'Sensitivity / tornado (±5% factor span)', xaxis: { title: 'Thay đổi chuẩn hóa lớn nhất (%)' }, margin: { l: 65, r: 20, t: 45, b: 45 }, height: 250 }}
-                style={{ height: '250px' }}
-              />
-            </div>
-            <div style={{ overflowX: 'auto' }}>
-              <table className="data-table" style={{ fontSize: '0.74rem', minWidth: '430px' }}>
-                <thead><tr><th>Factor</th><th>Rủi ro nhạy hơn</th><th>PAR screening</th><th>Ghi chú</th></tr></thead>
-                <tbody>{robustness.sensitivities.map((item) => <tr key={item.factorCode}><td><strong>{item.factorCode}</strong> · {item.factorName}</td><td>{item.direction === 'higher-risk-at-low' ? 'Phía thấp' : item.direction === 'higher-risk-at-high' ? 'Phía cao' : 'Cân bằng'}</td><td>{item.parLow !== undefined ? `${item.parLow} – ${item.parHigh}` : 'Xem mixture overlay'}</td><td>{item.note ?? 'OAT, giữ các factor khác tại setpoint'}</td></tr>)}</tbody>
-              </table>
-            </div>
-          </div>
-          <div style={{ marginTop: '0.6rem', color: '#64748b', fontSize: '0.7rem' }}>{robustness.note}</div>
-        </div>
-      )}
+      </section>
 
       {/* Monte Carlo Risk & Reliability Assessment (ICH Q9) */}
+      <section id="step7-monte-carlo" className="step7-section"><div className="step7-section-heading"><span>3</span><div><h2>Đánh giá độ bền dự báo</h2><p>Chọn điều kiện mô phỏng, chạy thử và xem rủi ro dự báo tại phương án đã chọn.</p></div></div>
       <div className="qbd-card">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
           <div>
@@ -1778,7 +1782,6 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                     key={preset.val}
                     onClick={() => {
                       setMcSimulations(preset.val);
-                      handleRunMonteCarlo(preset.val, mcVariability);
                     }}
                     disabled={isSimulating}
                     className={`btn ${mcSimulations === preset.val ? 'btn-teal' : 'btn-secondary'}`}
@@ -1895,8 +1898,9 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
           </div>
         )}
 
+        {simulationNeedsRefresh && <p role="status" className="step7-refresh-warning">Cấu hình hoặc phương án đã thay đổi. Hãy chạy lại mô phỏng để có kết quả tương ứng.</p>}
         {/* Simulation Results Grid */}
-        {mcResult && !isSimulating && (
+        {mcResult && !simulationNeedsRefresh && !isSimulating && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
             {/* Performance Strip */}
             <div
@@ -2019,13 +2023,57 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
         )}
       </div>
 
+      {robustness && (
+        <div className="qbd-card" style={{ borderLeft: '4px solid #0284c7' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: '0.8rem' }}>
+            <div>
+              <h3 style={{ fontSize: '1rem', margin: 0, color: '#0c4a6e' }}>Độ bền phương án và khoảng vận hành sàng lọc</h3>
+              <p style={{ fontSize: '0.75rem', color: '#475569', margin: '0.2rem 0 0' }}>Kết hợp probability-of-failure từ Monte Carlo với sensitivity cục bộ và PAR sàng lọc quanh setpoint tối ưu.</p>
+            </div>
+            <span className={`badge ${robustness.probabilityOfFailurePercent !== null && robustness.probabilityOfFailurePercent <= 1 ? 'badge-success' : 'badge-warning'}`}>
+              P(failure) {robustness.probabilityOfFailurePercent === null ? '—' : `${robustness.probabilityOfFailurePercent}%`}
+            </span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.7rem', marginBottom: '0.75rem' }}>
+            <div style={{ background: '#f0f9ff', borderRadius: '0.45rem', padding: '0.65rem', fontSize: '0.75rem', color: '#334155' }}>
+              <strong>Acceptance region tại setpoint</strong><br />
+              {robustness.acceptance.map((item) => <div key={item.code} style={{ color: item.accepted ? '#15803d' : '#b91c1c' }}>{item.accepted ? '✓' : '⚠'} {item.code}: dự đoán {item.predicted.toFixed(3)} · margin {(item.normalizedMargin * 100).toFixed(1)}%</div>)}
+            </div>
+            <div style={{ background: '#f0fdfa', borderRadius: '0.45rem', padding: '0.65rem', fontSize: '0.75rem', color: '#334155' }}>
+              <strong>Uncertainty của risk estimate</strong><br />
+              {robustness.probabilityInterval95 ? `95% MC interval: ${robustness.probabilityInterval95.low}%–${robustness.probabilityInterval95.high}%` : 'Chạy Monte Carlo để ước lượng xác suất thất bại.'}<br />
+              RSD hiện chọn: ±{mcVariability}% · {mcResult?.simulations.toLocaleString() ?? 0} lô ảo.
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(340px, 100%), 1fr))', gap: '0.85rem' }}>
+            <div style={{ minHeight: '250px' }}>
+              <PlotlyChart
+                data={[{ type: 'bar', orientation: 'h', y: robustness.sensitivities.map((item) => item.factorCode).reverse(), x: robustness.sensitivities.map((item) => item.relativeImpact).reverse(), marker: { color: '#0284c7' }, hovertemplate: '%{y}: %{x:.2f}%<extra></extra>' }]}
+                layout={{ title: 'Sensitivity / tornado (±5% factor span)', xaxis: { title: 'Thay đổi chuẩn hóa lớn nhất (%)' }, margin: { l: 65, r: 20, t: 45, b: 45 }, height: 250 }}
+                style={{ height: '250px' }}
+              />
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="data-table" style={{ fontSize: '0.74rem', minWidth: '430px' }}>
+                <thead><tr><th>Factor</th><th>Rủi ro nhạy hơn</th><th>PAR screening</th><th>Ghi chú</th></tr></thead>
+                <tbody>{robustness.sensitivities.map((item) => <tr key={item.factorCode}><td><strong>{item.factorCode}</strong> · {item.factorName}</td><td>{item.direction === 'higher-risk-at-low' ? 'Phía thấp' : item.direction === 'higher-risk-at-high' ? 'Phía cao' : 'Cân bằng'}</td><td>{item.parLow !== undefined ? `${item.parLow} – ${item.parHigh}` : 'Xem mixture overlay'}</td><td>{item.note ?? 'OAT, giữ các factor khác tại setpoint'}</td></tr>)}</tbody>
+              </table>
+            </div>
+          </div>
+          <div style={{ marginTop: '0.6rem', color: '#64748b', fontSize: '0.7rem' }}>{robustness.note}</div>
+        </div>
+      )}
+
+      </section>
+      <div className="step7-section-heading"><span>4</span><div><h2>Thí nghiệm xác nhận phương án tối ưu</h2><p>Chốt kế hoạch trước khi nhập số liệu thực nghiệm, rồi đánh giá từng CQA.</p></div></div>
       <ConfirmationPanel
         project={project}
         onUpdateProject={onUpdateProject}
-        onCreate={profilerSolution && !project.isLocked ? () => handleCreateConfirmation(profilerSolution) : undefined}
+        onCreate={selectedSetpoint && !project.isLocked ? () => handleCreateConfirmation(optimum) : undefined}
       />
 
       {/* 4. Comprehensive Control Strategy Table (ICH Q10 & FDA Table 105/106/107) */}
+      <section id="step7-control" className="step7-section"><div className="step7-section-heading"><span>5</span><div><h2>Rà soát chiến lược kiểm soát</h2><p>Đối chiếu mục tiêu vận hành, phạm vi đề xuất và mức bằng chứng hiện có.</p></div></div>
       <div className="qbd-card" style={{ borderLeft: '4px solid #0f766e' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -2040,7 +2088,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
         </div>
 
         <div style={{ fontSize: '0.78rem', color: '#475569', marginBottom: '0.85rem' }}>
-          Bảng thiết lập các mức kiểm soát từ nguyên liệu đầu vào (CMAs), thông số quy trình (CPPs), kiểm soát trong quá trình (IPCs/PAT) đến tiêu chuẩn xuất xưởng thành phẩm, phân định rõ giữa <strong>NOR</strong> (Normal Operating Range), <strong>PAR</strong> (Proven Acceptable Range) và <strong>Design Space</strong>.
+          Bảng đề xuất mức kiểm soát từ nguyên liệu đầu vào (CMAs), thông số quy trình (CPPs), kiểm soát trong quá trình (IPCs/PAT) đến thành phẩm. Các khoảng NOR/PAR ở đây là phạm vi sàng lọc từ mô hình; cần thêm bằng chứng và phê duyệt trước khi xem là phạm vi vận hành đã chứng minh.
         </div>
 
         <div className="table-container">
@@ -2052,7 +2100,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                 <th>Đơn Vị</th>
                 <th>Mục Tiêu (Target)</th>
                 <th>Khoảng Vận Hành Thông Thường (NOR)</th>
-                <th>Khoảng Chấp Nhận Đã Chứng Minh (PAR)</th>
+                <th>Khoảng PAR sàng lọc</th>
                 <th>Giới Hạn Design Space</th>
                 <th>Phương Pháp Kiểm Soát</th>
               </tr>
@@ -2099,6 +2147,16 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+      </section>
+
+      <div className="step7-overview" aria-label="Tổng hợp Bước 7">
+        <strong>Trước khi sang Bước 8</strong>
+        <div className="step7-values">
+          <span>Phương án: <b>{selectedSetpoint ? 'Đã chọn' : 'Đang dùng đề xuất từ mô hình'}</b></span>
+          <span>Mô phỏng: <b>{simulationNeedsRefresh ? 'Cần chạy lại' : mcResult ? 'Đã có kết quả' : 'Chưa chạy'}</b></span>
+          <span>Thí nghiệm xác nhận: <b>{latestConfirmation?.status === 'complete' ? 'Đã hoàn tất' : latestConfirmation?.status === 'collecting' ? `Đang nhập · ${confirmationProgress}` : latestConfirmation ? 'Chưa chốt kế hoạch' : 'Chưa có hồ sơ'}</b></span>
         </div>
       </div>
 

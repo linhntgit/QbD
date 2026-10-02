@@ -264,7 +264,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 </p>
                 <div style={{ backgroundColor: '#f0fdf4', padding: '0.6rem 0.8rem', borderRadius: '0.4rem', border: '1px solid #bbf7d0', fontSize: '0.78rem', color: '#166534', lineHeight: 1.6 }}>
                   <strong>Thứ tự thao tác chuẩn:</strong>
-                  <br />1. Nhập <strong>Thông tin Tổng quan Dự án</strong> (Metadata).
+                  <br />1. Bấm <strong>Mới</strong> khi cần tạo dự án mới; ô tên ở đầu trang hiện <strong>Untitled project</strong> để gõ tên dự án/tên file JSON. Nhập <strong>Thông tin Tổng quan Dự án</strong> (Metadata).
                   <br />2. Bấm <strong>"+ Thêm Yếu tố QTPP"</strong> để khai báo các chỉ tiêu lâm sàng đích.
                   <br />3. Bấm <strong>"+ Thêm CQA (Đáp ứng Y)"</strong> để khai báo các biến đầu ra cần kiểm soát và khoảng chấp nhận LSL–USL.
                   <br />4. Bấm <strong>"+ Thêm Yếu Tố (X)"</strong> để khai báo các biến công thức/quy trình sẽ đưa vào nghiên cứu thực nghiệm.
@@ -282,10 +282,12 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 <div style={{ backgroundColor: '#f8fafc', padding: '0.65rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
                   <strong style={{ color: '#1e3a8a' }}>1. Khung "Thông tin Tổng quan Dự án (Project Metadata)":</strong>
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
-                    <li><strong>Tên Dự án / Nghiên cứu:</strong> Tiêu đề nghiên cứu (vd: <em>Tối ưu hóa viên nén Metoprolol 100mg</em>).</li>
+                    <li><strong>Tên Dự án / Nghiên cứu:</strong> Tiêu đề nghiên cứu (vd: <em>Tối ưu hóa viên nén Metoprolol 100mg</em>); đồng bộ với ô tên ở thanh đầu trang và dùng làm tên file khi bấm Lưu.</li>
                     <li><strong>Tên Hoạt chất / API:</strong> Tên hoạt chất mục tiêu (vd: <em>Metoprolol Succinate</em>).</li>
-                    <li><strong>Dạng bào chế &amp; Đường dùng:</strong> Ví dụ: <em>Viên nén giải phóng kéo dài, dùng đường uống</em>.</li>
+                    <li><strong>Hàm lượng / Nồng độ:</strong> Nhập giá trị kèm đơn vị, ví dụ <em>10 mg</em>, <em>2,5%</em> hoặc <em>100 mg/mL</em>.</li>
+                    <li><strong>Dạng bào chế &amp; Đường dùng:</strong> Ví dụ: <em>Viên nén giải phóng kéo dài, dùng đường uống</em>. Ba ô Hoạt chất, Hàm lượng và Dạng bào chế nằm cạnh nhau trên màn hình rộng.</li>
                     <li><strong>Đơn vị / Nhóm nghiên cứu:</strong> Đơn vị R&amp;D thực hiện.</li>
+                    <li><strong>Ngày bắt đầu dự án:</strong> Chọn ngày theo lịch; thông tin này được lưu trong dự án và đưa vào báo cáo.</li>
                   </ul>
                 </div>
 
@@ -1058,8 +1060,8 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   <strong>Thứ tự thao tác chuẩn:</strong>
                   <br />1. Chọn <strong>Chế độ Huấn luyện</strong> (Độc lập từng CQA hoặc Mạng chung đa đầu ra Shared).
                   <br />2. Điều chỉnh <strong>Số nơ-ron lớp ẩn 1 &amp; 2</strong>, <strong>Hàm kích hoạt</strong> (Tanh/Sigmoid/ReLU) và <strong>Weight Decay (<InlineMath math="\lambda" />)</strong>.
-                  <br />3. Kiểm tra tỷ lệ <strong>N/P</strong> (số mẫu huấn luyện/số tham số). App dùng <InlineMath math="N/P \ge 2" /> như cảnh báo sàng lọc.
-                  <br />4. Bấm nút <strong>"Huấn Luyện Lại (Train Network)"</strong> để tiến hành huấn luyện mạng nơ-ron với thanh tiến trình trực quan.
+                  <br />3. Kiểm tra tỷ lệ <strong>N/P</strong> (số mẫu huấn luyện sau khi chia validation/số tham số). Điều kiện tối thiểu để tạo mô hình là <strong>N &gt; P</strong>; <InlineMath math="N/P \ge 2" /> là mức khuyến nghị để giảm nguy cơ quá khớp.
+                  <br />4. Bấm <strong>Huấn Luyện Y hiện tại</strong> hoặc <strong>Huấn luyện tất cả CQAs</strong>. Nếu N ≤ P, app dừng và báo số dòng Y hợp lệ, số mẫu huấn luyện, số tham số; bấm <strong>Áp Dụng Gợi Ý Kiến Trúc</strong> hoặc giảm H1/H2, bổ sung kết quả thí nghiệm rồi thử lại. Thông báo thành công chỉ hiện khi mô hình được tạo.
                   <br />5. Khám phá <strong>Explainable AI Studio</strong>: Chuyển đổi giữa <em>🐝 SHAP Beeswarm</em> (toàn cục), <em>📊 SHAP Waterfall</em> (từng mẻ thử nghiệm) và <em>⚖️ Đối Chiếu 3 Thuật Toán</em> (Garson - Olden - SHAP).
                   <br />6. Tham khảo bảng <strong>Đấu Trường Đa Mô Hình (Multi-Model Benchmarking)</strong>: So sánh đối đầu giữa Polynomial RSM, ANN MLP, SVR (RBF) và Akaike Ensemble Stacking với các chỉ số <InlineMath math="R^2, R^2_{\text{adj}}" />, RMSE, AICc, BIC.
                   <br /><em>* Vai trò của SVR và Ensemble Stacking:</em> Đóng vai trò là <strong>Mô hình Thẩm định &amp; Đối chuẩn Độc lập (Challenger / Benchmarking Models)</strong>. Cung cấp cơ sở khoa học khách quan để chứng minh mô hình bạn chọn (Đa thức hoặc Mạng nơ-ron) không bị thiên lệch bởi một thuật toán đơn lẻ trước khi chuyển sang Bước 6 (Mặt đáp) và Bước 7 (Không gian thiết kế).
@@ -1077,8 +1079,9 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
                   <strong style={{ color: '#6b21a8' }}>1. Khung Điều Khiển Huấn Luyện &amp; Các Nút Bấm Điều Hướng:</strong>
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
-                    <li><strong>Nút "Huấn Luyện Lại (Train Network)":</strong> Bắt đầu huấn luyện mô hình mạng nơ-ron cho CQA hiện tại.</li>
+                    <li><strong>Nút "Huấn Luyện Y hiện tại":</strong> Kiểm tra điều kiện N &gt; P rồi huấn luyện mô hình cho CQA đang chọn.</li>
                     <li><strong>Nút "Huấn Luyện Tất Cả CQAs":</strong> Huấn luyện đồng loạt tất cả các mạng nơ-ron độc lập cho toàn bộ các CQA.</li>
+                    <li><strong>Cảnh báo thiếu mẫu:</strong> Ví dụ 17 dòng hợp lệ chia K-fold còn 13 mẫu huấn luyện nhưng mạng có 16 tham số thì chưa thể tạo mô hình. Giảm số nơ-ron hoặc bổ sung mẻ có kết quả Y; không diễn giải thông báo tiến trình là kết quả mô hình.</li>
                     <li><strong>Nút "Sao Chép Cấu Hình Sang Tất Cả Y":</strong> Đồng bộ bộ siêu tham số hiện tại sang tất cả các CQA khác.</li>
                     <li><strong>Nút "Khôi Phục Mặc Định (Reset)":</strong> Đặt lại các siêu tham số về giá trị khuyến nghị chuẩn của dược phẩm.</li>
                     <li><strong>Nút "Tiếp Tục Với Mạng Nơ-ron (Bước 6: Mặt Đáp)":</strong> Nút hành động chính, khóa mô hình Mạng Nơ-ron AI và chuyển sang Bước 6 để khảo sát trực quan bề mặt đáp ứng phi tuyến 3D.</li>
@@ -1512,13 +1515,11 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 </p>
                 <div style={{ backgroundColor: '#f0fdf4', padding: '0.6rem 0.8rem', borderRadius: '0.4rem', border: '1px solid #bbf7d0', fontSize: '0.78rem', color: '#166534', lineHeight: 1.6 }}>
                   <strong>Thứ tự thao tác chuẩn:</strong>
-                  <br />1. Trong thanh công cụ <strong>Prediction Profiler</strong>: Bấm nút <strong>"✨ Tối Đa Hóa Thỏa Dụng (Max D)"</strong> để kích hoạt giải thuật di truyền <strong>RCGA + Nelder-Mead</strong> tự động tìm điểm tối ưu toàn cục Derringer-Suich.
-                  <br />2. (Tùy chọn) Bấm <strong>"💾 Lưu Kịch Bản (n)"</strong> để lưu lại các kịch bản cài đặt ứng viên cần so sánh, hoặc <strong>"🔄 Về Tâm (0)"</strong> để đặt lại điểm tâm, hoặc <strong>"⚙️ Mục Tiêu &amp; Trọng Số ∨"</strong> để sửa nhanh LSL/Target/USL/Trọng số.
-                  <br />3. Chọn chế độ xem: <strong>"2D Contour"</strong> hoặc bấm <strong>"3D Surface"</strong> để quan sát bề mặt biên an toàn chất lượng (<InlineMath math="Z = \text{Margin}_{\min}" />) và mặt phẳng chuẩn <InlineMath math="Z = 0" />.
-                  <br />4. Tương tác với <strong>Thanh Trượt Lát Cắt Động Yếu Tố Thứ 3 (Dynamic Slicing X3)</strong>: Di chuyển thanh trượt để quét liên tục các lát cắt, quan sát dải màu <strong>PAR / NOR Range Bar</strong> và huy hiệu trạng thái khả thi của lát cắt.
-                  <br />5. Tại <strong>Thí nghiệm xác nhận phương án tối ưu</strong>, ngay phía trên Bảng Chiến Lược Kiểm Soát ICH Q10, bấm <strong>"Tạo thí nghiệm xác nhận"</strong>. Chốt điều kiện thực hiện, số mẻ độc lập và ngưỡng sai lệch trước khi nhập kết quả thực nghiệm.
-                  <br />6. Nhập giá trị yếu tố và CQA thực tế theo từng mẻ; xem sai lệch giữa dự đoán và quan sát, sau đó nhập <em>Số lô mô phỏng</em> và <em>Độ biến thiên RSD%</em> để chạy Monte Carlo nếu cần.
-                  <br />7. Chuyển sang <strong>Bước 8</strong> để rà soát mục 6c của báo cáo và xuất tài liệu.
+                  <br />1. <strong>Chọn phương án:</strong> Theo thứ tự nút <strong>Mục Tiêu &amp; Trọng Số → Tối Đa Hóa Thỏa Dụng (Max D) → Lưu Kịch Bản → Về Tâm (0)</strong>. Xem điểm đang khảo sát rồi bấm <strong>Chọn phương án này</strong> nếu muốn dùng điểm đó.
+                  <br />2. <strong>Khảo sát vùng:</strong> Xem đồ thị 2D, đổi trục hoặc lát cắt; mở ma trận Profiler và chế độ 3D khi cần phân tích sâu.
+                  <br />3. <strong>Độ bền dự báo:</strong> Chọn số lô và RSD rồi bấm <strong>Chạy Mô Phỏng</strong>. Các nút 1k–100k chỉ chọn quy mô; nếu đổi cấu hình hoặc phương án, chạy lại để cập nhật kết quả.
+                  <br />4. <strong>Thí nghiệm xác nhận:</strong> Tạo hồ sơ ngay phía trên Bảng Chiến Lược Kiểm Soát ICH Q10; chốt kế hoạch, nhập X/Y thực tế theo từng mẻ và xem đánh giá riêng cho từng CQA.
+                  <br />5. <strong>Chiến lược kiểm soát và báo cáo:</strong> Rà soát mức bằng chứng của phạm vi đề xuất, sau đó sang Bước 8.
                 </div>
               </div>
             ),
@@ -1542,7 +1543,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   <strong style={{ color: '#1e3a8a' }}>2. Khung "Prediction Profiler &amp; Desirability Optimization" (Thanh màu xanh đậm):</strong>
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
                     <li><strong>Đồng hồ OVERALL D:</strong> Trung bình nhân có trọng số của các desirability (<InlineMath math="D \in [0, 1]" />). Tự động bằng 0 nếu bất kỳ CQA nào bị vi phạm giới hạn.</li>
-                    <li><strong>Nút "✨ Tối Đa Hóa Thỏa Dụng (Max D)":</strong> Chạy bộ giải thuật di truyền số thực liên tục <strong>RCGA</strong> đa khởi tạo, sau đó tinh chỉnh cục bộ bằng thuật toán <strong>Nelder-Mead simplex</strong> để tìm ra điểm cực đại toàn cục mượt mà và chính xác.</li>
+                    <li><strong>Nút "✨ Tối Đa Hóa Thỏa Dụng (Max D)":</strong> Chạy bộ giải thuật di truyền số thực liên tục <strong>RCGA</strong>, sau đó tinh chỉnh cục bộ bằng thuật toán <strong>Nelder-Mead simplex</strong>; chọn phương án để dùng trong phân tích tiếp theo.</li>
                     <li><strong>Nút "💾 Lưu Kịch Bản (n)":</strong> Lưu lại điểm cài đặt hiện tại vào danh sách kịch bản để dễ dàng đối chiếu và khôi phục.</li>
                     <li><strong>Nút "🔄 Về Tâm (0)":</strong> Đặt lại tất cả các yếu tố về mức tâm thực nghiệm.</li>
                     <li><strong>Nút "⚙️ Mục Tiêu &amp; Trọng Số ∨":</strong> Mở bảng accordion để chỉnh sửa nhanh mục tiêu (Target, Max, Min), giới hạn LSL–USL, hàm hình dạng lũy thừa (<InlineMath math="s, t" />) và trọng số (<InlineMath math="w_i" />).</li>
@@ -1749,7 +1750,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   <strong>Thứ tự thao tác chuẩn (Standard Operating Procedure):</strong>
                   <br />1. <strong>Kiểm tra Cổng Sẵn Sàng Khoa Học (Scientific Readiness Gate):</strong> Xác nhận hệ thống đã thỏa mãn 4 điều kiện cốt lõi (dữ liệu thực nghiệm đầy đủ, mô hình hợp lệ, điểm tối ưu Desirability &gt; 0, và hoàn thành mô phỏng Monte Carlo).
                   <br />2. <strong>Chọn công cụ mô hình hóa nguồn:</strong> Bấm nút <em>"Đa Thức (ANOVA)"</em> hoặc <em>"Mạng Nơ-ron AI"</em> để chỉ định tập mô hình sẽ đưa vào bảng biểu và kết luận của báo cáo.
-                  <br />3. <strong>Rà soát các mục báo cáo:</strong> Dùng mục lục bên trái, đặc biệt mục <strong>6c. Thí nghiệm xác nhận phương án tối ưu</strong>, để đối chiếu điều kiện kế hoạch, giá trị dự đoán, giá trị thực tế và từng kết luận riêng.
+                  <br />3. <strong>Rà soát các mục báo cáo:</strong> Kiểm tra tên dự án, Hoạt chất, Hàm lượng/Nồng độ, Dạng bào chế và ngày bắt đầu trong bảng đầu báo cáo. Dùng mục lục bên trái, đặc biệt mục <strong>5b. Mạng Nơ-ron</strong> và <strong>6c. Thí nghiệm xác nhận phương án tối ưu</strong>, để đối chiếu tình trạng mô hình, điều kiện kế hoạch, giá trị dự đoán, giá trị thực tế và từng kết luận riêng.
                   <br />4. <strong>Thực hiện Ký Duyệt Điện Tử 3 Cấp (21 CFR Part 11 Sign-off):</strong> Ký theo phân quyền nghiêm ngặt <em>Analyst (Tác giả)</em> &rarr; <em>Reviewer (Thẩm định kỹ thuật)</em> &rarr; <em>Approver (Phê duyệt pháp lý)</em>. Sau khi Approver ký, hồ sơ được khóa mật mã học (Cryptographic Record Lock).
                   <br />5. <strong>Xuất báo cáo lưu trữ pháp lý:</strong>
                   <ul style={{ paddingLeft: '1.2rem', margin: '0.2rem 0' }}>

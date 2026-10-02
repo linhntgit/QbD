@@ -275,7 +275,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({
           <span className="badge badge-primary">QbD Framework</span>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
           <div>
             <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: '#475569', marginBottom: '0.3rem' }}>
               Tên Dự án / Nghiên cứu
@@ -291,6 +291,32 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({
 
           <div>
             <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: '#475569', marginBottom: '0.3rem' }}>
+              Đơn vị / Nhóm nghiên cứu
+            </label>
+            <input
+              type="text"
+              className="input-field"
+              value={project.author}
+              onChange={(e) => onUpdateProject({ author: e.target.value })}
+              placeholder="VD: Phòng Nghiên cứu Phát triển Bào chế"
+            />
+          </div>
+          <div>
+            <label htmlFor="project-date" style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: '#475569', marginBottom: '0.3rem' }}>
+              Ngày bắt đầu dự án
+            </label>
+            <input
+              id="project-date"
+              type="date"
+              className="input-field"
+              value={project.createdDate || ''}
+              onChange={(e) => onUpdateProject({ createdDate: e.target.value })}
+            />
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '1rem' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: '#475569', marginBottom: '0.3rem' }}>
               Tên Hoạt chất / Hoạt chất mục tiêu (API)
             </label>
             <input
@@ -301,7 +327,19 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({
               placeholder="VD: Metoprolol Succinate"
             />
           </div>
-
+          <div>
+            <label htmlFor="project-strength" style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: '#475569', marginBottom: '0.3rem' }}>
+              Hàm lượng / Nồng độ
+            </label>
+            <input
+              id="project-strength"
+              type="text"
+              className="input-field"
+              value={project.strength ?? ''}
+              onChange={(e) => onUpdateProject({ strength: e.target.value })}
+              placeholder="VD: 10 mg, 2,5%, 100 mg/mL"
+            />
+          </div>
           <div>
             <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: '#475569', marginBottom: '0.3rem' }}>
               Dạng bào chế & Đường dùng
@@ -312,19 +350,6 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({
               value={project.dosageForm}
               onChange={(e) => onUpdateProject({ dosageForm: e.target.value })}
               placeholder="VD: Viên nén giải phóng kéo dài, dùng đường uống"
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: '#475569', marginBottom: '0.3rem' }}>
-              Đơn vị / Nhóm nghiên cứu
-            </label>
-            <input
-              type="text"
-              className="input-field"
-              value={project.author}
-              onChange={(e) => onUpdateProject({ author: e.target.value })}
-              placeholder="VD: Phòng Nghiên cứu Phát triển Bào chế"
             />
           </div>
         </div>

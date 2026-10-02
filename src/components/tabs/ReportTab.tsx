@@ -86,7 +86,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
       {
         id: 'sec-5b',
         title: '5b. Mạng Nơ-ron AI (ANN)',
-        subtitle: hasNeural ? 'MLP Architecture & Metrics' : 'Chưa kích hoạt / huấn luyện',
+        subtitle: hasNeural ? 'MLP Architecture & Metrics' : 'Chưa có mô hình hợp lệ',
         icon: BrainCircuit,
         badge: hasNeural ? 'ANN' : 'Optional',
       },
@@ -484,8 +484,16 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                 <td>{project.moleculeName}</td>
               </tr>
               <tr>
-                <td style={{ fontWeight: '700', backgroundColor: '#f8fafc' }}>Dạng Bào Chế</td>
+                <td style={{ fontWeight: '700', backgroundColor: '#f8fafc' }}>Hàm Lượng / Nồng Độ</td>
+                <td>{project.strength || 'Chưa nhập'}</td>
+              </tr>
+              <tr>
+                <td style={{ fontWeight: '700', backgroundColor: '#f8fafc' }}>Dạng Bào Chế & Đường Dùng</td>
                 <td>{project.dosageForm}</td>
+              </tr>
+              <tr>
+                <td style={{ fontWeight: '700', backgroundColor: '#f8fafc' }}>Ngày Bắt Đầu Dự Án</td>
+                <td>{project.createdDate || 'Chưa nhập'}</td>
               </tr>
               <tr>
                 <td style={{ fontWeight: '700', backgroundColor: '#f8fafc' }}>Nhóm Nghiên Cứu</td>
@@ -971,15 +979,15 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                 5b. Mô Hình Mạng Nơ-ron Nhân Tạo AI (Artificial Neural Network - ANN)
               </h2>
               <span className="badge" style={{ backgroundColor: '#64748b', color: '#ffffff', fontSize: '0.74rem', padding: '0.25rem 0.55rem' }}>
-                Chưa kích hoạt / Chưa huấn luyện
+                Chưa có mô hình hợp lệ
               </span>
             </div>
             <div style={{ backgroundColor: '#faf5ff', border: '1px dashed #d8b4fe', borderRadius: '0.5rem', padding: '1rem', fontSize: '0.85rem', color: '#581c87' }}>
               <div style={{ fontWeight: '600', marginBottom: '0.3rem' }}>
-                ℹ️ Chưa có mô hình Mạng Nơ-ron AI được huấn luyện trong dự án này.
+                ℹ️ Chưa có mô hình Mạng Nơ-ron AI hợp lệ trong dự án này.
               </div>
               <div>
-                Dự án hiện tại đang áp dụng mô hình hồi quy đa thức cổ điển bậc ≤ 2 kết hợp phân tích ANOVA (mục 5a). Để kích hoạt hoặc xây dựng mô hình học máy phi tuyến tính (Multi-Layer Perceptron - MLP), vui lòng chuyển sang <strong>Tab 5 (Mạng Nơ-ron AI)</strong> để khởi tạo và huấn luyện mạng.
+                Xem kết quả hồi quy đa thức ở mục 5a. Để tạo mô hình MLP, chuyển sang <strong>Bước 5 (Mạng Nơ-ron)</strong>. Mỗi lượt huấn luyện cần số mẫu có kết quả Y hợp lệ sau khi chia validation <strong>lớn hơn</strong> số tham số mạng. Nếu không đạt, hãy giảm H1/H2 bằng nút gợi ý kiến trúc hoặc bổ sung thí nghiệm có kết quả Y rồi huấn luyện lại; chỉ dùng mô hình ANN trong kết luận khi Bước 5 hiển thị kết quả mô hình.
               </div>
             </div>
           </div>
@@ -1282,7 +1290,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                 ⏳ Chưa thiết lập điểm tối ưu hóa đa mục tiêu.
               </div>
               <div>
-                Chuyển sang <strong>Tab 6 (Tối Ưu Hóa & Không Gian Thiết Kế)</strong> để tìm điểm cài đặt tối ưu (Optimal Target Setpoint) thỏa mãn đồng thời các chỉ tiêu CQA theo hàm thỏa dụng Derringer-Suich.
+                Chuyển sang <strong>Bước 7 (Không gian Thiết kế)</strong>: thiết lập Mục Tiêu &amp; Trọng Số, bấm Tối Đa Hóa Thỏa Dụng (Max D), rồi chọn phương án tối ưu trước khi tạo thí nghiệm xác nhận.
               </div>
             </div>
           )}
@@ -1416,7 +1424,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                 ⏳ Chưa thực hiện mô phỏng Monte Carlo để xác nhận độ bền vững miền dự báo.
               </div>
               <div>
-                Theo khuyến cáo ICH Q9 & FDA, cần chuyển sang <strong>Tab 7 (Monte Carlo)</strong> để chạy mô phỏng 5.000 – 10.000 lô ảo với dao động thực tế của thiết bị nhằm ước lượng tỷ lệ lỗi (Defect Rate PPM) và xác nhận ranh giới PAR/Design Space trước khi nộp hồ sơ.
+                Chuyển sang <strong>Bước 7 (Không gian Thiết kế)</strong>, chọn số lô và mức biến thiên rồi bấm <strong>Chạy Mô Phỏng</strong>. Kết quả mô phỏng cần được đọc cùng dữ liệu thí nghiệm xác nhận và phạm vi mô hình đã kiểm tra.
               </div>
             </div>
           )}

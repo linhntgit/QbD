@@ -259,6 +259,7 @@ export const qbdProjectSchema = z.object({
   name: z.string(),
   moleculeName: z.string(),
   dosageForm: z.string(),
+  strength: z.string().optional(),
   author: z.string(),
   version: z.string(),
   createdDate: z.string(),

@@ -135,8 +135,20 @@ export async function exportQBDWordReport(
     }),
     new TableRow({
       children: [
-        createDataCell('Dạng bào chế & Hàm lượng', false, 30),
-        createDataCell(project.dosageForm, false, 70),
+        createDataCell('Hàm lượng / Nồng độ', false, 30),
+        createDataCell(project.strength || 'Chưa nhập', false, 70),
+      ],
+    }),
+    new TableRow({
+      children: [
+        createDataCell('Dạng bào chế & Đường dùng', true, 30),
+        createDataCell(project.dosageForm, true, 70),
+      ],
+    }),
+    new TableRow({
+      children: [
+        createDataCell('Ngày bắt đầu dự án', false, 30),
+        createDataCell(project.createdDate || 'Chưa nhập', false, 70),
       ],
     }),
     new TableRow({

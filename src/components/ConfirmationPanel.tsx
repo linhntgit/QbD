@@ -23,7 +23,7 @@ export function ConfirmationPanel({ project, onUpdateProject, onCreate }: Props)
   const createButton = onCreate && <button className="btn btn-secondary" disabled={Boolean(project.isLocked)} onClick={onCreate}>Tạo thí nghiệm xác nhận</button>;
   if (!study) return <section className="qbd-card" id="confirmation" style={{borderTop:'4px solid #0d9488'}}>
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'0.75rem',flexWrap:'wrap'}}><h3>Thí nghiệm xác nhận phương án tối ưu</h3>{createButton}</div>
-    <p>{onCreate ? 'Tạo hồ sơ từ điều kiện đang chọn trong Profiler để chốt tiêu chí và nhập kết quả thực nghiệm.' : 'Cần có phương án tối ưu và mô hình khả định để tạo hồ sơ xác nhận.'}</p>
+    <p>{onCreate ? 'Tạo hồ sơ từ phương án đã chọn để chốt tiêu chí và nhập kết quả thực nghiệm.' : 'Hãy chọn phương án ở phần trên và bảo đảm có mô hình khả định trước khi tạo hồ sơ xác nhận.'}</p>
   </section>;
   const locked = Boolean(project.isLocked);
   const editable = !locked && study.status !== 'complete';
@@ -51,7 +51,7 @@ export function ConfirmationPanel({ project, onUpdateProject, onCreate }: Props)
     {sourceHash!==study.sourceHash && <p role="status" style={{color:'#92400e'}}>Mô hình hoặc dữ liệu hiện tại đã thay đổi. Hồ sơ này tiếp tục dùng mô hình được lưu khi lập kế hoạch.</p>}
     {locked && <p role="status">Project đang khóa. Chỉ xem kết quả.</p>}
     {error && <p role="alert" style={{color:'#b91c1c'}}>{error}</p>}
-    <details open={study.status==='draft'}>
+    <details key={`${study.id}-${study.status}-plan`} open={study.status==='draft'}>
     <summary><strong>1. Điều kiện và tiêu chí đã định trước</strong> — {study.plannedReplicates} thí nghiệm, PI {study.confidence*100}%</summary>
     <fieldset disabled={locked || study.status!=='draft'} style={{padding:16,border:'1px solid #cbd5e1',borderRadius:8}}>
       <legend>1. Lập tiêu chí trước khi nhập kết quả</legend>
@@ -68,12 +68,15 @@ export function ConfirmationPanel({ project, onUpdateProject, onCreate }: Props)
     </fieldset>
     </details>
     {study.status!=='draft' && <>
-      <h4>2. Nhập kết quả thực nghiệm</h4>
+      <details key={`${study.id}-${study.status}-entry`} open={study.status==='collecting'}>
+      <summary><strong>2. Nhập kết quả thực nghiệm</strong> — {study.runs.length}/{study.plannedReplicates} mẻ đã lập</summary>
       <fieldset disabled={!editable} style={{border:0,padding:0}}>
         <ConfirmationMatrix study={study} disabled={!editable} onSave={(runs,action)=>save({runs},action)} onError={setError}/>
         <details><summary>Dán bảng từ Excel</summary><p>Cột theo đúng thứ tự bên dưới; dùng tab giữa các cột. Dòng đầu phải có tiêu đề. Các dòng được thêm vào, không ghi đè.</p><pre style={{whiteSpace:'pre-wrap'}}>{header}</pre><textarea aria-label="Dữ liệu xác nhận từ Excel" rows={5} value={paste} onChange={e=>setPaste(e.target.value)} style={{width:'100%'}}/><button className="btn btn-secondary" onClick={()=>{try{const rows=parseConfirmationPaste(study,paste);if(study.runs.length+rows.length>500)throw new Error('Tối đa 500 mẻ mỗi hồ sơ.');save({runs:[...study.runs,...rows]},`Nhập ${rows.length} mẻ từ bảng`);setPaste('');}catch(e){setError((e as Error).message);}}}>Kiểm tra và thêm dữ liệu</button></details>
       </fieldset>
-      <h4>3. Đánh giá tại điều kiện thực tế</h4>
+      </details>
+      <details key={`${study.id}-${study.status}-evaluation`} open={study.status==='complete'}>
+      <summary><strong>3. Đánh giá tại điều kiện thực tế</strong> — {overall('specification')} về chất lượng</summary>
       <p><strong>Chất lượng: {overall('specification')} · Ngưỡng lệch: {overall('practical')} · Phù hợp PI trung bình: {overall('predictive')}</strong></p>
       <p>PI áp dụng riêng cho từng đáp ứng. Nằm trong PI không chứng minh tương đương; xác nhận một điểm không xác nhận toàn bộ Design Space/PAR.</p>
       <div className="table-container"><table className="qbd-table"><thead><tr>{['Đáp ứng','n','Dự đoán TB thực tế','Thực nghiệm TB ± SD','Sai lệch TB / |lệch|','Lệch tương đối %','RMSE','PI của TB','Chất lượng','Ngưỡng lệch','Phù hợp PI'].map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{study.responses.map((r,i)=>{const e=evaluations[i];return <tr key={r.cqa.code}><td>{r.cqa.code} ({r.cqa.unit})</td><td>{e.n}/{study.plannedReplicates}</td><td>{fmt(e.predictedMean)}</td><td>{r.cqa.dataType?.startsWith('qualitative')?`Phân loại: ${r.cqa.targetCategory??'chưa có mức đích'}`:`${fmt(e.mean)} ± ${fmt(e.sd)}`}</td><td>{fmt(e.bias)} / {fmt(e.absoluteBias)}</td><td>{fmt(e.relative)}</td><td>{fmt(e.rmse)}</td><td>{e.meanPI?`${fmt(e.meanPI.low)} → ${fmt(e.meanPI.high)}`:'Chưa có PI'}</td><td>{verdictLabel(e.specification)}</td><td>{verdictLabel(e.practical)}</td><td>{verdictLabel(e.predictive)}</td></tr>;})}</tbody></table></div>
@@ -91,6 +94,7 @@ export function ConfirmationPanel({ project, onUpdateProject, onCreate }: Props)
       {study.status==='complete' && <><p>Hồ sơ đã hoàn tất. Kết quả xác nhận giữ nguyên khi cập nhật mô hình.</p><label>Lý do sửa kết quả <input disabled={locked||Boolean(study.addedToTrainingAt)} value={changeReason} onChange={e=>setChangeReason(e.target.value)}/></label><button className="btn btn-secondary" disabled={locked||Boolean(study.addedToTrainingAt)||!changeReason.trim()} onClick={()=>{save({status:'collecting'},`Mở sửa kết quả: ${changeReason.trim()}`);setChangeReason('');}}>Mở sửa có lưu lịch sử</button>
         <details><summary>Bổ sung dữ liệu để xây dựng phiên bản mô hình mới</summary><p>Các mẻ được thêm vào DoE dưới một block mới; mô hình hiện tại sẽ tính lại. Hồ sơ xác nhận này vẫn dùng mô hình cũ. ANN cần huấn luyện lại. Đây không còn là tập xác nhận độc lập của mô hình mới.</p><button className="btn btn-secondary" disabled={locked||Boolean(study.addedToTrainingAt)} onClick={()=>{try{const runs=confirmationTrainingRuns(project,study);const at=new Date().toISOString();onUpdateProject({runs:[...project.runs,...runs],confirmationStudies:studies.map(s=>s.id===study.id?{...s,addedToTrainingAt:at,history:[...s.history,{at,action:'Bổ sung dữ liệu vào DoE dưới block mới sau khi hoàn tất xác nhận.'}]}:s)});setError('');}catch(e){setError((e as Error).message);}}}>{study.addedToTrainingAt?'Đã bổ sung vào DoE':'Bổ sung vào DoE và cập nhật mô hình'}</button></details>
       </>}
+      </details>
     </>}
     {studies.length>1 && <details><summary>So sánh các phương án đã xác nhận</summary><div className="table-container"><table className="qbd-table"><thead><tr><th>Phương án</th><th>Đáp ứng</th><th>n</th><th>Bias</th><th>RMSE</th><th>Chất lượng</th></tr></thead><tbody>{studies.flatMap(s=>s.responses.map(r=>{const e=evaluateConfirmation(s,r);return <tr key={`${s.id}-${r.cqa.code}`}><td>{s.name}</td><td>{r.cqa.code} ({r.cqa.unit})</td><td>{e.n}</td><td>{fmt(e.bias)}</td><td>{fmt(e.rmse)}</td><td>{verdictLabel(e.specification)}</td></tr>;}))}</tbody></table></div>
       {study.responses.filter(r=>!r.cqa.dataType?.startsWith('qualitative')).map(r=>{

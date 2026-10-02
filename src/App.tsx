@@ -17,6 +17,7 @@ import { fitModel, optimizeDesirability } from './services/statistics';
 import { fitNeuralNetModel, fitMultiOutputNeuralNet, DEFAULT_NEURAL_CONFIG, getNeuralArtifactFingerprint, hydrateNeuralModels, serializeNeuralModels } from './services/neuralNetwork';
 import { loadPersistedProject, persistProject, recordProjectVersion, validateProjectTemplate } from './services/projectGovernance';
 import { stableSeedFromText } from './services/random';
+import { projectFileName } from './services/projectFileName';
 import { Navbar } from './components/Navbar';
 import { TabNavigation, type TabKey } from './components/TabNavigation';
 import { HelpDrawer } from './components/HelpDrawer';
@@ -345,9 +346,10 @@ export function App() {
   const handleNewProject = () => {
     const blankProject: QBDProject = {
       id: `project-${Date.now()}`,
-      name: 'Dự án Phát triển Bào chế Mới (QbD Project)',
+      name: 'Untitled project',
       moleculeName: 'Hoạt chất mới (New Chemical Entity)',
       dosageForm: 'Viên nén bao phim',
+      strength: '',
       author: 'Tran Linh Nguyen',
       version: '1.0.0',
       createdDate: new Date().toISOString().slice(0, 10),
@@ -453,7 +455,7 @@ export function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `QbD_Project_${project.moleculeName.replace(/\s+/g, '_')}.json`;
+    a.download = projectFileName(project.name);
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -477,6 +479,7 @@ export function App() {
         onLoadProject={handleLoadProject}
         onSaveJSON={handleSaveJSON}
         onNewProject={handleNewProject}
+        onRenameProject={(name) => handleUpdateProject({ name })}
         onToggleHelp={() => setIsHelpOpen((prev) => !prev)}
         isHelpOpen={isHelpOpen}
       />

@@ -775,6 +775,28 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
           {/* Action Buttons Toolbar */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
             <button
+              onClick={() => setShowGoalEditor(!showGoalEditor)}
+              className="btn"
+              style={{
+                backgroundColor: showGoalEditor ? '#ffffff' : 'rgba(255, 255, 255, 0.15)',
+                color: showGoalEditor ? '#1e3a8a' : '#ffffff',
+                fontWeight: '600',
+                fontSize: '0.8rem',
+                padding: '0.45rem 0.85rem',
+                borderRadius: '0.5rem',
+                border: '1px solid rgba(255,255,255,0.3)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+              }}
+              title="Mở bảng cấu hình mục tiêu và hàm hình dạng (s/t shapes)"
+            >
+              <Settings size={14} />
+              <span>Mục Tiêu & Trọng Số</span>
+              {showGoalEditor ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+            <button
               onClick={handleMaximizeDesirability}
               className="btn"
               style={{
@@ -841,28 +863,6 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
               <span>Về Tâm (0)</span>
             </button>
 
-            <button
-              onClick={() => setShowGoalEditor(!showGoalEditor)}
-              className="btn"
-              style={{
-                backgroundColor: showGoalEditor ? '#ffffff' : 'rgba(255, 255, 255, 0.15)',
-                color: showGoalEditor ? '#1e3a8a' : '#ffffff',
-                fontWeight: '600',
-                fontSize: '0.8rem',
-                padding: '0.45rem 0.85rem',
-                borderRadius: '0.5rem',
-                border: '1px solid rgba(255,255,255,0.3)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.35rem',
-              }}
-              title="Mở bảng cấu hình mục tiêu và hàm hình dạng (s/t shapes)"
-            >
-              <Settings size={14} />
-              <span>Mục Tiêu & Trọng Số</span>
-              {showGoalEditor ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            </button>
           </div>
         </div>
       </div>
@@ -1154,7 +1154,21 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
         </div>
       )}
 
+      {currentEvaluation && <div className="qbd-card" style={{ padding: '0.85rem 1rem', borderLeft: '4px solid #0d9488' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div><strong>Điểm đang khảo sát</strong><div style={{ fontSize: '0.76rem', color: '#475569' }}>Overall D = {currentEvaluation.overallD}</div></div>
+          {onApplyOptimum && <button className="btn btn-teal" onClick={() => onApplyOptimum({ codedFactors: { ...currentCoded }, actualFactors: { ...currentEvaluation.actualFactors }, predictedResponses: { ...currentEvaluation.predictions }, overallDesirability: currentEvaluation.overallD })}>Chọn phương án này</button>}
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem 0.9rem', marginTop: '0.5rem', fontSize: '0.76rem' }}>
+          {factors.map(f => <span key={f.code}>{f.code}: <strong>{String(currentEvaluation.actualFactors[f.code] ?? '—')} {f.unit}</strong></span>)}
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem 0.9rem', marginTop: '0.3rem', fontSize: '0.76rem', color: '#0f766e' }}>
+          {cqas.map(cqa => <span key={cqa.code}>{cqa.code} dự đoán: <strong>{currentEvaluation.predictions[cqa.code]?.value ?? '—'} {cqa.unit}</strong></span>)}
+        </div>
+      </div>}
+
       {/* Main Prediction Profiler Matrix */}
+      <details className="profiler-matrix-details"><summary>Ma trận đồ thị và điều chỉnh từng yếu tố X</summary>
       <div className="qbd-card" style={{ padding: '1rem', overflowX: 'auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -1615,6 +1629,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
           </div>
         )}
       </div>
+      </details>
 
       {/* Saved Solutions Comparison Table (Candidate Table) */}
       {savedSettings.length > 0 && (

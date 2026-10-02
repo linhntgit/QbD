@@ -363,6 +363,7 @@ export interface QBDProject {
   name: string;
   moleculeName: string;
   dosageForm: string;
+  strength?: string;
   author: string;
   version: string;
   createdDate: string;

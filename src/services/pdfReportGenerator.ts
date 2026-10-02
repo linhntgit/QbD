@@ -495,8 +495,16 @@ export function generateRegulatoryPDFABuffer(
     { text: project.moleculeName, width: 331, bold: true },
   ], 16);
   doc.addTableRow([
-    { text: 'Dạng bào chế & Hàm lượng:', width: 180, bold: true, bg: [0.96, 0.97, 0.99] },
+    { text: 'Hàm lượng / Nồng độ:', width: 180, bold: true, bg: [0.96, 0.97, 0.99] },
+    { text: project.strength || 'Chưa nhập', width: 331 },
+  ], 16);
+  doc.addTableRow([
+    { text: 'Dạng bào chế & Đường dùng:', width: 180, bold: true, bg: [0.96, 0.97, 0.99] },
     { text: project.dosageForm, width: 331 },
+  ], 16);
+  doc.addTableRow([
+    { text: 'Ngày bắt đầu dự án:', width: 180, bold: true, bg: [0.96, 0.97, 0.99] },
+    { text: project.createdDate || 'Chưa nhập', width: 331 },
   ], 16);
   doc.addTableRow([
     { text: 'Chuyên viên Nghiên cứu (Author):', width: 180, bold: true, bg: [0.96, 0.97, 0.99] },
