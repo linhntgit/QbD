@@ -70,7 +70,7 @@ export function ConfirmationPanel({ project, onUpdateProject, onCreate }: Props)
     {study.status!=='draft' && <>
       <details key={`${study.id}-${study.status}-entry`} open={study.status==='collecting'}>
       <summary><strong>2. Nhập kết quả thực nghiệm</strong> — {study.runs.length}/{study.plannedReplicates} mẻ đã lập</summary>
-      <fieldset disabled={!editable} style={{border:0,padding:0}}>
+      <fieldset disabled={!editable} style={{border:0,padding:0,margin:0,minWidth:0}}>
         <ConfirmationMatrix study={study} disabled={!editable} onSave={(runs,action)=>save({runs},action)} onError={setError}/>
         <details><summary>Dán bảng từ Excel</summary><p>Cột theo đúng thứ tự bên dưới; dùng tab giữa các cột. Dòng đầu phải có tiêu đề. Các dòng được thêm vào, không ghi đè.</p><pre style={{whiteSpace:'pre-wrap'}}>{header}</pre><textarea aria-label="Dữ liệu xác nhận từ Excel" rows={5} value={paste} onChange={e=>setPaste(e.target.value)} style={{width:'100%'}}/><button className="btn btn-secondary" onClick={()=>{try{const rows=parseConfirmationPaste(study,paste);if(study.runs.length+rows.length>500)throw new Error('Tối đa 500 mẻ mỗi hồ sơ.');save({runs:[...study.runs,...rows]},`Nhập ${rows.length} mẻ từ bảng`);setPaste('');}catch(e){setError((e as Error).message);}}}>Kiểm tra và thêm dữ liệu</button></details>
       </fieldset>
