@@ -69,6 +69,7 @@ export interface Factor {
   currentValue?: number; // for contour slices
   distribution?: ProbabilityDistributionType;
   distParams?: DistributionParams;
+  processSD?: number; // Absolute process standard deviation for Monte Carlo (e.g. +/- 0.5 °C or 2 rpm)
 }
 
 export interface FMEARiskItem {
@@ -236,6 +237,23 @@ export interface RSMCanonicalAnalysisResult {
   canonicalEquation: string;
 }
 
+export interface BoxCoxRecommendation {
+  optimalLambda: number;
+  ci95Low: number;
+  ci95High: number;
+  recommendedTransform: 'None' | 'Natural Log (ln)' | 'Square Root' | 'Inverse' | 'Inverse Square Root' | 'Power';
+  formulaExplanation: string;
+  points: { lambda: number; logLikelihood: number }[];
+}
+
+export interface CrossValidationDiagnostics {
+  kFold: number;
+  rmseCV: number;
+  maeCV: number;
+  qSquaredCV: number; // 1 - PRESS_CV / SST
+  residualsCV: number[];
+}
+
 export interface StatisticalModelResult {
   /** Covariance of the non-block coefficients, in buildModelTerms order. */
   predictionCovariance?: number[][];
@@ -243,12 +261,18 @@ export interface StatisticalModelResult {
   modelType: ModelType;
   terms: RegressionTerm[];
   anova: ANOVASource[];
+  type3Anova?: ANOVASource[];
+  boxCox?: BoxCoxRecommendation;
+  cvDiagnostics?: CrossValidationDiagnostics;
   lackOfFit?: ANOVASource;
   pureError?: ANOVASource;
   totalError?: ANOVASource;
   curvatureTest?: ANOVASource & { significant: boolean; note: string };
   diagnostics: ModelDiagnostics;
   equationString: string;
+  actualEquationString?: string;
+  actualEquationLatex?: string;
+  reducedTerms?: string[];
   predict: (codedFactors: Record<string, number>) => number;
   /** Standard error of the estimated mean response at a coded factor point. */
   predictStandardError?: (codedFactors: Record<string, number>) => number;
@@ -313,6 +337,7 @@ export interface MonteCarloResult {
   simulations: number;
   seed?: number;
   variabilityPercent?: number;
+  twoStageMonteCarlo?: boolean;
   modeledCqaCodes: string[];
   unmodeledCqaCodes: string[];
   excursionCount: number;

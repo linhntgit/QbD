@@ -17,6 +17,7 @@ import {
   Clock,
   Zap,
   AlertTriangle,
+  X,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import type {
@@ -38,7 +39,7 @@ import {
   generateControlStrategy,
 } from '../../services/statistics';
 import { codedToActual, actualToCoded, getConfiguredFactorCodes, getConfiguredFactorLevels, getFactorGridCodes, isDiscreteFactor } from '../../services/doeGenerator';
-import { formatAxisTitle, calculateCQAMargin } from '../../services/mathUtils';
+import { formatAxisTitle, calculateCQAMargin, calculateProbabilisticCQAMargin } from '../../services/mathUtils';
 import { generateTernaryDesignSpace } from '../../services/ternaryContour';
 import { assessDesignSpaceRobustness } from '../../services/designSpaceRobustness';
 import './DesignSpaceTab.css';
@@ -209,6 +210,10 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
   const [xAxisFactor, setXAxisFactor] = useState<string>(factors[0]?.code || 'X1');
   const [yAxisFactor, setYAxisFactor] = useState<string>(factors[1]?.code || 'X2');
 
+  // Boundary Mode for Design Space (P3.3, STAT-S12)
+  const [boundaryMode, setBoundaryMode] = useState<'mean' | 'pi95' | 'probabilistic'>('mean');
+  const [probThreshold, setProbThreshold] = useState<number>(0.95);
+
   // Selected Vertices for Ternary Design Space
   const [ternaryA, setTernaryA] = useState<string>(() => mixtureFactors[0]?.code || factors[0]?.code || 'X1');
   const [ternaryB, setTernaryB] = useState<string>(() => mixtureFactors[1]?.code || factors[1]?.code || 'X2');
@@ -340,11 +345,15 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
     ? JSON.stringify([optimum.actualFactors, mcSimulations, mcVariability, modelingEngine]) : null;
   const simulationNeedsRefresh = Boolean(mcResult && currentSimulationKey !== lastSimulationKey);
   const simulationTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const mcAbortControllerRef = useRef<AbortController | null>(null);
+
   useEffect(() => {
     setIsSimulating(false);
+    mcAbortControllerRef.current?.abort();
     const timer = simulationTimer.current;
     return () => {
       if (timer) clearTimeout(timer);
+      mcAbortControllerRef.current?.abort();
     };
   }, [project.id, factors, cqas, models, monteCarloSeed]);
 
@@ -377,6 +386,10 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
     variability: number
   ) => {
     if (simulationTimer.current) clearTimeout(simulationTimer.current);
+    mcAbortControllerRef.current?.abort();
+    const controller = new AbortController();
+    mcAbortControllerRef.current = controller;
+
     setIsSimulating(true);
     setSimProgress(0);
 
@@ -391,7 +404,8 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
         monteCarloSeed,
         (progressPercent) => {
           setSimProgress(progressPercent);
-        }
+        },
+        controller.signal
       );
       setMcResult(mc);
       setLastSimulationKey(JSON.stringify([targetActual, batches, variability, modelingEngine]));
@@ -405,10 +419,21 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
         });
       } catch {}
     } catch (error) {
+      if (controller.signal.aborted) {
+        return;
+      }
       window.alert(`Không thể chạy Monte Carlo: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
+      if (mcAbortControllerRef.current === controller) {
+        mcAbortControllerRef.current = null;
+      }
       setIsSimulating(false);
     }
+  };
+
+  const handleCancelMonteCarlo = () => {
+    mcAbortControllerRef.current?.abort();
+    setIsSimulating(false);
   };
 
   // Handle Apply Optimum from Desirability Profiler
@@ -521,7 +546,24 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
         for (const cqa of validCQAs) {
           const model = models[cqa.code];
           const yPred = model.predict(pointCoded);
-          const cqaMargin = calculateCQAMargin(yPred, cqa.objective, cqa.lowerLimit, cqa.upperLimit, cqa.target);
+          const sePred = 'predictStandardError' in model && typeof model.predictStandardError === 'function'
+            ? model.predictStandardError(pointCoded)
+            : 0;
+          const msResidual = 'anova' in model
+            ? (model.anova.find((a) => a.source.startsWith('Residual'))?.ms ?? 0.01)
+            : ((model.diagnostics as any)?.rmseVal ?? 0.1);
+          const dfResidual = 'residualDegreesOfFreedom' in model ? model.residualDegreesOfFreedom ?? 10 : 10;
+          const cqaMargin = calculateProbabilisticCQAMargin(
+            yPred,
+            sePred,
+            msResidual,
+            dfResidual,
+            cqa.objective,
+            cqa.lowerLimit,
+            cqa.upperLimit,
+            boundaryMode,
+            probThreshold
+          );
 
           if (cqaMargin < minMargin) {
             minMargin = cqaMargin;
@@ -566,7 +608,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
       xDisplayArr,
       yDisplayArr,
     };
-  }, [cartesianAxesValid, overlayMode, factorX, factorY, models, cqas, factors, sliceFactorsCoded, resolution]);
+  }, [cartesianAxesValid, overlayMode, factorX, factorY, models, cqas, factors, sliceFactorsCoded, resolution, boundaryMode, probThreshold]);
 
   // Ternary Design Space Mesh Computation
   const ternaryDS = useMemo(() => {
@@ -1099,6 +1141,46 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                       {preset.label}
                     </button>
                   ))}
+                </div>
+              </div>
+
+              {/* Boundary Mode Selector (P3.3, S12) */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', backgroundColor: '#f8fafc', padding: '0.2rem 0.4rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
+                <span style={{ fontSize: '0.73rem', color: '#475569', fontWeight: '600' }}>Biên DS:</span>
+                <div style={{ display: 'flex', gap: '0.15rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setBoundaryMode('mean')}
+                    className={`btn ${boundaryMode === 'mean' ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ fontSize: '0.68rem', padding: '0.18rem 0.4rem', borderRadius: '0.25rem', fontWeight: boundaryMode === 'mean' ? '700' : '500' }}
+                    title="Biên theo Trung bình dự đoán (Truyền thống)"
+                  >
+                    Mean
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBoundaryMode('pi95')}
+                    className={`btn ${boundaryMode === 'pi95' ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ fontSize: '0.68rem', padding: '0.18rem 0.4rem', borderRadius: '0.25rem', fontWeight: boundaryMode === 'pi95' ? '700' : '500' }}
+                    title="Biên theo Khoảng dự đoán 95% cá thể (PI 95% - Thận trọng ICH Q8)"
+                  >
+                    PI 95%
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (boundaryMode === 'probabilistic') {
+                        setProbThreshold((prev) => (prev === 0.95 ? 0.99 : prev === 0.99 ? 0.90 : 0.95));
+                      } else {
+                        setBoundaryMode('probabilistic');
+                      }
+                    }}
+                    className={`btn ${boundaryMode === 'probabilistic' ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ fontSize: '0.68rem', padding: '0.18rem 0.4rem', borderRadius: '0.25rem', fontWeight: boundaryMode === 'probabilistic' ? '700' : '500' }}
+                    title="Biên theo Xác suất đạt P(in-spec) ≥ π (Bấm để chuyển ngưỡng 90%, 95%, 99%)"
+                  >
+                    P ≥ {(probThreshold * 100).toFixed(0)}%
+                  </button>
                 </div>
               </div>
 
@@ -1875,9 +1957,32 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                   Đang sinh ngẫu nhiên {mcSimulations.toLocaleString()} lô sản xuất ảo & đánh giá {cqas.length} CQAs...
                 </span>
               </div>
-              <span className="font-mono" style={{ fontWeight: '800', fontSize: '0.95rem', color: '#6ee7b7' }}>
-                {simProgress}%
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <span className="font-mono" style={{ fontWeight: '800', fontSize: '0.95rem', color: '#6ee7b7' }}>
+                  {simProgress}%
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCancelMonteCarlo}
+                  style={{
+                    backgroundColor: 'rgba(239, 68, 68, 0.9)',
+                    color: '#ffffff',
+                    border: '1px solid rgba(254, 202, 202, 0.5)',
+                    borderRadius: '0.375rem',
+                    padding: '0.2rem 0.6rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.25rem',
+                  }}
+                  title="Dừng tính toán mô phỏng Monte Carlo"
+                >
+                  <X size={12} />
+                  <span>Hủy</span>
+                </button>
+              </div>
             </div>
             {/* Animated Progress bar */}
             <div style={{ width: '100%', height: '8px', backgroundColor: 'rgba(255, 255, 255, 0.2)', borderRadius: '4px', overflow: 'hidden' }}>

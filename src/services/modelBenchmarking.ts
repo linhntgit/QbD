@@ -4,8 +4,10 @@ import type {
   DoERun,
   StatisticalModelResult,
   NeuralNetModelResult,
+  CrossValidationDiagnostics,
 } from '../types/qbd';
 import { calculateInformationCriteria } from './mathUtils';
+import { createSeededRandom } from './random';
 
 export interface SVRConfig {
   kernel: 'rbf' | 'linear';
@@ -14,6 +16,7 @@ export interface SVRConfig {
   gamma?: number; // RBF kernel parameter gamma = 1 / (2 * sigma^2)
   tol?: number; // KKT numerical tolerance (default: 1e-3)
   maxIter?: number; // Maximum SMO iterations (default: 1000)
+  seed?: number;
 }
 
 export interface SVRModelResult {
@@ -55,6 +58,12 @@ export interface ModelBenchmarkCandidate {
   rmse: number;
   mae: number;
   sse: number;
+
+  // Out-of-sample Cross-Validation Metrics (STAT-S3, P3.6)
+  rmseCV?: number;
+  maeCV?: number;
+  qSquaredCV?: number;
+  cvDiagnostics?: CrossValidationDiagnostics;
 
   // Information Criteria
   aicc: number;
@@ -229,6 +238,7 @@ export function fitSVRModel(
   };
 
   // Sequential Minimal Optimization (SMO) Loop
+  const random = createSeededRandom(config.seed ?? 42);
   let iter = 0;
   let numChanged = 0;
   let examineAll = true;
@@ -250,7 +260,7 @@ export function fitSVRModel(
 
       if (violatesKKT) {
         // Select second index j maximizing error step |Ei - Ej|
-        let j = Math.floor(Math.random() * N);
+        let j = Math.floor(random() * N);
         let maxDeltaE = 0;
         for (let cand = 0; cand < N; cand++) {
           if (cand === i) continue;
@@ -371,6 +381,87 @@ export function fitSVRModel(
 }
 
 /**
+ * Calculate out-of-sample Cross-Validation metrics for OLS Polynomial models (P3.6, STAT-S3).
+ * Uses exact Leave-One-Out (LOO) PRESS residuals: e_i / (1 - h_ii).
+ */
+export function calculateOLSCrossValidation(
+  olsModel: StatisticalModelResult,
+  N: number,
+  sst: number
+): CrossValidationDiagnostics | undefined {
+  const residuals = olsModel.diagnostics.residuals ?? [];
+  if (residuals.length === 0 || N === 0) return undefined;
+  const residualsCV = residuals.map((r) =>
+    Math.abs(1 - (r.leverage ?? 0)) > 1e-6 ? r.residual / (1 - (r.leverage ?? 0)) : r.residual
+  );
+  const pressCV = olsModel.diagnostics.press ?? residualsCV.reduce((sum, e) => sum + e * e, 0);
+  const rmseCV = Math.sqrt(pressCV / N);
+  const maeCV = residualsCV.reduce((sum, e) => sum + Math.abs(e), 0) / N;
+  const qSquaredCV = sst > 0 ? Math.max(0, 1 - pressCV / sst) : 0;
+
+  return {
+    kFold: N,
+    rmseCV: Number(rmseCV.toFixed(4)),
+    maeCV: Number(maeCV.toFixed(4)),
+    qSquaredCV: Number(qSquaredCV.toFixed(4)),
+    residualsCV,
+  };
+}
+
+/**
+ * Calculate out-of-sample Cross-Validation metrics for SVR models (P3.6, STAT-S3).
+ * Uses K-fold cross-validation (default K = min(5, N)).
+ */
+export function calculateSVRCrossValidation(
+  factors: Factor[],
+  validRuns: DoERun[],
+  cqaCode: string,
+  userConfig?: Partial<SVRConfig>,
+  kFolds: number = 5
+): CrossValidationDiagnostics | undefined {
+  const N = validRuns.length;
+  if (N < 4) return undefined;
+  const K = Math.min(kFolds, N);
+  const residualsCV: number[] = new Array(N).fill(0);
+  const Y = validRuns.map((r) => Number(r.responses[cqaCode]));
+  const yMean = Y.reduce((a, b) => a + b, 0) / N;
+  const sst = Y.reduce((sum, val) => sum + Math.pow(val - yMean, 2), 0);
+
+  for (let fold = 0; fold < K; fold++) {
+    const testIndices: number[] = [];
+    const trainRuns: DoERun[] = [];
+    for (let i = 0; i < N; i++) {
+      if (i % K === fold) {
+        testIndices.push(i);
+      } else {
+        trainRuns.push(validRuns[i]);
+      }
+    }
+    const svrFold = fitSVRModel(factors, trainRuns, cqaCode, userConfig);
+    if (!svrFold) continue;
+    testIndices.forEach((idx) => {
+      const run = validRuns[idx];
+      const yTrue = Number(run.responses[cqaCode]);
+      const yPred = svrFold.predict(run.factorCoded);
+      residualsCV[idx] = yTrue - yPred;
+    });
+  }
+
+  const pressCV = residualsCV.reduce((sum, r) => sum + r * r, 0);
+  const rmseCV = Math.sqrt(pressCV / N);
+  const maeCV = residualsCV.reduce((sum, r) => sum + Math.abs(r), 0) / N;
+  const qSquaredCV = sst > 0 ? Math.max(0, 1 - pressCV / sst) : 0;
+
+  return {
+    kFold: K,
+    rmseCV: Number(rmseCV.toFixed(4)),
+    maeCV: Number(maeCV.toFixed(4)),
+    qSquaredCV: Number(qSquaredCV.toFixed(4)),
+    residualsCV,
+  };
+}
+
+/**
  * Head-to-Head Multi-Model Benchmarking Engine
  * Compares: Polynomial RSM, ANN MLP, SVR, and Ensemble Stacking
  */
@@ -398,6 +489,7 @@ export function benchmarkCQAModels(
     const pCount = olsModel.terms.length;
     const sse = olsModel.anova.find((a) => a.source.startsWith('Residual'))?.ss ?? 0;
     const metrics = calculateBenchmarkInformationCriteria(N, pCount, sse, sst);
+    const olsCV = calculateOLSCrossValidation(olsModel, N, sst);
 
     rawCandidates.push({
       modelId: 'polynomial_rsm',
@@ -410,7 +502,13 @@ export function benchmarkCQAModels(
       adjRSquared: olsModel.diagnostics.adjRSquared,
       qSquared: olsModel.diagnostics.qSquared ?? olsModel.diagnostics.predRSquared,
       rmse: olsModel.diagnostics.stdDev,
-      mae: sse > 0 ? Math.sqrt(sse / N) * 0.8 : 0,
+      mae: (olsModel.diagnostics.residuals?.length ?? 0) > 0
+        ? olsModel.diagnostics.residuals.reduce((sum, r) => sum + Math.abs(r.residual), 0) / olsModel.diagnostics.residuals.length
+        : 0,
+      rmseCV: olsCV?.rmseCV,
+      maeCV: olsCV?.maeCV,
+      qSquaredCV: olsCV?.qSquaredCV,
+      cvDiagnostics: olsCV,
       sse,
       aicc: olsModel.diagnostics.aicc ?? metrics.aicc,
       bic: olsModel.diagnostics.bic ?? metrics.bic,
@@ -455,6 +553,16 @@ export function benchmarkCQAModels(
             ? 'Moderate'
             : 'Low';
 
+    const annCV: CrossValidationDiagnostics | undefined = diag.rmseVal !== undefined
+      ? {
+          kFold: 1,
+          rmseCV: Number((diag.rmseVal ?? diag.rmseOverall).toFixed(4)),
+          maeCV: Number((diag.maeVal ?? diag.maeOverall).toFixed(4)),
+          qSquaredCV: Number((diag.rSquaredVal ?? 0).toFixed(4)),
+          residualsCV: [],
+        }
+      : undefined;
+
     rawCandidates.push({
       modelId: 'neural_mlp',
       name: 'Mạng Nơ-ron Nhân Tạo (ANN MLP)',
@@ -467,6 +575,10 @@ export function benchmarkCQAModels(
       qSquared: diag.rSquaredVal,
       rmse: diag.rmseOverall,
       mae: diag.maeOverall,
+      rmseCV: annCV?.rmseCV,
+      maeCV: annCV?.maeCV,
+      qSquaredCV: annCV?.qSquaredCV,
+      cvDiagnostics: annCV,
       sse,
       aicc: aiccVal,
       bic: bicVal,
@@ -493,6 +605,8 @@ export function benchmarkCQAModels(
   const svr = fitSVRModel(factors, runs, cqa.code, options?.svrConfig);
   if (svr && N > 0) {
     const sDiag = svr.diagnostics;
+    const svrCV = calculateSVRCrossValidation(factors, validRuns, cqa.code, options?.svrConfig);
+
     rawCandidates.push({
       modelId: 'svr_rbf',
       name: `Hồi Quy Vectơ Hỗ Trợ (SVR ${svr.config.kernel.toUpperCase()})`,
@@ -504,6 +618,10 @@ export function benchmarkCQAModels(
       adjRSquared: sDiag.adjRSquared,
       rmse: sDiag.rmse,
       mae: sDiag.mae,
+      rmseCV: svrCV?.rmseCV,
+      maeCV: svrCV?.maeCV,
+      qSquaredCV: svrCV?.qSquaredCV,
+      cvDiagnostics: svrCV,
       sse: sDiag.sse,
       aicc: sDiag.aicc,
       bic: sDiag.bic,
@@ -551,6 +669,16 @@ export function benchmarkCQAModels(
       candidatesWithWeights.reduce((sum, c) => sum + (c.akaikeWeight ?? 0) * c.parameterCount, 0),
     );
     const ensMetrics = calculateBenchmarkInformationCriteria(N, Math.max(2, ensP), ensSSE, sst);
+    const ensHasCV = candidatesWithWeights.some((c) => c.rmseCV !== undefined);
+    const ensRmseCV = ensHasCV
+      ? Number(candidatesWithWeights.reduce((sum, c) => sum + (c.akaikeWeight ?? 0) * (c.rmseCV ?? c.rmse), 0).toFixed(4))
+      : undefined;
+    const ensMaeCV = ensHasCV
+      ? Number(candidatesWithWeights.reduce((sum, c) => sum + (c.akaikeWeight ?? 0) * (c.maeCV ?? c.mae), 0).toFixed(4))
+      : undefined;
+    const ensQ2CV = ensHasCV
+      ? Number(candidatesWithWeights.reduce((sum, c) => sum + (c.akaikeWeight ?? 0) * (c.qSquaredCV ?? c.qSquared ?? 0), 0).toFixed(4))
+      : undefined;
 
     rawCandidates.push({
       modelId: 'ensemble_stacking',
@@ -563,6 +691,9 @@ export function benchmarkCQAModels(
       adjRSquared: ensMetrics.adjRSquared,
       rmse: ensMetrics.rmse,
       mae: ensSAE / N,
+      rmseCV: ensRmseCV,
+      maeCV: ensMaeCV,
+      qSquaredCV: ensQ2CV,
       sse: ensSSE,
       aicc: ensMetrics.aicc,
       bic: ensMetrics.bic,

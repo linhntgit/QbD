@@ -1210,6 +1210,23 @@ export async function exportQBDWordReport(
       width: { size: 100, type: WidthType.PERCENTAGE },
       rows: signRows,
     }),
+    new Paragraph({
+      children: [
+        new TextRun({
+          text: 'THÔNG CÁO TUÂN THỦ GxP & KHUYẾN CÁO CSV (GAMP 5): ',
+          bold: true,
+          color: '1E40AF',
+          size: 18,
+        }),
+        new TextRun({
+          text: 'Bản thảo báo cáo phát triển này được xuất từ ứng dụng QbD Studio™ phiên bản client-side nhằm mục đích Nghiên cứu & Phát triển (R&D). Ứng dụng không thay thế hệ thống eDMS/LIMS đã thẩm định CSV/GAMP 5. Dữ liệu cần được thẩm định nội bộ và ký ướt (wet signature) hoặc ký số trên hệ thống đạt chuẩn của đơn vị trước khi sử dụng cho hồ sơ nộp cơ quan quản lý.',
+          italics: true,
+          color: '334155',
+          size: 18,
+        }),
+      ],
+      spacing: { before: 140, after: 180 },
+    }),
     new Paragraph({ text: '', spacing: { after: 250 } })
   );
 

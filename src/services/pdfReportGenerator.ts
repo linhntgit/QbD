@@ -925,6 +925,17 @@ export function generateRegulatoryPDFABuffer(
     ], 16);
   }
 
+  doc.addSpacer(8);
+  doc.addParagraph(
+    'THONG BAO GxP / CSV (GAMP 5): Bao cao client-side phuc vu R&D va luu tru noi bo. Khong thay the eDMS/LIMS da tham dinh. Can in va ky tay (wet signature) hoac tham dinh tren he thong quan ly ho so cua don vi truoc khi nop co quan quan ly.',
+    'F1',
+    7,
+    10,
+    0.35,
+    0.4,
+    0.5
+  );
+
   return doc.generatePdfBytes();
 }
 

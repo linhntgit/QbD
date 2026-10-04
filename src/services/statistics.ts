@@ -15,6 +15,7 @@ import type {
   QBDProject,
   GeneticOptimizerOptions,
   PiepelBoundsResult,
+  BoxCoxRecommendation,
 } from '../types/qbd';
 import {
   matMul,
@@ -34,6 +35,7 @@ import {
 import { buildModelTerms, getModelBlockCounts, type ModelTermDefinition } from './modelTerms';
 import { createSeededRandom } from './random';
 import { actualToCoded, codedToActual, getConfiguredFactorCodes, isDiscreteFactor, snapFactorCoded } from './doeGenerator';
+import { convertCodedToActualEquation } from './equationTransforms';
 
 type TermDef = ModelTermDefinition;
 
@@ -112,10 +114,151 @@ function calculateVIFs(X: number[][], firstPredictorIndex: number = 1): number[]
 }
 
 /**
+ * Calculates Partial (Type III) Sum of Squares for each term in the regression model.
+ * Type III SS for term j: SS(term_j | all other terms) = SSE(model without term j) - SSE(full model).
+ */
+export function calculateType3ANOVA(
+  X: number[][],
+  Y: number[][],
+  terms: { name: string }[],
+  ssResidualFull: number,
+  msResidualFull: number,
+  dfResidualFull: number
+): ANOVASource[] {
+  const sources: ANOVASource[] = [];
+
+  for (let j = 0; j < terms.length; j++) {
+    const term = terms[j];
+    if (term.name === 'Intercept') continue;
+
+    // Build design matrix omitting column j
+    const X_omit = X.map((row) => row.filter((_, colIndex) => colIndex !== j));
+
+    let ssTerm = 0;
+    try {
+      const sseReduced = calculateSSE(X_omit, Y);
+      if (sseReduced !== null && Number.isFinite(sseReduced)) {
+        ssTerm = Math.max(0, sseReduced - ssResidualFull);
+      }
+    } catch {
+      ssTerm = 0;
+    }
+
+    const dfTerm = 1;
+    const msTerm = ssTerm / dfTerm;
+    const fVal = msResidualFull > 0 ? msTerm / msResidualFull : 0;
+    const pVal = fDistributionPValue(fVal, dfTerm, dfResidualFull);
+
+    sources.push({
+      source: term.name,
+      ss: ssTerm,
+      df: dfTerm,
+      ms: msTerm,
+      fValue: fVal,
+      pValue: pVal,
+    });
+  }
+
+  sources.push({
+    source: 'Residual',
+    ss: ssResidualFull,
+    df: dfResidualFull,
+    ms: msResidualFull,
+  });
+
+  return sources;
+}
+
+/**
+ * Calculates Box-Cox power transformation profile log-likelihood and optimal lambda.
+ * Only applicable when all response values are strictly positive (> 0).
+ */
+export function calculateBoxCoxRecommendation(
+  yValues: number[],
+  X: number[][]
+): BoxCoxRecommendation | null {
+  const n = yValues.length;
+  if (n < 4) return null;
+  if (yValues.some((y) => !Number.isFinite(y) || y <= 0)) return null;
+
+  const sumLnY = yValues.reduce((sum, y) => sum + Math.log(y), 0);
+  const dotY = Math.exp(sumLnY / n);
+
+  const lambdaGrid: number[] = [];
+  for (let l = -2.0; l <= 2.05; l += 0.1) {
+    lambdaGrid.push(Number(l.toFixed(2)));
+  }
+
+  const points: { lambda: number; logLikelihood: number }[] = [];
+  let bestLambda = 1.0;
+  let maxLogLikelihood = -Infinity;
+
+  for (const lambda of lambdaGrid) {
+    const yTrans = yValues.map((y) => {
+      if (Math.abs(lambda) < 1e-4) {
+        return dotY * Math.log(y);
+      }
+      return (Math.pow(y, lambda) - 1) / (lambda * Math.pow(dotY, lambda - 1));
+    });
+
+    const Y_col = yTrans.map((yt) => [yt]);
+    const sse = calculateSSE(X, Y_col);
+    if (sse === null || sse <= 0) continue;
+
+    const logLikelihood = - (n / 2) * Math.log(sse / n);
+    points.push({ lambda, logLikelihood });
+
+    if (logLikelihood > maxLogLikelihood) {
+      maxLogLikelihood = logLikelihood;
+      bestLambda = lambda;
+    }
+  }
+
+  if (points.length === 0 || !Number.isFinite(maxLogLikelihood)) return null;
+
+  const cutoff = maxLogLikelihood - 1.9207;
+  const inCI = points.filter((p) => p.logLikelihood >= cutoff);
+  const ci95Low = inCI.length > 0 ? inCI[0].lambda : bestLambda;
+  const ci95High = inCI.length > 0 ? inCI[inCI.length - 1].lambda : bestLambda;
+
+  let recommendedTransform: BoxCoxRecommendation['recommendedTransform'] = 'None';
+  let formulaExplanation = 'Khoảng tin cậy 95% bao gồm λ = 1; không cần biến đổi dữ liệu.';
+
+  if (ci95Low <= 1 && ci95High >= 1) {
+    recommendedTransform = 'None';
+    formulaExplanation = 'λ = 1 nằm trong khoảng tin cậy 95%; giữ nguyên thang đo gốc Y.';
+  } else if (ci95Low <= 0 && ci95High >= 0) {
+    recommendedTransform = 'Natural Log (ln)';
+    formulaExplanation = 'λ = 0 nằm trong khoảng tin cậy 95%; khuyến nghị biến đổi Y* = ln(Y).';
+  } else if (ci95Low <= 0.5 && ci95High >= 0.5) {
+    recommendedTransform = 'Square Root';
+    formulaExplanation = 'λ = 0.5 nằm trong khoảng tin cậy 95%; khuyến nghị biến đổi Y* = √Y.';
+  } else if (ci95Low <= -1 && ci95High >= -1) {
+    recommendedTransform = 'Inverse';
+    formulaExplanation = 'λ = -1 nằm trong khoảng tin cậy 95%; khuyến nghị biến đổi Y* = 1 / Y.';
+  } else if (ci95Low <= -0.5 && ci95High >= -0.5) {
+    recommendedTransform = 'Inverse Square Root';
+    formulaExplanation = 'λ = -0.5 nằm trong khoảng tin cậy 95%; khuyến nghị biến đổi Y* = 1 / √Y.';
+  } else {
+    recommendedTransform = 'Power';
+    formulaExplanation = `Khuyến nghị biến đổi lũy thừa tối ưu Y* = Y^(${bestLambda.toFixed(2)}).`;
+  }
+
+  return {
+    optimalLambda: bestLambda,
+    ci95Low,
+    ci95High,
+    recommendedTransform,
+    formulaExplanation,
+    points,
+  };
+}
+
+/**
  * Build term definitions based on factors and model type
  */
-function buildTerms(factors: Factor[], modelType: ModelType): TermDef[] {
-  return buildModelTerms(factors, modelType);
+function buildTerms(factors: Factor[], modelType: ModelType, selectedTermNames?: string[]): TermDef[] {
+  return buildModelTerms(factors, modelType, selectedTermNames);
 }
 
 /**
@@ -125,13 +268,16 @@ export function fitModel(
   cqa: CQA,
   factors: Factor[],
   runs: DoERun[],
-  modelType: ModelType = 'Quadratic'
+  modelType: ModelType = 'Quadratic',
+  selectedTerms?: string[]
 ): StatisticalModelResult | null {
   // A 0/100 surrogate is not a binomial model.  Fail closed until a logistic
   // modelling engine is supplied rather than reporting invalid OLS p-values.
   if (cqa.dataType?.startsWith('qualitative') || cqa.objective === 'pass_category') return null;
-  // Only vary factors that are not constant
-  const activeFactors = factors.filter((f) => f.controllability !== 'constant');
+  // Only vary factors that are controllable (or undefined for legacy data).
+  // Uncontrollable noise factors are not modeled as active DoE response surface variables.
+  const activeControllable = factors.filter((f) => f.controllability === 'controllable' || f.controllability === undefined);
+  const activeFactors = activeControllable.length > 0 ? activeControllable : factors.filter((f) => f.controllability !== 'constant');
 
   // Convert response value to numeric (handling qualitative binary / numbers)
   const parseResponse = (raw: number | string | null | undefined): number | null => {
@@ -150,7 +296,7 @@ export function fitModel(
     .filter((item) => item.parsedY !== null);
 
   const n = validRuns.length;
-  const terms = buildTerms(activeFactors, modelType);
+  const terms = buildTerms(activeFactors, modelType, selectedTerms);
   // Treat execution block as a fixed nuisance effect.  The lowest numbered
   // block is the reference; this keeps the treatment surface interpretable
   // for normal operating conditions while removing between-block shifts from
@@ -534,12 +680,23 @@ export function fitModel(
     ? calculateRSMCanonicalAnalysis(regressionTerms, activeFactors, interceptCoeff)
     : undefined;
 
+  // Actual engineering units transformation (P3.2)
+  const actualEq = convertCodedToActualEquation(regressionTerms, activeFactors, cqa.code);
+
+  // Type III Partial Sum of Squares ANOVA (P3.5)
+  const type3Anova = calculateType3ANOVA(X, Y, terms, ssResidual, msResidual, dfResidual);
+
+  // Box-Cox transformation recommendation (P3.5)
+  const boxCox = calculateBoxCoxRecommendation(yActual, X);
+
   return {
     cqaCode: cqa.code,
     modelType,
     predictionCovariance: invXTX.slice(0, terms.length).map((row) => row.slice(0, terms.length).map((value) => value * msResidual)),
     terms: regressionTerms,
     anova,
+    type3Anova,
+    boxCox: boxCox ?? undefined,
     curvatureTest,
     diagnostics: {
       rSquared,
@@ -567,6 +724,9 @@ export function fitModel(
       residuals: residualDetails,
     },
     equationString,
+    actualEquationString: actualEq.equationString,
+    actualEquationLatex: actualEq.latexString,
+    reducedTerms: modelType === 'Reduced' ? terms.map((t) => t.name) : undefined,
     predict,
     predictStandardError,
     residualDegreesOfFreedom: dfResidual,
@@ -586,7 +746,8 @@ export function calculateRSMCanonicalAnalysis(
   factors: Factor[],
   interceptCoeff?: number
 ): RSMCanonicalAnalysisResult | undefined {
-  const activeFactors = factors.filter((f) => f.controllability !== 'constant');
+  const activeControllable = factors.filter((f) => f.controllability === 'controllable' || f.controllability === undefined);
+  const activeFactors = activeControllable.length > 0 ? activeControllable : factors.filter((f) => f.controllability !== 'constant');
   const k = activeFactors.length;
   if (k < 1) return undefined;
 
@@ -1523,6 +1684,8 @@ export function runMonteCarloSimulation(
   variabilityPercent: number = 2.0, // % RSD of process parameters
   simulations: number = 10000,
   seed: number = 20260827,
+  onProgress?: (progressPercent: number) => void,
+  twoStageMonteCarlo: boolean = false
 ): MonteCarloResult {
   simulations = Math.max(100, Math.min(100_000, Math.round(Number.isFinite(simulations) ? simulations : 10_000)));
   variabilityPercent = Math.max(0.1, Math.min(15, Number.isFinite(variabilityPercent) ? variabilityPercent : 2));
@@ -1614,7 +1777,47 @@ export function runMonteCarloSimulation(
   }
   cholesky ??= correlation.map((row, i) => row.map((_, j) => i === j ? 1 : 0));
 
+  // Stage 1 Parameter Uncertainty Preparation for Two-Stage Monte Carlo (STAT-S8)
+  const batchesPerRealization = twoStageMonteCarlo ? Math.max(10, Math.floor(simulations / 50)) : 1;
+  const cqaParamCholesky: (number[][] | null)[] = validCQAs.map((cqa) => {
+    const model = models[cqa.code];
+    if (twoStageMonteCarlo && model && 'predictionCovariance' in model && model.predictionCovariance && model.predictionCovariance.length > 0) {
+      let pChol = tryCholesky(model.predictionCovariance);
+      let shrink = 0.95;
+      while (!pChol && shrink >= 0.05) {
+        const candidate = model.predictionCovariance.map((row, i) =>
+          row.map((val, j) => (i === j ? val * (1 + (1 - shrink)) : val * shrink))
+        );
+        pChol = tryCholesky(candidate);
+        shrink *= 0.9;
+      }
+      return pChol;
+    }
+    return null;
+  });
+  let currentBetaShift: number[][] = validCQAs.map(() => []);
+
+  const progressStep = Math.max(500, Math.floor(simulations / 20));
   for (let s = 0; s < simulations; s++) {
+    if (onProgress && simulations >= 1000 && s % progressStep === 0) {
+      onProgress(Math.round((s / simulations) * 100));
+    }
+    if (twoStageMonteCarlo && (s === 0 || s % batchesPerRealization === 0)) {
+      currentBetaShift = validCQAs.map((cqa, cqaIdx) => {
+        const model = models[cqa.code];
+        const pChol = cqaParamCholesky[cqaIdx];
+        if (pChol && 'terms' in model && model.terms) {
+          const p = model.terms.length;
+          const z = Array.from({ length: p }, () => standardNormal());
+          const delta = new Array(p).fill(0);
+          for (let i = 0; i < p; i++) {
+            delta[i] = pChol[i].reduce((sum, coef, j) => sum + coef * z[j], 0);
+          }
+          return delta;
+        }
+        return [];
+      });
+    }
     // Generate randomized factor actuals and convert to coded/proportion
     const sampleCoded: Record<string, number> = {};
     let batchOutsideSurveyRegion = false;
@@ -1622,8 +1825,14 @@ export function runMonteCarloSimulation(
     // 1. Process factors
     factors.forEach((f) => {
       if (f.controllability === 'constant') {
-        const constNum = typeof f.constantValue === 'number' ? f.constantValue : Number(f.constantValue) || f.low;
-        sampleCoded[f.code] = f.role === 'mixture_component' || f.type === 'Mixture' ? constNum / 100 : 0;
+        const constNum = typeof f.constantValue === 'number' && Number.isFinite(f.constantValue)
+          ? f.constantValue
+          : (f.constantValue !== undefined && f.constantValue !== null && Number.isFinite(Number(f.constantValue)))
+            ? Number(f.constantValue)
+            : f.low;
+        sampleCoded[f.code] = f.role === 'mixture_component' || f.type === 'Mixture'
+          ? (f.high <= 1.0 && f.unit !== '%' ? constNum : constNum / 100)
+          : 0;
         return;
       }
 
@@ -1639,9 +1848,17 @@ export function runMonteCarloSimulation(
       }
 
       const rawMean = setpointActual[f.code];
-      const mean: number = typeof rawMean === 'number' ? rawMean : Number(rawMean) || (f.low + f.high) / 2;
+      const mean: number = typeof rawMean === 'number' && Number.isFinite(rawMean)
+        ? rawMean
+        : (rawMean !== undefined && rawMean !== null && Number.isFinite(Number(rawMean)))
+          ? Number(rawMean)
+          : f.center !== undefined
+            ? f.center
+            : (f.low + f.high) / 2;
       const scale = Math.max(Math.abs(mean), Math.abs(f.high - f.low) / 2);
-      const sd = Math.max(1e-5, scale * (variabilityPercent / 100.0));
+      const sd = f.processSD !== undefined && Number.isFinite(f.processSD) && f.processSD > 0
+        ? f.processSD
+        : Math.max(1e-5, scale * (variabilityPercent / 100.0));
 
       // Stochastic factor sampling (STAT-03: Normal, Lognormal, Uniform, Triangular per ICH Q9)
       // Draw the physical process without truncation. An excursion outside the
@@ -1674,13 +1891,23 @@ export function runMonteCarloSimulation(
       const sampledProps: number[] = [];
       mixFactors.forEach((f) => {
         if (f.controllability === 'constant') {
-          const constNum = typeof f.constantValue === 'number' ? f.constantValue : Number(f.constantValue) || f.low;
+          const constNum = typeof f.constantValue === 'number' && Number.isFinite(f.constantValue)
+            ? f.constantValue
+            : (f.constantValue !== undefined && f.constantValue !== null && Number.isFinite(Number(f.constantValue)))
+              ? Number(f.constantValue)
+              : f.low;
           sampledProps.push(valueToProportion(f, constNum));
           return;
         }
         const rawMean = setpointActual[f.code];
-        const mean: number = typeof rawMean === 'number' ? rawMean : Number(rawMean) || (f.low + f.high) / 2; // mean in %
-        const sd = Math.max(1e-5, mean * (variabilityPercent / 100.0));
+        const mean: number = typeof rawMean === 'number' && Number.isFinite(rawMean)
+          ? rawMean
+          : (rawMean !== undefined && rawMean !== null && Number.isFinite(Number(rawMean)))
+            ? Number(rawMean)
+            : (f.low + f.high) / 2; // mean in %
+        const sd = f.processSD !== undefined && Number.isFinite(f.processSD) && f.processSD > 0
+          ? f.processSD
+          : Math.max(1e-5, mean * (variabilityPercent / 100.0));
 
         let actualVal: number;
         if (f.distribution && f.distribution !== 'Normal') {
@@ -1735,12 +1962,41 @@ export function runMonteCarloSimulation(
       if (!Number.isFinite(residualStd) || residualStd < 0 || !Number.isFinite(meanPredictionSE)) {
         throw new Error(`Invalid uncertainty estimate for ${cqa.code}.`);
       }
-      const noiseStd = Math.sqrt(residualStd * residualStd + meanPredictionSE * meanPredictionSE);
-
-      // Exact Box-Muller Gaussian Noise for model residual variance
-      const resError = noiseStd * correlatedZ[cqaIndex];
-
-      const yPred = model.predict(sampleCoded) + resError;
+      let yPred: number;
+      if (twoStageMonteCarlo) {
+        // Stage 1: Response mean under realized parameter draw
+        let yPredMean = model.predict(sampleCoded);
+        const delta = currentBetaShift[cqaIndex];
+        if (delta && delta.length > 0 && 'terms' in model && model.terms) {
+          for (let k = 0; k < delta.length; k++) {
+            const term = model.terms[k];
+            let termVal = 1;
+            if (term.name !== 'Intercept' && term.name !== '(Intercept)') {
+              if (term.factorCodes && term.power) {
+                termVal = term.factorCodes.reduce(
+                  (prod, code, pIdx) => prod * Math.pow(sampleCoded[code] ?? 0, term.power[pIdx] ?? 1),
+                  1
+                );
+              } else if (term.name.includes('*')) {
+                termVal = term.name.split('*').reduce((prod, f) => prod * (sampleCoded[f] ?? 0), 1);
+              } else if (term.name.includes('^2')) {
+                const f = term.name.replace('^2', '');
+                termVal = Math.pow(sampleCoded[f] ?? 0, 2);
+              } else {
+                termVal = sampleCoded[term.name] ?? 0;
+              }
+            }
+            yPredMean += delta[k] * termVal;
+          }
+        }
+        // Stage 2: Batch process noise with residual covariance
+        const batchProcessNoise = residualStd * correlatedZ[cqaIndex];
+        yPred = yPredMean + batchProcessNoise;
+      } else {
+        const noiseStd = Math.sqrt(residualStd * residualStd + meanPredictionSE * meanPredictionSE);
+        const resError = noiseStd * correlatedZ[cqaIndex];
+        yPred = model.predict(sampleCoded) + resError;
+      }
       if (!Number.isFinite(yPred)) throw new Error(`Non-finite prediction for ${cqa.code}.`);
       cqaValues[cqa.code].push(yPred);
 
@@ -1766,8 +2022,12 @@ export function runMonteCarloSimulation(
     const vals = cqaValues[cqa.code];
     const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
     const sd = Math.sqrt(vals.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / Math.max(1, vals.length - 1));
-    const min = Math.min(...vals);
-    const max = Math.max(...vals);
+    let min = vals[0] ?? 0;
+    let max = vals[0] ?? 0;
+    for (let i = 1; i < vals.length; i++) {
+      if (vals[i] < min) min = vals[i];
+      if (vals[i] > max) max = vals[i];
+    }
 
     let ppk: number | undefined = undefined;
     if (sd > 0) {
@@ -1802,11 +2062,13 @@ export function runMonteCarloSimulation(
 
   const endTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
   const executionTimeMs = Number((endTime - startTime).toFixed(2));
+  onProgress?.(100);
 
   return {
     simulations,
     seed,
     variabilityPercent,
+    twoStageMonteCarlo,
     modeledCqaCodes,
     unmodeledCqaCodes,
     excursionCount,
@@ -1822,8 +2084,8 @@ export function runMonteCarloSimulation(
 
 /**
  * Asynchronous Monte Carlo simulation runner.
- * Periodically yields to browser event loop to prevent freezing the UI thread,
- * reporting incremental progress via onProgress callback.
+ * Offloads compute to Web Worker in browser environments to avoid freezing the main UI thread,
+ * with graceful fallback and abort signal support.
  */
 export async function runMonteCarloSimulationAsync(
   setpointActual: Record<string, number | string>,
@@ -1833,23 +2095,24 @@ export async function runMonteCarloSimulationAsync(
   variabilityPercent: number = 2.0,
   simulations: number = 10000,
   seed: number = 20260827,
-  onProgress?: (progressPercent: number) => void
+  onProgress?: (progressPercent: number) => void,
+  abortSignal?: AbortSignal,
+  twoStageMonteCarlo: boolean = false
 ): Promise<MonteCarloResult> {
-  const chunkSize = 5000;
-  if (simulations <= chunkSize) {
-    onProgress?.(100);
-    return runMonteCarloSimulation(setpointActual, factors, cqas, models, variabilityPercent, simulations, seed);
-  }
-
-  const totalChunks = Math.ceil(simulations / chunkSize);
-  for (let c = 0; c < totalChunks; c++) {
-    onProgress?.(Math.min(99, Math.round(((c + 1) / totalChunks) * 100)));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  }
-
-  const result = runMonteCarloSimulation(setpointActual, factors, cqas, models, variabilityPercent, simulations, seed);
-  onProgress?.(100);
-  return result;
+  const { runMonteCarloInWorker } = await import('./analysisWorkerClient');
+  return runMonteCarloInWorker(
+    setpointActual,
+    factors,
+    cqas,
+    models,
+    variabilityPercent,
+    simulations,
+    seed,
+    onProgress,
+    abortSignal,
+    runMonteCarloSimulation,
+    twoStageMonteCarlo
+  );
 }
 
 /**

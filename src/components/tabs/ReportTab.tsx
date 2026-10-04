@@ -28,7 +28,6 @@ import type {
   ModelingEngine,
 } from '../../types/qbd';
 import type { NeuralTrainingMode } from '../../types/neuralNetwork';
-import { exportQBDWordReport } from '../../services/reportGenerator';
 import { evaluateConfirmation, formatConfirmationNumber, verdictLabel } from '../../services/confirmation';
 import { downloadRegulatoryPDFA } from '../../services/pdfReportGenerator';
 import { calculateDesignEfficiency } from '../../services/doeGenerator';
@@ -181,6 +180,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
   };
 
   const [isExportingPdf, setIsExportingPdf] = useState<boolean>(false);
+  const [isExportingWord, setIsExportingWord] = useState<boolean>(false);
 
   const auditHistory = useMemo(() => getProjectHistory(project.id), [project]);
   const auditVerification = useMemo(() => verifyAuditTrailIntegrity(auditHistory, project), [auditHistory, project]);
@@ -207,12 +207,20 @@ export const ReportTab: React.FC<ReportTabProps> = ({
     }
   };
 
-  const handleDownloadWord = () => {
+  const handleDownloadWord = async () => {
     if (!reportReadiness.readyForScientificReport) {
       window.alert(`Chưa thể xuất bản thảo báo cáo phát triển.\n${[...reportReadiness.errors, ...reportReadiness.warnings].slice(0, 8).join('\n')}`);
       return;
     }
-    exportQBDWordReport(project, models, optimum, monteCarlo, neuralModels, modelingEngine);
+    setIsExportingWord(true);
+    try {
+      const { exportQBDWordReport } = await import('../../services/reportGenerator');
+      await exportQBDWordReport(project, models, optimum, monteCarlo, neuralModels, modelingEngine);
+    } catch (err) {
+      window.alert(`Lỗi khi xuất Word (.docx): ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIsExportingWord(false);
+    }
   };
 
   const handlePrint = () => {
@@ -288,21 +296,21 @@ export const ReportTab: React.FC<ReportTabProps> = ({
               backgroundColor: reportReadiness.readyForScientificReport ? '#1e3a8a' : undefined,
               color: '#ffffff',
             }}
-            title="Xuất tệp PDF/A-1b lưu trữ pháp lý (ISO 19005) có nhúng mã băm kiểm toán SHA-256"
+            title="Xuất tệp PDF lưu trữ (Archival PDF / XMP) có nhúng mã băm kiểm toán SHA-256 (tham chiếu ISO 19005)"
           >
             <FileText size={16} />
-            <span>{isExportingPdf ? 'Đang tạo PDF/A...' : 'Xuất PDF/A Pháp Lý (ISO 19005)'}</span>
+            <span>{isExportingPdf ? 'Đang tạo PDF Lưu Trữ...' : 'Xuất Báo Cáo Lưu Trữ (Archival PDF)'}</span>
           </button>
 
           <button
             onClick={handleDownloadWord}
             className={`btn ${reportReadiness.readyForScientificReport ? 'btn-teal' : 'btn-secondary'}`}
-            disabled={!reportReadiness.readyForScientificReport}
+            disabled={!reportReadiness.readyForScientificReport || isExportingWord}
             style={{ fontSize: '0.82rem', padding: '0.4rem 1rem' }}
             title={reportReadiness.readyForScientificReport ? 'Xuất bản thảo để rà soát khoa học/QA' : 'Cần hoàn tất và kiểm tra dữ liệu trước khi xuất'}
           >
             <Download size={16} />
-            <span>Tải Bản Thảo Word (.docx)</span>
+            <span>{isExportingWord ? 'Đang tạo Word...' : 'Tải Bản Thảo Word (.docx)'}</span>
           </button>
         </div>
       </div>
@@ -326,7 +334,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
           <ShieldCheck size={18} color={auditVerification.isValid ? '#16a34a' : '#dc2626'} />
           <span style={{ fontSize: '0.82rem', fontWeight: '700', color: auditVerification.isValid ? '#166534' : '#991b1b' }}>
             {auditVerification.isValid
-              ? 'Mã Băm Kiểm Toán Mật Mã Học (21 CFR Part 11 Tamper-Evident Root Checksum):'
+              ? 'Mã Băm Toàn Vẹn Kiểm Toán (Tham Chiếu 21 CFR Part 11 / EU Annex 11):'
               : 'Cảnh Báo Toàn Vẹn Kiểm Toán (Audit Trail Integrity Alert):'}
           </span>
           <code
@@ -1477,7 +1485,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
               <span>⚖</span> TUYÊN BỐ PHÁP LÝ &amp; THÔNG CÁO TUÂN THỦ GxP (21 CFR PART 11 / EU ANNEX 11)
             </div>
             <div>
-              Ứng dụng <strong>QbD Studio™ Pharma DoE Suite</strong> phiên bản client-side được thiết kế chuyên biệt cho mục đích <strong>Nghiên cứu &amp; Phát triển Khám phá (Exploratory Formulation R&amp;D)</strong> và tối ưu hóa quy trình. Hệ thống này <strong>chưa cấu thành</strong> một giải pháp lưu trữ hồ sơ điện tử tuân thủ đầy đủ US FDA 21 CFR Part 11 hoặc EU GMP Annex 11 (chưa tích hợp kiểm soát truy cập tập trung, phân quyền đa cấp, audit trail chuỗi khối bất biến và chữ ký số PKI). Mọi báo cáo hoặc kết quả xuất ra cần được in ấn, ký ướt (wet signature) hoặc thẩm định lại trên hệ thống LIMS/ELN đạt chuẩn của doanh nghiệp trước khi sử dụng cho hồ sơ nộp cơ quan quản lý y tế.
+              Ứng dụng <strong>QbD Studio™ Pharma DoE Suite</strong> phiên bản client-side được thiết kế chuyên biệt cho mục đích <strong>Nghiên cứu &amp; Phát triển Khám phá (Exploratory Formulation R&amp;D)</strong> và tối ưu hóa quy trình. Hệ thống này <strong>chưa cấu thành</strong> một giải pháp lưu trữ hồ sơ điện tử tuân thủ đầy đủ US FDA 21 CFR Part 11 hoặc EU GMP Annex 11 (chưa tích hợp máy chủ eDMS xác thực tập trung, phân quyền đa cấp LDAP/SSO và chữ ký số PKI trên đám mây). <em>Báo cáo số R&amp;D phục vụ lưu trữ nội bộ và nghiên cứu phát triển, không thay thế hệ thống eDMS/LIMS thẩm định GAMP 5.</em> Mọi báo cáo hoặc kết quả xuất ra cần được in ấn, ký ướt (wet signature) hoặc thẩm định lại trên hệ thống quản lý hồ sơ đạt chuẩn của doanh nghiệp trước khi sử dụng cho hồ sơ nộp cơ quan quản lý y tế.
             </div>
           </div>
         </div>

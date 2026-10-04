@@ -50,7 +50,9 @@ Every feature identified from the authoritative request (`ORIGINAL_REQUEST.md §
 | M1 | Advanced DoE & Metaheuristic Optimization | DSD generator, Continuous GA + Nelder-Mead desirability optimizer, Piepel mixture polyhedral bounds | none | DONE (34 unit + 30 E2E tests passing) |
 | M2 | Explainable AI & Multi-Model Benchmarking | ANN AICc/BIC/$R^2_{adj}$, Garson/Olden/SHAP XAI engine, SVR + Ensemble benchmarking table | none | DONE (20 unit + 13 E2E tests passing) |
 | M3 | GxP Governance & 21 CFR Part 11 Audit Trail | Pure TypeScript SHA-256, canonical JSON, tamper-evident hash chain, integrity verification, 3-tier sign-off workflow | none | DONE (42 unit + 13 E2E tests passing) |
+| M4 | 3D Design Space & Regulatory Archival Reporting | Plotly 3D sweet-spot surface view, slice factor slider & auto-scan, Archival PDF/A (ISO 19005-1), Word (.docx) export with audit trail | none | DONE (9 unit + 14 E2E tests passing) |
 | M5 | Final E2E Integration & Verification Gates | 100% E2E test pass, adversarial test hardening, zero TypeScript build errors, zero lint warnings | M1, M2, M3, M4 | DONE (Reviewers, Challengers, and Forensic Auditor APPROVED — Gate Result: PASS) |
+| P0-P2 | Remediation & Production Hardening | P0 Hotfixes (Zod, Scheffé, D-optimal, Desirability), P1 Scale (IndexedDB, Web Worker, Code Splitting), P2 Compliance (Calibrated GxP Claims, User Session, WebCrypto, Consent Mode v2) | none | DONE (29 test files, 372 tests passing — 100% Pass) |
 
 ---
 

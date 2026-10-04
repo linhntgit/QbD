@@ -411,9 +411,9 @@ function downloadCSV(headers: string[], rows: Array<Array<string | number | null
 }
 
 /**
- * Export DoE matrix as an Excel-compatible CSV without a binary workbook parser.
+ * Export DoE matrix as an Excel-compatible UTF-8 CSV with coded factors & responses.
  */
-export function exportToExcel(project: QBDProject, filename?: string) {
+export function exportFullDoECSV(project: QBDProject, filename?: string) {
   if (project.runs.length === 0) return;
 
   const headers = [
@@ -439,9 +439,14 @@ export function exportToExcel(project: QBDProject, filename?: string) {
 }
 
 /**
- * Export a laboratory-entry template as Excel-compatible CSV.
+ * Backward-compatible alias for exportFullDoECSV.
  */
-export function exportTemplateExcel(project: QBDProject) {
+export const exportToExcel = exportFullDoECSV;
+
+/**
+ * Export a laboratory-entry blank/current template as UTF-8 CSV.
+ */
+export function exportTemplateCSV(project: QBDProject) {
   if (project.runs.length === 0) return;
 
   const headers = [
@@ -461,6 +466,11 @@ export function exportTemplateExcel(project: QBDProject) {
   const cleanName = `${(project.name || 'QbD').replace(/\s+/g, '_')}_Mau_Nhap_Lab`;
   downloadCSV(headers, dataRows, `${cleanName}.csv`);
 }
+
+/**
+ * Backward-compatible alias for exportTemplateCSV.
+ */
+export const exportTemplateExcel = exportTemplateCSV;
 
 /**
  * Export CSV file with UTF-8 BOM

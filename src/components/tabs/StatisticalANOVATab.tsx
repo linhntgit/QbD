@@ -8,7 +8,9 @@ import {
   ShieldCheck,
   Share2,
   Info,
+  Wand2,
 } from 'lucide-react';
+import { runBackwardElimination, type BackwardEliminationStep } from '../../services/modelReduction';
 import type {
   QBDProject,
   StatisticalModelResult,
@@ -51,6 +53,9 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
 }) => {
   const [activeDiagPlot, setActiveDiagPlot] = useState<'pareto' | 'resPred' | 'normProb' | 'cooks'>('pareto');
   const [bulkModelNotice, setBulkModelNotice] = useState<string | null>(null);
+  const [anovaType, setAnovaType] = useState<'type1' | 'type3'>('type1');
+  const [reductionSteps, setReductionSteps] = useState<BackwardEliminationStep[] | null>(null);
+  const [isReducing, setIsReducing] = useState(false);
 
   const currentCQA = project.cqas.find((c) => c.code === selectedCQA) || project.cqas[0];
   const model = currentCQA ? models[currentCQA.code] : null;
@@ -68,6 +73,24 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
       : null,
     [currentCQA, model, project.runs],
   );
+
+  const handleRunBackward = () => {
+    if (!currentCQA) return;
+    setIsReducing(true);
+    try {
+      const res = runBackwardElimination(currentCQA, project.factors, project.runs, {
+        alphaToRemove: 0.10,
+        criterion: 'p-value',
+        startModelType: appliedModelType === 'Reduced' ? 'Quadratic' : appliedModelType,
+      });
+      if (res) {
+        setReductionSteps(res.steps);
+        onModelTypeChange(currentCQA.code, 'Reduced');
+      }
+    } finally {
+      setIsReducing(false);
+    }
+  };
 
   const hasTrainedNeuralModels = useMemo(() => {
     if (!neuralModels || Object.keys(neuralModels).length === 0) return false;
@@ -395,7 +418,19 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                 <option value="Quadratic">Đa thức Bậc 2 (Quadratic)</option>
                 <option value="2FI">Tương tác 2 Yếu tố (2FI)</option>
                 <option value="Linear">Tuyến tính (Linear)</option>
+                <option value="Reduced">Rút gọn (Reduced RSM)</option>
               </select>
+              <button
+                type="button"
+                onClick={handleRunBackward}
+                disabled={isReducing}
+                className="btn btn-secondary"
+                style={{ fontSize: '0.8rem', padding: '0.35rem 0.65rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                title="Rút gọn mô hình từng bước tự động (Stepwise Backward Elimination, alpha=0.10, giữ nguyên phân cấp bậc đa thức)"
+              >
+                <Wand2 size={14} color="#0f766e" />
+                <span>{isReducing ? 'Đang rút gọn...' : 'Rút Gọn (Backward)'}</span>
+              </button>
             </div>
 
             {onNavigateToNeural && (
@@ -605,6 +640,88 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
             >
               {model.equationString}
             </div>
+
+            {model.actualEquationString && (
+              <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px dashed #cbd5e1' }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: '700', color: '#0f766e', marginBottom: '0.35rem' }}>
+                  PHƯƠNG TRÌNH THEO ĐƠN VỊ THỰC TẾ (ACTUAL ENGINEERING UNITS - CTD 3.2.P.2):
+                </div>
+                <div
+                  className="font-mono"
+                  style={{
+                    fontSize: '0.92rem',
+                    color: '#0f766e',
+                    fontWeight: '600',
+                    lineHeight: '1.6',
+                    overflowX: 'auto',
+                  }}
+                >
+                  {model.actualEquationString}
+                </div>
+              </div>
+            )}
+
+            {model.boxCox && (
+              <div
+                style={{
+                  marginTop: '0.75rem',
+                  padding: '0.65rem 0.85rem',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '0.375rem',
+                  fontSize: '0.8rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ fontWeight: '700', color: '#334155' }}>Gợi ý biến đổi Box-Cox (P3.5):</span>
+                    <span
+                      style={{
+                        padding: '0.15rem 0.45rem',
+                        borderRadius: '0.25rem',
+                        fontWeight: '700',
+                        fontSize: '0.75rem',
+                        backgroundColor: model.boxCox.recommendedTransform === 'None' ? '#f0fdf4' : '#fef3c7',
+                        color: model.boxCox.recommendedTransform === 'None' ? '#166534' : '#92400e',
+                        border: `1px solid ${model.boxCox.recommendedTransform === 'None' ? '#bbf7d0' : '#fde68a'}`,
+                      }}
+                    >
+                      {model.boxCox.recommendedTransform}
+                    </span>
+                  </div>
+                  <div style={{ color: '#64748b', fontSize: '0.75rem' }}>
+                    λ Tối ưu: <b>{model.boxCox.optimalLambda.toFixed(2)}</b> (95% CI: [{model.boxCox.ci95Low.toFixed(2)}, {model.boxCox.ci95High.toFixed(2)}])
+                  </div>
+                </div>
+                <div style={{ color: '#64748b', marginTop: '0.25rem', fontSize: '0.75rem' }}>
+                  {model.boxCox.formulaExplanation}
+                </div>
+              </div>
+            )}
+
+            {reductionSteps && reductionSteps.length > 0 && (
+              <div
+                style={{
+                  marginTop: '0.75rem',
+                  padding: '0.65rem 0.85rem',
+                  backgroundColor: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '0.375rem',
+                  fontSize: '0.78rem',
+                }}
+              >
+                <div style={{ fontWeight: '700', color: '#166534', marginBottom: '0.3rem' }}>
+                  Lịch sử rút gọn mô hình từng bước (Backward Elimination):
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                  {reductionSteps.map((s) => (
+                    <div key={s.step} style={{ color: '#14532d' }}>
+                      • Bước {s.step}: Loại bỏ số hạng <b>{s.removedTerm}</b> {s.pValueAtRemoval !== undefined ? `(p = ${s.pValueAtRemoval.toFixed(4)})` : ''} — R² hiệu chỉnh sau loại: <b>{s.adjRSquaredAfterRemoval.toFixed(4)}</b> (còn {s.remainingTermsCount} số hạng).
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* ANOVA Table & Term Estimates Side-by-Side */}
@@ -612,9 +729,31 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
             
             {/* ANOVA Table */}
             <div className="qbd-card">
-              <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a', marginBottom: '0.75rem' }}>
-                Bảng Phân Tích Phương Sai (ANOVA Table)
-              </h3>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
+                  Bảng Phân Tích Phương Sai (ANOVA Table)
+                </h3>
+                {model.type3Anova && model.type3Anova.length > 0 && (
+                  <div style={{ display: 'flex', backgroundColor: '#f1f5f9', borderRadius: '0.375rem', padding: '0.15rem', gap: '0.15rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setAnovaType('type1')}
+                      className={`btn ${anovaType === 'type1' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ fontSize: '0.68rem', padding: '0.2rem 0.45rem', fontWeight: '600' }}
+                    >
+                      Type I (Sequential)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAnovaType('type3')}
+                      className={`btn ${anovaType === 'type3' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ fontSize: '0.68rem', padding: '0.2rem 0.45rem', fontWeight: '600' }}
+                    >
+                      Type III (Partial SS)
+                    </button>
+                  </div>
+                )}
+              </div>
               <div className="table-container">
                 <table className="qbd-table">
                   <thead>
@@ -628,7 +767,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {model.anova.map((row, idx) => {
+                    {((anovaType === 'type3' && model.type3Anova && model.type3Anova.length > 0) ? model.type3Anova : model.anova).map((row, idx) => {
                       const isLOF = row.source === 'Lack of Fit';
                       const isPass = isLOF
                         ? (row.pValue !== undefined && row.pValue > 0.05)

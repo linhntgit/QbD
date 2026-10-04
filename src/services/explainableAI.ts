@@ -5,6 +5,7 @@ import type {
   NeuralNetModelResult,
   NeuralLayerWeights,
 } from '../types/qbd';
+import { createSeededRandom } from './random';
 
 /**
  * Trained weights structure matching both standard ANN MLP and matrix representations
@@ -446,7 +447,7 @@ export function calculateExactShapleyValues(
   predict: (coded: Record<string, number>) => number,
   factors: Factor[],
   runs: DoERun[],
-  options?: { permutationSamples?: number },
+  options?: { permutationSamples?: number; seed?: number },
 ): SHAPAnalysisResult {
   const activeFactors = factors.filter((f) => f.controllability !== 'constant');
   const k = activeFactors.length;
@@ -508,11 +509,12 @@ export function calculateExactShapleyValues(
     } else {
       // Permutation SHAP for k > 8
       const nPerm = options?.permutationSamples ?? 200;
+      const random = createSeededRandom(options?.seed ?? 20260901);
       for (let p = 0; p < nPerm; p++) {
         // Generate random permutation of 0..k-1
         const perm = Array.from({ length: k }, (_, idx) => idx);
         for (let idx = k - 1; idx > 0; idx--) {
-          const j = Math.floor(Math.random() * (idx + 1));
+          const j = Math.floor(random() * (idx + 1));
           [perm[idx], perm[j]] = [perm[j], perm[idx]];
         }
 
@@ -653,7 +655,7 @@ export function computeXAIImportance(
   });
 
   // 3. Exact SHAP Values
-  const shap = calculateExactShapleyValues(model.predict, factors, runs);
+  const shap = calculateExactShapleyValues(model.predict, factors, runs, { seed: model.config?.seed });
 
   // 4. Consensus Comparison Table
   const comparisonTable: XAIComparisonRow[] = activeFactors.map((factor) => {

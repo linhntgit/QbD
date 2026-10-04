@@ -207,7 +207,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({
       if (field === 'low' || field === 'high') {
         const l = field === 'low' ? Number(value) : f.low;
         const h = field === 'high' ? Number(value) : f.high;
-        modified.center = Number(((l + h) / 2).toFixed(2));
+        modified.center = (l + h) / 2;
       }
       if (field === 'categories' && f.dataType === 'quantitative_multilevel') {
         const numericLevels = (value as string[])

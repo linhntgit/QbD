@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   FlaskConical,
   Save,
@@ -9,9 +9,12 @@ import {
   BrainCircuit,
   HelpCircle,
   ChevronDown,
+  User,
 } from 'lucide-react';
 import type { QBDProject, ModelingEngine } from '../types/qbd';
 import { CASE_STUDIES } from '../data/caseStudies';
+import { UserSessionModal } from './UserSessionModal';
+import { getActiveSession, type ActiveUserSession } from '../services/sessionService';
 
 interface NavbarProps {
   project: QBDProject;
@@ -40,6 +43,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const projectNameRef = useRef<HTMLInputElement>(null);
+  const [isSessionModalOpen, setIsSessionModalOpen] = useState<boolean>(false);
+  const [activeSession, setActiveSessionState] = useState<ActiveUserSession>(getActiveSession);
 
   const handleJSONUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -267,6 +272,37 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span>Mới</span>
             </button>
 
+            {/* User Session Badge (ALCOA+ Attributable) */}
+            <button
+              onClick={() => setIsSessionModalOpen(true)}
+              className="btn btn-secondary"
+              style={{
+                fontSize: '0.8rem',
+                padding: '0.38rem 0.65rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                border: '1px solid #cbd5e1',
+                backgroundColor: '#f8fafc',
+              }}
+              title="Xem và chỉnh sửa phiên làm việc người dùng (GxP User Session)"
+            >
+              <User size={14} color="#0f766e" />
+              <span style={{ fontWeight: '600', color: '#0f172a' }}>{activeSession.name}</span>
+              <span
+                style={{
+                  fontSize: '0.68rem',
+                  padding: '0.1rem 0.35rem',
+                  borderRadius: '3px',
+                  backgroundColor: activeSession.role === 'Approver' ? '#fef3c7' : activeSession.role === 'Reviewer' ? '#e0f2fe' : '#dcfce7',
+                  color: activeSession.role === 'Approver' ? '#92400e' : activeSession.role === 'Reviewer' ? '#075985' : '#166534',
+                  fontWeight: '700',
+                }}
+              >
+                {activeSession.role}
+              </span>
+            </button>
+
             {/* Help / Contextual Guide Button */}
             {onToggleHelp && (
               <button
@@ -291,6 +327,12 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         </div>
       </div>
+
+      <UserSessionModal
+        isOpen={isSessionModalOpen}
+        onClose={() => setIsSessionModalOpen(false)}
+        onSessionChange={(s) => setActiveSessionState(s)}
+      />
     </header>
   );
 };

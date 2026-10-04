@@ -109,32 +109,23 @@ describe('Deterministic Canonical JSON Serializer (RFC 8785)', () => {
     const project = CASE_STUDIES[0];
 
     // Create a copy with scrambled keys
-    const scrambled = {
-      version: project.version,
-      runs: project.runs.map((r) => ({
-        responses: { ...r.responses },
-        factorActual: { ...r.factorActual },
-        factorCoded: { ...r.factorCoded },
-        id: r.id,
-        runOrder: r.runOrder,
-        stdOrder: r.stdOrder,
-        block: r.block,
-      })),
-      name: project.name,
-      id: project.id,
-      factors: [...project.factors],
-      cqas: [...project.cqas],
-      qtpp: [...project.qtpp],
-      fmeaRisks: [...project.fmeaRisks],
-      doeConfig: { ...project.doeConfig },
-      description: project.description,
-      dosageForm: project.dosageForm,
-      moleculeName: project.moleculeName,
-      createdDate: project.createdDate,
-      updatedDate: project.updatedDate,
-      designSpace: [...project.designSpace],
-      author: project.author,
-    };
+    const scrambled: Record<string, unknown> = {};
+    const reversedKeys = Object.keys(project).reverse();
+    for (const key of reversedKeys) {
+      if (key === 'runs') {
+        scrambled[key] = project.runs.map((r) => ({
+          responses: { ...r.responses },
+          factorActual: { ...r.factorActual },
+          factorCoded: { ...r.factorCoded },
+          id: r.id,
+          runOrder: r.runOrder,
+          stdOrder: r.stdOrder,
+          block: r.block,
+        }));
+      } else {
+        scrambled[key] = (project as unknown as Record<string, unknown>)[key];
+      }
+    }
 
     const hash1 = computeProjectPayloadHash(project);
     const hash2 = computeProjectPayloadHash(scrambled);

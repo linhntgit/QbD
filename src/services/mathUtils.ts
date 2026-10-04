@@ -487,6 +487,64 @@ export function calculateCQAMargin(
   return objective === 'pass_category' ? -Infinity : 1;
 }
 
+
+/**
+ * Calculates QbD Acceptance Margin considering either:
+ * - 'mean': traditional predicted mean y_hat
+ * - 'pi95': conservative 95% individual Prediction Interval boundary (ICH Q8 robustness)
+ * - 'probabilistic': probability of meeting specification P(L <= Y <= U) >= probThreshold (default 0.95)
+ */
+export function calculateProbabilisticCQAMargin(
+  yPred: number,
+  sePred: number,
+  msResidual: number,
+  dfResidual: number,
+  objective: string,
+  lowerLimit?: number,
+  upperLimit?: number,
+  mode: 'mean' | 'pi95' | 'probabilistic' = 'mean',
+  probThreshold = 0.95
+): number {
+  if (!Number.isFinite(yPred)) return -Infinity;
+
+  if (mode === 'mean' || sePred <= 0 || msResidual <= 0) {
+    return calculateCQAMargin(yPred, objective, lowerLimit, upperLimit);
+  }
+
+  // Individual prediction standard deviation: sigma_ind = sqrt(msResidual + sePred^2)
+  const sigmaInd = Math.sqrt(Math.max(1e-8, msResidual + sePred * sePred));
+  const tCrit = dfResidual > 0 ? tDistributionCritical(0.05, dfResidual) : 1.96;
+
+  if (lowerLimit !== undefined || upperLimit !== undefined) {
+    const scale = lowerLimit !== undefined && upperLimit !== undefined
+      ? Math.abs(upperLimit - lowerLimit) || 1
+      : Math.abs(lowerLimit ?? upperLimit!) || 1;
+
+    if (mode === 'pi95') {
+      // Conservative PI bounds: y_low = y_pred - tCrit * sigmaInd, y_high = y_pred + tCrit * sigmaInd
+      const yLow = yPred - tCrit * sigmaInd;
+      const yHigh = yPred + tCrit * sigmaInd;
+
+      const lowerMargin = lowerLimit !== undefined ? (yLow - lowerLimit) / scale : Infinity;
+      const upperMargin = upperLimit !== undefined ? (upperLimit - yHigh) / scale : Infinity;
+
+      return Math.min(lowerMargin, upperMargin);
+    }
+
+    if (mode === 'probabilistic') {
+      // P(L <= Y <= U) = Phi((U - y_pred)/sigmaInd) - Phi((L - y_pred)/sigmaInd)
+      const pUpper = upperLimit !== undefined ? normalCDF((upperLimit - yPred) / sigmaInd) : 1.0;
+      const pLower = lowerLimit !== undefined ? normalCDF((lowerLimit - yPred) / sigmaInd) : 0.0;
+      const pInSpec = Math.max(0, pUpper - pLower);
+
+      // Return margin relative to requested threshold (e.g. 0.95)
+      return pInSpec - probThreshold;
+    }
+  }
+
+  return calculateCQAMargin(yPred, objective, lowerLimit, upperLimit);
+}
+
 /** Wilson score interval for a binomial proportion, including zero events. */
 export function wilsonInterval(events: number, n: number, z = 1.959963984540054): { low: number; high: number } {
   if (!Number.isInteger(n) || n <= 0 || !Number.isInteger(events) || events < 0 || events > n) {

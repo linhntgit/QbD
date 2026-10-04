@@ -11,6 +11,7 @@ import {
   type ElectronicSignature,
   type GxPRole,
 } from '../services/projectGovernance';
+import { getActiveSession } from '../services/sessionService';
 import {
   ShieldCheck,
   AlertTriangle,
@@ -61,9 +62,10 @@ export const ProjectGovernancePanel: React.FC<ProjectGovernancePanelProps> = ({
   );
 
   // Sign-off Form State
+  const activeSession = getActiveSession();
   const [isSigningOpen, setIsSigningOpen] = useState(false);
-  const [signerName, setSignerName] = useState(project.author || '');
-  const [signerDepartment, setSignerDepartment] = useState('Phòng Nghiên cứu Bào chế & Phát triển');
+  const [signerName, setSignerName] = useState(() => activeSession.name || project.author || '');
+  const [signerDepartment, setSignerDepartment] = useState(() => activeSession.department || 'Phòng Nghiên cứu Bào chế & Phát triển');
   
   // Determine next role in the 3-tier hierarchy
   const hasAnalyst = signatures.some((s) => s.signerRole === 'Analyst');
@@ -167,11 +169,11 @@ export const ProjectGovernancePanel: React.FC<ProjectGovernancePanelProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <ShieldCheck size={20} color={integrity.isValid ? '#059669' : '#dc2626'} />
             <h3 style={{ fontSize: '1.05rem', margin: 0, color: '#0f172a', fontWeight: '700' }}>
-              Quản trị GxP &amp; Tuân thủ 21 CFR Part 11 / EU Annex 11
+              Quản Trị GxP &amp; Vết Kiểm Toán (Tham Chiếu 21 CFR Part 11 / EU Annex 11)
             </h3>
           </div>
           <p style={{ fontSize: '0.75rem', margin: '0.2rem 0 0', color: '#64748b' }}>
-            Chuỗi kiểm toán mật mã học SHA-256 (Tamper-Evident Hash Chain), xác thực toàn vẹn tức thời và chữ ký điện tử phân quyền.
+            Chuỗi kiểm toán mật mã học SHA-256 (Tamper-Evident Hash Chain), xác thực toàn vẹn tức thời và chữ ký điện tử phân quyền phục vụ R&amp;D.
           </p>
         </div>
 
@@ -639,20 +641,26 @@ export const ProjectGovernancePanel: React.FC<ProjectGovernancePanelProps> = ({
         )}
       </div>
 
-      {/* REGULATORY NOTICE */}
+      {/* REGULATORY DISCLAIMER & NOTICE */}
       <div
         style={{
           marginTop: '0.9rem',
-          padding: '0.65rem 0.75rem',
-          background: '#f8fafc',
-          border: '1px solid #e2e8f0',
+          padding: '0.75rem 0.9rem',
+          background: '#fffbeb',
+          border: '1px solid #fde68a',
           borderRadius: '0.4rem',
-          color: '#334155',
+          color: '#92400e',
           fontSize: '0.73rem',
-          lineHeight: '1.45',
+          lineHeight: '1.5',
         }}
       >
-        <strong>GxP Compliance Note (SEC-05 &amp; 21 CFR Part 11):</strong> Hệ thống ghi vết kiểm toán sử dụng chuỗi băm liên kết SHA-256 (FIPS 180-4) và chuẩn tuần tự hóa Canonical JSON (RFC 8785). Mọi hành động chỉnh sửa số liệu, cài đặt DoE và chữ ký điện tử 3 cấp đều được đóng dấu thời gian (UTC timestamp) và liên kết với khối trước đó để chống can thiệp trái phép.
+        <div style={{ fontWeight: '700', marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#b45309' }}>
+          <AlertTriangle size={15} />
+          <span>Thông Cáo Pháp Lý &amp; Giới Hạn Tuân Thủ (Regulatory Scope &amp; GAMP 5 Disclaimer):</span>
+        </div>
+        <div>
+          Ứng dụng QbD Studio vận hành 100% Client-Side trên trình duyệt người dùng phục vụ nghiên cứu &amp; phát triển (R&amp;D). Tính năng ghi vết kiểm toán (Audit Trail) và chữ ký điện tử dựa trên mật mã học SHA-256 / WebCrypto là giải pháp hỗ trợ truy xuất nguồn gốc nội bộ theo các nguyên lý ALCOA+. Ứng dụng chưa được thẩm định hệ thống máy tính chính thức (Computerized System Validation - CSV theo hướng dẫn GAMP 5) và không thay thế hệ thống eDMS / QMS / LIMS có chứng thực máy chủ khi nộp hồ sơ pháp lý bắt buộc tuân thủ 21 CFR Part 11 / EU Annex 11.
+        </div>
       </div>
     </div>
   );

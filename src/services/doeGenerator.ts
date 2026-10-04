@@ -123,7 +123,7 @@ export function actualToCoded(actual: number | string, factor: Factor): number {
       const halfRange = (numeric[numeric.length - 1] - numeric[0]) / 2;
       return halfRange > 0 ? (Number(actual) - center) / halfRange : 0;
     }
-    return 0;
+    return Number.NaN;
   }
   const val = typeof actual === 'number' ? actual : Number(actual);
 
@@ -141,6 +141,29 @@ export function actualToCoded(actual: number | string, factor: Factor): number {
   const halfRange = (high - low) / 2;
   if (halfRange === 0) return 0;
   return (val - center) / halfRange;
+}
+
+/**
+ * Recalculates factorCoded values for all runs when factor ranges or definitions change,
+ * using factorActual as the single source of ground truth.
+ */
+export function recodeRuns(factors: Factor[], runs: DoERun[]): DoERun[] {
+  if (!runs || runs.length === 0) return runs;
+  return runs.map((run) => {
+    const nextCoded = { ...run.factorCoded };
+    for (const factor of factors) {
+      if (run.factorActual && run.factorActual[factor.code] !== undefined) {
+        const coded = actualToCoded(run.factorActual[factor.code], factor);
+        if (Number.isFinite(coded)) {
+          nextCoded[factor.code] = coded;
+        }
+      }
+    }
+    return {
+      ...run,
+      factorCoded: nextCoded,
+    };
+  });
 }
 
 /** CCD low/high are factorial levels; circumscribed axial runs extend by alpha. */

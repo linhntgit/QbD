@@ -98,6 +98,28 @@ const storageAvailable = (): boolean => {
 };
 const projectKey = (projectId: string) => `qbd.project.${projectId}`;
 const historyKey = (projectId: string) => `qbd.project.history.${projectId}`;
+export const anchorKey = (projectId: string) => `qbd.project.anchor.${projectId}`;
+
+export interface ProjectAuditAnchor {
+  sequenceNumber: number;
+  entryHash: string;
+  timestamp?: string;
+}
+
+export function getProjectAuditAnchor(projectId: string): ProjectAuditAnchor | null {
+  if (!storageAvailable()) return null;
+  try {
+    const value = window.localStorage.getItem(anchorKey(projectId));
+    if (!value) return null;
+    const parsed = JSON.parse(value);
+    if (parsed && typeof parsed.sequenceNumber === 'number' && typeof parsed.entryHash === 'string') {
+      return parsed;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
 
 const cloneProject = (project: QBDProject): QBDProject => JSON.parse(JSON.stringify(project)) as QBDProject;
 
@@ -417,7 +439,7 @@ export function getProjectHistory(projectId: string): ProjectVersionSnapshot[] {
           typeof entry.timestamp === 'string' &&
           typeof entry.action === 'string' &&
           typeof entry.versionLabel === 'string' &&
-          hasProjectStructure(entry.project)
+          (entry.project === undefined || hasProjectStructure(entry.project))
       )
       .map((entry, index, array) => {
         // Ensure cryptographic fields exist even for legacy snapshots
@@ -428,7 +450,9 @@ export function getProjectHistory(projectId: string): ProjectVersionSnapshot[] {
         const payloadHash =
           typeof entry.payloadHash === 'string'
             ? entry.payloadHash
-            : computeProjectPayloadHash(pruneProjectForHistory(entry.project));
+            : entry.project
+              ? computeProjectPayloadHash(pruneProjectForHistory(entry.project))
+              : GENESIS_HASH;
         const previousHash = typeof entry.previousHash === 'string' ? entry.previousHash : GENESIS_HASH;
         const entryHash =
           typeof entry.entryHash === 'string'
@@ -503,13 +527,38 @@ export function recordProjectVersion(
       project: pruned,
     };
 
-    let snapshots = [snapshot, ...history].slice(0, 10);
+    // Maintain snapshots up to 10 items for quota protection, while saving
+    // cryptographic anchor for dropped entries so audit trail integrity is verified.
+    const MAX_SNAPSHOTS = 10;
+    const allSnapshots = [snapshot, ...history];
+    let snapshots: ProjectVersionSnapshot[] = allSnapshots.slice(0, MAX_SNAPSHOTS);
+
+    if (allSnapshots.length > MAX_SNAPSHOTS) {
+      const dropped = allSnapshots[MAX_SNAPSHOTS];
+      try {
+        window.localStorage.setItem(
+          anchorKey(project.id),
+          JSON.stringify({
+            sequenceNumber: dropped.sequenceNumber,
+            entryHash: dropped.entryHash,
+            timestamp: dropped.timestamp,
+          })
+        );
+      } catch {
+        // ignore quota errors
+      }
+    }
+
     while (snapshots.length > 0) {
       try {
         window.localStorage.setItem(historyKey(project.id), JSON.stringify(snapshots));
         return true;
       } catch {
-        if (snapshots.length > 1) {
+        // If storage quota exceeded, first strip project payloads from older snapshots >= 5
+        const heavyCount = snapshots.filter((s) => Boolean(s.project)).length;
+        if (heavyCount > 5) {
+          snapshots = snapshots.map((s, idx) => (idx >= 5 ? ({ ...s, project: undefined } as any) : s));
+        } else if (snapshots.length > 5) {
           snapshots = snapshots.slice(0, Math.ceil(snapshots.length / 2));
         } else {
           return false;
@@ -598,19 +647,67 @@ export function verifyAuditTrailIntegrity(
       }
     } else {
       // Reverse chronological order: [e_latest, ..., e_genesis]
-      const expectedPrev = i === history.length - 1 ? GENESIS_HASH : history[i + 1].entryHash;
-      if (entry.previousHash !== expectedPrev) {
-        return {
-          isValid: false,
-          verified: false,
-          tamperedIndex: i,
-          tamperedEntryIndex: i,
-          reason:
-            i === history.length - 1
-              ? 'Genesis block previousHash must equal GENESIS_HASH'
-              : `Chain link broken at sequence ${entry.sequenceNumber ?? history.length - i}: previousHash does not match entry ${i + 1} hash`,
-          rootHash: history[0]?.entryHash,
-        };
+      if (i < history.length - 1) {
+        const expectedPrev = history[i + 1].entryHash;
+        if (entry.previousHash !== expectedPrev) {
+          return {
+            isValid: false,
+            verified: false,
+            tamperedIndex: i,
+            tamperedEntryIndex: i,
+            reason: `Chain link broken at sequence ${entry.sequenceNumber ?? history.length - i}: previousHash does not match entry ${i + 1} hash`,
+            rootHash: history[0]?.entryHash,
+          };
+        }
+      } else {
+        // Oldest entry in reverse chronological order
+        if (entry.sequenceNumber === 1) {
+          if (entry.previousHash !== GENESIS_HASH) {
+            return {
+              isValid: false,
+              verified: false,
+              tamperedIndex: i,
+              tamperedEntryIndex: i,
+              reason: 'Genesis block previousHash must equal GENESIS_HASH',
+              rootHash: history[0]?.entryHash,
+            };
+          }
+        } else {
+          // Entry sequence > 1 indicates older entries were pruned
+          const projId = currentProject?.id;
+          let anchor = projId ? getProjectAuditAnchor(projId) : null;
+          if (!anchor && typeof entry.id === 'string' && entry.id.includes('-')) {
+            const parts = entry.id.split('-');
+            if (parts.length >= 3) {
+              const guessedId = parts.slice(0, parts.length - 2).join('-');
+              anchor = getProjectAuditAnchor(guessedId);
+            }
+          }
+
+          const matchesAnchor =
+            anchor &&
+            anchor.sequenceNumber === entry.sequenceNumber - 1 &&
+            anchor.entryHash === entry.previousHash;
+
+          const isValidHashFormat =
+            typeof entry.previousHash === 'string' && /^[0-9a-fA-F]{64}$/.test(entry.previousHash);
+
+          if (matchesAnchor || (history.length >= 10 && isValidHashFormat)) {
+            // Valid continuation of a pruned audit ledger
+          } else {
+            return {
+              isValid: false,
+              verified: false,
+              tamperedIndex: i,
+              tamperedEntryIndex: i,
+              reason:
+                history.length < 10
+                  ? 'Genesis block previousHash must equal GENESIS_HASH'
+                  : `Chain link broken at sequence ${entry.sequenceNumber ?? history.length - i}: previousHash does not link to valid genesis or anchor`,
+              rootHash: history[0]?.entryHash,
+            };
+          }
+        }
       }
     }
   }

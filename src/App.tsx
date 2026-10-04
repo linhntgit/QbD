@@ -14,15 +14,20 @@ import type {
 } from './types/qbd';
 import { CASE_STUDIES } from './data/caseStudies';
 import { fitModel, optimizeDesirability } from './services/statistics';
+import { recodeRuns } from './services/doeGenerator';
 import { fitNeuralNetModel, fitMultiOutputNeuralNet, DEFAULT_NEURAL_CONFIG, getNeuralArtifactFingerprint, hydrateNeuralModels, serializeNeuralModels } from './services/neuralNetwork';
 import { loadPersistedProject, persistProject, recordProjectVersion, validateProjectTemplate } from './services/projectGovernance';
+import { idbSaveProject, migrateLocalStorageToIndexedDB } from './services/storage';
 import { stableSeedFromText } from './services/random';
 import { projectFileName } from './services/projectFileName';
 import { Navbar } from './components/Navbar';
 import { TabNavigation, type TabKey } from './components/TabNavigation';
-import { HelpDrawer } from './components/HelpDrawer';
 import { ComponentErrorBoundary } from './components/ComponentErrorBoundary';
 import { trackTabChange, trackProjectAction, trackModelAction } from './services/analytics';
+import { getAuditUserFromSession } from './services/sessionService';
+import { ConsentBanner } from './components/ConsentBanner';
+
+const HelpDrawer = lazy(() => import('./components/HelpDrawer').then((module) => ({ default: module.HelpDrawer })));
 
 const QTPPTab = lazy(() => import('./components/tabs/QTPPTab').then((module) => ({ default: module.QTPPTab })));
 const FMEATab = lazy(() => import('./components/tabs/FMEATab').then((module) => ({ default: module.FMEATab })));
@@ -115,14 +120,20 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    migrateLocalStorageToIndexedDB().catch(() => {});
+  }, []);
+
+  useEffect(() => {
     const timer = window.setTimeout(() => {
       const persisted = persistProject(project);
+      idbSaveProject(project).catch(() => {});
       setStorageWarning(persisted ? null : 'Autosave trình duyệt đã thất bại hoặc hết dung lượng. Hãy dùng nút Lưu để xuất JSON ngay.');
       const now = Date.now();
       const action = pendingAuditAction.current;
       const shouldCheckpoint = hasPersistedInitialProject.current &&
-        (action !== lastSnapshot.current.action || now - lastSnapshot.current.timestamp >= 30_000);
-      if (shouldCheckpoint && recordProjectVersion(project, action)) {
+        (action !== lastSnapshot.current.action || now - lastSnapshot.current.timestamp >= 300_000);
+      const auditUser = getAuditUserFromSession();
+      if (shouldCheckpoint && recordProjectVersion(project, action, auditUser)) {
         lastSnapshot.current = { action, timestamp: now };
       }
       hasPersistedInitialProject.current = true;
@@ -228,10 +239,41 @@ export function App() {
     persistAnalysisSettings({ neuralConfigs: next, appliedOptimum: undefined, neuralArtifacts: undefined });
   };
 
-  // Calculate Desirability Optimum dynamically from active modeling engine
-  const calculatedOptimum = useMemo(() => {
-    return optimizeDesirability(project.factors, project.cqas, activeModels, undefined, analysisProvenance.optimizerSeed);
-  }, [project.factors, project.cqas, activeModels, analysisProvenance.optimizerSeed]);
+  const needsOptimum = activeTab === 'design_space' || activeTab === 'report';
+
+  // Calculate Desirability Optimum lazily and debounced from active modeling engine
+  const [calculatedOptimum, setCalculatedOptimum] = useState<DesirabilitySolution | null>(() => {
+    return project.analysisSettings?.appliedOptimum ?? null;
+  });
+
+  useEffect(() => {
+    if (project.analysisSettings?.appliedOptimum) {
+      setCalculatedOptimum(project.analysisSettings.appliedOptimum);
+      return;
+    }
+    if (!needsOptimum) return;
+
+    const timer = window.setTimeout(() => {
+      const opt = optimizeDesirability(
+        project.factors,
+        project.cqas,
+        activeModels,
+        undefined,
+        analysisProvenance.optimizerSeed
+      );
+      setCalculatedOptimum(opt);
+    }, 200);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    needsOptimum,
+    project.analysisSettings?.appliedOptimum,
+    project.factors,
+    project.cqas,
+    activeModels,
+    analysisProvenance.optimizerSeed,
+  ]);
+
   const optimum = project.analysisSettings?.appliedOptimum ?? calculatedOptimum;
 
   // Monte Carlo is intentionally explicit: changing project fields or models
@@ -244,6 +286,11 @@ export function App() {
     analysisProvenance.monteCarloVariabilityPercent, analysisProvenance.monteCarloSimulations]);
   // Update Project Handler
   const handleUpdateProject = (updated: Partial<QBDProject>) => {
+    // 21 CFR Part 11: Block modification if project is locked, unless performing unlock
+    if (project.isLocked && updated.isLocked !== false && !('isLocked' in updated)) {
+      window.alert('Hồ sơ đã được phê duyệt và đang khóa theo 21 CFR Part 11. Cần thực hiện quy trình Mở khóa (Unlock) có ghi nhận lý do trước khi chỉnh sửa.');
+      return;
+    }
     pendingAuditAction.current = `Cập nhật: ${Object.keys(updated).join(', ')}`;
     const invalidatesModel = Boolean(updated.factors || updated.cqas || updated.runs);
     if (invalidatesModel) {
@@ -251,12 +298,17 @@ export function App() {
       setRestoredNeuralModels({});
     }
     setProject((prev) => {
+      let nextRuns = updated.runs ?? prev.runs;
+      if (updated.factors && !updated.runs && prev.runs.length > 0) {
+        nextRuns = recodeRuns(updated.factors, prev.runs);
+      }
       const analysisSettings = invalidatesModel
         ? { ...createAnalysisSettings(prev), appliedOptimum: undefined, neuralArtifacts: undefined }
         : prev.analysisSettings;
       return {
         ...prev,
         ...updated,
+        runs: nextRuns,
         analysisSettings,
         updatedDate: new Date().toISOString().slice(0, 10),
       };
@@ -264,6 +316,9 @@ export function App() {
   };
 
   function persistAnalysisSettings(updated: Partial<AnalysisSettings>) {
+    if (project.isLocked) {
+      return;
+    }
     pendingAuditAction.current = `Cập nhật cấu hình phân tích: ${Object.keys(updated).join(', ')}`;
     setProject((previous) => ({
       ...previous,
@@ -314,6 +369,27 @@ export function App() {
     }));
   };
 
+  const hydrateProjectState = useCallback((targetProject: QBDProject, options?: { warnANN?: boolean; defaultTab?: TabKey }) => {
+    const normalized = normalizeProjectAnalysis(targetProject);
+    setProject(normalized);
+    setModelTypes(normalized.analysisSettings?.modelTypes ?? {});
+    setNeuralTrainingMode(normalized.analysisSettings?.neuralTrainingMode ?? 'independent');
+    setSharedNeuralConfig(normalized.analysisSettings?.sharedNeuralConfig ?? { ...DEFAULT_NEURAL_CONFIG });
+    setNeuralConfigs(normalized.analysisSettings?.neuralConfigs ?? {});
+    const artifact = normalized.analysisSettings?.neuralArtifacts;
+    const canRestoreANN = artifact?.version === 1 && artifact.fingerprint === getNeuralArtifactFingerprint(normalized.factors, normalized.cqas, normalized.runs);
+    setRestoredNeuralModels(canRestoreANN && artifact ? hydrateNeuralModels(artifact.models, normalized.factors, normalized.runs) : {});
+    if (options?.warnANN && artifact && !canRestoreANN) {
+      window.alert('ANN đã bị vô hiệu vì dữ liệu hoặc cấu trúc project thay đổi. Hãy train lại ANN.');
+    }
+    setNeuralTrainingVersion(0);
+    setModelingEngine(normalized.analysisSettings?.modelingEngine ?? 'polynomial');
+    setSelectedCQA(targetProject.cqas[0]?.code || 'Y1');
+    if (options?.defaultTab) {
+      setActiveTab(options.defaultTab);
+    }
+  }, []);
+
   // Load Case Study / Project
   const handleLoadProject = (newProj: QBDProject) => {
     const validation = validateProjectTemplate(newProj);
@@ -323,23 +399,7 @@ export function App() {
     }
     trackProjectAction('load');
     pendingAuditAction.current = 'Tải project/case study';
-    const normalized = normalizeProjectAnalysis(newProj);
-    setProject(normalized);
-    setModelTypes(normalized.analysisSettings?.modelTypes ?? {});
-    setNeuralTrainingMode(normalized.analysisSettings?.neuralTrainingMode ?? 'independent');
-    setSharedNeuralConfig(normalized.analysisSettings?.sharedNeuralConfig ?? { ...DEFAULT_NEURAL_CONFIG });
-    setNeuralConfigs(normalized.analysisSettings?.neuralConfigs ?? {});
-    const artifact = normalized.analysisSettings?.neuralArtifacts;
-    const canRestoreANN = artifact?.version === 1 && artifact.fingerprint === getNeuralArtifactFingerprint(normalized.factors, normalized.cqas, normalized.runs);
-    setRestoredNeuralModels(canRestoreANN ? hydrateNeuralModels(artifact!.models, normalized.factors, normalized.runs) : {});
-    if (artifact && !canRestoreANN) {
-      window.alert('ANN đã bị vô hiệu vì dữ liệu hoặc cấu trúc project thay đổi. Hãy train lại ANN.');
-    }
-    setNeuralTrainingVersion(0);
-    setModelingEngine(normalized.analysisSettings?.modelingEngine ?? 'polynomial');
-    if (newProj.cqas.length > 0) {
-      setSelectedCQA(newProj.cqas[0].code);
-    }
+    hydrateProjectState(newProj, { warnANN: true });
   };
 
   // New Blank Project
@@ -350,7 +410,7 @@ export function App() {
       moleculeName: 'Hoạt chất mới (New Chemical Entity)',
       dosageForm: 'Viên nén bao phim',
       strength: '',
-      author: 'Tran Linh Nguyen',
+      author: project.author || 'Analyst',
       version: '1.0.0',
       createdDate: new Date().toISOString().slice(0, 10),
       updatedDate: new Date().toISOString().slice(0, 10),
@@ -416,35 +476,12 @@ export function App() {
 
     trackProjectAction('new');
     pendingAuditAction.current = 'Tạo project mới';
-    const normalized = normalizeProjectAnalysis(blankProject);
-    setProject(normalized);
-    setModelTypes({});
-    setNeuralTrainingMode('independent');
-    setSharedNeuralConfig({ ...DEFAULT_NEURAL_CONFIG });
-    setNeuralConfigs({});
-    setNeuralTrainingVersion(0);
-    setRestoredNeuralModels({});
-    setModelingEngine('polynomial');
-    setSelectedCQA('Y1');
-    setActiveTab('qtpp');
+    hydrateProjectState(blankProject, { defaultTab: 'qtpp' });
   };
 
   const handleRestoreProject = (snapshot: QBDProject) => {
     pendingAuditAction.current = 'Khôi phục snapshot lịch sử';
-    const normalized = normalizeProjectAnalysis(snapshot);
-    setProject(normalized);
-    setModelTypes(normalized.analysisSettings?.modelTypes ?? {});
-    setNeuralTrainingMode(normalized.analysisSettings?.neuralTrainingMode ?? 'independent');
-    setSharedNeuralConfig(normalized.analysisSettings?.sharedNeuralConfig ?? { ...DEFAULT_NEURAL_CONFIG });
-    setNeuralConfigs(normalized.analysisSettings?.neuralConfigs ?? {});
-    const artifact = normalized.analysisSettings?.neuralArtifacts;
-    setRestoredNeuralModels(artifact?.version === 1 &&
-      artifact.fingerprint === getNeuralArtifactFingerprint(normalized.factors, normalized.cqas, normalized.runs)
-      ? hydrateNeuralModels(artifact.models, normalized.factors, normalized.runs)
-      : {});
-    setNeuralTrainingVersion(0);
-    setModelingEngine(normalized.analysisSettings?.modelingEngine ?? 'polynomial');
-    setSelectedCQA(snapshot.cqas[0]?.code || 'Y1');
+    hydrateProjectState(snapshot);
   };
 
   // Save Project JSON
@@ -457,7 +494,7 @@ export function App() {
     a.href = url;
     a.download = projectFileName(project.name);
     a.click();
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   return (
@@ -503,6 +540,34 @@ export function App() {
           transition: 'opacity 0.15s ease',
         }}
       >
+        {project.isLocked && (
+          <div
+            className="qbd-card"
+            role="status"
+            style={{
+              backgroundColor: '#fef2f2',
+              border: '1.5px solid #f87171',
+              color: '#991b1b',
+              marginBottom: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0.75rem 1rem',
+              borderRadius: '0.5rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <span style={{ fontSize: '1.2rem' }}>🔒</span>
+              <div>
+                <strong>Hồ sơ đang khóa theo 21 CFR Part 11</strong>
+                <span style={{ fontSize: '0.82rem', marginLeft: '0.5rem', color: '#7f1d1d' }}>
+                  (Phê duyệt bởi: {project.lockDetails?.lockedBy || 'Approver'} lúc {project.lockDetails?.lockedAt ? new Date(project.lockDetails.lockedAt).toLocaleString('vi-VN') : ''} — {project.lockDetails?.reason || 'Đã ký duyệt'})
+                </span>
+              </div>
+            </div>
+            <span style={{ fontSize: '0.78rem', color: '#b91c1c', fontWeight: 600 }}>Chế độ chỉ đọc (Read-only)</span>
+          </div>
+        )}
         {storageWarning && <div className="qbd-card" role="alert" style={{ borderLeft: '4px solid #d97706', color: '#92400e', marginBottom: '1rem' }}>{storageWarning}</div>}
         <Suspense fallback={<div className="qbd-card" role="status" aria-live="polite">Đang tải mô-đun phân tích…</div>}>
           <ComponentErrorBoundary key={activeTab} fallbackTitle={`Sự cố khi tải tab ${activeTab.toUpperCase()}`}>
@@ -618,17 +683,24 @@ export function App() {
       </main>
 
       {/* Contextual Help Drawer (Right Sidebar Companion) */}
-      <HelpDrawer
-        isOpen={isHelpOpen}
-        onClose={() => setIsHelpOpen(false)}
-        activeTab={activeTab}
-        project={project}
-        modelingEngine={modelingEngine}
-        selectedCQA={selectedCQA}
-        onNavigateToTab={handleTabChange}
-        isPinned={isHelpPinned}
-        onTogglePin={() => setIsHelpPinned((prev) => !prev)}
-      />
+      {(isHelpOpen || isHelpPinned) && (
+        <Suspense fallback={null}>
+          <HelpDrawer
+            isOpen={isHelpOpen}
+            onClose={() => setIsHelpOpen(false)}
+            activeTab={activeTab}
+            project={project}
+            modelingEngine={modelingEngine}
+            selectedCQA={selectedCQA}
+            onNavigateToTab={handleTabChange}
+            isPinned={isHelpPinned}
+            onTogglePin={() => setIsHelpPinned((prev) => !prev)}
+          />
+        </Suspense>
+      )}
+
+      {/* R&D Data Privacy & Telemetry Consent Banner */}
+      <ConsentBanner />
 
       {/* Scientific Footer */}
       <footer style={{ borderTop: '1px solid #e2e8f0', backgroundColor: '#ffffff', padding: '1rem', marginTop: 'auto', textAlign: 'center', fontSize: '0.78rem', color: '#64748b' }}>

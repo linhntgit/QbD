@@ -183,6 +183,24 @@ describe('Phase 2: Monte Carlo Simulation & Ppk Metric (STAT-08 & PERF-01)', () 
     expect(asyncResult.cqaStats['Y1'].mean).toBe(syncResult.cqaStats['Y1'].mean);
     expect(asyncResult.cqaStats['Y1'].ppk).toBe(syncResult.cqaStats['Y1'].ppk);
   });
+
+  it('aborts async Monte Carlo simulation when AbortSignal is triggered', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      runMonteCarloSimulationAsync(
+        { X1: 70 },
+        [factor1],
+        [cqa1],
+        models,
+        2.0,
+        2000,
+        42,
+        undefined,
+        controller.signal
+      )
+    ).rejects.toThrow('Mô phỏng Monte Carlo đã bị hủy');
+  });
 });
 
 describe('Phase 2: ANN Early Stopping (STAT-07)', () => {

@@ -6,14 +6,18 @@
 
 ## Chức năng
 
-- Xây dựng **QTPP**, CQA, CMA và CPP; quản lý đánh giá rủi ro FMEA.
-- Tạo ma trận DoE: full/fractional factorial, Box–Behnken, CCD, D-optimal, mixture và combined mixture–process; thiết kế mixture–process có tùy chọn D-optimal 14/24/30 run theo mức độ mô hình.
-- Nhập/xuất bảng DoE bằng CSV UTF-8 tương thích Excel hoặc copy/paste trực tiếp từ Excel; không đọc workbook `.xlsx` nhị phân.
-- Phân tích hồi quy đa thức và ANOVA, bao gồm kiểm tra thiếu bậc tự do, đa cộng tuyến và tính khả định của mô hình.
-- Huấn luyện mô hình mạng nơ-ron theo từng CQA hoặc đa đầu ra.
-- Hiển thị response surface, contour/ternary plot, profiler, desirability và Design Space qua mô phỏng Monte Carlo.
-- Xác nhận phương án tối ưu bằng các mẻ/thí nghiệm độc lập: chốt điều kiện và ngưỡng sai lệch, nhập kết quả trực tiếp hoặc dán bảng tab từ Excel, so sánh thực nghiệm với dự đoán tại điều kiện thực tế, PI của mô hình OLS và giới hạn chất lượng. Hồ sơ được lưu cùng project và đưa vào báo cáo Word.
-- Tạo báo cáo phát triển theo cấu trúc CTD 3.2.P.2 và xuất Word.
+- Xây dựng **QTPP**, CQA, CMA và CPP; quản lý đánh giá rủi ro FMEA (ICH Q9).
+- Tạo ma trận DoE toàn diện: full/fractional factorial, Plackett–Burman, Definitive Screening Design (DSD - Jones & Nachtsheim 2011), Box–Behnken, CCD, D-optimal, mixture (Simplex Lattice, Centroid, Extreme Vertices) và combined mixture–process với ràng buộc đa diện Piepel (1983).
+- Nhập/xuất ma trận DoE bằng định dạng CSV UTF-8 BOM tương thích Excel và phần mềm thống kê (không phụ thuộc parser workbook nhị phân, phòng chống CSV Injection).
+- Phân tích hồi quy đa thức OLS và ANOVA Type I/III, kiểm tra thiếu độ phù hợp (Lack-of-Fit), kiểm tra độ cong (Curvature test), đa cộng tuyến (VIF) và tính khả định của mô hình.
+- Huấn luyện mô hình trí tuệ nhân tạo mạng nơ-ron (ANN MLP), máy vectơ hỗ trợ (SVR) và mô hình kết hợp (Ensemble Stacking) với tiêu chuẩn thông tin AICc (Hurvich–Tsai) và giải thích mô hình XAI (Garson, Olden, SHAP values).
+- Tối ưu hóa đa đáp ứng Derringer–Suich bằng thuật toán di truyền liên tục (Real-Coded GA + Nelder–Mead simplex local search).
+- Hiển thị response surface 2D/3D Plotly, contour/ternary plot, profiler dự đoán động, và đánh giá độ bền vững Design Space qua mô phỏng Monte Carlo 10.000+ lô ảo.
+- Quản trị GxP & Vết kiểm toán mật mã học (tham chiếu 21 CFR Part 11 / EU Annex 11): Lưu trữ phiên người dùng (Analyst / Reviewer / Approver), ký duyệt số WebCrypto ECDSA P-256, chuỗi băm SHA-256 phát hiện can thiệp và lưu trữ bền vững IndexedDB.
+- Huấn luyện nền Web Worker tránh nghẽn luồng giao diện người dùng.
+- Tôn trọng quyền riêng tư dữ liệu: Tích hợp Google Consent Mode v2 (mặc định từ chối telemetry).
+- Xác nhận phương án tối ưu bằng các mẻ/thí nghiệm độc lập: chốt điều kiện và ngưỡng sai lệch, so sánh thực nghiệm với khoảng dự đoán (PI 95%) và giới hạn chất lượng.
+- Xuất bản thảo báo cáo phát triển CTD 3.2.P.2 sang định dạng Word (.docx) và PDF lưu trữ (Archival PDF kèm siêu dữ liệu XMP).
 
 ## Case Study đi kèm
 
@@ -70,9 +74,11 @@ src/
 
 Kho đã có GitHub Actions để build và triển khai GitHub Pages khi có thay đổi trên nhánh `main`. Cần bật GitHub Pages trong phần Settings của repository nếu chưa được cấu hình.
 
-## Lưu ý khoa học
+## Lưu ý khoa học & Tuân thủ GxP (CSV / GAMP 5)
 
-Kết quả thống kê và Design Space phụ thuộc vào chất lượng, cỡ mẫu, thiết kế, phương pháp phân tích và giả định mô hình. Trước khi sử dụng cho mục đích GxP hoặc hồ sơ đăng ký, cần có đánh giá độc lập của chuyên gia phát triển dược phẩm và thống kê.
+Kết quả thống kê, tối ưu hóa và Design Space phụ thuộc vào chất lượng, cỡ mẫu, thiết kế, phương pháp phân tích và giả định mô hình. Trước khi sử dụng cho mục đích GxP hoặc hồ sơ đăng ký, cần có đánh giá độc lập của chuyên gia phát triển dược phẩm và thống kê.
+
+Ứng dụng **QbD Studio™** phiên bản client-side được thiết kế chuyên biệt cho mục đích **Nghiên cứu & Phát triển (Exploratory Formulation R&D)**. Ứng dụng tích hợp hỗ trợ quản trị GxP và vết kiểm toán mật mã học tham chiếu 21 CFR Part 11 / EU Annex 11, nhưng **không thay thế** hệ thống quản lý tài liệu điện tử (eDMS) hoặc LIMS đã được thẩm định GAMP 5/CSV đầy đủ của doanh nghiệp. Mọi dữ liệu hoặc báo cáo xuất ra cần được thẩm định nội bộ, ký ướt hoặc ký số trên hệ thống chính thức trước khi nộp cơ quan quản lý.
 
 Các dải được lưu từ Prediction Profiler là **provisional screening ranges**, không phải PAR đã xác nhận. PAR/Design Space chính thức cần đánh giá đa biến, uncertainty phù hợp, confirmation run độc lập và phê duyệt theo hệ thống chất lượng. OLS/ANOVA có biến giả cho hiệu ứng block cố định; đây không phải mô hình random-effects. Xem [báo cáo đối chiếu thống kê](STATISTICAL_AUDIT.md) để biết phạm vi kiểm chứng và giới hạn.
 

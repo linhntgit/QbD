@@ -13,4 +13,25 @@ export default defineConfig({
       ignored: ['**/*.pdf', '**/*.docx', '**/*.xlsx', '**/.git/**'],
     },
   },
+  build: {
+    chunkSizeWarningLimit: 1800,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/katex')) {
+            return 'katex-vendor';
+          }
+          if (id.includes('node_modules/docx')) {
+            return 'docx-vendor';
+          }
+          if (id.includes('node_modules/lucide-react')) {
+            return 'icons-vendor';
+          }
+          if (id.includes('node_modules/zod')) {
+            return 'zod-vendor';
+          }
+        },
+      },
+    },
+  },
 })
