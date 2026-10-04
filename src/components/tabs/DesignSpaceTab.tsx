@@ -178,6 +178,52 @@ export function render3DSweetSpotSurface(
   return [surfaceTrace, referencePlaneTrace];
 }
 
+function getSimulationKey(
+  targetActual: Record<string, number | string> | null | undefined,
+  batches: number,
+  variability: number,
+  engine: ModelingEngine,
+  customVariability?: MonteCarloCustomVariability | null
+): string | null {
+  if (!targetActual) return null;
+  const sortedFactors = Object.keys(targetActual)
+    .sort()
+    .map((k) => [k, targetActual[k]]);
+
+  const mode = customVariability?.mode ?? 'global';
+  let factorPart: [string, string, number][] | null = null;
+  let cqaPart: [string, boolean, string, number][] | null = null;
+
+  if (mode === 'component_wise') {
+    if (customVariability?.factorVariability) {
+      factorPart = Object.keys(customVariability.factorVariability)
+        .sort()
+        .map((k) => {
+          const cfg = customVariability.factorVariability![k];
+          return [k, cfg?.type ?? 'rsd', Number((cfg?.value ?? 0).toFixed(4))];
+        });
+    }
+    if (customVariability?.cqaMeasurementVariability) {
+      cqaPart = Object.keys(customVariability.cqaMeasurementVariability)
+        .sort()
+        .map((k) => {
+          const cfg = customVariability.cqaMeasurementVariability![k];
+          return [k, Boolean(cfg?.enabled), cfg?.type ?? 'rsd', Number((cfg?.value ?? 0).toFixed(4))];
+        });
+    }
+  }
+
+  return JSON.stringify([
+    sortedFactors,
+    Math.round(batches),
+    Number(variability.toFixed(2)),
+    engine,
+    mode,
+    factorPart,
+    cqaPart,
+  ]);
+}
+
 export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
   project,
   models,
@@ -431,9 +477,24 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
   const [mcResult, setMcResult] = useState<MonteCarloResult | null>(sharedMonteCarlo);
   const lastSharedMonteCarlo = useRef<MonteCarloResult | null>(sharedMonteCarlo);
   const [lastSimulationKey, setLastSimulationKey] = useState<string | null>(() => sharedMonteCarlo && sharedOptimum
-    ? JSON.stringify([sharedOptimum.actualFactors, monteCarloSimulations, monteCarloVariabilityPercent, modelingEngine, customVariabilityPayload]) : null);
+    ? getSimulationKey(
+        sharedOptimum.actualFactors,
+        monteCarloSimulations,
+        sharedMonteCarlo.variabilityPercent ?? monteCarloVariabilityPercent,
+        modelingEngine,
+        sharedMonteCarlo.customVariability ?? customVariabilityPayload
+      )
+    : null
+  );
   const currentSimulationKey = optimum
-    ? JSON.stringify([optimum.actualFactors, mcSimulations, mcVariability, modelingEngine, customVariabilityPayload]) : null;
+    ? getSimulationKey(
+        optimum.actualFactors,
+        mcSimulations,
+        mcVariability,
+        modelingEngine,
+        customVariabilityPayload
+      )
+    : null;
   const simulationNeedsRefresh = Boolean(mcResult && currentSimulationKey !== lastSimulationKey);
   const simulationTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const mcAbortControllerRef = useRef<AbortController | null>(null);
@@ -448,6 +509,14 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
     };
   }, [project.id, factors, cqas, models, monteCarloSeed]);
 
+  useEffect(() => {
+    const customVar = project.analysisProvenance?.monteCarloCustomVariability;
+    setFactorVariabilityMap(customVar?.factorVariability ?? defaultFactorVariability);
+    setCqaMeasurementVariabilityMap(customVar?.cqaMeasurementVariability ?? defaultCqaVariability);
+    setMcVariabilityMode(customVar?.mode ?? 'global');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.id]);
+
   const robustness = useMemo(
     () => optimum ? assessDesignSpaceRobustness(optimum.actualFactors, factors, cqas, models, simulationNeedsRefresh ? null : mcResult) : null,
     [optimum, factors, cqas, models, mcResult, simulationNeedsRefresh],
@@ -459,7 +528,26 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
     setOptimum(sharedOptimum);
     setMcResult(sharedMonteCarlo);
     if (sharedMonteCarlo && sharedOptimum && sharedMonteCarlo !== lastSharedMonteCarlo.current) {
-      setLastSimulationKey(JSON.stringify([sharedOptimum.actualFactors, monteCarloSimulations, monteCarloVariabilityPercent, modelingEngine]));
+      if (sharedMonteCarlo.customVariability) {
+        if (sharedMonteCarlo.customVariability.mode) {
+          setMcVariabilityMode(sharedMonteCarlo.customVariability.mode);
+        }
+        if (sharedMonteCarlo.customVariability.factorVariability) {
+          setFactorVariabilityMap(sharedMonteCarlo.customVariability.factorVariability);
+        }
+        if (sharedMonteCarlo.customVariability.cqaMeasurementVariability) {
+          setCqaMeasurementVariabilityMap(sharedMonteCarlo.customVariability.cqaMeasurementVariability);
+        }
+      }
+      setLastSimulationKey(
+        getSimulationKey(
+          sharedOptimum.actualFactors,
+          monteCarloSimulations,
+          sharedMonteCarlo.variabilityPercent ?? monteCarloVariabilityPercent,
+          modelingEngine,
+          sharedMonteCarlo.customVariability ?? customVariabilityPayload
+        )
+      );
     }
     if (!sharedMonteCarlo) setLastSimulationKey(null);
     lastSharedMonteCarlo.current = sharedMonteCarlo;
@@ -468,7 +556,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
     if (sharedOptimum) {
       setSliceFactorsCoded({ ...sharedOptimum.codedFactors });
     }
-  }, [sharedOptimum, sharedMonteCarlo, monteCarloVariabilityPercent, monteCarloSimulations, modelingEngine]);
+  }, [sharedOptimum, sharedMonteCarlo, monteCarloVariabilityPercent, monteCarloSimulations, modelingEngine, customVariabilityPayload]);
 
   // Execute Monte Carlo with non-blocking async execution (PERF-01)
   const executeSimulation = async (
@@ -485,7 +573,10 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
     setIsSimulating(true);
     setSimProgress(0);
 
-    const activeCustomVariability = customVariabilityOverride ?? customVariabilityPayload;
+    const activeCustomVariability: MonteCarloCustomVariability = customVariabilityOverride ?? {
+      ...customVariabilityPayload,
+      globalRSD: variability,
+    };
 
     try {
       const mc = await runMonteCarloSimulationAsync(
@@ -503,8 +594,10 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
         false,
         activeCustomVariability
       );
+      lastSharedMonteCarlo.current = mc;
       setMcResult(mc);
-      setLastSimulationKey(JSON.stringify([targetActual, batches, variability, modelingEngine, activeCustomVariability]));
+      const simKey = getSimulationKey(targetActual, batches, variability, modelingEngine, activeCustomVariability);
+      setLastSimulationKey(simKey);
       onMonteCarloResult(mc);
       if (project.analysisProvenance) {
         onUpdateProject({
