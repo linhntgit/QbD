@@ -1572,12 +1572,17 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 </div>
 
                 <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
-                  <strong style={{ color: '#b45309' }}>4. Khung "Mô Phỏng Độ Bền Vững Monte Carlo (ICH Q9 / Q10)":</strong>
+                  <strong style={{ color: '#b45309' }}>4. Khung "Mô Phỏng Độ Bền Vững Monte Carlo &amp; Phân Rã Phương Sai (ICH Q9 / ICH Q14)":</strong>
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
-                    <li><strong>Ô "Số lô mô phỏng ảo":</strong> Nhập số lượng lô ảo cần thử nghiệm (vd: 10.000 lô).</li>
-                    <li><strong>Ô "Độ biến thiên thiết bị/môi trường (RSD %)":</strong> Mức dao động dự kiến quanh điểm cài đặt (vd: &plusmn;2.0%).</li>
-                    <li><strong>Nút "▶ Chạy Mô Phỏng Monte Carlo":</strong> Lấy mẫu Gaussian cho biến liên tục; mẫu vượt miền khảo sát được ghi nhận là excursion và tính là thất bại.</li>
-                    <li><strong>Kết quả thu được:</strong> Reliability (%) là tỷ lệ lô ảo đạt tất cả CQA; PPM là số lô lỗi trên một triệu; Cpk phản ánh năng lực quy trình.</li>
+                    <li><strong>Bộ chuyển đổi chế độ biến thiên (Variability Mode):</strong>
+                      <ul style={{ paddingLeft: '1rem', marginTop: '0.2rem' }}>
+                        <li><em>RSD Chung (Global RSD):</em> Áp dụng cùng tỷ lệ phần trăm RSD (mặc định &plusmn;2.0%) cho tất cả các biến đầu vào liên tục.</li>
+                        <li><em>Từng Biến (ICH Q14 Component-wise &amp; Analytical Measurement Noise):</em> Thiết lập độ dao động độc lập cho từng yếu tố đầu vào (theo độ lệch chuẩn tuyệt đối SD hoặc theo % RSD tương đối quanh điểm tối ưu đã chọn). Đồng thời hỗ trợ kích hoạt sai số phép đo phân tích lặp lại của từng CQA (<InlineMath math="\sigma_{\text{meas}}" /> hoặc % RSD phép đo).</li>
+                      </ul>
+                    </li>
+                    <li><strong>Ô "Số lô mô phỏng ảo":</strong> Nhập số lượng lô ảo cần thử nghiệm (khuyến cáo: 5.000 – 10.000 lô).</li>
+                    <li><strong>Nút "▶ Chạy Mô Phỏng Monte Carlo":</strong> Lấy mẫu phân bố chuẩn quanh Setpoint đã chọn; tính toán phân bố CQA dự báo; nếu kích hoạt ICH Q14, cộng thêm nhiễu đo lường ngẫu nhiên; ghi nhận mẫu vượt miền khảo sát (excursion).</li>
+                    <li><strong>Kết quả thu được:</strong> Tỷ lệ đạt tiêu chuẩn (Reliability %), tỷ lệ lỗi CQA OOS (PPM), tỷ lệ rủi ro tổng hợp (PPM), chỉ số hiệu năng <InlineMath math="P_{pk}" /> (năng lực quy trình dài hạn <InlineMath math="C_{pk}" />), và bảng Phân rã phương sai chất lượng 3 thành phần (<InlineMath math="s^2_{\text{process}}, s^2_{\text{residual}}, s^2_{\text{meas}}" />).</li>
                   </ul>
                 </div>
               </div>
@@ -1606,12 +1611,26 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 <p>Nếu bất kỳ CQA nào có <InlineMath math="d_i = 0" /> (ngoài tiêu chuẩn) &rarr; <InlineMath math="D = 0" />.</p>
 
                 <p style={{ marginTop: '0.5rem' }}><strong>4. Mô Phỏng Monte Carlo Quanh Setpoint &amp; Chỉ Số Hiệu Năng Ppk / Năng Lực Cpk (Chuẩn 3&sigma;):</strong></p>
-                <BlockMath math="X_j \sim \mathcal{N}(\mu_{j, \text{setpoint}}, \, \sigma_j^2), \quad P_{pk} = \min\left( \frac{\text{USL} - \bar{Y}}{3s}, \, \frac{\bar{Y} - \text{LSL}}{3s} \right)" />
+                <BlockMath math="X_j \sim \mathcal{N}\left(\mu_{j, \text{setpoint}}, \, \sigma_{X_j}^2\right), \quad P_{pk} = \min\left( \frac{\text{USL} - \bar{Y}}{3s_{\text{total}}}, \, \frac{\bar{Y} - \text{LSL}}{3s_{\text{total}}} \right)" />
                 <p>
-                  Mô phỏng Monte Carlo lấy mẫu ngẫu nhiên hàng ngàn lô ảo dao động xung quanh <strong>Phương án tối ưu đã chọn (Target Setpoint)</strong>. Do đánh giá trên tập mẫu toàn bộ các lô mô phỏng, chỉ số thu được là <strong><InlineMath math="P_{pk}" /> (Process Performance Index)</strong> dựa trên độ lệch chuẩn mẫu <InlineMath math="s" />. Khi quy trình sản xuất ổn định và kiểm soát tốt, <InlineMath math="P_{pk}" /> phản ánh trực tiếp năng lực quy trình dài hạn <strong><InlineMath math="C_{pk}" /></strong>.
+                  Mô phỏng Monte Carlo lấy mẫu ngẫu nhiên hàng ngàn lô ảo dao động xung quanh <strong>Phương án tối ưu đã chọn (Target Setpoint)</strong>. Do đánh giá trên tập mẫu toàn bộ các lô mô phỏng, chỉ số thu được là <strong><InlineMath math="P_{pk}" /> (Process Performance Index)</strong> dựa trên độ lệch chuẩn tổng thể <InlineMath math="s_{\text{total}}" />. Khi quy trình sản xuất ổn định và kiểm soát tốt, <InlineMath math="P_{pk}" /> phản ánh trực tiếp năng lực quy trình dài hạn <strong><InlineMath math="C_{pk}" /></strong>.
                 </p>
                 <p>
-                  Chỉ số <InlineMath math="P_{pk} / C_{pk} = 1.0" /> về cơ bản là quy trình <strong>3 sigma (3&sigma;)</strong>, nghĩa là dự kiến có <strong>0.27%</strong> sản phẩm đầu ra (tương đương 2.700 PPM) nằm ngoài thông số kỹ thuật (OOS). Trong công nghiệp dược phẩm (ICH Q8/Q9), quy trình đạt năng lực tốt thường yêu cầu <InlineMath math="P_{pk} / C_{pk} \ge 1.33" /> (tương đương 4&sigma;, tỷ lệ lỗi &le; 0.0063% hay 63 PPM).
+                  Chỉ số <InlineMath math="P_{pk} / C_{pk} = 1.0" /> về cơ bản là quy trình <strong>3 sigma (3&sigma;)</strong>, nghĩa là dự kiến có <strong>0.27%</strong> sản phẩm đầu ra (tương đương 2.700 PPM) nằm ngoài thông số kỹ thuật (OOS). Trong công nghiệp dược phẩm (ICH Q8/Q9), quy trình đạt năng lực xuất sắc thường yêu cầu <InlineMath math="P_{pk} / C_{pk} \ge 1.33" /> (tương đương 4&sigma;, tỷ lệ lỗi &le; 0.0063% hay 63 PPM).
+                </p>
+
+                <p style={{ marginTop: '0.5rem' }}><strong>5. Mô Hình Phân Rã Phương Sai Chất Lượng 3 Thành Phần (ICH Q14 &amp; Six Sigma Variance Decomposition):</strong></p>
+                <BlockMath math="s^2_{\text{total}} = s^2_{\text{process}} + s^2_{\text{residual}} + s^2_{\text{meas}}" />
+                <p>
+                  Để bóc tách chính xác nguyên nhân gây biến thiên chất lượng theo hướng dẫn <strong>ICH Q14</strong> (Phát triển phương pháp phân tích) và <strong>USP &lang;1220&rang;</strong>, tổng phương sai được phân rã thành 3 cấu phần độc lập:
+                </p>
+                <ul style={{ paddingLeft: '1.2rem', marginTop: '0.2rem' }}>
+                  <li>• <strong><InlineMath math="s^2_{\text{process}}" /> (Phương sai quy trình):</strong> Biến thiên CQA do dao động của các yếu tố đầu vào (<InlineMath math="X_i" />) xung quanh setpoint.</li>
+                  <li>• <strong><InlineMath math="s^2_{\text{residual}}" /> (Sai số mô hình):</strong> Phương sai phần dư thực nghiệm của mô hình DoE/ANN (Model RMSE²), phản ánh độ bất định toán học.</li>
+                  <li>• <strong><InlineMath math="s^2_{\text{meas}}" /> (Nhiễu đo lường phân tích):</strong> Phương sai lặp lại của phương pháp thử nghiệm (<InlineMath math="\sigma_{\text{meas}}^2" />).</li>
+                </ul>
+                <p style={{ marginTop: '0.3rem' }}>
+                  <strong>Quy tắc diễn giải ICH Q14:</strong> Nếu tỷ lệ đóng góp của phương sai đo lường <InlineMath math="\frac{s^2_{\text{meas}}}{s^2_{\text{total}}} \ge 30\%" />, hệ thống sẽ đưa ra cảnh báo cần thẩm định hoặc cải tiến phương pháp phân tích (như tăng số lần tiêm mẫu, đổi cột sắc ký, hiệu chuẩn đầu dò) thay vì can thiệp vào công thức hoặc thiết bị sản xuất.
                 </p>
               </div>
             ),
@@ -1632,7 +1651,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
             id: 'glossary',
             title: 'Giải Thích Thuật Ngữ (Glossary & Terminology)',
             icon: BookOpen,
-            keywords: ['Design Space', '3D Surface', 'Dynamic Slicing', 'RCGA', 'Nelder-Mead', 'PAR', 'NOR', 'Desirability', 'Monte Carlo', 'Cpk', 'PPM', 'Sweet Spot'],
+            keywords: ['Design Space', '3D Surface', 'Dynamic Slicing', 'RCGA', 'Nelder-Mead', 'PAR', 'NOR', 'Desirability', 'Monte Carlo', 'Cpk', 'PPM', 'Sweet Spot', 'Variance Decomposition', 'Analytical Measurement Noise'],
             content: (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
                 <GlossaryTermCard
@@ -1724,6 +1743,24 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   tagColor="danger"
                   definition="Số lượng lô hoặc sản phẩm dự báo vượt ngoài giới hạn tiêu chuẩn chất lượng trên một triệu đơn vị sản xuất, ước tính từ kết quả mô phỏng ngẫu nhiên Monte Carlo."
                 />
+                <GlossaryTermCard
+                  term="Variance Decomposition (ICH Q14)"
+                  vietnamese="Phân rã phương sai chất lượng (ICH Q14)"
+                  tag="Phân Tích Biến Thiên"
+                  tagColor="teal"
+                  definition={
+                    <>
+                      Kỹ thuật thống kê bóc tách tổng phương sai quan sát được thành 3 thành phần độc lập: <InlineMath math="s^2_{\text{total}} = s^2_{\text{process}} + s^2_{\text{residual}} + s^2_{\text{meas}}" />. Giúp phân định rạch ròi biến thiên thực tế của dây chuyền sản xuất so với sai số của mô hình toán học và sai số từ phương pháp thử nghiệm trong phòng kiểm nghiệm.
+                    </>
+                  }
+                />
+                <GlossaryTermCard
+                  term="Analytical Measurement Noise (σ_meas)"
+                  vietnamese="Sai số phép đo phân tích lặp lại"
+                  tag="ICH Q14 / USP <1220>"
+                  tagColor="primary"
+                  definition="Độ biến thiên ngẫu nhiên vốn có của phương pháp phân tích kiểm nghiệm (ví dụ HPLC, đo độ hòa tan UV-Vis). Theo ICH Q14, việc đưa độ không đảm bảo đo vào mô phỏng giúp đánh giá chính xác năng lực quy trình thực chất và phát hiện sớm các phương pháp thử có độ lặp lại kém (đóng góp ≥ 30% phương sai)."
+                />
               </div>
             ),
           },
@@ -1812,7 +1849,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                     <li><strong>6b. Đánh Giá Rủi Ro Sau DoE:</strong> Bảng cập nhật rủi ro FMEA dựa trên bằng chứng thực nghiệm đã thu được.</li>
                     <li><strong>6c. Thí nghiệm xác nhận phương án tối ưu:</strong> Điều kiện thực hiện, nguồn mô hình, số mẻ; dự đoán và trung bình thực tế ± SD, bias, RMSE; kết luận riêng về tiêu chuẩn, ngưỡng sai lệch thực tiễn, khoảng dự đoán và tương đương. Có chi tiết và cảnh báo theo từng mẻ; nếu chưa tạo hồ sơ, báo cáo ghi rõ chưa có dữ liệu xác nhận.</li>
                     <li><strong>7. Chiến Lược Kiểm Soát Toàn Diện (ICH Q10):</strong> Phân loại CMA, CPP, IPC, tiêu chuẩn xuất xưởng thành phẩm, dải vận hành thường quy (NOR) và dải chứng minh chấp nhận được (PAR).</li>
-                    <li><strong>8. Độ Bền Vững Quy Trình (Monte Carlo):</strong> Kết quả mô phỏng 10.000 lô ảo, độ tin cậy phần trăm (Reliability %), chỉ số năng lực quy trình Cpk và tỷ lệ lỗi PPM.</li>
+                    <li><strong>8. Độ Bền Vững Quy Trình (Monte Carlo &amp; Phân Rã Phương Sai ICH Q14):</strong> Kết quả mô phỏng hàng ngàn lô ảo theo chế độ RSD chung hoặc từng biến; bảng đánh giá năng lực &amp; hiệu năng quy trình từng CQA (Ppk/Cpk) đối chiếu mốc chuẩn 3σ (0.27% lỗi / 2.700 PPM) và chuẩn dược phẩm 4σ (≥ 1.33 / ≤ 63 PPM); bảng phân rã phương sai thành phần (s²process, s²residual, s²meas) cùng khuyến cáo thẩm định phương pháp phân tích theo ICH Q14.</li>
                     <li><strong>9. Ký Duyệt Điện Tử &amp; Audit Trail:</strong> Bảng biểu chữ ký điện tử 3 cấp độ (Analyst, Reviewer, Approver) tuân thủ 21 CFR Part 11 và sổ cái chuỗi khối bất biến.</li>
                     <li><strong>Quản Trị Dự Án &amp; Lịch Sử Phiên Bản:</strong> Tạo snapshot lưu trữ, đối chiếu sai khác và kiểm tra tính toàn vẹn chuỗi kiểm toán.</li>
                   </ol>
@@ -1899,7 +1936,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                     <li>✓ Có đủ số liệu thực nghiệm cho tất cả các CQA trong bảng DoE Runs.</li>
                     <li>✓ Tất cả CQA đều đã được xây dựng mô hình toán học hợp lệ (đầy đủ bậc tự do, không bị lỗi tính toán).</li>
                     <li>✓ Đã thực hiện tối ưu hóa Desirability và tìm ra nghiệm thỏa dụng toàn cục khả thi (<InlineMath math="D &gt; 0" />).</li>
-                    <li>✓ Đã hoàn thành phân tích mô phỏng Monte Carlo đánh giá độ bền vững và chỉ số Cpk quy trình.</li>
+                    <li>✓ Đã hoàn thành phân tích mô phỏng Monte Carlo đánh giá độ bền vững và chỉ số năng lực/hiệu năng quy trình (Ppk/Cpk).</li>
                   </ul>
                 </div>
               </div>

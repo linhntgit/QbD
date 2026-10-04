@@ -121,7 +121,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
       {
         id: 'sec-8',
         title: '8. Độ Bền Vững Monte Carlo',
-        subtitle: monteCarlo ? `Đạt ${monteCarlo.reliabilityPercent}%` : 'Chưa chạy mô phỏng',
+        subtitle: monteCarlo ? `Đạt ${monteCarlo.reliabilityPercent}% (${monteCarlo.customVariability?.mode === 'component_wise' ? 'ICH Q14' : 'RSD chung'})` : 'Chưa chạy mô phỏng',
         icon: Activity,
         badge: monteCarlo ? 'Risk' : 'Pending',
       },
@@ -1412,20 +1412,185 @@ export const ReportTab: React.FC<ReportTabProps> = ({
           </div>
         </div>
 
-        {/* 8. Monte Carlo Reliability */}
+        {/* 8. Monte Carlo Reliability & Variance Decomposition (ICH Q9 / ICH Q14) */}
         <div id="sec-8" className="report-section" style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
-            8. Đánh Giá Độ Bền Vững Miền Dự Báo (Mô Phỏng Monte Carlo, tham chiếu ICH Q9)
+            8. Đánh Giá Độ Bền Vững Miền Dự Báo (Mô Phỏng Monte Carlo &amp; Phân Rã Phương Sai, tham chiếu ICH Q9 &amp; ICH Q14)
           </h2>
           {monteCarlo ? (
-            <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '0.5rem', padding: '1rem', fontSize: '0.85rem', color: '#14532d' }}>
-              <div style={{ marginBottom: '0.3rem' }}>• Tổng số lô mô phỏng ảo: <strong>{monteCarlo.simulations.toLocaleString()} lô</strong></div>
-              <div style={{ marginBottom: '0.3rem' }}>• Tỷ lệ mẫu đạt tiêu chí của các CQA đã mô hình hóa: <strong style={{ color: '#15803d', fontSize: '0.95rem' }}>{monteCarlo.reliabilityPercent}%</strong></div>
-              <div style={{ marginBottom: '0.3rem' }}>• CQA đã mô hình hóa: <strong>{monteCarlo.modeledCqaCodes.join(', ') || 'Không có'}</strong></div>
-              <div style={{ marginBottom: '0.3rem', color: monteCarlo.unmodeledCqaCodes.length ? '#b45309' : 'inherit' }}>• CQA chưa được bao phủ: <strong>{monteCarlo.unmodeledCqaCodes.join(', ') || 'Không có'}</strong></div>
-              <div style={{ marginBottom: '0.3rem' }}>• Mẫu vượt miền khảo sát (Excursion): <strong>{monteCarlo.excursionCount.toLocaleString()} ({monteCarlo.excursionRatePercent}%)</strong></div>
-              <div style={{ marginBottom: '0.3rem' }}>• Tỷ lệ lỗi chỉ tiêu chất lượng (CQA OOS): <strong>{(monteCarlo.cqaDefectRatePPM ?? monteCarlo.defectRatePPM).toLocaleString()} PPM</strong></div>
-              <div>• Tỷ lệ rủi ro tổng hợp (gồm cả lỗi CQA và vượt miền): <strong>{monteCarlo.defectRatePPM.toLocaleString()} PPM</strong></div>
+            <div>
+              {/* Summary Banner with Mode Badge */}
+              {(() => {
+                const isGlobal = monteCarlo.customVariability?.mode !== 'component_wise';
+                const modeText = isGlobal
+                  ? `Chế độ RSD Chung (Global RSD ±${monteCarlo.variabilityPercent ?? 2.0}%)`
+                  : 'Chế độ Từng Biến (Component-wise & Analytical Measurement Noise - ICH Q14)';
+                return (
+                  <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '0.5rem', padding: '1rem', fontSize: '0.85rem', color: '#14532d', marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.6rem' }}>
+                      <span className="badge badge-teal" style={{ fontSize: '0.75rem', fontWeight: 600, padding: '0.3rem 0.6rem' }}>
+                        ⚙ {modeText}
+                      </span>
+                      <span style={{ fontSize: '0.8rem', color: '#166534', fontWeight: 600 }}>
+                        Số lô mô phỏng ảo: <strong>{monteCarlo.simulations.toLocaleString()} lô</strong>
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem', marginTop: '0.5rem' }}>
+                      <div style={{ backgroundColor: '#ffffff', padding: '0.6rem 0.8rem', borderRadius: '0.375rem', border: '1px solid #dcfce7' }}>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Tỷ lệ đạt chuẩn CQA mô hình</div>
+                        <div style={{ fontSize: '1.1rem', fontWeight: 700, color: monteCarlo.reliabilityPercent >= 99 ? '#15803d' : '#b91c1c' }}>
+                          {monteCarlo.reliabilityPercent}%
+                        </div>
+                        <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                          Lỗi CQA: <strong>{(monteCarlo.cqaDefectRatePPM ?? monteCarlo.defectRatePPM).toLocaleString()} PPM</strong>
+                        </div>
+                      </div>
+
+                      <div style={{ backgroundColor: '#ffffff', padding: '0.6rem 0.8rem', borderRadius: '0.375rem', border: '1px solid #dcfce7' }}>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Rủi ro tổng hợp (kèm Excursions)</div>
+                        <div style={{ fontSize: '1.1rem', fontWeight: 700, color: monteCarlo.defectRatePPM <= 63 ? '#15803d' : monteCarlo.defectRatePPM <= 2700 ? '#0d9488' : '#b45309' }}>
+                          {monteCarlo.defectRatePPM.toLocaleString()} PPM
+                        </div>
+                        <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                          Vượt miền: <strong>{monteCarlo.excursionCount.toLocaleString()} ({monteCarlo.excursionRatePercent}%)</strong>
+                        </div>
+                      </div>
+
+                      <div style={{ backgroundColor: '#ffffff', padding: '0.6rem 0.8rem', borderRadius: '0.375rem', border: '1px solid #dcfce7' }}>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Phạm vi CQA mô hình hóa</div>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#1e3a8a', marginTop: '0.2rem' }}>
+                          {monteCarlo.modeledCqaCodes.join(', ') || 'Không có'}
+                        </div>
+                        {monteCarlo.unmodeledCqaCodes.length > 0 && (
+                          <div style={{ fontSize: '0.7rem', color: '#b45309', marginTop: '0.2rem' }}>
+                            Chưa bao phủ: {monteCarlo.unmodeledCqaCodes.join(', ')}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Table 1: Per-CQA Capability & Performance Table (Ppk / Cpk) */}
+              {monteCarlo.cqaStats && Object.keys(monteCarlo.cqaStats).length > 0 && (
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a', marginBottom: '0.4rem' }}>
+                    Bảng Năng Lực &amp; Hiệu Năng Quy Trình Theo Từng CQA (Ppk / Cpk Benchmarks):
+                  </h3>
+                  <div className="table-container">
+                    <table className="qbd-table">
+                      <thead>
+                        <tr style={{ backgroundColor: '#f1f5f9' }}>
+                          <th>Chỉ Tiêu CQA</th>
+                          <th>Trung Bình ± SD</th>
+                          <th>Hiệu Năng Ppk (Cpk)</th>
+                          <th>Ngoài Chuẩn (% OOS)</th>
+                          <th>Đánh Giá 6σ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(monteCarlo.cqaStats).map(([code, stats]) => {
+                          const cqa = project.cqas.find((c) => c.code === code);
+                          const p = stats.ppk ?? stats.cpk;
+                          let ratingBadge = <span className="badge badge-danger">Chưa đạt 3σ (&gt;0.27% lỗi)</span>;
+                          if (p !== undefined) {
+                            if (p >= 1.33) {
+                              ratingBadge = <span className="badge badge-success">Đạt 4σ (Dược phẩm)</span>;
+                            } else if (p >= 1.0) {
+                              ratingBadge = <span className="badge badge-teal">Đạt 3σ (0.27% lỗi)</span>;
+                            }
+                          }
+                          return (
+                            <tr key={code}>
+                              <td style={{ fontWeight: '600' }}>
+                                {cqa ? cqa.name : code} <span style={{ color: '#64748b', fontSize: '0.75rem' }}>({code})</span>
+                              </td>
+                              <td className="font-mono">
+                                {stats.mean.toFixed(2)} ± {stats.sd.toFixed(2)}
+                              </td>
+                              <td className="font-mono font-bold" style={{ color: p !== undefined && p >= 1.33 ? '#15803d' : p !== undefined && p >= 1.0 ? '#0f766e' : '#b91c1c' }}>
+                                Ppk = {stats.ppk !== undefined ? stats.ppk : 'N/A'}
+                                {stats.cpk !== undefined ? ` (Cpk: ${stats.cpk})` : ''}
+                              </td>
+                              <td className="font-mono" style={{ color: stats.outOfSpecPercent > 0 ? '#b91c1c' : '#15803d' }}>
+                                {stats.outOfSpecPercent}%
+                              </td>
+                              <td>{ratingBadge}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.35rem', fontStyle: 'italic' }}>
+                    * Mốc chuẩn 6σ: Ppk ≥ 1.33 tương đương mức 4σ (tỷ lệ lỗi ≤ 63 PPM) khuyến cáo cho sản xuất dược phẩm; Ppk = 1.0 tương đương quy trình 3σ với tỷ lệ lỗi kỳ vọng 0.27% (2.700 PPM).
+                  </div>
+                </div>
+              )}
+
+              {/* Table 2: Variance Decomposition Table (ICH Q14) */}
+              {monteCarlo.varianceDecomposition && Object.keys(monteCarlo.varianceDecomposition).length > 0 && (
+                <div style={{ marginBottom: '1rem' }}>
+                  <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a', marginBottom: '0.4rem' }}>
+                    Bảng Phân Rã Phương Sai Chất Lượng (Variance Decomposition - ICH Q14 / Six Sigma):
+                  </h3>
+                  <p style={{ fontSize: '0.78rem', color: '#475569', marginBottom: '0.5rem' }}>
+                    Phân tích đóng góp phương sai thành phần: Phương sai quy trình (Process Variance <span className="font-mono">s²<sub>process</sub></span>), Sai số mô hình (Model Residual <span className="font-mono">s²<sub>residual</sub></span>), và Sai số phép đo phân tích lặp lại (Analytical Measurement Noise <span className="font-mono">s²<sub>meas</sub></span> - ICH Q14) theo công thức <span className="font-mono font-bold">s²<sub>total</sub> = s²<sub>process</sub> + s²<sub>residual</sub> + s²<sub>meas</sub></span>.
+                  </p>
+                  <div className="table-container">
+                    <table className="qbd-table">
+                      <thead>
+                        <tr style={{ backgroundColor: '#f1f5f9' }}>
+                          <th>Chỉ Tiêu CQA</th>
+                          <th>Phương Sai Tổng (s²<sub>total</sub>)</th>
+                          <th>Quy Trình (Process %)</th>
+                          <th>Mô Hình (Residual %)</th>
+                          <th>Đo Lường (Meas %)</th>
+                          <th>Khuyến Cáo ICH Q14</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(monteCarlo.varianceDecomposition).map(([code, d]) => {
+                          const cqa = project.cqas.find((c) => c.code === code);
+                          const isMeasHigh = d.measurementPercent >= 30;
+                          return (
+                            <tr key={code}>
+                              <td style={{ fontWeight: '600' }}>
+                                {cqa ? cqa.name : code} <span style={{ color: '#64748b', fontSize: '0.75rem' }}>({code})</span>
+                              </td>
+                              <td className="font-mono font-bold" style={{ color: '#0f172a' }}>
+                                {d.totalVariance.toFixed(4)}
+                              </td>
+                              <td className="font-mono" style={{ color: '#15803d' }}>
+                                {d.processPercent}% <span style={{ fontSize: '0.7rem', color: '#64748b' }}>(s²={d.processVariance.toFixed(4)})</span>
+                              </td>
+                              <td className="font-mono" style={{ color: '#2563eb' }}>
+                                {d.modelPercent}% <span style={{ fontSize: '0.7rem', color: '#64748b' }}>(s²={d.modelResidualVariance.toFixed(4)})</span>
+                              </td>
+                              <td className="font-mono" style={{ color: isMeasHigh ? '#b45309' : '#0f766e' }}>
+                                {d.measurementPercent}% <span style={{ fontSize: '0.7rem', color: '#64748b' }}>(s²={d.measurementVariance.toFixed(4)})</span>
+                              </td>
+                              <td>
+                                {isMeasHigh ? (
+                                  <span className="badge badge-warning" style={{ fontSize: '0.7rem', whiteSpace: 'normal', textAlign: 'left' }}>
+                                    ⚠ Cần thẩm định lại PPPT (nhiễu đo ≥ 30%)
+                                  </span>
+                                ) : (
+                                  <span className="badge badge-success" style={{ fontSize: '0.7rem' }}>
+                                    ✓ Đạt; quy trình chi phối chính
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div style={{ backgroundColor: '#f8fafc', border: '1px dashed #94a3b8', borderRadius: '0.5rem', padding: '1rem', fontSize: '0.85rem', color: '#475569' }}>
@@ -1433,7 +1598,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                 ⏳ Chưa thực hiện mô phỏng Monte Carlo để xác nhận độ bền vững miền dự báo.
               </div>
               <div>
-                Chuyển sang <strong>Bước 7 (Không gian Thiết kế)</strong>, chọn số lô và mức biến thiên rồi bấm <strong>Chạy Mô Phỏng</strong>. Kết quả mô phỏng cần được đọc cùng dữ liệu thí nghiệm xác nhận và phạm vi mô hình đã kiểm tra.
+                Theo khuyến cáo ICH Q9 &amp; US FDA, chuyển sang <strong>Bước 7 (Không gian Thiết kế)</strong>, chọn chế độ biến thiên (RSD chung hoặc từng biến theo ICH Q14) và bấm <strong>Chạy Mô Phỏng</strong> (5.000 – 10.000 lô ảo) để ước lượng tỷ lệ lỗi (Defect Rate PPM), chỉ số hiệu năng Ppk/Cpk và đánh giá rủi ro trước khi chuyển giao sản xuất. Kết quả mô phỏng cần được đọc cùng dữ liệu thí nghiệm xác nhận và phạm vi mô hình đã kiểm tra.
               </div>
             </div>
           )}
