@@ -8,7 +8,7 @@ import type {
 let workerInstance: Worker | null = null;
 let currentTaskId: string | null = null;
 
-function serializeModelsForWorker(models: Record<string, StatisticalModelResult | NeuralNetModelResult>) {
+export function serializeModelsForWorker(models: Record<string, StatisticalModelResult | NeuralNetModelResult>) {
   const serialized: Record<string, any> = {};
 
   Object.entries(models).forEach(([code, m]) => {

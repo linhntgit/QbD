@@ -63,14 +63,7 @@ export const hydrateNeuralModels = (
   const expectedInputs = [...features.map((feature) => feature.name), ...blockFeatures.map((block) => `Block ${block}`)];
   return Object.fromEntries(Object.entries(artifacts).flatMap(([code, artifact]) => {
     if (artifact.inputFactorCodes.join('|') !== expectedInputs.join('|')) return [];
-    const { W1, b1, W2, b2, WOut, bOut } = artifact.weights;
-    const activation = artifact.config.activation;
-    const predict = (coded: Record<string, number>): number => {
-      const input = [...features.map((feature) => feature.evaluator(coded)), ...blockFeatures.map(() => 0)];
-      const layer1 = b1.map((bias, j) => activate(bias + input.reduce((sum, value, k) => sum + value * W1[k][j], 0), activation));
-      const last = W2 && b2 ? b2.map((bias, j) => activate(bias + layer1.reduce((sum, value, k) => sum + value * W2[k][j], 0), activation)) : layer1;
-      return (bOut + last.reduce((sum, value, k) => sum + value * WOut[k][0], 0)) * artifact.normParams.ySd + artifact.normParams.yMean;
-    };
+    const predict = createNeuralPredictor(artifact, factors);
     return [[code, { ...artifact, predict }]];
   }));
 };
@@ -178,7 +171,7 @@ function randomNormal(rng: () => number, mean: number = 0, std: number = 1): num
 /**
  * Activation function evaluation and its derivative
  */
-function activate(x: number, func: NeuralActivation): number {
+export function activate(x: number, func: NeuralActivation): number {
   switch (func) {
     case 'tanh':
       return Math.tanh(x);
@@ -210,6 +203,105 @@ function activateDerivative(x: number, a: number, func: NeuralActivation): numbe
     default:
       return 1 - a * a;
   }
+}
+
+/**
+ * Reconstruct a callable prediction function for a trained or serialized neural network model.
+ * Handles both 1-layer and 2-layer architectures, all activation functions,
+ * continuous/mixture/categorical factors, and block reference effects.
+ */
+export function createNeuralPredictor(
+  model: {
+    weights: NeuralLayerWeights;
+    config?: Partial<NeuralNetConfig>;
+    inputFactorCodes?: string[];
+    normParams?: {
+      xMeans?: number[];
+      xSds?: number[];
+      yMean?: number;
+      ySd?: number;
+    };
+  },
+  factors?: Factor[]
+): (coded: Record<string, number>) => number {
+  const { W1, b1, W2, b2, WOut, bOut } = model.weights || ({} as NeuralLayerWeights);
+  const act: NeuralActivation = model.config?.activation ?? 'tanh';
+  const yMean = Number.isFinite(model.normParams?.yMean) ? model.normParams!.yMean! : 0;
+  const ySd = Number.isFinite(model.normParams?.ySd) ? model.normParams!.ySd! : 1;
+  const inputCodes = model.inputFactorCodes ?? [];
+  const numInputs = W1?.length ?? 0;
+  const h1 = b1?.length ?? 0;
+  const hasLayer2 = Boolean(W2 && b2 && W2.length >= h1 && b2.length > 0);
+  const h2 = b2?.length ?? 0;
+  const lastHidden = hasLayer2 ? h2 : h1;
+
+  if (numInputs === 0 || h1 === 0 || !WOut) {
+    return () => yMean;
+  }
+
+  let featureMap: Map<string, (coded: Record<string, number>) => number> | null = null;
+  if (factors && factors.length > 0) {
+    const activeFactors = factors.filter((f) => f.controllability !== 'constant');
+    const features = buildFactorFeatures(activeFactors);
+    featureMap = new Map();
+    for (const feat of features) {
+      featureMap.set(feat.name, feat.evaluator);
+    }
+  }
+
+  return (coded: Record<string, number>): number => {
+    // 1. Build input vector
+    const xVec = new Array<number>(numInputs);
+    for (let k = 0; k < numInputs; k++) {
+      const code = inputCodes[k];
+      if (code !== undefined && featureMap?.has(code)) {
+        xVec[k] = featureMap.get(code)!(coded);
+      } else if (code && code.startsWith('Block ')) {
+        xVec[k] = 0;
+      } else if (code && code in coded) {
+        xVec[k] = coded[code] ?? 0;
+      } else {
+        xVec[k] = 0;
+      }
+    }
+
+    // 2. Hidden Layer 1
+    const a1 = new Array<number>(h1);
+    for (let j = 0; j < h1; j++) {
+      let sum = b1[j];
+      for (let k = 0; k < numInputs; k++) {
+        sum += xVec[k] * W1[k][j];
+      }
+      a1[j] = activate(sum, act);
+    }
+
+    // 3. Hidden Layer 2 (if present)
+    let aLast = a1;
+    if (hasLayer2 && W2 && b2) {
+      const a2 = new Array<number>(h2);
+      for (let j = 0; j < h2; j++) {
+        let sum = b2[j];
+        for (let k = 0; k < h1; k++) {
+          sum += a1[k] * W2[k][j];
+        }
+        a2[j] = activate(sum, act);
+      }
+      aLast = a2;
+    }
+
+    // 4. Output Layer
+    const rawBOut = bOut as number | number[] | undefined;
+    const singleBOut = Array.isArray(rawBOut) ? (rawBOut[0] ?? 0) : (typeof rawBOut === 'number' ? rawBOut : 0);
+    let predNorm = singleBOut;
+    for (let k = 0; k < lastHidden; k++) {
+      const row = WOut[k] as number[] | number | undefined;
+      const wVal = Array.isArray(row) ? (row[0] ?? 0) : (typeof row === 'number' ? row : 0);
+      predNorm += aLast[k] * wVal;
+    }
+
+    // 5. Denormalize
+    return predNorm * ySd + yMean;
+  };
 }
 
 /**

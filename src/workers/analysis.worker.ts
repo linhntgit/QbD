@@ -1,9 +1,13 @@
 import { runMonteCarloSimulation, optimizeDesirability } from '../services/statistics';
+import { createNeuralPredictor } from '../services/neuralNetwork';
 import type { Factor, CQA, StatisticalModelResult, NeuralNetModelResult } from '../types/qbd';
 import type { WorkerRequestMessage, WorkerResponseMessage } from './workerProtocol';
 
 // Helper to rebuild callable predict function from serialized model payload
-function rebuildModels(modelsPayload: Record<string, any>): Record<string, StatisticalModelResult | NeuralNetModelResult> {
+export function rebuildModels(
+  modelsPayload: Record<string, any>,
+  factors?: Factor[]
+): Record<string, StatisticalModelResult | NeuralNetModelResult> {
   const result: Record<string, any> = {};
 
   Object.entries(modelsPayload).forEach(([code, m]) => {
@@ -56,8 +60,12 @@ function rebuildModels(modelsPayload: Record<string, any>): Record<string, Stati
           return sum;
         },
       };
+    } else if (m.kind === 'ann' || m.weights) {
+      result[code] = {
+        ...m,
+        predict: createNeuralPredictor(m, factors),
+      };
     } else {
-      // Rebuild ANN prediction if weights exist
       result[code] = m;
     }
   });
@@ -65,56 +73,58 @@ function rebuildModels(modelsPayload: Record<string, any>): Record<string, Stati
   return result;
 }
 
-self.onmessage = (event: MessageEvent<WorkerRequestMessage>) => {
-  const { taskId, type, payload } = event.data;
+if (typeof self !== 'undefined') {
+  self.onmessage = (event: MessageEvent<WorkerRequestMessage>) => {
+    const { taskId, type, payload } = event.data;
 
-  try {
-    if (type === 'MONTE_CARLO') {
-      const { setpointActual, factors, cqas, modelsPayload, variabilityPercent, simulations, seed, twoStageMonteCarlo } = payload;
-      const reconstructedModels = rebuildModels(modelsPayload);
+    try {
+      if (type === 'MONTE_CARLO') {
+        const { setpointActual, factors, cqas, modelsPayload, variabilityPercent, simulations, seed, twoStageMonteCarlo } = payload;
+        const reconstructedModels = rebuildModels(modelsPayload, factors as Factor[]);
 
-      // Report initial progress
-      const progressMsg: WorkerResponseMessage = { taskId, type: 'PROGRESS', progress: 5 };
-      self.postMessage(progressMsg);
+        // Report initial progress
+        const progressMsg: WorkerResponseMessage = { taskId, type: 'PROGRESS', progress: 5 };
+        self.postMessage(progressMsg);
 
-      const result = runMonteCarloSimulation(
-        setpointActual,
-        factors as Factor[],
-        cqas as CQA[],
-        reconstructedModels,
-        variabilityPercent,
-        simulations,
-        seed,
-        (progress) => {
-          const pMsg: WorkerResponseMessage = { taskId, type: 'PROGRESS', progress };
-          self.postMessage(pMsg);
-        },
-        Boolean(twoStageMonteCarlo)
-      );
+        const result = runMonteCarloSimulation(
+          setpointActual,
+          factors as Factor[],
+          cqas as CQA[],
+          reconstructedModels,
+          variabilityPercent,
+          simulations,
+          seed,
+          (progress) => {
+            const pMsg: WorkerResponseMessage = { taskId, type: 'PROGRESS', progress };
+            self.postMessage(pMsg);
+          },
+          Boolean(twoStageMonteCarlo)
+        );
 
-      const successMsg: WorkerResponseMessage = { taskId, type: 'SUCCESS', result };
-      self.postMessage(successMsg);
-    } else if (type === 'OPTIMIZE_DESIRABILITY') {
-      const { factors, cqas, modelsPayload, options, seed } = payload;
-      const reconstructedModels = rebuildModels(modelsPayload);
+        const successMsg: WorkerResponseMessage = { taskId, type: 'SUCCESS', result };
+        self.postMessage(successMsg);
+      } else if (type === 'OPTIMIZE_DESIRABILITY') {
+        const { factors, cqas, modelsPayload, options, seed } = payload;
+        const reconstructedModels = rebuildModels(modelsPayload, factors as Factor[]);
 
-      const result = optimizeDesirability(
-        factors as Factor[],
-        cqas as CQA[],
-        reconstructedModels,
-        options,
-        seed
-      );
+        const result = optimizeDesirability(
+          factors as Factor[],
+          cqas as CQA[],
+          reconstructedModels,
+          options,
+          seed
+        );
 
-      const successMsg: WorkerResponseMessage = { taskId, type: 'SUCCESS', result };
-      self.postMessage(successMsg);
+        const successMsg: WorkerResponseMessage = { taskId, type: 'SUCCESS', result };
+        self.postMessage(successMsg);
+      }
+    } catch (error) {
+      const errorMsg: WorkerResponseMessage = {
+        taskId,
+        type: 'ERROR',
+        error: error instanceof Error ? error.message : String(error),
+      };
+      self.postMessage(errorMsg);
     }
-  } catch (error) {
-    const errorMsg: WorkerResponseMessage = {
-      taskId,
-      type: 'ERROR',
-      error: error instanceof Error ? error.message : String(error),
-    };
-    self.postMessage(errorMsg);
-  }
-};
+  };
+}

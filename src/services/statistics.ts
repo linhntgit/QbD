@@ -1669,11 +1669,9 @@ export function optimizeDesirabilityGA(
     const model = models[cqa.code];
     const val = model.predict(bestCoded);
     const statisticalModel = 'predictStandardError' in model ? model : undefined;
-    const se = statisticalModel?.predictStandardError?.(bestCoded)
-      ?? (model as any).diagnostics?.stdDev
-      ?? (model as any).diagnostics?.rmseVal
-      ?? (model as any).diagnostics?.rmseOverall
-      ?? 0;
+    const diag = (model as any).diagnostics;
+    const seCandidates = [statisticalModel?.predictStandardError?.(bestCoded), diag?.stdDev, diag?.rmseVal, diag?.rmseOverall, 0];
+    const se = seCandidates.find((v) => typeof v === 'number' && Number.isFinite(v) && v >= 0) ?? 0;
     const df = statisticalModel?.residualDegreesOfFreedom;
     const critical = df && df > 0 ? tDistributionCritical(0.05, df) : Number.NaN;
     const ciHalfWidth = Number.isFinite(critical) && statisticalModel?.predictStandardError ? critical * se : Number.NaN;
@@ -1995,7 +1993,9 @@ export function runMonteCarloSimulation(
     for (let cqaIndex = 0; cqaIndex < validCQAs.length; cqaIndex++) {
       const cqa = validCQAs[cqaIndex];
       const model = models[cqa.code];
-      const residualStd = (model.diagnostics as any).stdDev ?? (model.diagnostics as any).rmseVal ?? (model.diagnostics as any).rmseOverall ?? 0.1;
+      const diag = (model.diagnostics as any) ?? {};
+      const residualStdCandidates = [diag.stdDev, diag.rmseVal, diag.rmseOverall, 0.1];
+      const residualStd = residualStdCandidates.find((v) => typeof v === 'number' && Number.isFinite(v) && v >= 0) ?? 0.1;
       const meanPredictionSE = 'predictStandardError' in model ? model.predictStandardError?.(sampleCoded) ?? 0 : 0;
       if (!Number.isFinite(residualStd) || residualStd < 0 || !Number.isFinite(meanPredictionSE)) {
         throw new Error(`Invalid uncertainty estimate for ${cqa.code}.`);

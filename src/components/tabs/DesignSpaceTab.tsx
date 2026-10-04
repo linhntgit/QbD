@@ -549,9 +549,10 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
           const sePred = 'predictStandardError' in model && typeof model.predictStandardError === 'function'
             ? model.predictStandardError(pointCoded)
             : 0;
+          const diag = model.diagnostics as any;
           const msResidual = 'anova' in model
             ? (model.anova.find((a) => a.source.startsWith('Residual'))?.ms ?? 0.01)
-            : ((model.diagnostics as any)?.rmseVal ?? 0.1);
+            : (Number.isFinite(diag?.rmseVal) ? diag.rmseVal : Number.isFinite(diag?.rmseOverall) ? diag.rmseOverall : 0.1);
           const dfResidual = 'residualDegreesOfFreedom' in model ? model.residualDegreesOfFreedom ?? 10 : 10;
           const cqaMargin = calculateProbabilisticCQAMargin(
             yPred,

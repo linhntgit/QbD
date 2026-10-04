@@ -122,7 +122,9 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
       const model = models[cqa.code];
       const val = model.predict(currentCoded);
       const statisticalModel = 'predictStandardError' in model ? model : undefined;
-      const se = statisticalModel?.predictStandardError?.(currentCoded) ?? (model.diagnostics as any)?.rmseOverall ?? (model.diagnostics as any)?.rmseVal ?? 0;
+      const diag = (model.diagnostics as any);
+      const seCandidates = [statisticalModel?.predictStandardError?.(currentCoded), diag?.rmseOverall, diag?.rmseVal, 0];
+      const se = seCandidates.find((v) => typeof v === 'number' && Number.isFinite(v) && v >= 0) ?? 0;
       const df = statisticalModel?.residualDegreesOfFreedom;
       const critical = df ? tDistributionCritical(0.05, df) : Number.NaN;
       const halfWidth = statisticalModel && Number.isFinite(critical) ? critical * se : Number.NaN;
