@@ -692,7 +692,7 @@ export function fitModel(
   return {
     cqaCode: cqa.code,
     modelType,
-    predictionCovariance: invXTX.slice(0, terms.length).map((row) => row.slice(0, terms.length).map((value) => value * msResidual)),
+    predictionCovariance: invXTX.map((row) => row.map((value) => value * msResidual)),
     terms: regressionTerms,
     anova,
     type3Anova,
@@ -1304,6 +1304,42 @@ export function optimizeDesirabilityGA(
 
   if (hasMixture && !isFeasibleBoundedMixture(mixLowProps, mixHighProps)) return null;
 
+  // Robust set-point margin: an optimum on the boundary of the studied region
+  // puts ~50% of normally distributed batches outside the knowledge space.
+  // Keep continuous process factors ≥ k·processSD inside the bounds (capped at
+  // half of the half-range so the search region never collapses).
+  const robustSigma = Math.max(0, options?.robustMarginSigma ?? 3);
+  const robustCodedMargin = new Map<string, number>();
+  procFactors.forEach((f) => {
+    if (isDiscreteFactor(f) || !(typeof f.processSD === 'number' && f.processSD > 0)) return;
+    const half = (f.high - f.low) / 2;
+    if (!(half > 0)) return;
+    robustCodedMargin.set(f.code, Math.min(0.5, (robustSigma * f.processSD) / half));
+  });
+
+  const robustMixLow = [...mixLowProps];
+  const robustMixHigh = [...mixHighProps];
+  if (hasMixture && robustSigma > 0) {
+    const candidateLow = mixFactors.map((f, i) => {
+      if (typeof f.processSD === 'number' && f.processSD > 0) {
+        const sdProp = f.high <= 1.0 && f.unit !== '%' ? f.processSD : f.processSD / 100;
+        return mixLowProps[i] + robustSigma * sdProp;
+      }
+      return mixLowProps[i];
+    });
+    const candidateHigh = mixFactors.map((f, i) => {
+      if (typeof f.processSD === 'number' && f.processSD > 0) {
+        const sdProp = f.high <= 1.0 && f.unit !== '%' ? f.processSD : f.processSD / 100;
+        return mixHighProps[i] - robustSigma * sdProp;
+      }
+      return mixHighProps[i];
+    });
+    if (isFeasibleBoundedMixture(candidateLow, candidateHigh)) {
+      candidateLow.forEach((v, i) => { robustMixLow[i] = v; });
+      candidateHigh.forEach((v, i) => { robustMixHigh[i] = v; });
+    }
+  }
+
   // Feasibility repair operator R(x)
   const repairCandidate = (raw: Record<string, number>): Record<string, number> => {
     const repaired: Record<string, number> = {};
@@ -1320,15 +1356,16 @@ export function optimizeDesirabilityGA(
         repaired[f.code] = snapFactorCoded(val, f);
       } else if (f.role !== 'mixture_component' && f.type !== 'Mixture') {
         const val = raw[f.code] ?? 0;
-        repaired[f.code] = Math.max(-1.0, Math.min(1.0, val));
+        const margin = robustCodedMargin.get(f.code) ?? 0;
+        repaired[f.code] = Math.max(-1.0 + margin, Math.min(1.0 - margin, val));
       } else {
         repaired[f.code] = raw[f.code] ?? 0;
       }
     });
 
     if (hasMixture) {
-      const rawMix = mixFactors.map((f) => repaired[f.code] ?? (mixLowProps[0] + mixHighProps[0]) / 2);
-      const proj = projectToBoundedMixture(rawMix, mixLowProps, mixHighProps, 1.0);
+      const rawMix = mixFactors.map((f, i) => repaired[f.code] ?? (robustMixLow[i] + robustMixHigh[i]) / 2);
+      const proj = projectToBoundedMixture(rawMix, robustMixLow, robustMixHigh, 1.0);
       mixFactors.forEach((f, i) => {
         repaired[f.code] = proj[i];
       });
@@ -1361,8 +1398,8 @@ export function optimizeDesirabilityGA(
     seedCenter[f.code] = lockedFactors?.[f.code] ?? 0.0;
   });
   if (hasMixture) {
-    const rawMid = mixFactors.map((f, i) => lockedFactors?.[f.code] ?? (mixLowProps[i] + mixHighProps[i]) / 2);
-    const projMid = projectToBoundedMixture(rawMid, mixLowProps, mixHighProps, 1.0);
+    const rawMid = mixFactors.map((f, i) => lockedFactors?.[f.code] ?? (robustMixLow[i] + robustMixHigh[i]) / 2);
+    const projMid = projectToBoundedMixture(rawMid, robustMixLow, robustMixHigh, 1.0);
     mixFactors.forEach((f, i) => { seedCenter[f.code] = projMid[i]; });
   }
   population.push(repairCandidate(seedCenter));
@@ -1396,8 +1433,8 @@ export function optimizeDesirabilityGA(
         const u = lhs[r][idx]; // in [0, 1]
         if (f.role === 'mixture_component' || f.type === 'Mixture') {
           const mIdx = mixFactors.indexOf(f);
-          const low = mIdx >= 0 ? mixLowProps[mIdx] : 0;
-          const high = mIdx >= 0 ? mixHighProps[mIdx] : 1;
+          const low = mIdx >= 0 ? robustMixLow[mIdx] : 0;
+          const high = mIdx >= 0 ? robustMixHigh[mIdx] : 1;
           candidate[f.code] = low + u * (high - low);
         } else if (isDiscreteFactor(f)) {
           const codes = getConfiguredFactorCodes(f);
@@ -1696,6 +1733,7 @@ export function runMonteCarloSimulation(
   const unmodeledCqaCodes = cqas.filter((cqa) => !models[cqa.code]).map((cqa) => cqa.code);
   let passCount = 0;
   let failCount = 0;
+  let cqaFailCount = 0;
   let excursionCount = 0;
 
   const cqaValues: Record<string, number[]> = {};
@@ -1807,11 +1845,11 @@ export function runMonteCarloSimulation(
         const model = models[cqa.code];
         const pChol = cqaParamCholesky[cqaIdx];
         if (pChol && 'terms' in model && model.terms) {
-          const p = model.terms.length;
+          const p = Math.min(model.terms.length, pChol.length);
           const z = Array.from({ length: p }, () => standardNormal());
           const delta = new Array(p).fill(0);
           for (let i = 0; i < p; i++) {
-            delta[i] = pChol[i].reduce((sum, coef, j) => sum + coef * z[j], 0);
+            delta[i] = pChol[i].slice(0, p).reduce((sum, coef, j) => sum + coef * z[j], 0);
           }
           return delta;
         }
@@ -1948,7 +1986,7 @@ export function runMonteCarloSimulation(
 
     // 3. Evaluate each CQA with True Gaussian Model Residual Noise
     if (batchOutsideSurveyRegion) excursionCount++;
-    let batchPass = !batchOutsideSurveyRegion;
+    let batchCqaPass = true;
     const correlatedZ = new Array(validCQAs.length).fill(0);
     const independentZ = validCQAs.map(() => standardNormal());
     for (let i = 0; i < cholesky.length; i++) {
@@ -1971,8 +2009,11 @@ export function runMonteCarloSimulation(
           for (let k = 0; k < delta.length; k++) {
             const term = model.terms[k];
             let termVal = 1;
-            if (term.name !== 'Intercept' && term.name !== '(Intercept)') {
-              if (term.factorCodes && term.power) {
+            if (term.name.startsWith('Block ')) {
+              // Block dummies are 0 at the reference (normal operating) block.
+              termVal = 0;
+            } else if (term.name !== 'Intercept' && term.name !== '(Intercept)') {
+              if (term.factorCodes && term.factorCodes.length > 0 && term.power) {
                 termVal = term.factorCodes.reduce(
                   (prod, code, pIdx) => prod * Math.pow(sampleCoded[code] ?? 0, term.power[pIdx] ?? 1),
                   1
@@ -2001,19 +2042,23 @@ export function runMonteCarloSimulation(
       cqaValues[cqa.code].push(yPred);
 
       if (cqa.lowerLimit !== undefined && yPred < cqa.lowerLimit) {
-        batchPass = false;
+        batchCqaPass = false;
       }
       if (cqa.upperLimit !== undefined && yPred > cqa.upperLimit) {
-        batchPass = false;
+        batchCqaPass = false;
       }
-      if (cqa.objective === 'pass_category' && yPred < 90) batchPass = false;
+      if (cqa.objective === 'pass_category' && yPred < 90) batchCqaPass = false;
     }
 
-    if (batchPass) passCount++;
+    if (!batchCqaPass) cqaFailCount++;
+    // Fail-closed total: a batch outside the studied region is unverified and
+    // therefore counted as failed, in addition to CQA spec failures.
+    if (batchCqaPass && !batchOutsideSurveyRegion) passCount++;
     else failCount++;
   }
 
   const defectRatePPM = Math.round((failCount / simulations) * 1_000_000);
+  const cqaDefectRatePPM = Math.round((cqaFailCount / simulations) * 1_000_000);
   const reliabilityPercent = Number(((passCount / simulations) * 100).toFixed(2));
   const excursionRatePercent = Number(((excursionCount / simulations) * 100).toFixed(3));
 
@@ -2075,6 +2120,8 @@ export function runMonteCarloSimulation(
     excursionRatePercent,
     passCount,
     failCount,
+    cqaFailCount,
+    cqaDefectRatePPM,
     defectRatePPM,
     reliabilityPercent,
     executionTimeMs,

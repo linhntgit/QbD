@@ -345,6 +345,10 @@ export interface MonteCarloResult {
   passCount: number;
   failCount: number;
   defectRatePPM: number;
+  /** Batches whose predicted CQAs fall outside specification (excursions not counted unless CQA also fails). */
+  cqaFailCount?: number;
+  /** CQA out-of-specification rate (PPM), consistent with the per-CQA Ppk statistics. */
+  cqaDefectRatePPM?: number;
   reliabilityPercent: number;
   executionTimeMs?: number;
   cqaStats: Record<string, {
@@ -453,6 +457,13 @@ export interface GeneticOptimizerOptions {
   polishWithNelderMead?: boolean;
   nelderMeadMaxIterations?: number;
   seed?: number;
+  /**
+   * Robust set-point margin (ICH Q8 NOR inside PAR): keep continuous process
+   * factors at least `robustMarginSigma × processSD` away from the studied
+   * bounds so normal operating variability stays inside the knowledge space.
+   * Default 3 (±3σ). Set 0 to allow edge-of-region optima.
+   */
+  robustMarginSigma?: number;
 }
 
 export interface PiepelBoundsResult {

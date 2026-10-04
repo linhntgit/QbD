@@ -2066,22 +2066,22 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
               </div>
 
               <div style={{ backgroundColor: '#f8fafc', borderRadius: '0.5rem', padding: '0.85rem', border: '1px solid #cbd5e1' }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#475569' }}>TỶ LỆ LỖI DỰ KIẾN (DEFECT RATE)</div>
-                <div style={{ fontSize: '1.6rem', fontWeight: '800', color: mcResult.defectRatePPM < 1000 ? '#15803d' : '#dc2626', margin: '0.2rem 0' }}>
-                  {mcResult.defectRatePPM.toLocaleString()} PPM
+                <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#475569' }}>TỶ LỆ LỖI CHỈ TIÊU (CQA DEFECT RATE)</div>
+                <div style={{ fontSize: '1.6rem', fontWeight: '800', color: (mcResult.cqaDefectRatePPM ?? mcResult.defectRatePPM) < 1000 ? '#15803d' : '#dc2626', margin: '0.2rem 0' }}>
+                  {(mcResult.cqaDefectRatePPM ?? mcResult.defectRatePPM).toLocaleString()} PPM
                 </div>
                 <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                  {((mcResult.failCount / mcResult.simulations) * 100).toFixed(3)}% ngoài tiêu chuẩn (OOS)
+                  {(((mcResult.cqaFailCount ?? mcResult.failCount) / mcResult.simulations) * 100).toFixed(3)}% ngoài tiêu chuẩn (OOS)
                 </div>
               </div>
 
               <div style={{ backgroundColor: mcResult.excursionCount > 0 ? '#fff7ed' : '#f0fdf4', borderRadius: '0.5rem', padding: '0.85rem', border: '1px solid #cbd5e1' }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#475569' }}>EXCURSION NGOÀI VÙNG KHẢO SÁT</div>
+                <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#475569' }}>DAO ĐỘNG NGOÀI VÙNG KHẢO SÁT</div>
                 <div style={{ fontSize: '1.35rem', fontWeight: '800', color: mcResult.excursionCount > 0 ? '#c2410c' : '#15803d', margin: '0.2rem 0' }}>
                   {mcResult.excursionRatePercent}%
                 </div>
                 <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                  {mcResult.excursionCount.toLocaleString()} lô được tính là thất bại; model không ngoại suy ngoài vùng đã khảo sát.
+                  {mcResult.excursionCount.toLocaleString()} lô vượt biên DoE; model không ngoại suy ngoài vùng kiểm chứng.
                 </div>
               </div>
 

@@ -1423,8 +1423,9 @@ export const ReportTab: React.FC<ReportTabProps> = ({
               <div style={{ marginBottom: '0.3rem' }}>• Tỷ lệ mẫu đạt tiêu chí của các CQA đã mô hình hóa: <strong style={{ color: '#15803d', fontSize: '0.95rem' }}>{monteCarlo.reliabilityPercent}%</strong></div>
               <div style={{ marginBottom: '0.3rem' }}>• CQA đã mô hình hóa: <strong>{monteCarlo.modeledCqaCodes.join(', ') || 'Không có'}</strong></div>
               <div style={{ marginBottom: '0.3rem', color: monteCarlo.unmodeledCqaCodes.length ? '#b45309' : 'inherit' }}>• CQA chưa được bao phủ: <strong>{monteCarlo.unmodeledCqaCodes.join(', ') || 'Không có'}</strong></div>
-              <div style={{ marginBottom: '0.3rem' }}>• Mẫu vượt miền khảo sát: <strong>{monteCarlo.excursionCount.toLocaleString()} ({monteCarlo.excursionRatePercent}%)</strong></div>
-              <div>• Tỷ lệ lỗi dự kiến trong điều kiện mô phỏng (Defect Rate): <strong>{monteCarlo.defectRatePPM.toLocaleString()} PPM</strong></div>
+              <div style={{ marginBottom: '0.3rem' }}>• Mẫu vượt miền khảo sát (Excursion): <strong>{monteCarlo.excursionCount.toLocaleString()} ({monteCarlo.excursionRatePercent}%)</strong></div>
+              <div style={{ marginBottom: '0.3rem' }}>• Tỷ lệ lỗi chỉ tiêu chất lượng (CQA OOS): <strong>{(monteCarlo.cqaDefectRatePPM ?? monteCarlo.defectRatePPM).toLocaleString()} PPM</strong></div>
+              <div>• Tỷ lệ rủi ro tổng hợp (gồm cả lỗi CQA và vượt miền): <strong>{monteCarlo.defectRatePPM.toLocaleString()} PPM</strong></div>
             </div>
           ) : (
             <div style={{ backgroundColor: '#f8fafc', border: '1px dashed #94a3b8', borderRadius: '0.5rem', padding: '1rem', fontSize: '0.85rem', color: '#475569' }}>
