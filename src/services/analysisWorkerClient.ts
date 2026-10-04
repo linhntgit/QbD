@@ -1,4 +1,4 @@
-import type { Factor, CQA, MonteCarloResult, StatisticalModelResult, NeuralNetModelResult } from '../types/qbd';
+import type { Factor, CQA, MonteCarloResult, StatisticalModelResult, NeuralNetModelResult, MonteCarloCustomVariability } from '../types/qbd';
 import type {
   WorkerRequestMessage,
   WorkerResponseMessage,
@@ -90,9 +90,11 @@ export async function runMonteCarloInWorker(
     simulations?: number,
     seed?: number,
     onProgress?: (progressPercent: number) => void,
-    twoStageMonteCarlo?: boolean
+    twoStageMonteCarlo?: boolean,
+    customVariability?: MonteCarloCustomVariability
   ) => MonteCarloResult,
-  twoStageMonteCarlo?: boolean
+  twoStageMonteCarlo?: boolean,
+  customVariability?: MonteCarloCustomVariability
 ): Promise<MonteCarloResult> {
   const worker = getWorker();
 
@@ -111,7 +113,8 @@ export async function runMonteCarloInWorker(
       simulations,
       seed,
       onProgress,
-      twoStageMonteCarlo
+      twoStageMonteCarlo,
+      customVariability
     );
     onProgress?.(100);
     return result;
@@ -129,6 +132,7 @@ export async function runMonteCarloInWorker(
     simulations,
     seed,
     twoStageMonteCarlo,
+    customVariability,
   };
 
   const request: WorkerRequestMessage = {

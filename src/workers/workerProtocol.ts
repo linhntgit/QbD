@@ -1,4 +1,4 @@
-import type { Factor, CQA, MonteCarloResult, DesirabilitySolution } from '../types/qbd';
+import type { Factor, CQA, MonteCarloResult, DesirabilitySolution, MonteCarloCustomVariability } from '../types/qbd';
 
 export type WorkerTaskType = 'MONTE_CARLO' | 'OPTIMIZE_DESIRABILITY';
 
@@ -21,6 +21,7 @@ export interface MonteCarloTaskPayload {
   simulations: number;
   seed: number;
   twoStageMonteCarlo?: boolean;
+  customVariability?: MonteCarloCustomVariability;
 }
 
 export interface WorkerRequestMessage {

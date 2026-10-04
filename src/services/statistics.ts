@@ -10,6 +10,8 @@ import type {
   NeuralNetModelResult,
   DesirabilitySolution,
   MonteCarloResult,
+  MonteCarloCustomVariability,
+  MonteCarloVarianceDecomposition,
   UpdatedRiskItem,
   ControlStrategyItem,
   QBDProject,
@@ -1720,8 +1722,12 @@ export function runMonteCarloSimulation(
   simulations: number = 10000,
   seed: number = 20260827,
   onProgress?: (progressPercent: number) => void,
-  twoStageMonteCarlo: boolean = false
+  twoStageMonteCarlo: boolean = false,
+  customVariability?: MonteCarloCustomVariability
 ): MonteCarloResult {
+  if (customVariability && customVariability.mode === 'global' && Number.isFinite(customVariability.globalRSD)) {
+    variabilityPercent = customVariability.globalRSD;
+  }
   simulations = Math.max(100, Math.min(100_000, Math.round(Number.isFinite(simulations) ? simulations : 10_000)));
   variabilityPercent = Math.max(0.1, Math.min(15, Number.isFinite(variabilityPercent) ? variabilityPercent : 2));
   const startTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -1735,8 +1741,14 @@ export function runMonteCarloSimulation(
   let excursionCount = 0;
 
   const cqaValues: Record<string, number[]> = {};
+  const cqaModelValues: Record<string, number[]> = {};
+  const cqaResidualErrors: Record<string, number[]> = {};
+  const cqaMeasurementErrors: Record<string, number[]> = {};
   validCQAs.forEach((c) => {
     cqaValues[c.code] = [];
+    cqaModelValues[c.code] = [];
+    cqaResidualErrors[c.code] = [];
+    cqaMeasurementErrors[c.code] = [];
   });
 
   const mixFactors = factors.filter((f) => f.role === 'mixture_component' || f.type === 'Mixture');
@@ -1892,9 +1904,26 @@ export function runMonteCarloSimulation(
             ? f.center
             : (f.low + f.high) / 2;
       const scale = Math.max(Math.abs(mean), Math.abs(f.high - f.low) / 2);
-      const sd = f.processSD !== undefined && Number.isFinite(f.processSD) && f.processSD > 0
-        ? f.processSD * (variabilityPercent / 2.0)
-        : Math.max(1e-5, scale * (variabilityPercent / 100.0));
+      let sd: number;
+      if (customVariability?.mode === 'component_wise') {
+        if (customVariability.factorVariability?.[f.code]) {
+          const cfg = customVariability.factorVariability[f.code];
+          sd = cfg.type === 'sd' ? Math.max(1e-5, cfg.value) : Math.max(1e-5, scale * (cfg.value / 100.0));
+        } else if (f.variabilityType === 'sd' && f.processSD !== undefined && Number.isFinite(f.processSD) && f.processSD > 0) {
+          sd = Math.max(1e-5, f.processSD);
+        } else if (f.variabilityType === 'rsd' && f.processRSD !== undefined && Number.isFinite(f.processRSD) && f.processRSD > 0) {
+          sd = Math.max(1e-5, scale * (f.processRSD / 100.0));
+        } else if (f.processSD !== undefined && Number.isFinite(f.processSD) && f.processSD > 0) {
+          sd = f.processSD * (variabilityPercent / 2.0);
+        } else {
+          sd = Math.max(1e-5, scale * (variabilityPercent / 100.0));
+        }
+      } else {
+        // Global RSD mode: variabilityPercent dynamically scales process variance
+        sd = f.processSD !== undefined && Number.isFinite(f.processSD) && f.processSD > 0
+          ? f.processSD * (variabilityPercent / 2.0)
+          : Math.max(1e-5, scale * (variabilityPercent / 100.0));
+      }
 
       // Stochastic factor sampling (STAT-03: Normal, Lognormal, Uniform, Triangular per ICH Q9)
       // Draw the physical process without truncation. An excursion outside the
@@ -1941,9 +1970,26 @@ export function runMonteCarloSimulation(
           : (rawMean !== undefined && rawMean !== null && Number.isFinite(Number(rawMean)))
             ? Number(rawMean)
             : (f.low + f.high) / 2; // mean in %
-        const sd = f.processSD !== undefined && Number.isFinite(f.processSD) && f.processSD > 0
-          ? f.processSD * (variabilityPercent / 2.0)
-          : Math.max(1e-5, mean * (variabilityPercent / 100.0));
+        let sd: number;
+        if (customVariability?.mode === 'component_wise') {
+          if (customVariability.factorVariability?.[f.code]) {
+            const cfg = customVariability.factorVariability[f.code];
+            sd = cfg.type === 'sd' ? Math.max(1e-5, cfg.value) : Math.max(1e-5, mean * (cfg.value / 100.0));
+          } else if (f.variabilityType === 'sd' && f.processSD !== undefined && Number.isFinite(f.processSD) && f.processSD > 0) {
+            sd = Math.max(1e-5, f.processSD);
+          } else if (f.variabilityType === 'rsd' && f.processRSD !== undefined && Number.isFinite(f.processRSD) && f.processRSD > 0) {
+            sd = Math.max(1e-5, mean * (f.processRSD / 100.0));
+          } else if (f.processSD !== undefined && Number.isFinite(f.processSD) && f.processSD > 0) {
+            sd = f.processSD * (variabilityPercent / 2.0);
+          } else {
+            sd = Math.max(1e-5, mean * (variabilityPercent / 100.0));
+          }
+        } else {
+          // Global RSD mode
+          sd = f.processSD !== undefined && Number.isFinite(f.processSD) && f.processSD > 0
+            ? f.processSD * (variabilityPercent / 2.0)
+            : Math.max(1e-5, mean * (variabilityPercent / 100.0));
+        }
 
         let actualVal: number;
         if (f.distribution && f.distribution !== 'Normal') {
@@ -2000,10 +2046,11 @@ export function runMonteCarloSimulation(
       if (!Number.isFinite(residualStd) || residualStd < 0 || !Number.isFinite(meanPredictionSE)) {
         throw new Error(`Invalid uncertainty estimate for ${cqa.code}.`);
       }
-      let yPred: number;
+      let yPredMean: number;
+      let residualNoise: number;
       if (twoStageMonteCarlo) {
         // Stage 1: Response mean under realized parameter draw
-        let yPredMean = model.predict(sampleCoded);
+        yPredMean = model.predict(sampleCoded);
         const delta = currentBetaShift[cqaIndex];
         if (delta && delta.length > 0 && 'terms' in model && model.terms) {
           for (let k = 0; k < delta.length; k++) {
@@ -2031,15 +2078,35 @@ export function runMonteCarloSimulation(
           }
         }
         // Stage 2: Batch process noise with residual covariance
-        const batchProcessNoise = residualStd * correlatedZ[cqaIndex];
-        yPred = yPredMean + batchProcessNoise;
+        residualNoise = residualStd * correlatedZ[cqaIndex];
       } else {
+        yPredMean = model.predict(sampleCoded);
         const noiseStd = Math.sqrt(residualStd * residualStd + meanPredictionSE * meanPredictionSE);
-        const resError = noiseStd * correlatedZ[cqaIndex];
-        yPred = model.predict(sampleCoded) + resError;
+        residualNoise = noiseStd * correlatedZ[cqaIndex];
       }
+
+      // 4. Analytical Measurement Noise (ICH Q14 / USP <1220>)
+      let measSD = 0;
+      if (customVariability?.mode === 'component_wise' && customVariability.cqaMeasurementVariability?.[cqa.code]) {
+        const cqaVar = customVariability.cqaMeasurementVariability[cqa.code];
+        if (cqaVar.enabled && cqaVar.value > 0) {
+          measSD = cqaVar.type === 'sd' ? cqaVar.value : Math.abs(yPredMean) * (cqaVar.value / 100.0);
+        }
+      } else if (cqa.includeMeasurementNoise) {
+        if (cqa.measurementVariabilityType === 'sd' && cqa.measurementSD !== undefined && cqa.measurementSD > 0) {
+          measSD = cqa.measurementSD;
+        } else if (cqa.measurementRSD !== undefined && cqa.measurementRSD > 0) {
+          measSD = Math.abs(yPredMean) * (cqa.measurementRSD / 100.0);
+        }
+      }
+      const measNoise = measSD > 0 ? standardNormal() * measSD : 0;
+      const yPred = yPredMean + residualNoise + measNoise;
+
       if (!Number.isFinite(yPred)) throw new Error(`Non-finite prediction for ${cqa.code}.`);
       cqaValues[cqa.code].push(yPred);
+      cqaModelValues[cqa.code].push(yPredMean);
+      cqaResidualErrors[cqa.code].push(residualNoise);
+      cqaMeasurementErrors[cqa.code].push(measNoise);
 
       if (cqa.lowerLimit !== undefined && yPred < cqa.lowerLimit) {
         batchCqaPass = false;
@@ -2105,6 +2172,41 @@ export function runMonteCarloSimulation(
     };
   });
 
+  const varianceDecomposition: Record<string, MonteCarloVarianceDecomposition> = {};
+  validCQAs.forEach((cqa) => {
+    const vals = cqaValues[cqa.code];
+    const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const sd = Math.sqrt(vals.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / Math.max(1, vals.length - 1));
+    const varTotal = Math.pow(sd, 2);
+
+    const modelVals = cqaModelValues[cqa.code];
+    const meanModel = modelVals.reduce((a, b) => a + b, 0) / modelVals.length;
+    const varProcess = modelVals.reduce((sum, v) => sum + Math.pow(v - meanModel, 2), 0) / Math.max(1, modelVals.length - 1);
+
+    const resVals = cqaResidualErrors[cqa.code];
+    const meanRes = resVals.reduce((a, b) => a + b, 0) / resVals.length;
+    const varResidual = resVals.reduce((sum, v) => sum + Math.pow(v - meanRes, 2), 0) / Math.max(1, resVals.length - 1);
+
+    const measVals = cqaMeasurementErrors[cqa.code];
+    const meanMeas = measVals.reduce((a, b) => a + b, 0) / measVals.length;
+    const varMeas = measVals.reduce((sum, v) => sum + Math.pow(v - meanMeas, 2), 0) / Math.max(1, measVals.length - 1);
+
+    const varSum = varProcess + varResidual + varMeas;
+    const processPercent = varSum > 0 ? Number(((varProcess / varSum) * 100).toFixed(1)) : 0;
+    const modelPercent = varSum > 0 ? Number(((varResidual / varSum) * 100).toFixed(1)) : 0;
+    const measurementPercent = varSum > 0 ? Number(((varMeas / varSum) * 100).toFixed(1)) : 0;
+
+    varianceDecomposition[cqa.code] = {
+      processVariance: Number(varProcess.toFixed(4)),
+      modelResidualVariance: Number(varResidual.toFixed(4)),
+      measurementVariance: Number(varMeas.toFixed(4)),
+      totalVariance: Number(varTotal.toFixed(4)),
+      processPercent,
+      modelPercent,
+      measurementPercent,
+    };
+  });
+
   const endTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
   const executionTimeMs = Number((endTime - startTime).toFixed(2));
   onProgress?.(100);
@@ -2126,6 +2228,8 @@ export function runMonteCarloSimulation(
     reliabilityPercent,
     executionTimeMs,
     cqaStats,
+    varianceDecomposition,
+    customVariability,
   };
 }
 
@@ -2144,7 +2248,8 @@ export async function runMonteCarloSimulationAsync(
   seed: number = 20260827,
   onProgress?: (progressPercent: number) => void,
   abortSignal?: AbortSignal,
-  twoStageMonteCarlo: boolean = false
+  twoStageMonteCarlo: boolean = false,
+  customVariability?: MonteCarloCustomVariability
 ): Promise<MonteCarloResult> {
   const { runMonteCarloInWorker } = await import('./analysisWorkerClient');
   return runMonteCarloInWorker(
@@ -2158,7 +2263,8 @@ export async function runMonteCarloSimulationAsync(
     onProgress,
     abortSignal,
     runMonteCarloSimulation,
-    twoStageMonteCarlo
+    twoStageMonteCarlo,
+    customVariability
   );
 }
 

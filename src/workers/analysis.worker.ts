@@ -79,7 +79,7 @@ if (typeof self !== 'undefined') {
 
     try {
       if (type === 'MONTE_CARLO') {
-        const { setpointActual, factors, cqas, modelsPayload, variabilityPercent, simulations, seed, twoStageMonteCarlo } = payload;
+        const { setpointActual, factors, cqas, modelsPayload, variabilityPercent, simulations, seed, twoStageMonteCarlo, customVariability } = payload;
         const reconstructedModels = rebuildModels(modelsPayload, factors as Factor[]);
 
         // Report initial progress
@@ -98,7 +98,8 @@ if (typeof self !== 'undefined') {
             const pMsg: WorkerResponseMessage = { taskId, type: 'PROGRESS', progress };
             self.postMessage(pMsg);
           },
-          Boolean(twoStageMonteCarlo)
+          Boolean(twoStageMonteCarlo),
+          customVariability
         );
 
         const successMsg: WorkerResponseMessage = { taskId, type: 'SUCCESS', result };

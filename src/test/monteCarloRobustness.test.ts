@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { CASE_STUDIES } from '../data/caseStudies';
-import { fitModel, runMonteCarloSimulation, optimizeDesirability } from '../services/statistics';
+import { fitModel, runMonteCarloSimulation, runMonteCarloSimulationAsync, optimizeDesirability } from '../services/statistics';
+import type { MonteCarloCustomVariability } from '../types/qbd';
 
 describe('Monte Carlo Robustness & Statistical Coherence', () => {
   it('ensures Case Study 2 with high Ppk (>3) has 0 PPM CQA defects and near-zero excursions with robust margin', () => {
@@ -106,5 +107,124 @@ describe('Monte Carlo Robustness & Statistical Coherence', () => {
     expect(ppkLow).toBeDefined();
     expect(ppkHigh).toBeDefined();
     expect(Number(ppkLow)).toBeGreaterThan(Number(ppkHigh));
+  });
+
+  it('supports individual factor Xi variability in component_wise mode', () => {
+    const cs = CASE_STUDIES.find((p) => p.id === 'case-study-api-ccd')!;
+    const models: Record<string, any> = {};
+    for (const cqa of cs.cqas) {
+      const m = fitModel(cqa, cs.factors, cs.runs, 'Quadratic');
+      if (m) models[cqa.code] = m;
+    }
+    const setpoint = { X1: 75, X2: 450, X3: 2.0 };
+
+    // Config 1: Tight variability on all factors
+    const customTight: MonteCarloCustomVariability = {
+      mode: 'component_wise',
+      globalRSD: 2.0,
+      factorVariability: {
+        X1: { type: 'sd', value: 0.05 },
+        X2: { type: 'sd', value: 0.01 },
+        X3: { type: 'sd', value: 0.005 },
+      },
+    };
+    const mcTight = runMonteCarloSimulation(setpoint, cs.factors, cs.cqas, models, 2.0, 1000, 2026, undefined, false, customTight);
+
+    // Config 2: Loose variability on X1 only (e.g. temperature fluctuates widely)
+    const customLooseX1: MonteCarloCustomVariability = {
+      mode: 'component_wise',
+      globalRSD: 2.0,
+      factorVariability: {
+        X1: { type: 'sd', value: 3.5 }, // large temperature fluctuation +/- 3.5 °C
+        X2: { type: 'sd', value: 0.01 },
+        X3: { type: 'sd', value: 0.005 },
+      },
+    };
+    const mcLooseX1 = runMonteCarloSimulation(setpoint, cs.factors, cs.cqas, models, 2.0, 1000, 2026, undefined, false, customLooseX1);
+
+    // Y1 (Yield) is heavily influenced by X1 (Temperature)
+    expect(mcLooseX1.cqaStats['Y1'].sd).toBeGreaterThan(mcTight.cqaStats['Y1'].sd);
+    expect(mcLooseX1.varianceDecomposition!['Y1'].processVariance).toBeGreaterThan(mcTight.varianceDecomposition!['Y1'].processVariance);
+  });
+
+  it('supports CQA analytical measurement noise and decomposes variance components', () => {
+    const cs = CASE_STUDIES.find((p) => p.id === 'case-study-api-ccd')!;
+    const models: Record<string, any> = {};
+    for (const cqa of cs.cqas) {
+      const m = fitModel(cqa, cs.factors, cs.runs, 'Quadratic');
+      if (m) models[cqa.code] = m;
+    }
+    const setpoint = { X1: 75, X2: 450, X3: 2.0 };
+
+    // Case A: Simulation without analytical measurement noise
+    const mcNoMeas = runMonteCarloSimulation(setpoint, cs.factors, cs.cqas, models, 2.0, 1000, 2026);
+    expect(mcNoMeas.varianceDecomposition).toBeDefined();
+    const decompNoMeas = mcNoMeas.varianceDecomposition!['Y1'];
+    expect(decompNoMeas.measurementVariance).toBe(0);
+    expect(decompNoMeas.measurementPercent).toBe(0);
+    expect(decompNoMeas.processPercent + decompNoMeas.modelPercent).toBeCloseTo(100, 0);
+
+    // Case B: Simulation with analytical measurement noise enabled on Y1 (e.g. HPLC RSD = 3.5%)
+    const customWithMeas: MonteCarloCustomVariability = {
+      mode: 'component_wise',
+      globalRSD: 2.0,
+      factorVariability: {
+        X1: { type: 'sd', value: 0.5 },
+        X2: { type: 'sd', value: 0.08 },
+        X3: { type: 'sd', value: 0.03 },
+      },
+      cqaMeasurementVariability: {
+        Y1: { type: 'rsd', value: 3.5, enabled: true },
+      },
+    };
+    const mcWithMeas = runMonteCarloSimulation(setpoint, cs.factors, cs.cqas, models, 2.0, 1000, 2026, undefined, false, customWithMeas);
+    expect(mcWithMeas.varianceDecomposition).toBeDefined();
+    const decompWithMeas = mcWithMeas.varianceDecomposition!['Y1'];
+
+    // Measurement noise must increase total SD and have non-zero measurement variance & percent
+    expect(mcWithMeas.cqaStats['Y1'].sd).toBeGreaterThan(mcNoMeas.cqaStats['Y1'].sd);
+    expect(decompWithMeas.measurementVariance).toBeGreaterThan(0);
+    expect(decompWithMeas.measurementPercent).toBeGreaterThan(5.0);
+    const sumPercents = decompWithMeas.processPercent + decompWithMeas.modelPercent + decompWithMeas.measurementPercent;
+    expect(sumPercents).toBeCloseTo(100, 0);
+  });
+
+  it('runs asynchronously via runMonteCarloSimulationAsync forwarding customVariability', async () => {
+    const cs = CASE_STUDIES.find((p) => p.id === 'case-study-api-ccd')!;
+    const models: Record<string, any> = {};
+    for (const cqa of cs.cqas) {
+      const m = fitModel(cqa, cs.factors, cs.runs, 'Quadratic');
+      if (m) models[cqa.code] = m;
+    }
+    const setpoint = { X1: 75, X2: 450, X3: 2.0 };
+
+    const customConfig: MonteCarloCustomVariability = {
+      mode: 'component_wise',
+      globalRSD: 2.0,
+      factorVariability: {
+        X1: { type: 'sd', value: 0.5 },
+      },
+      cqaMeasurementVariability: {
+        Y1: { type: 'rsd', value: 2.0, enabled: true },
+      },
+    };
+
+    const mcAsync = await runMonteCarloSimulationAsync(
+      setpoint,
+      cs.factors,
+      cs.cqas,
+      models,
+      2.0,
+      500,
+      2026,
+      undefined,
+      undefined,
+      false,
+      customConfig
+    );
+
+    expect(mcAsync.customVariability).toEqual(customConfig);
+    expect(mcAsync.varianceDecomposition).toBeDefined();
+    expect(mcAsync.varianceDecomposition!['Y1'].measurementVariance).toBeGreaterThan(0);
   });
 });

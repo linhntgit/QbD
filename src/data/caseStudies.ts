@@ -53,6 +53,9 @@ export const CASE_STUDIES: QBDProject[] = [
         weight: 5,
         sShape: 1,
         tShape: 1,
+        measurementVariabilityType: 'rsd',
+        measurementRSD: 2.5,
+        includeMeasurementNoise: false,
       },
       {
         id: 'cqa-2',
@@ -67,6 +70,9 @@ export const CASE_STUDIES: QBDProject[] = [
         weight: 5,
         sShape: 1,
         tShape: 1,
+        measurementVariabilityType: 'rsd',
+        measurementRSD: 2.0,
+        includeMeasurementNoise: false,
       },
       {
         id: 'cqa-3',
@@ -81,6 +87,9 @@ export const CASE_STUDIES: QBDProject[] = [
         weight: 3,
         sShape: 1,
         tShape: 1,
+        measurementVariabilityType: 'sd',
+        measurementSD: 0.3,
+        includeMeasurementNoise: false,
       },
       {
         id: 'cqa-4',
@@ -95,6 +104,9 @@ export const CASE_STUDIES: QBDProject[] = [
         weight: 4,
         sShape: 1,
         tShape: 1,
+        measurementVariabilityType: 'sd',
+        measurementSD: 0.05,
+        includeMeasurementNoise: false,
       },
     ],
     factors: [
@@ -111,6 +123,8 @@ export const CASE_STUDIES: QBDProject[] = [
         high: 35.0,
         center: 25.0,
         processSD: 0.2,
+        processRSD: 0.8,
+        variabilityType: 'sd',
       },
       {
         id: 'factor-2',
@@ -125,6 +139,8 @@ export const CASE_STUDIES: QBDProject[] = [
         high: 20.0,
         center: 14.0,
         processSD: 0.5,
+        processRSD: 3.5,
+        variabilityType: 'sd',
       },
       {
         id: 'factor-3',
@@ -139,6 +155,8 @@ export const CASE_STUDIES: QBDProject[] = [
         high: 6.0,
         center: 4.0,
         processSD: 0.1,
+        processRSD: 2.5,
+        variabilityType: 'sd',
       },
       {
         id: 'factor-4',
@@ -418,6 +436,9 @@ export const CASE_STUDIES: QBDProject[] = [
         weight: 5,
         sShape: 1,
         tShape: 1,
+        measurementVariabilityType: 'rsd',
+        measurementRSD: 1.0,
+        includeMeasurementNoise: false,
       },
       {
         id: 'cqa-api-2',
@@ -432,6 +453,9 @@ export const CASE_STUDIES: QBDProject[] = [
         weight: 5,
         sShape: 1,
         tShape: 1,
+        measurementVariabilityType: 'sd',
+        measurementSD: 0.02,
+        includeMeasurementNoise: false,
       },
       {
         id: 'cqa-api-3',
@@ -446,6 +470,9 @@ export const CASE_STUDIES: QBDProject[] = [
         weight: 4,
         sShape: 1,
         tShape: 1,
+        measurementVariabilityType: 'rsd',
+        measurementRSD: 3.0,
+        includeMeasurementNoise: false,
       },
     ],
     factors: [
@@ -462,6 +489,8 @@ export const CASE_STUDIES: QBDProject[] = [
         high: 85.0,
         center: 75.0,
         processSD: 0.5,
+        processRSD: 0.67,
+        variabilityType: 'sd',
       },
       {
         id: 'factor-api-2',
@@ -476,6 +505,8 @@ export const CASE_STUDIES: QBDProject[] = [
         high: 10.0,
         center: 7.0,
         processSD: 0.08,
+        processRSD: 1.14,
+        variabilityType: 'sd',
       },
       {
         id: 'factor-api-3',
@@ -490,6 +521,8 @@ export const CASE_STUDIES: QBDProject[] = [
         high: 2.5,
         center: 1.5,
         processSD: 0.03,
+        processRSD: 2.0,
+        variabilityType: 'sd',
       },
     ],
     fmeaRisks: [
@@ -729,6 +762,9 @@ export const CASE_STUDIES: QBDProject[] = [
         weight: 5,
         sShape: 1,
         tShape: 1,
+        measurementVariabilityType: 'rsd',
+        measurementRSD: 2.5,
+        includeMeasurementNoise: false,
       },
       {
         id: 'cqa-sedds-2',
@@ -743,6 +779,9 @@ export const CASE_STUDIES: QBDProject[] = [
         weight: 4,
         sShape: 1,
         tShape: 1,
+        measurementVariabilityType: 'sd',
+        measurementSD: 0.015,
+        includeMeasurementNoise: false,
       },
       {
         id: 'cqa-sedds-3',
@@ -757,6 +796,9 @@ export const CASE_STUDIES: QBDProject[] = [
         weight: 5,
         sShape: 1,
         tShape: 1,
+        measurementVariabilityType: 'rsd',
+        measurementRSD: 1.0,
+        includeMeasurementNoise: false,
       },
     ],
     factors: [
@@ -773,6 +815,8 @@ export const CASE_STUDIES: QBDProject[] = [
         high: 60.0,
         center: 33.3,
         processSD: 0.2,
+        processRSD: 0.6,
+        variabilityType: 'sd',
       },
       {
         id: 'factor-sedds-2',
@@ -787,6 +831,8 @@ export const CASE_STUDIES: QBDProject[] = [
         high: 70.0,
         center: 33.3,
         processSD: 0.2,
+        processRSD: 0.6,
+        variabilityType: 'sd',
       },
       {
         id: 'factor-sedds-3',
@@ -801,6 +847,8 @@ export const CASE_STUDIES: QBDProject[] = [
         high: 50.0,
         center: 33.3,
         processSD: 0.2,
+        processRSD: 0.6,
+        variabilityType: 'sd',
       },
       {
         id: 'factor-sedds-4',
@@ -815,6 +863,8 @@ export const CASE_STUDIES: QBDProject[] = [
         high: 15000.0,
         center: 10000.0,
         processSD: 150.0,
+        processRSD: 1.5,
+        variabilityType: 'sd',
       },
       {
         id: 'factor-sedds-5',
@@ -829,6 +879,8 @@ export const CASE_STUDIES: QBDProject[] = [
         high: 15.0,
         center: 10.0,
         processSD: 0.2,
+        processRSD: 2.0,
+        variabilityType: 'sd',
       },
     ],
     fmeaRisks: [
@@ -1105,6 +1157,9 @@ export const CASE_STUDIES: QBDProject[] = [
         weight: 5,
         sShape: 1,
         tShape: 1,
+        measurementVariabilityType: 'rsd',
+        measurementRSD: 2.0,
+        includeMeasurementNoise: false,
       },
       {
         id: 'cqa-fda-2',
@@ -1119,6 +1174,9 @@ export const CASE_STUDIES: QBDProject[] = [
         weight: 5,
         sShape: 1,
         tShape: 1,
+        measurementVariabilityType: 'rsd',
+        measurementRSD: 2.0,
+        includeMeasurementNoise: false,
       },
       {
         id: 'cqa-fda-3',
@@ -1133,6 +1191,9 @@ export const CASE_STUDIES: QBDProject[] = [
         weight: 4,
         sShape: 1,
         tShape: 1,
+        measurementVariabilityType: 'sd',
+        measurementSD: 0.3,
+        includeMeasurementNoise: false,
       },
       {
         id: 'cqa-fda-4',
@@ -1146,6 +1207,9 @@ export const CASE_STUDIES: QBDProject[] = [
         weight: 3,
         sShape: 1,
         tShape: 1,
+        measurementVariabilityType: 'sd',
+        measurementSD: 0.05,
+        includeMeasurementNoise: false,
       },
       {
         id: 'cqa-fda-5',
@@ -1159,6 +1223,9 @@ export const CASE_STUDIES: QBDProject[] = [
         weight: 4,
         sShape: 1,
         tShape: 1,
+        measurementVariabilityType: 'rsd',
+        measurementRSD: 3.0,
+        includeMeasurementNoise: false,
       },
     ],
     factors: [
@@ -1175,6 +1242,8 @@ export const CASE_STUDIES: QBDProject[] = [
         role: 'formulation_other',
         controllability: 'controllable',
         processSD: 0.4,
+        processRSD: 1.33,
+        variabilityType: 'sd',
       },
       {
         id: 'f-fda-2',
@@ -1189,6 +1258,8 @@ export const CASE_STUDIES: QBDProject[] = [
         role: 'formulation_other',
         controllability: 'controllable',
         processSD: 0.1,
+        processRSD: 1.0,
+        variabilityType: 'sd',
       },
       {
         id: 'f-fda-3',
@@ -1203,6 +1274,8 @@ export const CASE_STUDIES: QBDProject[] = [
         role: 'process_parameter',
         controllability: 'controllable',
         processSD: 0.3,
+        processRSD: 3.0,
+        variabilityType: 'sd',
       },
       {
         id: 'f-fda-4',
@@ -1217,6 +1290,8 @@ export const CASE_STUDIES: QBDProject[] = [
         role: 'process_parameter',
         controllability: 'controllable',
         processSD: 0.8,
+        processRSD: 2.0,
+        variabilityType: 'sd',
       },
     ],
     fmeaRisks: [

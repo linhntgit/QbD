@@ -33,6 +33,10 @@ export interface CQA {
   weight: number; // 1 to 5 (importance)
   sShape?: number; // Desirability shape parameter (default 1)
   tShape?: number;
+  measurementVariabilityType?: 'rsd' | 'sd';
+  measurementRSD?: number; // % RSD of analytical test method (e.g. HPLC 1.0%, Dissolution 2.5%)
+  measurementSD?: number; // Absolute measurement SD (e.g. +/- 0.3 kP)
+  includeMeasurementNoise?: boolean; // Toggle inclusion of analytical measurement error in simulation
 }
 
 export type FactorRole = 
@@ -70,6 +74,8 @@ export interface Factor {
   distribution?: ProbabilityDistributionType;
   distParams?: DistributionParams;
   processSD?: number; // Absolute process standard deviation for Monte Carlo (e.g. +/- 0.5 °C or 2 rpm)
+  variabilityType?: 'rsd' | 'sd';
+  processRSD?: number; // Relative standard deviation (% RSD) for Monte Carlo (e.g. 1.5%)
 }
 
 export interface FMEARiskItem {
@@ -333,6 +339,34 @@ export interface DesignSpaceRanges {
   evidenceNote?: string;
 }
 
+export interface FactorVariabilityConfig {
+  type: 'rsd' | 'sd';
+  value: number;
+}
+
+export interface CQAMeasurementVariabilityConfig {
+  type: 'rsd' | 'sd';
+  value: number;
+  enabled: boolean;
+}
+
+export interface MonteCarloCustomVariability {
+  mode: 'global' | 'component_wise';
+  globalRSD: number;
+  factorVariability?: Record<string, FactorVariabilityConfig>;
+  cqaMeasurementVariability?: Record<string, CQAMeasurementVariabilityConfig>;
+}
+
+export interface MonteCarloVarianceDecomposition {
+  processVariance: number;
+  modelResidualVariance: number;
+  measurementVariance: number;
+  totalVariance: number;
+  processPercent: number;
+  modelPercent: number;
+  measurementPercent: number;
+}
+
 export interface MonteCarloResult {
   simulations: number;
   seed?: number;
@@ -360,6 +394,8 @@ export interface MonteCarloResult {
     cpk?: number;
     outOfSpecPercent: number;
   }>;
+  varianceDecomposition?: Record<string, MonteCarloVarianceDecomposition>;
+  customVariability?: MonteCarloCustomVariability;
 }
 
 /** Persisted analysis settings make optimization/simulation reproducible. */
@@ -369,6 +405,7 @@ export interface AnalysisProvenance {
   demoDataSeed: number;
   monteCarloVariabilityPercent: number;
   monteCarloSimulations: number;
+  monteCarloCustomVariability?: MonteCarloCustomVariability;
 }
 
 /**
