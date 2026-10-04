@@ -458,3 +458,134 @@ describe('Tamper-Evident Reporting Integrity Workflow', () => {
     expect(pdfText).toContain('INTEGRITY ALERT');
   });
 });
+
+describe('Regulatory Reports with Monte Carlo Custom Variability and Variance Decomposition (Phase 4 & 5)', () => {
+  it('should generate PDF/A report including Monte Carlo custom variability mode, capability table, and variance decomposition', () => {
+    const project = createMockProject();
+
+    const mockMonteCarlo = {
+      simulations: 5000,
+      variabilityPercent: 2.5,
+      modeledCqaCodes: ['Y1', 'Y2'],
+      unmodeledCqaCodes: [],
+      excursionCount: 12,
+      excursionRatePercent: 0.24,
+      passCount: 4970,
+      failCount: 30,
+      defectRatePPM: 6000,
+      reliabilityPercent: 99.4,
+      cqaStats: {
+        Y1: {
+          mean: 92.5,
+          sd: 1.8,
+          min: 85.0,
+          max: 98.2,
+          ppk: 1.45,
+          cpk: 1.50,
+          outOfSpecPercent: 0.05,
+        },
+        Y2: {
+          mean: 8.2,
+          sd: 0.6,
+          min: 6.1,
+          max: 10.4,
+          ppk: 1.12,
+          cpk: 1.15,
+          outOfSpecPercent: 0.22,
+        },
+      },
+      varianceDecomposition: {
+        Y1: {
+          processVariance: 2.15,
+          modelResidualVariance: 0.65,
+          measurementVariance: 0.44,
+          totalVariance: 3.24,
+          processPercent: 66.4,
+          modelPercent: 20.1,
+          measurementPercent: 13.5,
+        },
+        Y2: {
+          processVariance: 0.18,
+          modelResidualVariance: 0.06,
+          measurementVariance: 0.12,
+          totalVariance: 0.36,
+          processPercent: 50.0,
+          modelPercent: 16.7,
+          measurementPercent: 33.3,
+        },
+      },
+      customVariability: {
+        mode: 'component_wise' as const,
+        globalRSD: 2.5,
+        factorVariability: {
+          X1: { type: 'sd' as const, value: 0.5 },
+          X2: { type: 'rsd' as const, value: 3.0 },
+        },
+        cqaMeasurementVariability: {
+          Y1: { type: 'rsd' as const, value: 2.0, enabled: true },
+          Y2: { type: 'sd' as const, value: 0.35, enabled: true },
+        },
+      },
+    };
+
+    const bytes = generateRegulatoryPDFABuffer(project, { monteCarlo: mockMonteCarlo });
+    expect(bytes).toBeInstanceOf(Uint8Array);
+    const pdfText = new TextDecoder('utf-8').decode(bytes);
+
+    // Verify Section 8 contains the custom mode and decomposition
+    expect(pdfText).toContain('Tung Bien');
+    expect(pdfText).toContain('ICH Q14 Component-wise');
+    expect(pdfText).toContain('Danh gia nang luc Ppk / Cpk tung CQA:');
+    expect(pdfText).toContain('Phan ra phuong sai chat luong');
+    expect(pdfText).toContain('Variance Decomposition');
+    expect(pdfText).toContain('Quy Trinh');
+    expect(pdfText).toContain('Do Luong');
+  });
+
+  it('should generate Word (.docx) report including Monte Carlo custom variability mode, capability table, and variance decomposition', async () => {
+    const project = createMockProject();
+
+    const mockMonteCarlo = {
+      simulations: 10000,
+      variabilityPercent: 2.0,
+      modeledCqaCodes: ['Y1'],
+      unmodeledCqaCodes: [],
+      excursionCount: 0,
+      excursionRatePercent: 0,
+      passCount: 9980,
+      failCount: 20,
+      defectRatePPM: 2000,
+      reliabilityPercent: 99.8,
+      cqaStats: {
+        Y1: {
+          mean: 94.2,
+          sd: 1.1,
+          min: 88.0,
+          max: 98.0,
+          ppk: 1.62,
+          cpk: 1.65,
+          outOfSpecPercent: 0.02,
+        },
+      },
+      varianceDecomposition: {
+        Y1: {
+          processVariance: 0.90,
+          modelResidualVariance: 0.20,
+          measurementVariance: 0.11,
+          totalVariance: 1.21,
+          processPercent: 74.4,
+          modelPercent: 16.5,
+          measurementPercent: 9.1,
+        },
+      },
+      customVariability: {
+        mode: 'component_wise' as const,
+        globalRSD: 2.0,
+      },
+    };
+
+    const doc = await generateQBDWordDocument(project, undefined, null, mockMonteCarlo);
+    expect(doc).toBeDefined();
+  });
+});
+

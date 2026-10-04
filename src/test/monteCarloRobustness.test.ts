@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { CASE_STUDIES } from '../data/caseStudies';
 import { fitModel, runMonteCarloSimulation, runMonteCarloSimulationAsync, optimizeDesirability } from '../services/statistics';
+import { generateRegulatoryPDFABuffer } from '../services/pdfReportGenerator';
+import { generateQBDWordDocument } from '../services/reportGenerator';
 import type { MonteCarloCustomVariability } from '../types/qbd';
 
 describe('Monte Carlo Robustness & Statistical Coherence', () => {
@@ -226,5 +228,61 @@ describe('Monte Carlo Robustness & Statistical Coherence', () => {
     expect(mcAsync.customVariability).toEqual(customConfig);
     expect(mcAsync.varianceDecomposition).toBeDefined();
     expect(mcAsync.varianceDecomposition!['Y1'].measurementVariance).toBeGreaterThan(0);
+  });
+
+  it('executes full E2E workflow: optimization -> component-wise MC with measurement noise -> variance decomposition -> PDF & Word reports', async () => {
+    const cs = CASE_STUDIES.find((p) => p.id === 'case-study-api-ccd')!;
+    const models: Record<string, any> = {};
+    for (const cqa of cs.cqas) {
+      const m = fitModel(cqa, cs.factors, cs.runs, 'Quadratic');
+      if (m) models[cqa.code] = m;
+    }
+
+    const opt = optimizeDesirability(cs.factors, cs.cqas, models, undefined, 42, { robustMarginSigma: 3 });
+    expect(opt).not.toBeNull();
+
+    const customConfig: MonteCarloCustomVariability = {
+      mode: 'component_wise',
+      globalRSD: 2.0,
+      factorVariability: {
+        X1: { type: 'sd', value: 0.5 },
+        X2: { type: 'sd', value: 0.08 },
+        X3: { type: 'sd', value: 0.03 },
+      },
+      cqaMeasurementVariability: {
+        Y1: { type: 'rsd', value: 2.0, enabled: true },
+        Y2: { type: 'sd', value: 0.15, enabled: true },
+      },
+    };
+
+    const mc = await runMonteCarloSimulationAsync(
+      opt!.actualFactors,
+      cs.factors,
+      cs.cqas,
+      models,
+      2.0,
+      1000,
+      2026,
+      undefined,
+      undefined,
+      false,
+      customConfig
+    );
+
+    expect(mc.varianceDecomposition).toBeDefined();
+    expect(mc.varianceDecomposition!['Y1'].measurementVariance).toBeGreaterThan(0);
+    expect(mc.varianceDecomposition!['Y2'].measurementVariance).toBeGreaterThan(0);
+
+    // Verify PDF/A generation with this MC result
+    const pdfBytes = generateRegulatoryPDFABuffer(cs, { monteCarlo: mc });
+    expect(pdfBytes).toBeInstanceOf(Uint8Array);
+    const pdfText = new TextDecoder('utf-8').decode(pdfBytes);
+    expect(pdfText).toContain('Tung Bien');
+    expect(pdfText).toContain('ICH Q14');
+    expect(pdfText).toContain('Variance Decomposition');
+
+    // Verify Word document generation with this MC result
+    const doc = await generateQBDWordDocument(cs, models, opt, mc);
+    expect(doc).toBeDefined();
   });
 });

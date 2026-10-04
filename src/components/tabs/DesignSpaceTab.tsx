@@ -18,6 +18,12 @@ import {
   Zap,
   AlertTriangle,
   X,
+  ChevronDown,
+  ChevronUp,
+  RotateCcw,
+  SlidersHorizontal,
+  Info,
+  Layers,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import type {
@@ -27,6 +33,9 @@ import type {
   DesirabilitySolution,
   DesignSpaceRanges,
   MonteCarloResult,
+  MonteCarloCustomVariability,
+  FactorVariabilityConfig,
+  CQAMeasurementVariabilityConfig,
   ModelingEngine,
   Factor,
 } from '../../types/qbd';
@@ -337,12 +346,94 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
   const [simProgress, setSimProgress] = useState<number>(0);
 
+  // Component-wise & Analytical Measurement Variability State (Phase 3)
+  const [mcVariabilityMode, setMcVariabilityMode] = useState<'global' | 'component_wise'>(() => {
+    return project.analysisProvenance?.monteCarloCustomVariability?.mode ?? 'global';
+  });
+  const [showAdvancedVariability, setShowAdvancedVariability] = useState<boolean>(false);
+
+  const defaultFactorVariability = useMemo(() => {
+    const map: Record<string, FactorVariabilityConfig> = {};
+    factors.forEach((f) => {
+      const type = f.variabilityType ?? (f.processSD !== undefined && f.processSD > 0 ? 'sd' : 'rsd');
+      const val = type === 'sd'
+        ? (f.processSD ?? 0.2)
+        : (f.processRSD ?? 2.0);
+      map[f.code] = { type, value: val };
+    });
+    return map;
+  }, [factors]);
+
+  const [factorVariabilityMap, setFactorVariabilityMap] = useState<Record<string, FactorVariabilityConfig>>(() => {
+    return project.analysisProvenance?.monteCarloCustomVariability?.factorVariability ?? defaultFactorVariability;
+  });
+
+  const defaultCqaVariability = useMemo(() => {
+    const map: Record<string, CQAMeasurementVariabilityConfig> = {};
+    cqas.forEach((c) => {
+      const type = c.measurementVariabilityType ?? (c.measurementSD !== undefined && c.measurementSD > 0 ? 'sd' : 'rsd');
+      const val = type === 'sd'
+        ? (c.measurementSD ?? 0.3)
+        : (c.measurementRSD ?? 2.0);
+      const enabled = c.includeMeasurementNoise ?? false;
+      map[c.code] = { type, value: val, enabled };
+    });
+    return map;
+  }, [cqas]);
+
+  const [cqaMeasurementVariabilityMap, setCqaMeasurementVariabilityMap] = useState<Record<string, CQAMeasurementVariabilityConfig>>(() => {
+    return project.analysisProvenance?.monteCarloCustomVariability?.cqaMeasurementVariability ?? defaultCqaVariability;
+  });
+
+  const customVariabilityPayload = useMemo<MonteCarloCustomVariability>(() => ({
+    mode: mcVariabilityMode,
+    globalRSD: mcVariability,
+    factorVariability: factorVariabilityMap,
+    cqaMeasurementVariability: cqaMeasurementVariabilityMap,
+  }), [mcVariabilityMode, mcVariability, factorVariabilityMap, cqaMeasurementVariabilityMap]);
+
+  const handleUpdateFactorVariability = (code: string, updates: Partial<FactorVariabilityConfig>) => {
+    setFactorVariabilityMap((prev) => ({
+      ...prev,
+      [code]: { ...(prev[code] ?? { type: 'sd', value: 0.2 }), ...updates },
+    }));
+  };
+
+  const handleResetFactorVariability = (code?: string) => {
+    if (code) {
+      setFactorVariabilityMap((prev) => ({
+        ...prev,
+        [code]: defaultFactorVariability[code] ?? { type: 'rsd', value: 2.0 },
+      }));
+    } else {
+      setFactorVariabilityMap(defaultFactorVariability);
+    }
+  };
+
+  const handleUpdateCqaVariability = (code: string, updates: Partial<CQAMeasurementVariabilityConfig>) => {
+    setCqaMeasurementVariabilityMap((prev) => ({
+      ...prev,
+      [code]: { ...(prev[code] ?? { type: 'rsd', value: 2.0, enabled: false }), ...updates },
+    }));
+  };
+
+  const handleResetCqaVariability = (code?: string) => {
+    if (code) {
+      setCqaMeasurementVariabilityMap((prev) => ({
+        ...prev,
+        [code]: defaultCqaVariability[code] ?? { type: 'rsd', value: 2.0, enabled: false },
+      }));
+    } else {
+      setCqaMeasurementVariabilityMap(defaultCqaVariability);
+    }
+  };
+
   const [mcResult, setMcResult] = useState<MonteCarloResult | null>(sharedMonteCarlo);
   const lastSharedMonteCarlo = useRef<MonteCarloResult | null>(sharedMonteCarlo);
   const [lastSimulationKey, setLastSimulationKey] = useState<string | null>(() => sharedMonteCarlo && sharedOptimum
-    ? JSON.stringify([sharedOptimum.actualFactors, monteCarloSimulations, monteCarloVariabilityPercent, modelingEngine]) : null);
+    ? JSON.stringify([sharedOptimum.actualFactors, monteCarloSimulations, monteCarloVariabilityPercent, modelingEngine, customVariabilityPayload]) : null);
   const currentSimulationKey = optimum
-    ? JSON.stringify([optimum.actualFactors, mcSimulations, mcVariability, modelingEngine]) : null;
+    ? JSON.stringify([optimum.actualFactors, mcSimulations, mcVariability, modelingEngine, customVariabilityPayload]) : null;
   const simulationNeedsRefresh = Boolean(mcResult && currentSimulationKey !== lastSimulationKey);
   const simulationTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const mcAbortControllerRef = useRef<AbortController | null>(null);
@@ -383,7 +474,8 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
   const executeSimulation = async (
     targetActual: Record<string, number | string>,
     batches: number,
-    variability: number
+    variability: number,
+    customVariabilityOverride?: MonteCarloCustomVariability
   ) => {
     if (simulationTimer.current) clearTimeout(simulationTimer.current);
     mcAbortControllerRef.current?.abort();
@@ -392,6 +484,8 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
 
     setIsSimulating(true);
     setSimProgress(0);
+
+    const activeCustomVariability = customVariabilityOverride ?? customVariabilityPayload;
 
     try {
       const mc = await runMonteCarloSimulationAsync(
@@ -405,11 +499,21 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
         (progressPercent) => {
           setSimProgress(progressPercent);
         },
-        controller.signal
+        controller.signal,
+        false,
+        activeCustomVariability
       );
       setMcResult(mc);
-      setLastSimulationKey(JSON.stringify([targetActual, batches, variability, modelingEngine]));
+      setLastSimulationKey(JSON.stringify([targetActual, batches, variability, modelingEngine, activeCustomVariability]));
       onMonteCarloResult(mc);
+      if (project.analysisProvenance) {
+        onUpdateProject({
+          analysisProvenance: {
+            ...project.analysisProvenance,
+            monteCarloCustomVariability: activeCustomVariability,
+          },
+        });
+      }
       setSimProgress(100);
       try {
         confetti({
@@ -479,14 +583,14 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
   };
 
   // Run Monte Carlo simulation manually
-  const handleRunMonteCarlo = (customBatches?: number, customRsd?: number) => {
+  const handleRunMonteCarlo = (customBatches?: number, customRsd?: number, customVariability?: MonteCarloCustomVariability) => {
     if (!optimum) return;
     const batches = Math.max(100, Math.min(100_000, Math.round(customBatches ?? mcSimulations)));
     const rsd = Math.max(0.1, Math.min(15, customRsd ?? mcVariability));
     setMcSimulations(batches);
     setMcVariability(rsd);
     onMonteCarloConfigChange(rsd, batches);
-    executeSimulation(optimum.actualFactors, batches, rsd);
+    executeSimulation(optimum.actualFactors, batches, rsd, customVariability);
   };
 
   const latestConfirmation = project.confirmationStudies?.at(-1);
@@ -1963,23 +2067,72 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
               <span style={{ fontSize: '0.73rem', color: '#64748b' }}>lô</span>
             </div>
 
-            {/* Variability % RSD */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <label style={{ fontSize: '0.75rem', color: '#475569' }}>RSD:</label>
-              <input
-                type="number"
-                min={0.1}
-                max={15}
-                step={0.5}
-                disabled={isSimulating}
-                className="input-field font-mono"
-                style={{ width: '65px', padding: '0.25rem 0.4rem', fontSize: '0.78rem', textAlign: 'center' }}
-                value={mcVariability}
-                onChange={(e) => setMcVariability(Math.max(0.1, Math.min(15, Number(e.target.value) || 0.1)))}
-                title="Độ lệch chuẩn tương đối (% RSD) của các thông số quy trình"
-              />
-              <span style={{ fontSize: '0.73rem', color: '#64748b' }}>%</span>
+            {/* Variability Mode Selector */}
+            <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#f1f5f9', padding: '0.15rem', borderRadius: '0.375rem', border: '1px solid #cbd5e1' }}>
+              <button
+                type="button"
+                onClick={() => setMcVariabilityMode('global')}
+                className={`btn ${mcVariabilityMode === 'global' ? 'btn-teal' : 'btn-secondary'}`}
+                style={{ fontSize: '0.68rem', padding: '0.18rem 0.45rem', borderRadius: '0.25rem', border: 'none' }}
+                title="Áp dụng một hệ số % RSD chung cho tất cả các thông số quy trình X"
+              >
+                RSD Chung
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMcVariabilityMode('component_wise');
+                  setShowAdvancedVariability(true);
+                }}
+                className={`btn ${mcVariabilityMode === 'component_wise' ? 'btn-teal' : 'btn-secondary'}`}
+                style={{ fontSize: '0.68rem', padding: '0.18rem 0.45rem', borderRadius: '0.25rem', border: 'none' }}
+                title="Tùy chỉnh riêng SD/RSD cho từng biến X và sai số đo phân tích lặp lại cho từng CQA (ICH Q14)"
+              >
+                Từng Biến (ICH Q14)
+              </button>
             </div>
+
+            {/* Variability % RSD (for global mode) */}
+            {mcVariabilityMode === 'global' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <label style={{ fontSize: '0.75rem', color: '#475569' }}>RSD:</label>
+                <input
+                  type="number"
+                  min={0.1}
+                  max={15}
+                  step={0.5}
+                  disabled={isSimulating}
+                  className="input-field font-mono"
+                  style={{ width: '65px', padding: '0.25rem 0.4rem', fontSize: '0.78rem', textAlign: 'center' }}
+                  value={mcVariability}
+                  onChange={(e) => setMcVariability(Math.max(0.1, Math.min(15, Number(e.target.value) || 0.1)))}
+                  title="Độ lệch chuẩn tương đối (% RSD) của các thông số quy trình"
+                />
+                <span style={{ fontSize: '0.73rem', color: '#64748b' }}>%</span>
+              </div>
+            )}
+
+            {/* Advanced Configuration Panel Toggle */}
+            <button
+              type="button"
+              onClick={() => setShowAdvancedVariability(!showAdvancedVariability)}
+              className="btn btn-secondary"
+              style={{
+                fontSize: '0.72rem',
+                padding: '0.25rem 0.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.3rem',
+                borderColor: showAdvancedVariability ? '#0d9488' : '#cbd5e1',
+                color: showAdvancedVariability ? '#0f766e' : '#334155',
+                backgroundColor: showAdvancedVariability ? '#f0fdfa' : '#ffffff',
+              }}
+              title="Đóng/mở bảng cấu hình chi tiết dao động từng biến X và sai số đo CQA (ICH Q8 / Q14)"
+            >
+              <SlidersHorizontal size={13} />
+              <span>Cấu hình X &amp; Y</span>
+              {showAdvancedVariability ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+            </button>
 
             {/* Simulation Run Button */}
             <button
@@ -2060,6 +2213,230 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
             }}
           >
             ⚠️ Chưa có phương án tối ưu được áp dụng. Hãy thiết lập hoặc chọn điểm tối ưu tại Mục 1 (Desirability Profiler) trước khi chạy mô phỏng.
+          </div>
+        )}
+
+        {/* Advanced Variability Configuration Panel (ICH Q8 / ICH Q14) */}
+        {showAdvancedVariability && (
+          <div
+            style={{
+              backgroundColor: '#f8fafc',
+              border: '1px solid #cbd5e1',
+              borderLeft: '4px solid #0d9488',
+              borderRadius: '0.5rem',
+              padding: '0.85rem 1rem',
+              marginBottom: '1rem',
+            }}
+          >
+            {/* Panel Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <SlidersHorizontal size={16} color="#0f766e" />
+                  <span style={{ fontWeight: '700', fontSize: '0.88rem', color: '#0f172a' }}>
+                    Cấu Hình Dao Động Từng Biến (X) &amp; Sai Số Đo Phân Tích (Y) - ICH Q8 / ICH Q14
+                  </span>
+                  <span className="badge badge-teal" style={{ fontSize: '0.65rem' }}>
+                    {mcVariabilityMode === 'component_wise' ? 'Chế độ Từng Biến Kích Hoạt' : 'Chế độ RSD Chung'}
+                  </span>
+                </div>
+                <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '0.15rem 0 0 0' }}>
+                  {mcVariabilityMode === 'component_wise'
+                    ? 'Mô phỏng sử dụng độ lệch chuẩn (SD) hoặc % RSD riêng cho từng yếu tố quy trình (X), cộng thêm sai số đo phân tích lặp lại (Y).'
+                    : 'Ở chế độ "RSD Chung", hệ số % RSD ở thanh công cụ sẽ tự động nhân tỉ lệ với độ dao động cơ bản của từng biến. Chuyển sang "Từng biến (ICH Q14)" để chỉnh độc lập từng biến.'}
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleResetFactorVariability();
+                    handleResetCqaVariability();
+                  }}
+                  className="btn btn-secondary"
+                  style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                  title="Khôi phục thông số dao động mặc định từ hồ sơ dự án"
+                >
+                  <RotateCcw size={12} />
+                  <span>Đặt lại mặc định</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Two Tables Grid: Factors X and CQAs Y */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1rem' }}>
+              {/* Table 1: Factors Xi */}
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '0.375rem', border: '1px solid #e2e8f0', padding: '0.65rem' }}>
+                <div style={{ fontWeight: '700', fontSize: '0.78rem', color: '#1e3a8a', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <span>⚙️ 1. Dao Động Yếu Tố Quy Trình (X - Process Variability)</span>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="data-table" style={{ fontSize: '0.72rem', width: '100%' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ padding: '0.3rem 0.4rem' }}>Biến (X)</th>
+                        <th style={{ padding: '0.3rem 0.4rem' }}>Setpoint</th>
+                        <th style={{ padding: '0.3rem 0.4rem' }}>Kiểu</th>
+                        <th style={{ padding: '0.3rem 0.4rem' }}>Giá trị</th>
+                        <th style={{ padding: '0.3rem 0.4rem' }}>Dao động ±3s</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {factors.map((f) => {
+                        const sp = optimum && typeof optimum.actualFactors[f.code] === 'number'
+                          ? Number(optimum.actualFactors[f.code])
+                          : ((f.low + f.high) / 2);
+                        const cfg = factorVariabilityMap[f.code] ?? { type: 'sd', value: 0.2 };
+                        let estSD = cfg.type === 'sd'
+                          ? cfg.value
+                          : (Math.abs(sp) * cfg.value / 100);
+                        if (mcVariabilityMode === 'global') {
+                          estSD = estSD * (mcVariability / 2.0);
+                        }
+                        const span3sLow = (sp - 3 * estSD).toFixed(2);
+                        const span3sHigh = (sp + 3 * estSD).toFixed(2);
+
+                        return (
+                          <tr key={f.code}>
+                            <td style={{ padding: '0.3rem 0.4rem', fontWeight: '600' }}>
+                              {f.name} <span style={{ color: '#64748b' }}>({f.code})</span>
+                            </td>
+                            <td style={{ padding: '0.3rem 0.4rem', textAlign: 'center' }}>
+                              <strong className="font-mono">{sp.toFixed(2)}</strong> {f.unit || ''}
+                            </td>
+                            <td style={{ padding: '0.3rem 0.4rem' }}>
+                              <select
+                                value={cfg.type}
+                                onChange={(e) => handleUpdateFactorVariability(f.code, { type: e.target.value as 'sd' | 'rsd' })}
+                                disabled={mcVariabilityMode === 'global'}
+                                className="input-field"
+                                style={{ fontSize: '0.7rem', padding: '0.15rem 0.3rem' }}
+                              >
+                                <option value="sd">Độ lệch chuẩn (SD)</option>
+                                <option value="rsd">% RSD</option>
+                              </select>
+                            </td>
+                            <td style={{ padding: '0.3rem 0.4rem' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                                <input
+                                  type="number"
+                                  step={cfg.type === 'sd' ? 0.05 : 0.2}
+                                  min={0.001}
+                                  max={cfg.type === 'sd' ? 1000 : 50}
+                                  value={cfg.value}
+                                  onChange={(e) => handleUpdateFactorVariability(f.code, { value: Math.max(0.001, Number(e.target.value) || 0.001) })}
+                                  disabled={mcVariabilityMode === 'global'}
+                                  className="input-field font-mono"
+                                  style={{ width: '60px', padding: '0.15rem 0.3rem', fontSize: '0.72rem', textAlign: 'center' }}
+                                />
+                                <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                                  {cfg.type === 'sd' ? (f.unit || 'đv') : '%'}
+                                </span>
+                              </div>
+                            </td>
+                            <td style={{ padding: '0.3rem 0.4rem', fontSize: '0.68rem', color: '#0f766e', fontFamily: 'monospace' }}>
+                              [{span3sLow} ... {span3sHigh}]
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Table 2: CQAs Y Analytical Measurement Noise */}
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '0.375rem', border: '1px solid #e2e8f0', padding: '0.65rem' }}>
+                <div style={{ fontWeight: '700', fontSize: '0.78rem', color: '#7c3aed', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <span>🧪 2. Sai Số Phép Đo Phân Tích CQA (Y - Analytical Noise ICH Q14)</span>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="data-table" style={{ fontSize: '0.72rem', width: '100%' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ padding: '0.3rem 0.4rem' }}>Chỉ tiêu (Y)</th>
+                        <th style={{ padding: '0.3rem 0.4rem', textAlign: 'center' }}>Tính vào MC?</th>
+                        <th style={{ padding: '0.3rem 0.4rem' }}>Kiểu</th>
+                        <th style={{ padding: '0.3rem 0.4rem' }}>Độ lặp lại (σmeas)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cqas.map((c) => {
+                        const cfg = cqaMeasurementVariabilityMap[c.code] ?? { type: 'rsd', value: 2.0, enabled: false };
+                        return (
+                          <tr key={c.code} style={{ opacity: cfg.enabled ? 1 : 0.65 }}>
+                            <td style={{ padding: '0.3rem 0.4rem', fontWeight: '600' }}>
+                              {c.name} <span style={{ color: '#64748b' }}>({c.code})</span>
+                            </td>
+                            <td style={{ padding: '0.3rem 0.4rem', textAlign: 'center' }}>
+                              <input
+                                type="checkbox"
+                                checked={cfg.enabled}
+                                onChange={(e) => handleUpdateCqaVariability(c.code, { enabled: e.target.checked })}
+                                title={`Bật/tắt đưa sai số đo phân tích vào mô phỏng ${c.code}`}
+                                style={{ cursor: 'pointer' }}
+                              />
+                            </td>
+                            <td style={{ padding: '0.3rem 0.4rem' }}>
+                              <select
+                                value={cfg.type}
+                                onChange={(e) => handleUpdateCqaVariability(c.code, { type: e.target.value as 'sd' | 'rsd' })}
+                                disabled={!cfg.enabled}
+                                className="input-field"
+                                style={{ fontSize: '0.7rem', padding: '0.15rem 0.3rem' }}
+                              >
+                                <option value="rsd">% RSD (HPLC/UV)</option>
+                                <option value="sd">Độ lệch chuẩn (SD)</option>
+                              </select>
+                            </td>
+                            <td style={{ padding: '0.3rem 0.4rem' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                                <input
+                                  type="number"
+                                  step={cfg.type === 'sd' ? 0.05 : 0.2}
+                                  min={0.001}
+                                  max={cfg.type === 'sd' ? 100 : 30}
+                                  value={cfg.value}
+                                  onChange={(e) => handleUpdateCqaVariability(c.code, { value: Math.max(0.001, Number(e.target.value) || 0.001) })}
+                                  disabled={!cfg.enabled}
+                                  className="input-field font-mono"
+                                  style={{ width: '60px', padding: '0.15rem 0.3rem', fontSize: '0.72rem', textAlign: 'center' }}
+                                />
+                                <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                                  {cfg.type === 'sd' ? (c.unit || 'đv') : '%'}
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* Scientific Callout Box */}
+            <div
+              style={{
+                marginTop: '0.65rem',
+                padding: '0.45rem 0.65rem',
+                backgroundColor: '#f0fdfa',
+                borderRadius: '0.35rem',
+                border: '1px solid #ccfbf1',
+                fontSize: '0.7rem',
+                color: '#0f766e',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+              }}
+            >
+              <Info size={14} style={{ flexShrink: 0 }} />
+              <span>
+                <strong>Nguyên lý ICH Q14 &amp; Phân rã phương sai:</strong> Tổng phương sai phân bố s²<sub>total</sub> = s²<sub>process</sub> + s²<sub>residual</sub> + s²<sub>meas</sub>. Khi bật sai số đo, Monte Carlo cộng thêm nhiễu phân tích ε ~ <i>N</i>(0, σ²<sub>meas</sub>) vào mỗi mẻ ảo nhằm phản ánh kết quả kiểm nghiệm thực tế tại phòng lab.
+              </span>
+            </div>
           </div>
         )}
 
@@ -2259,6 +2636,111 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                 );
               })}
             </div>
+
+            {/* Variance Decomposition Card (ICH Q14) */}
+            {mcResult.varianceDecomposition && Object.keys(mcResult.varianceDecomposition).length > 0 && (
+              <div
+                style={{
+                  marginTop: '0.85rem',
+                  padding: '0.85rem 1rem',
+                  backgroundColor: '#ffffff',
+                  borderRadius: '0.5rem',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.65rem' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <Layers size={16} color="#0f766e" />
+                      <span style={{ fontWeight: '700', fontSize: '0.85rem', color: '#0f172a' }}>
+                        Phân Rã Phương Sai Chất Lượng (Variance Decomposition - ICH Q14 / Six Sigma)
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '0.15rem 0 0 0' }}>
+                      Bóc tách nguồn gốc biến thiên chất lượng trên từng CQA: Dao động thông số quy trình (s²<sub>process</sub>), Sai số mô hình (s²<sub>residual</sub>), và Sai số đo phân tích (s²<sub>meas</sub>).
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.7rem' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <span style={{ width: '10px', height: '10px', backgroundColor: '#3b82f6', borderRadius: '2px', display: 'inline-block' }} />
+                      Quy trình (Process)
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <span style={{ width: '10px', height: '10px', backgroundColor: '#f59e0b', borderRadius: '2px', display: 'inline-block' }} />
+                      Mô hình (Model Residual)
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <span style={{ width: '10px', height: '10px', backgroundColor: '#8b5cf6', borderRadius: '2px', display: 'inline-block' }} />
+                      Đo phân tích (Analytical)
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.75rem' }}>
+                  {Object.entries(mcResult.varianceDecomposition).map(([code, decomp]) => {
+                    const cqa = cqas.find((c) => c.code === code);
+                    const isMeasHigh = decomp.measurementPercent >= 30;
+
+                    return (
+                      <div
+                        key={code}
+                        style={{
+                          padding: '0.65rem 0.8rem',
+                          backgroundColor: '#f8fafc',
+                          borderRadius: '0.375rem',
+                          border: '1px solid #e2e8f0',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                          <span style={{ fontWeight: '700', fontSize: '0.78rem', color: '#1e3a8a' }}>
+                            {cqa ? cqa.name : code} ({code})
+                          </span>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'monospace' }}>
+                            s²<sub>total</sub> = {decomp.totalVariance.toFixed(3)}
+                          </span>
+                        </div>
+
+                        {/* Stacked Percentage Bar */}
+                        <div style={{ width: '100%', height: '14px', backgroundColor: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', display: 'flex', marginBottom: '0.45rem' }}>
+                          <div
+                            style={{ width: `${decomp.processPercent}%`, backgroundColor: '#3b82f6' }}
+                            title={`Quy trình (Process): ${decomp.processPercent}% (s² = ${decomp.processVariance.toFixed(3)})`}
+                          />
+                          <div
+                            style={{ width: `${decomp.modelPercent}%`, backgroundColor: '#f59e0b' }}
+                            title={`Mô hình dư (Residual): ${decomp.modelPercent}% (s² = ${decomp.modelResidualVariance.toFixed(3)})`}
+                          />
+                          <div
+                            style={{ width: `${decomp.measurementPercent}%`, backgroundColor: '#8b5cf6' }}
+                            title={`Đo phân tích (Measurement): ${decomp.measurementPercent}% (s² = ${decomp.measurementVariance.toFixed(3)})`}
+                          />
+                        </div>
+
+                        {/* Percentage Breakdown Details */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: '#475569' }}>
+                          <span style={{ color: '#1d4ed8', fontWeight: '600' }}>
+                            Process: {decomp.processPercent}%
+                          </span>
+                          <span style={{ color: '#b45309', fontWeight: '600' }}>
+                            Model: {decomp.modelPercent}%
+                          </span>
+                          <span style={{ color: '#6d28d9', fontWeight: '600' }}>
+                            Meas: {decomp.measurementPercent}%
+                          </span>
+                        </div>
+
+                        {isMeasHigh && (
+                          <div style={{ marginTop: '0.35rem', fontSize: '0.66rem', color: '#b91c1c', backgroundColor: '#fef2f2', padding: '0.2rem 0.4rem', borderRadius: '0.25rem', border: '1px solid #fecaca' }}>
+                            ⚠️ Sai số phân tích chiếm &gt; 30% phương sai. Cần tối ưu phương pháp thử nghiệm hoặc tăng số lần lặp mẫu kiểm nghiệm.
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Six Sigma & Process Capability Benchmark Guide */}
             <div

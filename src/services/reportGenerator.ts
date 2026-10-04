@@ -64,14 +64,14 @@ function createDataCell(text: string, isEven: boolean = false, widthPercent?: nu
  * Generate a review draft using the CTD 3.2.P.2 Pharmaceutical Development structure (.docx).
  * Output is not a validated submission dossier and requires independent scientific/QA review.
  */
-export async function exportQBDWordReport(
+export async function buildQBDWordDocument(
   project: QBDProject,
-  models: Record<string, StatisticalModelResult>,
-  optimum: DesirabilitySolution | null,
-  monteCarlo: MonteCarloResult | null,
+  models: Record<string, StatisticalModelResult> = {},
+  optimum: DesirabilitySolution | null = null,
+  monteCarlo: MonteCarloResult | null = null,
   neuralModels?: Record<string, NeuralNetModelResult>,
   modelingEngine: ModelingEngine = 'polynomial'
-): Promise<void> {
+): Promise<Document> {
   const sections: any[] = [];
   const reportModels: Record<string, StatisticalModelResult | NeuralNetModelResult> =
     modelingEngine === 'neural' ? (neuralModels ?? {}) : models;
@@ -1055,21 +1055,26 @@ export async function exportQBDWordReport(
     new Paragraph({ text: '', spacing: { after: 250 } })
   );
 
-  // SECTION 8: Monte Carlo Simulation Summary (ICH Q9)
+  // SECTION 8: Monte Carlo Simulation Summary & Variance Decomposition (ICH Q9 / ICH Q14)
   sections.push(
     new Paragraph({
-      text: '8. Đánh Giá Độ Bền Vững Miền Dự Báo (Mô Phỏng Monte Carlo, tham chiếu ICH Q9)',
+      text: '8. Đánh Giá Độ Bền Vững Miền Dự Báo (Mô Phỏng Monte Carlo & Phân Rã Phương Sai, tham chiếu ICH Q9 & ICH Q14)',
       heading: HeadingLevel.HEADING_1,
       spacing: { before: 300, after: 150 },
     })
   );
 
   if (monteCarlo) {
+    const isGlobal = monteCarlo.customVariability?.mode !== 'component_wise';
+    const modeText = isGlobal
+      ? `Chế độ RSD Chung (Global RSD ±${monteCarlo.variabilityPercent ?? 2.0}%)`
+      : 'Chế độ Từng Biến (Component-wise & Analytical Measurement Noise - ICH Q14)';
+
     sections.push(
       new Paragraph({
         children: [
           new TextRun({
-            text: `Kết quả mô phỏng ${monteCarlo.simulations.toLocaleString()} lô sản xuất ảo với dao động thực tế: `,
+            text: `Kết quả mô phỏng ${monteCarlo.simulations.toLocaleString()} lô sản xuất ảo với dao động thực tế (${modeText}): `,
             bold: true,
           }),
           new TextRun({
@@ -1082,9 +1087,112 @@ export async function exportQBDWordReport(
       }),
       new Paragraph({
         text: `Phạm vi mô hình: ${monteCarlo.modeledCqaCodes.join(', ') || 'Không có'} | CQA chưa được bao phủ: ${monteCarlo.unmodeledCqaCodes.join(', ') || 'Không có'} | Mẫu vượt miền khảo sát: ${monteCarlo.excursionCount.toLocaleString()} (${monteCarlo.excursionRatePercent}%).`,
-        spacing: { after: 200 },
+        spacing: { after: 150 },
       })
     );
+
+    // CQA Capability & Performance Table
+    if (monteCarlo.cqaStats && Object.keys(monteCarlo.cqaStats).length > 0) {
+      sections.push(
+        new Paragraph({
+          text: 'Bảng Năng Lực & Hiệu Năng Quy Trình Theo Từng CQA (Ppk / Cpk Benchmarks):',
+          heading: HeadingLevel.HEADING_2,
+          spacing: { before: 120, after: 100 },
+        })
+      );
+
+      const capTableRows = [
+        new TableRow({
+          children: [
+            createHeaderCell('Chỉ Tiêu CQA', 25),
+            createHeaderCell('Trung Bình ± SD', 25),
+            createHeaderCell('Hiệu Năng Ppk (Cpk)', 20),
+            createHeaderCell('Ngoài Chuẩn (% OOS)', 15),
+            createHeaderCell('Đánh Giá 6σ', 15),
+          ],
+        }),
+        ...Object.entries(monteCarlo.cqaStats).map(([code, stats], idx) => {
+          const cqa = project.cqas.find((c) => c.code === code);
+          const isEven = idx % 2 === 1;
+          const p = stats.ppk ?? stats.cpk;
+          let rating = 'Chưa đạt 3σ';
+          if (p !== undefined) {
+            if (p >= 1.33) rating = 'Đạt 4σ (Dược)';
+            else if (p >= 1.0) rating = 'Đạt 3σ cơ bản';
+          }
+          return new TableRow({
+            children: [
+              createDataCell(`${cqa ? cqa.name : code} (${code})`, isEven, 25),
+              createDataCell(`${stats.mean.toFixed(2)} ± ${stats.sd.toFixed(2)}`, isEven, 25),
+              createDataCell(`Ppk = ${stats.ppk ?? 'N/A'}${stats.cpk !== undefined ? ` (Cpk: ${stats.cpk})` : ''}`, isEven, 20),
+              createDataCell(`${stats.outOfSpecPercent}%`, isEven, 15),
+              createDataCell(rating, isEven, 15),
+            ],
+          });
+        }),
+      ];
+
+      sections.push(
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: capTableRows,
+        }),
+        new Paragraph({ text: '', spacing: { after: 150 } })
+      );
+    }
+
+    // Variance Decomposition Table (ICH Q14)
+    if (monteCarlo.varianceDecomposition && Object.keys(monteCarlo.varianceDecomposition).length > 0) {
+      sections.push(
+        new Paragraph({
+          text: 'Bảng Phân Rã Phương Sai Chất Lượng (Variance Decomposition - ICH Q14 / Six Sigma):',
+          heading: HeadingLevel.HEADING_2,
+          spacing: { before: 120, after: 100 },
+        }),
+        new Paragraph({
+          text: 'Phân tích đóng góp phương sai thành phần: Phương sai quy trình (Process Variance), Sai số mô hình (Model Residual), và Sai số đo phân tích lặp lại (Analytical Measurement Noise).',
+          spacing: { after: 100 },
+        })
+      );
+
+      const decompTableRows = [
+        new TableRow({
+          children: [
+            createHeaderCell('Chỉ Tiêu CQA', 20),
+            createHeaderCell('Phương Sai Tổng (s²total)', 18),
+            createHeaderCell('Quy Trình (Process %)', 18),
+            createHeaderCell('Mô Hình (Residual %)', 18),
+            createHeaderCell('Đo Lường (Meas %)', 16),
+            createHeaderCell('Khuyến Cáo ICH Q14', 10),
+          ],
+        }),
+        ...Object.entries(monteCarlo.varianceDecomposition).map(([code, d], idx) => {
+          const cqa = project.cqas.find((c) => c.code === code);
+          const isEven = idx % 2 === 1;
+          const advice = d.measurementPercent >= 30
+            ? 'Cần thẩm định lại phương pháp phân tích (nhiễu đo > 30%)'
+            : 'Đạt yêu cầu; quy trình chi phối chính';
+          return new TableRow({
+            children: [
+              createDataCell(`${cqa ? cqa.name : code} (${code})`, isEven, 20),
+              createDataCell(d.totalVariance.toFixed(4), isEven, 18),
+              createDataCell(`${d.processPercent}% (s²=${d.processVariance.toFixed(4)})`, isEven, 18),
+              createDataCell(`${d.modelPercent}% (s²=${d.modelResidualVariance.toFixed(4)})`, isEven, 18),
+              createDataCell(`${d.measurementPercent}% (s²=${d.measurementVariance.toFixed(4)})`, isEven, 16),
+              createDataCell(advice, isEven, 10),
+            ],
+          });
+        }),
+      ];
+
+      sections.push(
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: decompTableRows,
+        }),
+        new Paragraph({ text: '', spacing: { after: 200 } })
+      );
+    }
   } else {
     sections.push(
       new Paragraph({
@@ -1327,6 +1435,18 @@ export async function exportQBDWordReport(
     ],
   });
 
+  return doc;
+}
+
+export async function exportQBDWordReport(
+  project: QBDProject,
+  models: Record<string, StatisticalModelResult>,
+  optimum: DesirabilitySolution | null,
+  monteCarlo: MonteCarloResult | null,
+  neuralModels?: Record<string, NeuralNetModelResult>,
+  modelingEngine: ModelingEngine = 'polynomial'
+): Promise<void> {
+  const doc = await buildQBDWordDocument(project, models, optimum, monteCarlo, neuralModels, modelingEngine);
   const blob = await Packer.toBlob(doc);
   saveAs(blob, `QbD_Development_Report_DRAFT_${project.moleculeName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.docx`);
 }
@@ -1337,34 +1457,11 @@ export async function exportQBDWordReport(
  */
 export async function generateQBDWordDocument(
   project: QBDProject,
-  _models?: Record<string, StatisticalModelResult>,
-  _optimum?: DesirabilitySolution | null,
-  _monteCarlo?: MonteCarloResult | null,
-  _neuralModels?: Record<string, NeuralNetModelResult>,
-  _modelingEngine: ModelingEngine = 'polynomial'
+  models?: Record<string, StatisticalModelResult>,
+  optimum?: DesirabilitySolution | null,
+  monteCarlo?: MonteCarloResult | null,
+  neuralModels?: Record<string, NeuralNetModelResult>,
+  modelingEngine: ModelingEngine = 'polynomial'
 ): Promise<Document> {
-  const auditHistory = getProjectHistory(project.id);
-  const auditVerification = verifyAuditTrailIntegrity(auditHistory, project);
-  const rootChecksum = auditVerification.rootHash || computeProjectPayloadHash(project);
-
-  const doc = new Document({
-    sections: [
-      {
-        properties: {},
-        children: [
-          new Paragraph({
-            text: `CTD 3.2.P.2 - ${project.name} (${project.moleculeName})`,
-            heading: HeadingLevel.TITLE,
-          }),
-          new Paragraph({
-            text: `Embedded SHA-256 Root Checksum: ${rootChecksum}`,
-          }),
-          new Paragraph({
-            text: `Audit Trail Status: ${auditVerification.isValid ? 'VALID' : 'TAMPERED'}`,
-          }),
-        ],
-      },
-    ],
-  });
-  return doc;
+  return buildQBDWordDocument(project, models ?? {}, optimum ?? null, monteCarlo ?? null, neuralModels, modelingEngine);
 }

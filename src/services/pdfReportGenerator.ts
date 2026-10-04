@@ -807,10 +807,73 @@ export function generateRegulatoryPDFABuffer(
       { text: 'Tỷ Lệ Sai Lỗi Dự Báo (Defect Rate PPM):', width: 220, bold: true, bg: [0.96, 0.97, 0.99] },
       { text: `${monteCarlo.defectRatePPM.toLocaleString()} PPM`, width: 291, bold: true },
     ], 16);
+    const isGlobal = monteCarlo.customVariability?.mode !== 'component_wise';
+    const modeText = isGlobal
+      ? `RSD Chung (Global ±${monteCarlo.variabilityPercent ?? 2.0}%)`
+      : 'Từng Biến (ICH Q14 Component-wise)';
+
+    doc.addTableRow([
+      { text: 'Chế Độ Dao Động & Sai Số Đo:', width: 220, bg: [0.96, 0.97, 0.99] },
+      { text: modeText, width: 291, bold: true },
+    ], 16);
     doc.addTableRow([
       { text: 'CQA Được Bao Phủ Trong Mô Hình:', width: 220, bg: [0.96, 0.97, 0.99] },
       { text: monteCarlo.modeledCqaCodes.join(', ') || 'None', width: 291 },
     ], 16);
+
+    // Per-CQA capability rows
+    if (monteCarlo.cqaStats && Object.keys(monteCarlo.cqaStats).length > 0) {
+      doc.addParagraph('Đánh giá năng lực Ppk / Cpk từng CQA:', 'F1', 8, 12, 0.2, 0.2, 0.4);
+      doc.addTableRow([
+        { text: 'Chỉ Tiêu CQA', width: 140, isHeader: true, bg: [0.12, 0.23, 0.54] },
+        { text: 'Trung Bình ± SD', width: 120, isHeader: true, bg: [0.12, 0.23, 0.54] },
+        { text: 'Hiệu Năng Ppk (Cpk)', width: 110, isHeader: true, bg: [0.12, 0.23, 0.54] },
+        { text: 'Ngoài Chuẩn (% OOS)', width: 80, isHeader: true, bg: [0.12, 0.23, 0.54] },
+        { text: 'Đánh Giá 6σ', width: 61, isHeader: true, bg: [0.12, 0.23, 0.54] },
+      ], 16);
+
+      Object.entries(monteCarlo.cqaStats).forEach(([code, stats], idx) => {
+        const cqa = project.cqas.find((c) => c.code === code);
+        const bg: [number, number, number] = idx % 2 === 0 ? [1, 1, 1] : [0.96, 0.97, 0.99];
+        const p = stats.ppk ?? stats.cpk;
+        let rating = '< 3σ';
+        if (p !== undefined) {
+          if (p >= 1.33) rating = '≥ 4σ (Dược)';
+          else if (p >= 1.0) rating = '≥ 3σ';
+        }
+        doc.addTableRow([
+          { text: `${cqa ? cqa.name : code} (${code})`, width: 140, bold: true, bg },
+          { text: `${stats.mean.toFixed(2)} ± ${stats.sd.toFixed(2)}`, width: 120, bg },
+          { text: `Ppk=${stats.ppk ?? 'N/A'}${stats.cpk !== undefined ? ` (Cpk:${stats.cpk})` : ''}`, width: 110, bg },
+          { text: `${stats.outOfSpecPercent}%`, width: 80, bg },
+          { text: rating, width: 61, bold: true, bg: p !== undefined && p >= 1.33 ? [0.92, 0.98, 0.94] : bg },
+        ], 15);
+      });
+    }
+
+    // Variance Decomposition Table (ICH Q14)
+    if (monteCarlo.varianceDecomposition && Object.keys(monteCarlo.varianceDecomposition).length > 0) {
+      doc.addParagraph('Phân rã phương sai chất lượng (Variance Decomposition - ICH Q14):', 'F1', 8, 12, 0.2, 0.2, 0.4);
+      doc.addTableRow([
+        { text: 'Chỉ Tiêu CQA', width: 140, isHeader: true, bg: [0.08, 0.45, 0.4] },
+        { text: 'Phương Sai Tổng (s²)', width: 95, isHeader: true, bg: [0.08, 0.45, 0.4] },
+        { text: 'Quy Trình (%)', width: 92, isHeader: true, bg: [0.08, 0.45, 0.4] },
+        { text: 'Mô Hình (%)', width: 92, isHeader: true, bg: [0.08, 0.45, 0.4] },
+        { text: 'Đo Lường (%)', width: 92, isHeader: true, bg: [0.08, 0.45, 0.4] },
+      ], 16);
+
+      Object.entries(monteCarlo.varianceDecomposition).forEach(([code, d], idx) => {
+        const cqa = project.cqas.find((c) => c.code === code);
+        const bg: [number, number, number] = idx % 2 === 0 ? [1, 1, 1] : [0.96, 0.97, 0.99];
+        doc.addTableRow([
+          { text: `${cqa ? cqa.name : code} (${code})`, width: 140, bold: true, bg },
+          { text: d.totalVariance.toFixed(4), width: 95, bg },
+          { text: `${d.processPercent}%`, width: 92, bg },
+          { text: `${d.modelPercent}%`, width: 92, bg },
+          { text: `${d.measurementPercent}%`, width: 92, bold: d.measurementPercent >= 30, bg: d.measurementPercent >= 30 ? [1, 0.94, 0.94] : bg },
+        ], 15);
+      });
+    }
   } else {
     doc.addParagraph('Chưa thực hiện mô phỏng Monte Carlo để thẩm định độ bền của vùng vận hành.', 'F1', 8, 12, 0.5, 0.5, 0.5);
   }
