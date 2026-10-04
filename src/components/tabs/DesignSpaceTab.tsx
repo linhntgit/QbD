@@ -1270,7 +1270,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
           >
             <span style={{ fontSize: '1rem', flexShrink: 0 }}>💡</span>
             <div>
-              <strong>Tiêu chuẩn năng lực quy trình &amp; Six Sigma:</strong> Chỉ số <strong>Cpk = 1.0</strong> về cơ bản là quy trình <strong>3 sigma (3σ)</strong>, tương đương xác suất đạt <strong>99.73%</strong> và dự kiến có <strong>0.27%</strong> sản phẩm đầu ra (khoảng <strong>2.700 PPM</strong>) nằm ngoài thông số kỹ thuật. Khuyến nghị công nghiệp dược phẩm (ICH Q8/Q9) hướng tới <strong>Cpk ≥ 1.33</strong> (mức 4σ, tỷ lệ lỗi ≤ 63 PPM). Sử dụng nút <em>Biên DS: Cpk ≥ 1 (3σ / lỗi ≤ 0.27%)</em> để vạch ranh giới an toàn 3σ cho Design Space.
+              <strong>Tiêu chuẩn năng lực quy trình &amp; Six Sigma:</strong> Chỉ số <strong>Ppk / Cpk = 1.0</strong> về cơ bản là quy trình <strong>3 sigma (3σ)</strong>, tương đương xác suất đạt <strong>99.73%</strong> và dự kiến có <strong>0.27%</strong> sản phẩm đầu ra (khoảng <strong>2.700 PPM</strong>) nằm ngoài thông số kỹ thuật. Khuyến nghị công nghiệp dược phẩm (ICH Q8/Q9) hướng tới <strong>Ppk / Cpk ≥ 1.33</strong> (mức 4σ, tỷ lệ lỗi ≤ 63 PPM). Sử dụng nút <em>Biên DS: Cpk ≥ 1 (3σ / lỗi ≤ 0.27%)</em> để vạch ranh giới an toàn 3σ cho Design Space.
             </div>
           </div>
 
@@ -1898,7 +1898,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
       </section>
 
       {/* Monte Carlo Risk & Reliability Assessment (ICH Q9) */}
-      <section id="step7-monte-carlo" className="step7-section"><div className="step7-section-heading"><span>3</span><div><h2>Đánh giá độ bền dự báo</h2><p>Chọn điều kiện mô phỏng, chạy thử và xem rủi ro dự báo tại phương án đã chọn.</p></div></div>
+      <section id="step7-monte-carlo" className="step7-section"><div className="step7-section-heading"><span>3</span><div><h2>Đánh giá độ bền dự báo quanh phương án đã chọn</h2><p>Mô phỏng ngẫu nhiên các lô ảo dao động quanh điểm cài đặt tối ưu (Target Setpoint) để kiểm tra độ tin cậy và tỷ lệ lỗi.</p></div></div>
       <div className="qbd-card">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
           <div>
@@ -1909,7 +1909,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
               </h3>
             </div>
             <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.2rem' }}>
-              Mô phỏng ngẫu nhiên hàng ngàn lô sản xuất ảo với sai số thông số thực tế để tính toán tỷ lệ lỗi (Defect Rate) và chỉ số hiệu năng / năng lực quy trình (Ppk / Cpk). Mốc chuẩn: <strong>Cpk = 1.0</strong> tương ứng quy trình <strong>3 sigma (3σ)</strong> với tỷ lệ lỗi dự kiến <strong>0.27%</strong> (2.700 PPM); quy trình công nghiệp dược xuất sắc đạt <strong>Cpk ≥ 1.33</strong> (4σ, tỷ lệ lỗi ≤ 63 PPM).
+              Mô phỏng ngẫu nhiên hàng ngàn lô sản xuất ảo dao động quanh phương án tối ưu đã chọn (Target Setpoint) với sai số thông số thực tế để tính toán tỷ lệ lỗi (Defect Rate) và chỉ số hiệu năng thực tế <strong>Ppk</strong> (phản ánh năng lực <strong>Cpk</strong> dài hạn). Mốc chuẩn: <strong>Ppk (Cpk) = 1.0</strong> tương ứng quy trình <strong>3 sigma (3σ)</strong> với tỷ lệ lỗi dự kiến <strong>0.27%</strong> (2.700 PPM); quy trình công nghiệp dược xuất sắc đạt <strong>Ppk (Cpk) ≥ 1.33</strong> (4σ, tỷ lệ lỗi ≤ 63 PPM).
             </p>
           </div>
 
@@ -2002,6 +2002,66 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Setpoint Context Banner: Explicitly clarifies Monte Carlo is simulated around the selected setpoint */}
+        {optimum ? (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              backgroundColor: '#f0fdfa',
+              border: '1px solid #99f6e4',
+              borderRadius: '0.45rem',
+              padding: '0.45rem 0.75rem',
+              marginBottom: '0.85rem',
+              fontSize: '0.74rem',
+              color: '#0f766e',
+              flexWrap: 'wrap',
+            }}
+          >
+            <span style={{ fontWeight: '700', color: '#115e59', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              🎯 Tâm mô phỏng (Phương án đã chọn):
+            </span>
+            <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              {factors.map((f) => {
+                const val = optimum.actualFactors[f.code];
+                return (
+                  <span
+                    key={f.code}
+                    style={{
+                      backgroundColor: '#ffffff',
+                      padding: '0.12rem 0.45rem',
+                      borderRadius: '0.25rem',
+                      border: '1px solid #ccfbf1',
+                      fontWeight: '600',
+                      color: '#0f766e',
+                    }}
+                  >
+                    {f.name} ({f.code}): <strong>{typeof val === 'number' ? val.toFixed(2) : val}</strong> {f.unit || ''}
+                  </span>
+                );
+              })}
+            </div>
+            <span style={{ color: '#0d9488', fontSize: '0.7rem', fontStyle: 'italic', marginLeft: 'auto' }}>
+              (10.000 lô ảo được sinh ngẫu nhiên Gauss quanh Setpoint này với RSD ±{mcVariability}%)
+            </span>
+          </div>
+        ) : (
+          <div
+            style={{
+              padding: '0.45rem 0.75rem',
+              backgroundColor: '#fffbeb',
+              border: '1px solid #fde68a',
+              borderRadius: '0.45rem',
+              marginBottom: '0.85rem',
+              fontSize: '0.74rem',
+              color: '#92400e',
+            }}
+          >
+            ⚠️ Chưa có phương án tối ưu được áp dụng. Hãy thiết lập hoặc chọn điểm tối ưu tại Mục 1 (Desirability Profiler) trước khi chạy mô phỏng.
+          </div>
+        )}
 
         {/* Dynamic Simulation Running Feedback Banner */}
         {isSimulating && (
@@ -2189,11 +2249,11 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                     <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
                       TB: {stats.mean} ± {stats.sd} | Ngoài chuẩn: <strong>{stats.outOfSpecPercent}%</strong>
                       <span style={{ fontSize: '0.68rem', color: '#94a3b8', marginLeft: '0.35rem' }}>
-                        (Mốc 3σ / Cpk=1.0: 0.27%)
+                        (Mốc 3σ / Ppk=1.0: 0.27%)
                       </span>
                     </div>
                     <div style={{ fontSize: '0.66rem', color: '#94a3b8', marginTop: '0.15rem' }}>
-                      Ppk: Hiệu năng mẫu mô phỏng (s) | Cpk: Năng lực quy trình
+                      Ppk: Hiệu năng mẫu mô phỏng (tương đương năng lực Cpk khi quy trình ổn định)
                     </div>
                   </div>
                 );
@@ -2213,27 +2273,27 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
               }}
             >
               <div style={{ fontWeight: '700', color: '#0f172a', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <span>📊 Thang Đo Năng Lực Quy Trình &amp; Six Sigma (Process Capability Benchmarks - ICH Q9):</span>
+                <span>📊 Thang Đo Hiệu Năng &amp; Năng Lực Quy Trình (Ppk / Cpk Benchmarks - ICH Q9 &amp; Six Sigma):</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.5rem' }}>
                 <div style={{ padding: '0.35rem 0.5rem', backgroundColor: '#fef2f2', borderRadius: '0.375rem', border: '1px solid #fecaca' }}>
-                  <span style={{ fontWeight: '700', color: '#991b1b' }}>Cpk &lt; 1.00 (&lt; 3σ)</span>
+                  <span style={{ fontWeight: '700', color: '#991b1b' }}>Ppk / Cpk &lt; 1.00 (&lt; 3σ)</span>
                   <div style={{ fontSize: '0.68rem', color: '#b91c1c' }}>Lỗi &gt; 0.27% (&gt; 2.700 PPM) • Chưa đủ năng lực</div>
                 </div>
                 <div style={{ padding: '0.35rem 0.5rem', backgroundColor: '#fffbeb', borderRadius: '0.375rem', border: '1px solid #fde68a' }}>
-                  <span style={{ fontWeight: '700', color: '#92400e' }}>Cpk = 1.00 (3σ)</span>
+                  <span style={{ fontWeight: '700', color: '#92400e' }}>Ppk / Cpk = 1.00 (3σ)</span>
                   <div style={{ fontSize: '0.68rem', color: '#b45309' }}>Lỗi = 0.27% (2.700 PPM) • Mức cơ bản 3-sigma</div>
                 </div>
                 <div style={{ padding: '0.35rem 0.5rem', backgroundColor: '#f0fdf4', borderRadius: '0.375rem', border: '1px solid #bbf7d0' }}>
-                  <span style={{ fontWeight: '700', color: '#166534' }}>Cpk ≥ 1.33 (4σ)</span>
+                  <span style={{ fontWeight: '700', color: '#166534' }}>Ppk / Cpk ≥ 1.33 (4σ)</span>
                   <div style={{ fontSize: '0.68rem', color: '#15803d' }}>Lỗi ≤ 0.0063% (≤ 63 PPM) • Chuẩn ngành Dược</div>
                 </div>
                 <div style={{ padding: '0.35rem 0.5rem', backgroundColor: '#eff6ff', borderRadius: '0.375rem', border: '1px solid #bfdbfe' }}>
-                  <span style={{ fontWeight: '700', color: '#1e40af' }}>Cpk ≥ 1.67 (5σ)</span>
+                  <span style={{ fontWeight: '700', color: '#1e40af' }}>Ppk / Cpk ≥ 1.67 (5σ)</span>
                   <div style={{ fontSize: '0.68rem', color: '#2563eb' }}>Lỗi ≤ 0.57 PPM • Độ tin cậy xuất sắc</div>
                 </div>
                 <div style={{ padding: '0.35rem 0.5rem', backgroundColor: '#faf5ff', borderRadius: '0.375rem', border: '1px solid #e9d5ff' }}>
-                  <span style={{ fontWeight: '700', color: '#6b21a8' }}>Cpk ≥ 2.00 (6σ)</span>
+                  <span style={{ fontWeight: '700', color: '#6b21a8' }}>Ppk / Cpk ≥ 2.00 (6σ)</span>
                   <div style={{ fontSize: '0.68rem', color: '#7c3aed' }}>Lỗi ≤ 3.4 ppb • Đẳng cấp Six Sigma</div>
                 </div>
               </div>

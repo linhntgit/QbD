@@ -78,4 +78,33 @@ describe('Monte Carlo Robustness & Statistical Coherence', () => {
     expect(mc.cqaStats.Y3).toBeDefined();
     expect(mc.cqaDefectRatePPM).toBeDefined();
   });
+
+  it('dynamically changes simulation results and response variance when RSD is changed', () => {
+    const cs = CASE_STUDIES.find((p) => p.id === 'case-study-api-ccd')!;
+    expect(cs).toBeDefined();
+
+    const models: Record<string, any> = {};
+    for (const cqa of cs.cqas) {
+      const m = fitModel(cqa, cs.factors, cs.runs, 'Quadratic');
+      if (m) models[cqa.code] = m;
+    }
+    const setpoint = { X1: 75, X2: 450, X3: 2.0 };
+
+    // Run at RSD = 1.0% (tight control)
+    const mcLowRSD = runMonteCarloSimulation(setpoint, cs.factors, cs.cqas, models, 1.0, 1000, 2026);
+    // Run at RSD = 5.0% (high variability)
+    const mcHighRSD = runMonteCarloSimulation(setpoint, cs.factors, cs.cqas, models, 5.0, 1000, 2026);
+
+    // Response standard deviation should be strictly larger at higher RSD
+    const sdLow = mcLowRSD.cqaStats['Y1'].sd;
+    const sdHigh = mcHighRSD.cqaStats['Y1'].sd;
+    expect(sdHigh).toBeGreaterThan(sdLow);
+
+    // Ppk should be strictly lower at higher RSD
+    const ppkLow = mcLowRSD.cqaStats['Y1'].ppk;
+    const ppkHigh = mcHighRSD.cqaStats['Y1'].ppk;
+    expect(ppkLow).toBeDefined();
+    expect(ppkHigh).toBeDefined();
+    expect(Number(ppkLow)).toBeGreaterThan(Number(ppkHigh));
+  });
 });

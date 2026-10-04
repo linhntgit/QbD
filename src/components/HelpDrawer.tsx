@@ -1605,10 +1605,13 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 <BlockMath math="D = \left[ \prod_{i=1}^m (d_i)^{w_i} \right]^{\frac{1}{\sum_{i=1}^m w_i}} \in [0, 1]" />
                 <p>Nếu bất kỳ CQA nào có <InlineMath math="d_i = 0" /> (ngoài tiêu chuẩn) &rarr; <InlineMath math="D = 0" />.</p>
 
-                <p style={{ marginTop: '0.5rem' }}><strong>4. Mô Phỏng Monte Carlo &amp; Năng Lực Quy Trình Cpk (Chuẩn 3&sigma;):</strong></p>
-                <BlockMath math="X_j \sim \mathcal{N}(\mu_{\text{setpoint}}, \, \sigma_j^2), \quad C_{pk} = \min\left( \frac{\text{USL} - \mu}{3\sigma}, \, \frac{\mu - \text{LSL}}{3\sigma} \right)" />
+                <p style={{ marginTop: '0.5rem' }}><strong>4. Mô Phỏng Monte Carlo Quanh Setpoint &amp; Chỉ Số Hiệu Năng Ppk / Năng Lực Cpk (Chuẩn 3&sigma;):</strong></p>
+                <BlockMath math="X_j \sim \mathcal{N}(\mu_{j, \text{setpoint}}, \, \sigma_j^2), \quad P_{pk} = \min\left( \frac{\text{USL} - \bar{Y}}{3s}, \, \frac{\bar{Y} - \text{LSL}}{3s} \right)" />
                 <p>
-                  Chỉ số <InlineMath math="C_{pk} = 1.0" /> về cơ bản là quy trình <strong>3 sigma (3&sigma;)</strong>, nghĩa là dự kiến có <strong>0.27%</strong> sản phẩm đầu ra (tương đương 2.700 PPM) nằm ngoài thông số kỹ thuật (OOS). Trong công nghiệp dược phẩm (ICH Q8/Q9), quy trình đạt năng lực tốt thường yêu cầu <InlineMath math="C_{pk} \ge 1.33" /> (tương đương 4&sigma;, tỷ lệ lỗi &le; 0.0063% hay 63 PPM).
+                  Mô phỏng Monte Carlo lấy mẫu ngẫu nhiên hàng ngàn lô ảo dao động xung quanh <strong>Phương án tối ưu đã chọn (Target Setpoint)</strong>. Do đánh giá trên tập mẫu toàn bộ các lô mô phỏng, chỉ số thu được là <strong><InlineMath math="P_{pk}" /> (Process Performance Index)</strong> dựa trên độ lệch chuẩn mẫu <InlineMath math="s" />. Khi quy trình sản xuất ổn định và kiểm soát tốt, <InlineMath math="P_{pk}" /> phản ánh trực tiếp năng lực quy trình dài hạn <strong><InlineMath math="C_{pk}" /></strong>.
+                </p>
+                <p>
+                  Chỉ số <InlineMath math="P_{pk} / C_{pk} = 1.0" /> về cơ bản là quy trình <strong>3 sigma (3&sigma;)</strong>, nghĩa là dự kiến có <strong>0.27%</strong> sản phẩm đầu ra (tương đương 2.700 PPM) nằm ngoài thông số kỹ thuật (OOS). Trong công nghiệp dược phẩm (ICH Q8/Q9), quy trình đạt năng lực tốt thường yêu cầu <InlineMath math="P_{pk} / C_{pk} \ge 1.33" /> (tương đương 4&sigma;, tỷ lệ lỗi &le; 0.0063% hay 63 PPM).
                 </p>
               </div>
             ),
@@ -1704,13 +1707,13 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   definition="Kỹ thuật mô phỏng số ngẫu nhiên lặp lại hàng nghìn lần (ví dụ: 10.000 lô ảo) có tính đến độ trôi dạt ngẫu nhiên thực tế của thiết bị và môi trường (RSD%) để ước lượng xác suất rủi ro lỗi lô và kiểm tra độ bền vững (robustness) của quy trình."
                 />
                 <GlossaryTermCard
-                  term="Process Capability (Cpk)"
-                  vietnamese="Chỉ số năng lực quy trình"
+                  term="Process Capability & Performance (Cpk / Ppk)"
+                  vietnamese="Chỉ số năng lực & hiệu năng quy trình"
                   tag="Năng Lực Quy Trình"
                   tagColor="teal"
                   definition={
                     <>
-                      Thước đo khoảng cách giữa giá trị trung bình quy trình và biên tiêu chuẩn kỹ thuật gần nhất theo đơn vị 3 độ lệch chuẩn: <InlineMath math="C_{pk} = \min\left(\frac{\text{USL}-\mu}{3\sigma}, \frac{\mu-\text{LSL}}{3\sigma}\right)" />. Chỉ số <InlineMath math="C_{pk} = 1.0" /> là mốc quy trình 3-sigma (3&sigma;), dự kiến có <strong>0.27%</strong> sản phẩm nằm ngoài tiêu chuẩn (khoảng 2.700 PPM). Khuyến nghị công nghiệp dược (ICH Q8/Q9) hướng tới <InlineMath math="C_{pk} \ge 1.33" /> (mức kiểm soát 4-sigma, tỷ lệ lỗi &le; 63 PPM).
+                      Thước đo khoảng cách giữa giá trị trung bình quy trình và biên tiêu chuẩn kỹ thuật gần nhất theo đơn vị 3 độ lệch chuẩn: <InlineMath math="P_{pk} = \min\left(\frac{\text{USL}-\bar{Y}}{3s}, \frac{\bar{Y}-\text{LSL}}{3s}\right)" />. Trong mô phỏng Monte Carlo, do khảo sát trên toàn bộ tập lô ảo nên chỉ số tính được là <InlineMath math="P_{pk}" /> (hiệu năng thực tế), phản ánh năng lực <InlineMath math="C_{pk}" /> khi quy trình ổn định. Mốc <InlineMath math="P_{pk} / C_{pk} = 1.0" /> tương ứng quy trình 3-sigma (3&sigma;), dự kiến có <strong>0.27%</strong> sản phẩm nằm ngoài tiêu chuẩn (khoảng 2.700 PPM). Khuyến nghị công nghiệp dược (ICH Q8/Q9) hướng tới <InlineMath math="P_{pk} / C_{pk} \ge 1.33" /> (mức kiểm soát 4-sigma, tỷ lệ lỗi &le; 63 PPM).
                     </>
                   }
                 />

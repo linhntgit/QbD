@@ -1893,7 +1893,7 @@ export function runMonteCarloSimulation(
             : (f.low + f.high) / 2;
       const scale = Math.max(Math.abs(mean), Math.abs(f.high - f.low) / 2);
       const sd = f.processSD !== undefined && Number.isFinite(f.processSD) && f.processSD > 0
-        ? f.processSD
+        ? f.processSD * (variabilityPercent / 2.0)
         : Math.max(1e-5, scale * (variabilityPercent / 100.0));
 
       // Stochastic factor sampling (STAT-03: Normal, Lognormal, Uniform, Triangular per ICH Q9)
@@ -1942,7 +1942,7 @@ export function runMonteCarloSimulation(
             ? Number(rawMean)
             : (f.low + f.high) / 2; // mean in %
         const sd = f.processSD !== undefined && Number.isFinite(f.processSD) && f.processSD > 0
-          ? f.processSD
+          ? f.processSD * (variabilityPercent / 2.0)
           : Math.max(1e-5, mean * (variabilityPercent / 100.0));
 
         let actualVal: number;
