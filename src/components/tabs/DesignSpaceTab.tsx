@@ -583,10 +583,20 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
         hoverX.push(xAct);
         hoverY.push(yAct);
 
+        const isCpk1 = boundaryMode === 'probabilistic' && Math.abs(probThreshold - 0.9973) < 0.0001;
+        const boundaryTag =
+          boundaryMode === 'mean'
+            ? 'Mean'
+            : boundaryMode === 'pi95'
+            ? 'PI 95%'
+            : isCpk1
+            ? 'Cpk ≥ 1.0 (3σ / lỗi ≤ 0.27%)'
+            : `P ≥ ${(probThreshold * 100).toFixed(0)}%`;
+
         const statusText =
           minMargin >= 0
-            ? `<span style="color:#16a34a;font-weight:700">✓ ĐẠT DESIGN SPACE (+${(minMargin * 100).toFixed(1)}% Margin)</span>`
-            : `<span style="color:#dc2626;font-weight:700">⚠ NGOÀI TIÊU CHUẨN (${(minMargin * 100).toFixed(1)}% Margin)</span>`;
+            ? `<span style="color:#16a34a;font-weight:700">✓ ĐẠT DESIGN SPACE [${boundaryTag}] (+${(minMargin * 100).toFixed(1)}% Margin)</span>`
+            : `<span style="color:#dc2626;font-weight:700">⚠ NGOÀI TIÊU CHUẨN [${boundaryTag}] (${(minMargin * 100).toFixed(1)}% Margin)</span>`;
 
         hoverText.push(
           `<b>${factorX.name} (${factorX.code})</b>: ${typeof xAct === 'number' ? xAct.toFixed(2) : xAct} ${factorX.unit || ''}<br>` +
@@ -1170,17 +1180,40 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      if (boundaryMode === 'probabilistic') {
+                      setBoundaryMode('probabilistic');
+                      setProbThreshold(0.9973);
+                    }}
+                    className={`btn ${boundaryMode === 'probabilistic' && Math.abs(probThreshold - 0.9973) < 0.0001 ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{
+                      fontSize: '0.68rem',
+                      padding: '0.18rem 0.45rem',
+                      borderRadius: '0.25rem',
+                      fontWeight: boundaryMode === 'probabilistic' && Math.abs(probThreshold - 0.9973) < 0.0001 ? '700' : '500',
+                    }}
+                    title="Biên chuẩn 3 Sigma (Cpk = 1.0): Quy trình 3σ với P(in-spec) ≥ 99.73%, dự kiến tỷ lệ lỗi ngoài tiêu chuẩn ≤ 0.27% (2.700 PPM)"
+                  >
+                    Cpk ≥ 1 (3σ / lỗi ≤ 0.27%)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (boundaryMode === 'probabilistic' && Math.abs(probThreshold - 0.9973) >= 0.0001) {
                         setProbThreshold((prev) => (prev === 0.95 ? 0.99 : prev === 0.99 ? 0.90 : 0.95));
                       } else {
                         setBoundaryMode('probabilistic');
+                        setProbThreshold(0.95);
                       }
                     }}
-                    className={`btn ${boundaryMode === 'probabilistic' ? 'btn-primary' : 'btn-secondary'}`}
-                    style={{ fontSize: '0.68rem', padding: '0.18rem 0.4rem', borderRadius: '0.25rem', fontWeight: boundaryMode === 'probabilistic' ? '700' : '500' }}
-                    title="Biên theo Xác suất đạt P(in-spec) ≥ π (Bấm để chuyển ngưỡng 90%, 95%, 99%)"
+                    className={`btn ${boundaryMode === 'probabilistic' && Math.abs(probThreshold - 0.9973) >= 0.0001 ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{
+                      fontSize: '0.68rem',
+                      padding: '0.18rem 0.45rem',
+                      borderRadius: '0.25rem',
+                      fontWeight: boundaryMode === 'probabilistic' && Math.abs(probThreshold - 0.9973) >= 0.0001 ? '700' : '500',
+                    }}
+                    title="Biên theo Xác suất đạt tùy chọn P(in-spec) ≥ π (Bấm để chuyển đổi 90%, 95%, 99%)"
                   >
-                    P ≥ {(probThreshold * 100).toFixed(0)}%
+                    P ≥ {Math.abs(probThreshold - 0.9973) < 0.0001 ? '95' : (probThreshold * 100).toFixed(0)}%
                   </button>
                 </div>
               </div>
@@ -1216,6 +1249,28 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                   <span>Đường viền ranh giới</span>
                 </label>
               )}
+            </div>
+          </div>
+
+          {/* Six Sigma & Process Capability Info Banner */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.6rem',
+              backgroundColor: '#eff6ff',
+              border: '1px solid #bfdbfe',
+              borderRadius: '0.45rem',
+              padding: '0.45rem 0.75rem',
+              marginBottom: '0.65rem',
+              fontSize: '0.74rem',
+              color: '#1e40af',
+              lineHeight: 1.45,
+            }}
+          >
+            <span style={{ fontSize: '1rem', flexShrink: 0 }}>💡</span>
+            <div>
+              <strong>Tiêu chuẩn năng lực quy trình &amp; Six Sigma:</strong> Chỉ số <strong>Cpk = 1.0</strong> về cơ bản là quy trình <strong>3 sigma (3σ)</strong>, tương đương xác suất đạt <strong>99.73%</strong> và dự kiến có <strong>0.27%</strong> sản phẩm đầu ra (khoảng <strong>2.700 PPM</strong>) nằm ngoài thông số kỹ thuật. Khuyến nghị công nghiệp dược phẩm (ICH Q8/Q9) hướng tới <strong>Cpk ≥ 1.33</strong> (mức 4σ, tỷ lệ lỗi ≤ 63 PPM). Sử dụng nút <em>Biên DS: Cpk ≥ 1 (3σ / lỗi ≤ 0.27%)</em> để vạch ranh giới an toàn 3σ cho Design Space.
             </div>
           </div>
 
@@ -1286,7 +1341,16 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                 }}
               />
               <span style={{ color: '#475569', fontSize: '0.74rem' }}>
-                Ranh giới tiêu chuẩn (Margin = 0)
+                Ranh giới tiêu chuẩn (Margin = 0):{' '}
+                <strong style={{ color: '#1e3a8a' }}>
+                  {boundaryMode === 'mean'
+                    ? 'Mean dự đoán'
+                    : boundaryMode === 'pi95'
+                    ? 'Khoảng dự đoán PI 95%'
+                    : Math.abs(probThreshold - 0.9973) < 0.0001
+                    ? 'Chuẩn 3σ (Cpk = 1.0 • Lỗi dự kiến ≤ 0.27% / 2.700 PPM)'
+                    : `Xác suất P(in-spec) ≥ ${(probThreshold * 100).toFixed(0)}%`}
+                </strong>
               </span>
             </div>
 
@@ -1845,7 +1909,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
               </h3>
             </div>
             <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.2rem' }}>
-              Mô phỏng ngẫu nhiên hàng ngàn lô sản xuất ảo với sai số thông số thực tế để tính toán tỷ lệ lỗi (Defect Rate) và chỉ số hiệu năng / năng lực quy trình (Ppk / Cpk).
+              Mô phỏng ngẫu nhiên hàng ngàn lô sản xuất ảo với sai số thông số thực tế để tính toán tỷ lệ lỗi (Defect Rate) và chỉ số hiệu năng / năng lực quy trình (Ppk / Cpk). Mốc chuẩn: <strong>Cpk = 1.0</strong> tương ứng quy trình <strong>3 sigma (3σ)</strong> với tỷ lệ lỗi dự kiến <strong>0.27%</strong> (2.700 PPM); quy trình công nghiệp dược xuất sắc đạt <strong>Cpk ≥ 1.33</strong> (4σ, tỷ lệ lỗi ≤ 63 PPM).
             </p>
           </div>
 
@@ -2102,8 +2166,15 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                         <span
                           className={`badge ${isCapabilityGood ? 'badge-success' : isCapabilityAcceptable ? 'badge-warning' : 'badge-danger'}`}
                           style={{ fontSize: '0.65rem', padding: '0.1rem 0.35rem' }}
+                          title={
+                            isCapabilityGood
+                              ? 'Đạt chuẩn 4σ (lỗi ≤ 63 PPM / 0.0063%)'
+                              : isCapabilityAcceptable
+                              ? 'Đạt chuẩn 3σ (Cpk = 1.0, lỗi ≤ 0.27% / 2.700 PPM)'
+                              : 'Dưới chuẩn 3σ (lỗi dự kiến > 0.27%)'
+                          }
                         >
-                          {isCapabilityGood ? 'Ppk ≥ 1.33' : isCapabilityAcceptable ? 'Ppk ≥ 1.00' : 'Cần đánh giá'}
+                          {isCapabilityGood ? 'Ppk ≥ 1.33 (4σ)' : isCapabilityAcceptable ? 'Ppk ≥ 1.00 (3σ)' : 'Dưới 3σ (< 1.00)'}
                         </span>
                       )}
                     </div>
@@ -2116,7 +2187,10 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                       )}
                     </div>
                     <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                      TB: {stats.mean} ± {stats.sd} | Ngoài chuẩn: {stats.outOfSpecPercent}%
+                      TB: {stats.mean} ± {stats.sd} | Ngoài chuẩn: <strong>{stats.outOfSpecPercent}%</strong>
+                      <span style={{ fontSize: '0.68rem', color: '#94a3b8', marginLeft: '0.35rem' }}>
+                        (Mốc 3σ / Cpk=1.0: 0.27%)
+                      </span>
                     </div>
                     <div style={{ fontSize: '0.66rem', color: '#94a3b8', marginTop: '0.15rem' }}>
                       Ppk: Hiệu năng mẫu mô phỏng (s) | Cpk: Năng lực quy trình
@@ -2124,6 +2198,45 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                   </div>
                 );
               })}
+            </div>
+
+            {/* Six Sigma & Process Capability Benchmark Guide */}
+            <div
+              style={{
+                marginTop: '0.9rem',
+                padding: '0.65rem 0.85rem',
+                backgroundColor: '#f8fafc',
+                borderRadius: '0.5rem',
+                border: '1px solid #e2e8f0',
+                fontSize: '0.73rem',
+                color: '#334155',
+              }}
+            >
+              <div style={{ fontWeight: '700', color: '#0f172a', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span>📊 Thang Đo Năng Lực Quy Trình &amp; Six Sigma (Process Capability Benchmarks - ICH Q9):</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.5rem' }}>
+                <div style={{ padding: '0.35rem 0.5rem', backgroundColor: '#fef2f2', borderRadius: '0.375rem', border: '1px solid #fecaca' }}>
+                  <span style={{ fontWeight: '700', color: '#991b1b' }}>Cpk &lt; 1.00 (&lt; 3σ)</span>
+                  <div style={{ fontSize: '0.68rem', color: '#b91c1c' }}>Lỗi &gt; 0.27% (&gt; 2.700 PPM) • Chưa đủ năng lực</div>
+                </div>
+                <div style={{ padding: '0.35rem 0.5rem', backgroundColor: '#fffbeb', borderRadius: '0.375rem', border: '1px solid #fde68a' }}>
+                  <span style={{ fontWeight: '700', color: '#92400e' }}>Cpk = 1.00 (3σ)</span>
+                  <div style={{ fontSize: '0.68rem', color: '#b45309' }}>Lỗi = 0.27% (2.700 PPM) • Mức cơ bản 3-sigma</div>
+                </div>
+                <div style={{ padding: '0.35rem 0.5rem', backgroundColor: '#f0fdf4', borderRadius: '0.375rem', border: '1px solid #bbf7d0' }}>
+                  <span style={{ fontWeight: '700', color: '#166534' }}>Cpk ≥ 1.33 (4σ)</span>
+                  <div style={{ fontSize: '0.68rem', color: '#15803d' }}>Lỗi ≤ 0.0063% (≤ 63 PPM) • Chuẩn ngành Dược</div>
+                </div>
+                <div style={{ padding: '0.35rem 0.5rem', backgroundColor: '#eff6ff', borderRadius: '0.375rem', border: '1px solid #bfdbfe' }}>
+                  <span style={{ fontWeight: '700', color: '#1e40af' }}>Cpk ≥ 1.67 (5σ)</span>
+                  <div style={{ fontSize: '0.68rem', color: '#2563eb' }}>Lỗi ≤ 0.57 PPM • Độ tin cậy xuất sắc</div>
+                </div>
+                <div style={{ padding: '0.35rem 0.5rem', backgroundColor: '#faf5ff', borderRadius: '0.375rem', border: '1px solid #e9d5ff' }}>
+                  <span style={{ fontWeight: '700', color: '#6b21a8' }}>Cpk ≥ 2.00 (6σ)</span>
+                  <div style={{ fontSize: '0.68rem', color: '#7c3aed' }}>Lỗi ≤ 3.4 ppb • Đẳng cấp Six Sigma</div>
+                </div>
+              </div>
             </div>
           </div>
         )}

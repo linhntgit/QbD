@@ -1605,8 +1605,11 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 <BlockMath math="D = \left[ \prod_{i=1}^m (d_i)^{w_i} \right]^{\frac{1}{\sum_{i=1}^m w_i}} \in [0, 1]" />
                 <p>Nếu bất kỳ CQA nào có <InlineMath math="d_i = 0" /> (ngoài tiêu chuẩn) &rarr; <InlineMath math="D = 0" />.</p>
 
-                <p style={{ marginTop: '0.5rem' }}><strong>4. Mô Phỏng Monte Carlo &amp; Năng Lực Quy Trình Cpk:</strong></p>
+                <p style={{ marginTop: '0.5rem' }}><strong>4. Mô Phỏng Monte Carlo &amp; Năng Lực Quy Trình Cpk (Chuẩn 3&sigma;):</strong></p>
                 <BlockMath math="X_j \sim \mathcal{N}(\mu_{\text{setpoint}}, \, \sigma_j^2), \quad C_{pk} = \min\left( \frac{\text{USL} - \mu}{3\sigma}, \, \frac{\mu - \text{LSL}}{3\sigma} \right)" />
+                <p>
+                  Chỉ số <InlineMath math="C_{pk} = 1.0" /> về cơ bản là quy trình <strong>3 sigma (3&sigma;)</strong>, nghĩa là dự kiến có <strong>0.27%</strong> sản phẩm đầu ra (tương đương 2.700 PPM) nằm ngoài thông số kỹ thuật (OOS). Trong công nghiệp dược phẩm (ICH Q8/Q9), quy trình đạt năng lực tốt thường yêu cầu <InlineMath math="C_{pk} \ge 1.33" /> (tương đương 4&sigma;, tỷ lệ lỗi &le; 0.0063% hay 63 PPM).
+                </p>
               </div>
             ),
           },
@@ -1707,7 +1710,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   tagColor="teal"
                   definition={
                     <>
-                      Thước đo khoảng cách giữa giá trị trung bình quy trình và biên tiêu chuẩn kỹ thuật gần nhất theo đơn vị 3 độ lệch chuẩn: <InlineMath math="C_{pk} = \min\left(\frac{\text{USL}-\mu}{3\sigma}, \frac{\mu-\text{LSL}}{3\sigma}\right)" />. Chỉ số <InlineMath math="C_{pk} \ge 1.33" /> tương đương quy trình đạt mức kiểm soát 4-sigma ổn định.
+                      Thước đo khoảng cách giữa giá trị trung bình quy trình và biên tiêu chuẩn kỹ thuật gần nhất theo đơn vị 3 độ lệch chuẩn: <InlineMath math="C_{pk} = \min\left(\frac{\text{USL}-\mu}{3\sigma}, \frac{\mu-\text{LSL}}{3\sigma}\right)" />. Chỉ số <InlineMath math="C_{pk} = 1.0" /> là mốc quy trình 3-sigma (3&sigma;), dự kiến có <strong>0.27%</strong> sản phẩm nằm ngoài tiêu chuẩn (khoảng 2.700 PPM). Khuyến nghị công nghiệp dược (ICH Q8/Q9) hướng tới <InlineMath math="C_{pk} \ge 1.33" /> (mức kiểm soát 4-sigma, tỷ lệ lỗi &le; 63 PPM).
                     </>
                   }
                 />
