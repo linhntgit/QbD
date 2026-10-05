@@ -341,6 +341,8 @@ export function normalInverseCDF(p: number): number {
   return p < 0.5 ? r : -r;
 }
 
+const tCriticalCache = new Map<string, number>();
+
 /**
  * Positive two-sided Student-t critical value, solved from the existing
  * accurate survival-probability routine.  It avoids a second approximation
@@ -348,6 +350,10 @@ export function normalInverseCDF(p: number): number {
  */
 export function tDistributionCritical(alpha: number, df: number): number {
   if (!(alpha > 0 && alpha < 1) || df <= 0) return Number.NaN;
+  const cacheKey = `${alpha}_${df}`;
+  const cached = tCriticalCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
   let low = 0;
   let high = 1;
   while (tDistributionPValue(high, df) > alpha && high < 1e6) high *= 2;
@@ -356,7 +362,9 @@ export function tDistributionCritical(alpha: number, df: number): number {
     if (tDistributionPValue(mid, df) > alpha) low = mid;
     else high = mid;
   }
-  return (low + high) / 2;
+  const result = (low + high) / 2;
+  tCriticalCache.set(cacheKey, result);
+  return result;
 }
 
 /**
@@ -507,12 +515,16 @@ export function calculateProbabilisticCQAMargin(
 ): number {
   if (!Number.isFinite(yPred)) return -Infinity;
 
-  if (mode === 'mean' || sePred <= 0 || msResidual <= 0) {
+  const safeSePred = Math.max(0, Number.isFinite(sePred) ? sePred : 0);
+  const safeMsRes = Math.max(0, Number.isFinite(msResidual) ? msResidual : 0);
+
+  if (mode === 'mean' || (safeSePred <= 0 && safeMsRes <= 0)) {
     return calculateCQAMargin(yPred, objective, lowerLimit, upperLimit);
   }
 
   // Individual prediction standard deviation: sigma_ind = sqrt(msResidual + sePred^2)
-  const sigmaInd = Math.sqrt(Math.max(1e-8, msResidual + sePred * sePred));
+  const totalVariance = safeMsRes + safeSePred * safeSePred;
+  const sigmaInd = Math.sqrt(Math.max(1e-8, totalVariance));
   const tCrit = dfResidual > 0 ? tDistributionCritical(0.05, dfResidual) : 1.96;
 
   if (lowerLimit !== undefined || upperLimit !== undefined) {

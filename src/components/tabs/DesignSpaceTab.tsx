@@ -723,6 +723,9 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
     const hoverText: string[] = [];
     const validCQAs = cqas.filter((c) => models[c.code]);
 
+    let totalPoints = 0;
+    let inSpecPoints = 0;
+
     for (let j = 0; j < yCodedArr.length; j++) {
       const row: number[] = [];
       const yCoded = yCodedArr[j];
@@ -749,7 +752,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
           const diag = model.diagnostics as any;
           const msResidual = 'anova' in model
             ? (model.anova.find((a) => a.source.startsWith('Residual'))?.ms ?? 0.01)
-            : (Number.isFinite(diag?.rmseVal) ? diag.rmseVal : Number.isFinite(diag?.rmseOverall) ? diag.rmseOverall : 0.1);
+            : (Number.isFinite(diag?.rmseVal) ? diag.rmseVal * diag.rmseVal : Number.isFinite(diag?.rmseOverall) ? diag.rmseOverall * diag.rmseOverall : 0.01);
           const dfResidual = 'residualDegreesOfFreedom' in model ? model.residualDegreesOfFreedom ?? 10 : 10;
           const cqaMargin = calculateProbabilisticCQAMargin(
             yPred,
@@ -776,6 +779,8 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
         // Keep the margin field continuous for the design-space contour; use
         // rounding only in the hover text and report-facing display.
         row.push(minMargin);
+        totalPoints++;
+        if (minMargin >= 0) inSpecPoints++;
 
         hoverX.push(xAct);
         hoverY.push(yAct);
@@ -806,6 +811,8 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
       zScoreGrid.push(row);
     }
 
+    const inSpecPercent = totalPoints > 0 ? (inSpecPoints / totalPoints) * 100 : 0;
+
     return {
       xActualArr,
       yActualArr,
@@ -815,6 +822,9 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
       hoverText,
       xDisplayArr,
       yDisplayArr,
+      totalPoints,
+      inSpecPoints,
+      inSpecPercent,
     };
   }, [cartesianAxesValid, overlayMode, factorX, factorY, models, cqas, factors, sliceFactorsCoded, resolution, boundaryMode, probThreshold]);
 
@@ -841,9 +851,11 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
         showRegionPolygon: true,
         showOptimum: true,
         smoothness,
+        boundaryMode,
+        probThreshold,
       }
     );
-  }, [overlayMode, factorA, factorB, factorC, factors, sliceFactorsCoded, models, cqas, resolution, smoothness, optimum, project.runs]);
+  }, [overlayMode, factorA, factorB, factorC, factors, sliceFactorsCoded, models, cqas, resolution, smoothness, optimum, project.runs, boundaryMode, probThreshold]);
 
   // Sweet Spot Plotly Data
   const overlayPlotData = useMemo(() => {
@@ -969,11 +981,12 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
           coloring: 'heatmap',
           start: 0,
           end: 0,
-          size: 0,
+          size: 1,
           showlines: showBoundaryLines,
         },
         hoverinfo: 'none',
         name: 'Design Space',
+        showlegend: false,
       },
       // 2D Fine Hover Probing Layer
       {
@@ -992,6 +1005,47 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
         showlegend: false,
       },
     ];
+
+    const isCpk1 = boundaryMode === 'probabilistic' && Math.abs(probThreshold - 0.9973) < 0.0001;
+    const modeBadge = boundaryMode === 'mean'
+      ? 'Mean'
+      : boundaryMode === 'pi95'
+      ? 'PI 95%'
+      : isCpk1
+      ? 'Cpk ≥ 1 (3σ)'
+      : `P ≥ ${(probThreshold * 100).toFixed(0)}%`;
+
+    if (showBoundaryLines) {
+      data.push({
+        type: 'scatter',
+        mode: 'lines',
+        name: `Ranh giới DS (${modeBadge})`,
+        x: [null],
+        y: [null],
+        line: { color: '#1e3a8a', width: 2.5 },
+        showlegend: true,
+      });
+    }
+
+    data.push({
+      type: 'scatter',
+      mode: 'markers',
+      name: `Vùng Đạt DS (${sweetSpotGrid.inSpecPercent.toFixed(1)}%)`,
+      x: [null],
+      y: [null],
+      marker: { color: '#4ade80', size: 10, symbol: 'square' },
+      showlegend: true,
+    });
+
+    data.push({
+      type: 'scatter',
+      mode: 'markers',
+      name: 'Ngoài Tiêu Chuẩn (OOS)',
+      x: [null],
+      y: [null],
+      marker: { color: '#f87171', size: 10, symbol: 'square' },
+      showlegend: true,
+    });
 
     // Plot Optimum Target point if available
     if (optimum && optimum.actualFactors[factorX.code] !== undefined && optimum.actualFactors[factorY.code] !== undefined) {
@@ -1042,16 +1096,25 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
     }
 
     return data;
-  }, [overlayMode, ternaryDS, factorA, factorB, factorC, sweetSpotGrid, factorX, factorY, optimum, smoothness, showBoundaryLines, cqas, models]);
+  }, [overlayMode, ternaryDS, factorA, factorB, factorC, sweetSpotGrid, factorX, factorY, optimum, smoothness, showBoundaryLines, cqas, models, boundaryMode, probThreshold]);
 
   const overlayLayout = useMemo(() => {
     if (overlayMode === 'ternary' && ternaryDS) {
       return ternaryDS.layout;
     }
 
+    const isCpk1 = boundaryMode === 'probabilistic' && Math.abs(probThreshold - 0.9973) < 0.0001;
+    const modeBadge = boundaryMode === 'mean'
+      ? 'Mean'
+      : boundaryMode === 'pi95'
+      ? 'PI 95%'
+      : isCpk1
+      ? 'Cpk ≥ 1 (3σ)'
+      : `P ≥ ${(probThreshold * 100).toFixed(0)}%`;
+
     if (overlayMode === '3d') {
       return {
-        title: { text: 'Không gian thiết kế 3D — biên CQA nhỏ nhất', font: { size: 14, color: '#0f172a' }, x: 0.02 },
+        title: { text: `Không gian thiết kế 3D — Biên: ${modeBadge} — biên CQA nhỏ nhất`, font: { size: 14, color: '#0f172a' }, x: 0.02 },
         autosize: true,
         margin: { l: 20, r: 20, t: 58, b: 20 },
         scene: {
@@ -1063,9 +1126,11 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
       };
     }
 
+    const feasibleText = sweetSpotGrid ? ` [Khả thi: ${sweetSpotGrid.inSpecPercent.toFixed(1)}%]` : '';
+
     return {
       title: {
-        text: `Không Gian Thiết Kế (Design Space Overlay) - Giao điểm Tất cả các CQAs`,
+        text: `Không Gian Thiết Kế (Design Space Overlay) — Biên: ${modeBadge}${feasibleText}`,
         font: { size: 13, color: '#0f172a', family: 'Inter' },
       },
       xaxis: {
@@ -1088,10 +1153,18 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
         ...(factorY.dataType === 'qualitative' && sweetSpotGrid ? { tickmode: 'array', tickvals: sweetSpotGrid.yActualArr, ticktext: sweetSpotGrid.yDisplayArr.map(String) } : {}),
         automargin: true,
       },
+      legend: {
+        orientation: 'h',
+        x: 0,
+        y: 1.08,
+        xanchor: 'left',
+        yanchor: 'bottom',
+        font: { size: 10.5, family: 'Inter, sans-serif' },
+      },
       annotations: [],
-      margin: { l: 85, r: 40, t: 50, b: 75, pad: 4 },
+      margin: { l: 85, r: 40, t: 65, b: 75, pad: 4 },
     };
-  }, [overlayMode, ternaryDS, factorX, factorY, sweetSpotGrid]);
+  }, [overlayMode, ternaryDS, factorX, factorY, sweetSpotGrid, boundaryMode, probThreshold]);
 
   // Determine fixed factors list based on active overlay mode
   const activeAxisCodes =
@@ -1137,6 +1210,10 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
   }, [sweetSpotGrid]);
 
   const isSliceFeasible = sliceMaxMargin >= 0;
+
+  const feasiblePercentage = overlayMode === 'ternary'
+    ? (ternaryDS ? ternaryDS.sweetSpotFraction * 100 : null)
+    : (sweetSpotGrid ? sweetSpotGrid.inSpecPercent : null);
 
   const missingModelCodes = cqas
     .filter((cqa) => !cqa.dataType?.startsWith('qualitative') && cqa.objective !== 'pass_category' && !models[cqa.code])
@@ -1413,6 +1490,28 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                     P ≥ {Math.abs(probThreshold - 0.9973) < 0.0001 ? '95' : (probThreshold * 100).toFixed(0)}%
                   </button>
                 </div>
+                {feasiblePercentage !== null && (
+                  <span
+                    style={{
+                      marginLeft: '0.35rem',
+                      padding: '0.15rem 0.45rem',
+                      borderRadius: '0.25rem',
+                      fontSize: '0.68rem',
+                      fontWeight: '700',
+                      backgroundColor: feasiblePercentage > 0 ? '#dcfce7' : '#fee2e2',
+                      color: feasiblePercentage > 0 ? '#15803d' : '#b91c1c',
+                      border: `1px solid ${feasiblePercentage > 0 ? '#86efac' : '#fca5a5'}`,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                      whiteSpace: 'nowrap',
+                    }}
+                    title={`Tỷ lệ diện tích thỏa mãn tất cả CQA trên lát cắt hiện tại: ${feasiblePercentage.toFixed(1)}%`}
+                  >
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: feasiblePercentage > 0 ? '#22c55e' : '#ef4444' }} />
+                    Khả thi: {feasiblePercentage.toFixed(1)}%
+                  </span>
+                )}
               </div>
 
               {/* Smoothness Slider (both 2D and Ternary) */}
@@ -1548,6 +1647,11 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                     ? 'Chuẩn 3σ (Cpk = 1.0 • Lỗi dự kiến ≤ 0.27% / 2.700 PPM)'
                     : `Xác suất P(in-spec) ≥ ${(probThreshold * 100).toFixed(0)}%`}
                 </strong>
+                {feasiblePercentage !== null && (
+                  <span style={{ marginLeft: '0.45rem', color: '#166534', fontWeight: '600' }}>
+                    • Diện tích khả thi: <strong style={{ color: feasiblePercentage > 0 ? '#15803d' : '#b91c1c' }}>{feasiblePercentage.toFixed(1)}%</strong>
+                  </span>
+                )}
               </span>
             </div>
 
@@ -1806,7 +1910,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                     }}
                   >
                     {isSliceFeasible
-                      ? `✓ Lát Cắt Khả Thi (+${(sliceMaxMargin * 100).toFixed(1)}% Max Margin)`
+                      ? `✓ Lát Cắt Khả Thi (+${(sliceMaxMargin * 100).toFixed(1)}% Max Margin, ${sweetSpotGrid ? sweetSpotGrid.inSpecPercent.toFixed(1) : 0}% Diện tích)`
                       : '✗ Lát Cắt Không Khả Thi (OOS Toàn Diện)'}
                   </span>
                 </div>

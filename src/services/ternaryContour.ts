@@ -6,7 +6,7 @@ import type {
   StatisticalModelResult,
   NeuralNetModelResult,
 } from '../types/qbd';
-import { extract2DContourSegments, calculateCQAMargin } from './mathUtils';
+import { extract2DContourSegments, calculateCQAMargin, calculateProbabilisticCQAMargin } from './mathUtils';
 import { codedToActual, actualToCoded } from './doeGenerator';
 
 export interface TernaryPoint {
@@ -1100,6 +1100,8 @@ export function generateTernaryDesignSpace(
     showRegionPolygon?: boolean;
     showOptimum?: boolean;
     smoothness?: number;
+    boundaryMode?: 'mean' | 'pi95' | 'probabilistic';
+    probThreshold?: number;
   }
 ) {
   const {
@@ -1110,6 +1112,8 @@ export function generateTernaryDesignSpace(
     showRegionPolygon = true,
     showOptimum = true,
     smoothness = 1.0,
+    boundaryMode = 'mean',
+    probThreshold = 0.95,
   } = options || {};
 
   const otherMixFactors = allFactors.filter(
@@ -1144,6 +1148,13 @@ export function generateTernaryDesignSpace(
   const H = TERNARY_HEIGHT;
 
   const validCQAs = cqas.filter((c) => models[c.code]);
+  const modeBadge = boundaryMode === 'mean'
+    ? 'Mean'
+    : boundaryMode === 'pi95'
+    ? 'PI 95%'
+    : Math.abs(probThreshold - 0.9973) < 0.0001
+    ? 'Cpk ≥ 1 (3σ)'
+    : `P ≥ ${(probThreshold * 100).toFixed(0)}%`;
 
   const xGrid: number[] = [];
   for (let i = 0; i < Nx; i++) xGrid.push((i / (Nx - 1)) * 100);
@@ -1192,7 +1203,26 @@ export function generateTernaryDesignSpace(
           const m = models[cqa.code];
           if (!m) continue;
           const yPred = m.predict(pointCoded);
-          const cqaMargin = calculateCQAMargin(yPred, cqa.objective, cqa.lowerLimit, cqa.upperLimit, cqa.target);
+          const sePred = 'predictStandardError' in m && typeof (m as any).predictStandardError === 'function'
+            ? (m as any).predictStandardError(pointCoded)
+            : 0;
+          const diag = (m as any).diagnostics;
+          const msResidual = 'anova' in m && Array.isArray((m as any).anova)
+            ? ((m as any).anova.find((a: any) => a.source?.startsWith('Residual'))?.ms ?? 0.01)
+            : (Number.isFinite(diag?.rmseVal) ? diag.rmseVal * diag.rmseVal : Number.isFinite(diag?.rmseOverall) ? diag.rmseOverall * diag.rmseOverall : 0.01);
+          const dfResidual = 'residualDegreesOfFreedom' in m ? (m as any).residualDegreesOfFreedom ?? 10 : 10;
+
+          const cqaMargin = calculateProbabilisticCQAMargin(
+            yPred,
+            sePred,
+            msResidual,
+            dfResidual,
+            cqa.objective,
+            cqa.lowerLimit,
+            cqa.upperLimit,
+            boundaryMode,
+            probThreshold
+          );
 
           if (cqaMargin < minMargin) {
             minMargin = cqaMargin;
@@ -1222,8 +1252,8 @@ export function generateTernaryDesignSpace(
           hoverY.push(y);
           const statusText =
             minMargin >= 0
-              ? `<span style="color:#16a34a;font-weight:700">✓ ĐẠT DESIGN SPACE (+${(minMargin * 100).toFixed(1)}% Margin)</span>`
-              : `<span style="color:#dc2626;font-weight:700">⚠ NGOÀI TIÊU CHUẨN (${(minMargin * 100).toFixed(1)}% Margin)</span>`;
+              ? `<span style="color:#16a34a;font-weight:700">✓ ĐẠT DESIGN SPACE [${modeBadge}] (+${(minMargin * 100).toFixed(1)}% Margin)</span>`
+              : `<span style="color:#dc2626;font-weight:700">⚠ NGOÀI TIÊU CHUẨN [${modeBadge}] (${(minMargin * 100).toFixed(1)}% Margin)</span>`;
 
           hoverText.push(
             `<b>${factorA.name}</b>: ${aPct}%<br>` +
@@ -1406,7 +1436,7 @@ export function generateTernaryDesignSpace(
     sweetSpotTraces.push({
       type: 'scatter',
       mode: 'lines',
-      name: 'Ranh Giới Không Gian Thiết Kế (Design Space Margin = 0)',
+      name: `Ranh Giới Không Gian Thiết Kế (${modeBadge} • Margin = 0)`,
       x: boundX,
       y: boundY,
       line: {
@@ -1466,7 +1496,7 @@ export function generateTernaryDesignSpace(
   sweetSpotTraces.push({
     type: 'scatter',
     mode: 'lines',
-    name: `Vùng đạt chuẩn cho các CQA đã mô hình hóa (${(sweetSpotFraction * 100).toFixed(1)}% Simplex)`,
+    name: `Vùng đạt chuẩn (${modeBadge}) — ${(sweetSpotFraction * 100).toFixed(1)}% Simplex`,
     x: [null],
     y: [null],
     line: { color: '#22c55e', width: 2.5 },
@@ -1619,7 +1649,7 @@ export function generateTernaryDesignSpace(
   // 12. Complete 2D Cartesian Simplex Projection Layout
   const layout = {
     title: {
-      text: `Miền dự báo hỗn hợp (Ternary Sweet Spot) - các CQA đã mô hình hóa đạt chuẩn`,
+      text: `Miền dự báo hỗn hợp (Ternary Sweet Spot) — Biên: ${modeBadge} [Khả thi: ${(sweetSpotFraction * 100).toFixed(1)}%]`,
       font: { size: 13, color: '#0f172a', family: 'Inter, sans-serif' },
     },
     autosize: true,
