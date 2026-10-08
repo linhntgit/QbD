@@ -5,6 +5,7 @@ import {
   RefreshCw,
   Download,
   ArrowRight,
+  ArrowDown,
   Shuffle,
   Gauge,
   Award,
@@ -965,48 +966,79 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       
-      {/* Design Selector Header */}
-      <div className="qbd-card">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+      {/* 1. Header Card: Tổng quan & Trạng thái Bước 3 */}
+      <div className="qbd-card" style={{ padding: '1.1rem 1.25rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <LayoutGrid size={22} color="#0284c7" />
-              <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#0f172a' }}>
-                Thiết kế thí nghiệm (Design of Experiments - DoE)
+              <h2 style={{ fontSize: '1.18rem', fontWeight: '700', color: '#0f172a' }}>
+                Bước 3: Thiết kế thí nghiệm (Design of Experiments - DoE)
               </h2>
             </div>
-            <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.2rem' }}>
+            <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>
               Lựa chọn mô hình thiết kế: <strong>RSM, D-Optimal, Combined Mixture-Process, Sàng lọc</strong> và đánh giá hiệu quả tối ưu <strong>D-Efficiency (D-eff)</strong>.
             </p>
+            {/* Status Indicator */}
+            <div style={{ marginTop: '0.65rem', display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+              {project.runs.length > 0 ? (
+                <>
+                  <span className="badge badge-success" style={{ fontSize: '0.76rem', padding: '0.25rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <span>✓ Đã tạo ma trận:</span>
+                    <strong>{project.runs.length} mẻ</strong>
+                    <span>({designConfig.designType})</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const el = document.getElementById('doe-runs-table-section');
+                      if (el) el.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="btn btn-secondary"
+                    style={{ fontSize: '0.74rem', padding: '0.2rem 0.55rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                    title="Cuộn nhanh xuống bảng ma trận thực nghiệm bên dưới"
+                  >
+                    <span>Xem bảng số liệu</span>
+                    <ArrowDown size={13} />
+                  </button>
+                </>
+              ) : (
+                <span className="badge" style={{ backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', fontSize: '0.76rem', padding: '0.25rem 0.65rem' }}>
+                  Chưa tạo ma trận — Thiết lập thông số ở Bước 3.1 &amp; 3.2 bên dưới, sau đó bấm &quot;Tạo ma trận thí nghiệm&quot;
+                </span>
+              )}
+            </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             <button
-              onClick={handleGenerateMatrix}
-              className="btn btn-primary"
-              style={{ fontSize: '0.82rem', padding: '0.45rem 1rem' }}
-            >
-              <RefreshCw size={15} />
-              <span>Tạo ma trận thí nghiệm</span>
-            </button>
-
-            <button
               onClick={onNavigateToANOVA}
               className="btn btn-teal"
-              style={{ fontSize: '0.82rem', padding: '0.45rem 1rem' }}
+              style={{ fontSize: '0.82rem', padding: '0.5rem 1.1rem', fontWeight: '600' }}
+              title="Chuyển sang Bước 4 để phân tích phương sai ANOVA và xây dựng mô hình"
             >
-              <span>Phân tích ANOVA</span>
+              <span>Phân tích ANOVA (Bước 4)</span>
               <ArrowRight size={16} />
             </button>
           </div>
         </div>
+      </div>
 
-        {/* Model-first Design Wizard */}
-        <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '0.65rem', padding: '1rem', marginBottom: '1rem' }}>
+      {/* 2. Quy trình thiết lập & Tạo ma trận thí nghiệm */}
+      <div className="qbd-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        {/* Bước 3.1: Model-first Design Wizard (Gợi ý nhanh theo mục tiêu) */}
+        <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '0.65rem', padding: '1rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
             <div>
-              <div style={{ fontWeight: '800', color: '#0c4a6e', fontSize: '0.96rem' }}>Design Wizard — mục tiêu, mô hình, ngân sách</div>
-              <div style={{ fontSize: '0.76rem', color: '#475569', marginTop: '0.2rem' }}>Chọn phương án theo số hệ số có thể ước lượng và số run bạn thực sự có thể thực hiện.</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <Sparkles size={16} color="#0284c7" />
+                <span style={{ fontWeight: '800', color: '#0c4a6e', fontSize: '0.94rem' }}>
+                  Bước 3.1: Gợi ý phương án nhanh theo mục tiêu (Design Wizard)
+                </span>
+              </div>
+              <div style={{ fontSize: '0.76rem', color: '#475569', marginTop: '0.2rem' }}>
+                Chọn phương án theo số hệ số có thể ước lượng và số run bạn thực sự có thể thực hiện.
+              </div>
             </div>
             <span className="badge badge-primary" style={{ fontSize: '0.72rem' }}>Model-first</span>
           </div>
@@ -1073,32 +1105,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
           {designValidation.warnings.map((warning) => <div key={warning} style={{ marginTop: '0.35rem', color: '#a16207', fontSize: '0.74rem' }}>• {warning}</div>)}
         </div>
 
-        {/* Sequential design augmentation keeps completed runs immutable. */}
-        {project.runs.length > 0 && (
-          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '0.65rem', padding: '0.9rem', marginBottom: '1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-              <div>
-                <div style={{ fontWeight: '800', color: '#166534', fontSize: '0.9rem' }}>Bổ sung tuần tự D-optimal</div>
-                <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.2rem', maxWidth: '640px' }}>
-                  Giữ nguyên run đã thực hiện, chọn các điểm chưa lặp để tăng thông tin cho mô hình {selectedOptimalModel}. Các run mới được đặt trong block kế tiếp để dễ lập lịch và truy vết.
-                </div>
-              </div>
-              <span className="badge badge-success" style={{ fontSize: '0.7rem' }}>Sequential DoE</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'end', gap: '0.55rem', flexWrap: 'wrap', marginTop: '0.65rem' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: '700', color: '#166534' }}>
-                Số run bổ sung
-                <input type="number" min={1} max={30} className="input-field" style={{ width: '100px', marginLeft: '0.4rem' }} value={augmentationRuns} onChange={(e) => setAugmentationRuns(Math.max(1, Math.min(30, Number(e.target.value))))} />
-              </label>
-              <button type="button" className="btn btn-teal" style={{ fontSize: '0.78rem', padding: '0.4rem 0.7rem' }} onClick={handleAugmentDesign}>
-                <PlusCircle size={15} /> Thêm run thông tin nhất
-              </button>
-              <span style={{ fontSize: '0.73rem', color: '#475569' }}>Hiện tại: rank {currentReadiness.rank}/{currentReadiness.termCount}, df phần dư {currentReadiness.residualDegreesOfFreedom}.</span>
-            </div>
-          </div>
-        )}
-
-        {/* Configuration Selectors */}
+        {/* Bước 3.2: Cấu hình chi tiết ma trận thiết kế */}
         <div style={{
           backgroundColor: '#ffffff',
           borderRadius: '0.75rem',
@@ -1108,7 +1115,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
         }}>
           {/* Header khu vực cấu hình */}
           <div style={{
-            padding: '0.7rem 1.1rem',
+            padding: '0.75rem 1.1rem',
             backgroundColor: '#f8fafc',
             borderBottom: '1px solid #e2e8f0',
             display: 'flex',
@@ -1119,8 +1126,8 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
               <Sliders size={16} color="#0284c7" />
-              <span style={{ fontSize: '0.84rem', fontWeight: '700', color: '#0f172a' }}>
-                Cấu hình ma trận thiết kế (Design Matrix Setup)
+              <span style={{ fontSize: '0.86rem', fontWeight: '700', color: '#0f172a' }}>
+                Bước 3.2: Tùy chỉnh thông số chi tiết (Design Parameters Setup)
               </span>
             </div>
             <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
@@ -1439,6 +1446,74 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               </span>
             </div>
           </div>
+
+          {/* Bước 3.3: Thanh hành động tạo ma trận (Action Bar) */}
+          <div style={{
+            borderTop: '2px solid #bae6fd',
+            backgroundColor: '#f0f9ff',
+            padding: '1rem 1.25rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '1rem',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                backgroundColor: '#0284c7',
+                color: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: '800',
+                fontSize: '0.85rem',
+                flexShrink: 0,
+              }}>
+                ⚡
+              </div>
+              <div>
+                <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#0c4a6e' }}>
+                  Bước 3.3: Sinh ma trận thực nghiệm (Generate Matrix)
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#0369a1', marginTop: '0.1rem' }}>
+                  Cấu hình: <strong>{designConfig.designType}</strong> ({designConfig.category})
+                  {isOptimalDesign ? ` · Mô hình: ${designConfig.dOptimalModel || 'Mặc định'} · ${designConfig.numRuns || recommendedOptimalRuns} run` : ` · ${designConfig.centerPoints} điểm tâm`}
+                  {designConfig.randomized ? ' · Đã bật ngẫu nhiên hóa' : ' · Thứ tự tiêu chuẩn'}
+                  {` · ${designConfig.blocks ?? 1} block`}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              {project.runs.length > 0 && (
+                <span style={{ fontSize: '0.73rem', color: '#b45309', backgroundColor: '#fef3c7', padding: '0.35rem 0.65rem', borderRadius: '4px', border: '1px solid #fde68a' }}>
+                  ⚠ Bấm nút sẽ sinh lại ma trận mới (thay thế {project.runs.length} mẻ hiện tại)
+                </span>
+              )}
+
+              <button
+                type="button"
+                onClick={handleGenerateMatrix}
+                className="btn btn-primary"
+                style={{
+                  fontSize: '0.88rem',
+                  padding: '0.55rem 1.35rem',
+                  fontWeight: '700',
+                  boxShadow: '0 2px 8px rgba(2, 132, 199, 0.25)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  cursor: 'pointer',
+                }}
+              >
+                <RefreshCw size={16} />
+                <span>{project.runs.length > 0 ? 'Tạo lại ma trận thí nghiệm' : 'Tạo ma trận thí nghiệm'}</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1597,8 +1672,52 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
         </div>
       )}
 
+      {/* Sequential DoE - Mở rộng ma trận tuần tự */}
+      {project.runs.length > 0 && (
+        <div className="qbd-card" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ fontWeight: '800', color: '#166534', fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <PlusCircle size={17} color="#16a34a" />
+                <span>Mở rộng ma trận: Bổ sung tuần tự D-optimal (Sequential DoE)</span>
+              </div>
+              <div style={{ fontSize: '0.76rem', color: '#475569', marginTop: '0.25rem', maxWidth: '720px' }}>
+                Giữ nguyên các run đã thực hiện, thuật toán Fedorov sẽ tìm các điểm chưa lặp nhằm tăng tối đa thông tin cho mô hình <strong>{selectedOptimalModel}</strong>. Các run mới được đưa vào block kế tiếp để dễ lập lịch và truy vết.
+              </div>
+            </div>
+            <span className="badge badge-success" style={{ fontSize: '0.7rem' }}>Sequential DoE</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+            <label style={{ fontSize: '0.76rem', fontWeight: '700', color: '#166534', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span>Số run bổ sung:</span>
+              <input
+                type="number"
+                min={1}
+                max={30}
+                className="input-field font-mono"
+                style={{ width: '80px', height: '32px', textAlign: 'center' }}
+                value={augmentationRuns}
+                onChange={(e) => setAugmentationRuns(Math.max(1, Math.min(30, Number(e.target.value))))}
+              />
+            </label>
+            <button
+              type="button"
+              className="btn btn-teal"
+              style={{ fontSize: '0.78rem', padding: '0.4rem 0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+              onClick={handleAugmentDesign}
+            >
+              <PlusCircle size={15} />
+              <span>Thêm run thông tin nhất</span>
+            </button>
+            <span style={{ fontSize: '0.74rem', color: '#475569' }}>
+              Hiện tại: rank {currentReadiness.rank}/{currentReadiness.termCount}, df phần dư {currentReadiness.residualDegreesOfFreedom}.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Experimental Matrix & Runs Table (Excel-like Interactive Spreadsheet) */}
-      <div className="qbd-card" style={{ padding: '1rem', border: '1px solid #cbd5e1' }}>
+      <div id="doe-runs-table-section" className="qbd-card" style={{ padding: '1rem', border: '1px solid #cbd5e1' }}>
         
         {/* Top Header & Action Toolbar */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
@@ -2173,7 +2292,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
             <LayoutGrid size={40} color="#cbd5e1" style={{ margin: '0 auto 0.75rem' }} />
             <p style={{ fontWeight: '600' }}>Chưa có ma trận thí nghiệm</p>
             <p style={{ fontSize: '0.82rem', marginTop: '0.25rem' }}>
-              Vui lòng nhấn nút <strong>"Tạo ma trận thí nghiệm"</strong> ở phía trên để sinh bảng chạy.
+              Vui lòng hoàn tất thiết lập thông số và nhấn nút <strong>&quot;Tạo ma trận thí nghiệm&quot;</strong> tại mục Bước 3.3 phía trên để sinh bảng chạy.
             </p>
           </div>
         ) : (
