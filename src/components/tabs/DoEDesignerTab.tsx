@@ -715,6 +715,20 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
     () => recommendRunCount(activeFactors, selectedOptimalModel),
     [activeFactors, selectedOptimalModel]
   );
+
+  // Buffered string state for numRuns input so user can freely type/edit numbers
+  const [numRunsInput, setNumRunsInput] = useState<string>(() =>
+    String(designConfig.numRuns ?? recommendedOptimalRuns)
+  );
+
+  useEffect(() => {
+    if (designConfig.numRuns !== undefined) {
+      setNumRunsInput(String(designConfig.numRuns));
+    } else {
+      setNumRunsInput(String(recommendedOptimalRuns));
+    }
+  }, [designConfig.numRuns, recommendedOptimalRuns]);
+
   const designGoal: DoEDesignGoal = designConfig.designGoal || 'optimization';
   const runBudget = Math.max(1, designConfig.runBudget || recommendedOptimalRuns);
   const designValidation = useMemo(
@@ -775,13 +789,17 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
       showToast(`⚠ Không thể tạo thiết kế: ${designValidation.errors[0]}`, 'info');
       return;
     }
-    const { runs, alpha } = generateDoERuns(project.factors, designConfig);
+    const parsedRuns = parseInt(numRunsInput, 10);
+    const effectiveConfig = isOptimalDesign && !isNaN(parsedRuns) && parsedRuns >= minRequiredTerms + 1
+      ? { ...designConfig, numRuns: parsedRuns }
+      : designConfig;
+    const { runs, alpha } = generateDoERuns(project.factors, effectiveConfig);
     const readiness = assessDesignReadiness(project.factors, runs, selectedOptimalModel);
     if (!readiness.isEstimable) {
       showToast(`⚠ Thiết kế chưa đủ cho mô hình: ${readiness.messages[0] || 'không khả định'}`, 'info');
       return;
     }
-    const updatedConfig = { ...designConfig, alpha };
+    const updatedConfig = { ...effectiveConfig, alpha };
     onUpdateProject({ doeConfig: updatedConfig, runs });
     const warning = designValidation.warnings[0] ? ` ${designValidation.warnings[0]}` : '';
     showToast(`✓ Đã tạo ${runs.length} run; p=${readiness.termCount}, df dư=${readiness.residualDegreesOfFreedom}.${warning}`, 'success');
@@ -1296,11 +1314,36 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                   <input
                     type="number"
                     min={minRequiredTerms + 1}
-                    max={60}
+                    max={500}
                     className="input-field"
                     style={{ height: '38px', borderRadius: '0.45rem', borderColor: '#7dd3fc', fontSize: '0.88rem', fontWeight: '600', color: '#0369a1' }}
-                    value={designConfig.numRuns || recommendedOptimalRuns}
-                    onChange={(e) => setDesignConfig({ ...designConfig, numRuns: Math.max(minRequiredTerms + 1, Number(e.target.value)) })}
+                    value={numRunsInput}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setNumRunsInput(val);
+                      const parsed = parseInt(val, 10);
+                      if (!isNaN(parsed) && parsed >= minRequiredTerms + 1) {
+                        setDesignConfig((prev) => ({ ...prev, numRuns: parsed }));
+                      }
+                    }}
+                    onBlur={() => {
+                      const parsed = parseInt(numRunsInput, 10);
+                      const minAllowed = minRequiredTerms + 1;
+                      if (isNaN(parsed) || parsed < minAllowed) {
+                        setNumRunsInput(String(minAllowed));
+                        setDesignConfig((prev) => ({ ...prev, numRuns: minAllowed }));
+                        showToast(`Số mẻ thực nghiệm (N) tối thiểu cho mô hình ${selectedOptimalModel} là ${minAllowed}.`, 'info');
+                      } else {
+                        const clamped = Math.min(500, parsed);
+                        setNumRunsInput(String(clamped));
+                        setDesignConfig((prev) => ({ ...prev, numRuns: clamped }));
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        (e.target as HTMLInputElement).blur();
+                      }
+                    }}
                   />
                 </div>
                 {designConfig.designType === 'Combined_Mixture_DOptimal' && hasMixtureProcessFactors && (
