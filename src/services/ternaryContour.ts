@@ -6,7 +6,7 @@ import type {
   StatisticalModelResult,
   NeuralNetModelResult,
 } from '../types/qbd';
-import { extract2DContourSegments, calculateCQAMargin, calculateProbabilisticCQAMargin } from './mathUtils';
+import { extract2DContourSegments, calculateProbabilisticCQAMargin } from './mathUtils';
 import { codedToActual, actualToCoded } from './doeGenerator';
 
 export interface TernaryPoint {
