@@ -172,18 +172,20 @@ const hasVisibleLegend = (data: any[], layout: any) =>
 function normaliseChart(data: any[], layout: any, compact = false) {
   const hasColorbar = data.some(traceHasColorbar);
   const showLegend = hasVisibleLegend(data, layout);
+  const isBottomLegend = showLegend && typeof layout.legend?.y === 'number' && layout.legend.y < 0;
+  const isTopLegend = showLegend && !isBottomLegend;
   const margin = layout.margin || {};
   const scene = layout.scene;
   const is3D = Boolean(scene);
-  const isTernary = layout.yaxis?.scaleanchor === 'x' || (layout.xaxis?.showticklabels === false && layout.yaxis?.showticklabels === false);
+  const isTernary = (layout.xaxis?.showticklabels === false && layout.yaxis?.showticklabels === false) || data.some((t) => t.type === 'scatterternary');
   const isSmallChart = (layout.height && layout.height <= 250) || (margin.t !== undefined && margin.t <= 20 && !layout.title);
 
   // Tính lề thông minh theo loại đồ thị để tối ưu không gian hiển thị
   let computedMargin = {
     l: Math.max(margin.l ?? 0, compact ? 60 : 75),
     r: Math.max(margin.r ?? 0, hasColorbar ? (compact ? 90 : 115) : compact ? 25 : 35),
-    t: Math.max(margin.t ?? 0, showLegend ? (compact ? 94 : 90) : compact ? 58 : 68),
-    b: Math.max(margin.b ?? 0, compact ? 55 : 68),
+    t: Math.max(margin.t ?? 0, isTopLegend ? (compact ? 94 : 90) : compact ? 58 : 68),
+    b: Math.max(margin.b ?? 0, isBottomLegend ? (compact ? 85 : 92) : compact ? 55 : 68),
     pad: Math.max(margin.pad ?? 0, compact ? 2 : 4),
   };
 
@@ -200,16 +202,16 @@ function normaliseChart(data: any[], layout: any, compact = false) {
     computedMargin = {
       l: Math.max(margin.l ?? 0, compact ? 25 : 35),
       r: Math.max(margin.r ?? 0, hasColorbar ? (compact ? 70 : 85) : compact ? 20 : 35),
-      t: Math.max(margin.t ?? 0, showLegend ? (compact ? 94 : 90) : compact ? 50 : 60),
-      b: Math.max(margin.b ?? 0, compact ? 30 : 40),
+      t: Math.max(margin.t ?? 0, isTopLegend ? (compact ? 94 : 90) : compact ? 50 : 60),
+      b: Math.max(margin.b ?? 0, isBottomLegend ? (compact ? 75 : 85) : compact ? 30 : 40),
       pad: Math.max(margin.pad ?? 0, 2),
     };
   } else if (isTernary) {
     computedMargin = {
       l: Math.max(margin.l ?? 0, compact ? 25 : 35),
       r: Math.max(margin.r ?? 0, hasColorbar ? (compact ? 75 : 95) : compact ? 20 : 35),
-      t: Math.max(margin.t ?? 0, showLegend ? (compact ? 94 : 90) : compact ? 65 : 75),
-      b: Math.max(margin.b ?? 0, compact ? 55 : 65),
+      t: Math.max(margin.t ?? 0, isTopLegend ? (compact ? 94 : 90) : compact ? 65 : 75),
+      b: Math.max(margin.b ?? 0, isBottomLegend ? (compact ? 80 : 88) : compact ? 55 : 65),
       pad: Math.max(margin.pad ?? 0, 2),
     };
   }

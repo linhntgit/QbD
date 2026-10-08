@@ -206,7 +206,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
         };
 
         return (
-          <div style={{ width: '100%', maxWidth: '880px', margin: '0 auto' }}>
+          <div style={{ width: '100%', maxWidth: '760px', margin: '0 auto' }}>
             <PlotlyChart data={data} layout={layout} style={{ height: `${paretoHeight}px`, width: '100%' }} />
           </div>
         );
@@ -279,12 +279,12 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
               font: { color: '#dc2626', size: 10 },
             },
           ],
-          margin: { l: 75, r: 40, t: 60, b: 65, pad: 4 },
+          margin: { l: 75, r: 55, t: 60, b: 70, pad: 6 },
         };
 
         return (
-          <div style={{ width: '100%', maxWidth: '850px', margin: '0 auto' }}>
-            <PlotlyChart data={data} layout={layout} style={{ height: '480px', width: '100%' }} />
+          <div style={{ width: '100%', maxWidth: '680px', margin: '0 auto' }}>
+            <PlotlyChart data={data} layout={layout} style={{ height: '500px', width: '100%' }} />
           </div>
         );
       }
@@ -339,13 +339,13 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
             tickfont: { size: 10 },
             automargin: true,
           },
-          legend: { orientation: 'h', y: -0.22, yanchor: 'top', x: 0.5, xanchor: 'center' },
-          margin: { l: 75, r: 40, t: 60, b: 85, pad: 4 },
+          legend: { orientation: 'h', y: -0.24, yanchor: 'top', x: 0.5, xanchor: 'center' },
+          margin: { l: 75, r: 40, t: 60, b: 90, pad: 4 },
         };
 
         return (
-          <div style={{ width: '100%', maxWidth: '640px', margin: '0 auto' }}>
-            <PlotlyChart data={data} layout={layout} style={{ height: '520px', width: '100%' }} />
+          <div style={{ width: '100%', maxWidth: '560px', margin: '0 auto' }}>
+            <PlotlyChart data={data} layout={layout} style={{ height: '540px', width: '100%' }} />
           </div>
         );
       }
@@ -405,12 +405,12 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
               font: { color: '#dc2626', size: 10 },
             },
           ],
-          margin: { l: 75, r: 40, t: 60, b: 65, pad: 4 },
+          margin: { l: 75, r: 50, t: 60, b: 70, pad: 4 },
         };
 
         return (
-          <div style={{ width: '100%', maxWidth: '850px', margin: '0 auto' }}>
-            <PlotlyChart data={data} layout={layout} style={{ height: '460px', width: '100%' }} />
+          <div style={{ width: '100%', maxWidth: '680px', margin: '0 auto' }}>
+            <PlotlyChart data={data} layout={layout} style={{ height: '480px', width: '100%' }} />
           </div>
         );
       }

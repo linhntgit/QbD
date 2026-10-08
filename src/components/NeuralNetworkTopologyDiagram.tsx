@@ -22,7 +22,7 @@ function getNodeYs(count: number, topPadding: number, usableHeight: number): num
   if (count <= 0) return [];
   if (count === 1) return [topPadding + usableHeight / 2];
   const spacing = usableHeight / (count - 1);
-  const maxSpacing = 52;
+  const maxSpacing = 72;
   if (spacing > maxSpacing) {
     const totalSpan = (count - 1) * maxSpacing;
     const startY = topPadding + (usableHeight - totalSpan) / 2;
@@ -64,18 +64,18 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
   const hasH2 = numH2 > 0;
   const maxNodesInLayer = Math.max(numInputs, numH1, numH2, numOutputs, 3);
 
-  // SVG Canvas dimensions with generous width to prevent text clipping on left/right
-  const svgWidth = 1180;
-  const svgHeight = Math.max(300, maxNodesInLayer * 52 + 80);
+  // SVG Canvas dimensions with balanced aspect ratio
+  const svgWidth = 960;
+  const svgHeight = Math.max(340, maxNodesInLayer * 62 + 80);
   const topPadding = 52;
   const bottomPadding = 32;
   const usableHeight = svgHeight - topPadding - bottomPadding;
 
-  // Column X positions (255px left margin for input labels, 320px right margin for output labels)
-  const xInput = 255;
-  const xH1 = hasH2 ? 500 : 580;
-  const xH2 = hasH2 ? 675 : 0;
-  const xOutput = 855;
+  // Column X positions (230px left margin for input labels, 240px right margin for output labels)
+  const xInput = 230;
+  const xH1 = hasH2 ? 430 : 490;
+  const xH2 = hasH2 ? 560 : 0;
+  const xOutput = 720;
 
   const inputYs = useMemo(() => getNodeYs(numInputs, topPadding, usableHeight), [numInputs, topPadding, usableHeight]);
   const h1Ys = useMemo(() => getNodeYs(numH1, topPadding, usableHeight), [numH1, topPadding, usableHeight]);
@@ -206,7 +206,7 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
           style={{
             width: '100%',
             height: 'auto',
-            minWidth: '780px',
+            minWidth: '680px',
             display: 'block',
             backgroundColor: '#f8fafc',
             borderRadius: '0.5rem',

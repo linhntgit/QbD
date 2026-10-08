@@ -484,12 +484,12 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             tickfont: { size: 10 },
             automargin: true,
           },
-          legend: { orientation: 'h', y: -0.22, yanchor: 'top', x: 0.5, xanchor: 'center' },
-          margin: { l: 75, r: 40, t: 60, b: 85, pad: 4 },
+          legend: { orientation: 'h', y: -0.24, yanchor: 'top', x: 0.5, xanchor: 'center' },
+          margin: { l: 75, r: 40, t: 60, b: 90, pad: 4 },
         };
 
         return (
-          <div style={{ width: '100%', maxWidth: '680px', margin: '0 auto' }}>
+          <div style={{ width: '100%', maxWidth: '560px', margin: '0 auto' }}>
             <PlotlyChart data={data} layout={layout} style={{ height: '540px', width: '100%' }} />
           </div>
         );
@@ -566,12 +566,12 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               font: { color: '#dc2626', size: 10 },
             },
           ],
-          margin: { l: 75, r: 40, t: 60, b: 65, pad: 4 },
+          margin: { l: 75, r: 55, t: 60, b: 70, pad: 6 },
         };
 
         return (
-          <div style={{ width: '100%', maxWidth: '850px', margin: '0 auto' }}>
-            <PlotlyChart data={data} layout={layout} style={{ height: '480px', width: '100%' }} />
+          <div style={{ width: '100%', maxWidth: '680px', margin: '0 auto' }}>
+            <PlotlyChart data={data} layout={layout} style={{ height: '500px', width: '100%' }} />
           </div>
         );
       }
@@ -626,12 +626,12 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             tickfont: { size: 10 },
             automargin: true,
           },
-          legend: { orientation: 'h', y: -0.20, yanchor: 'top', x: 0.5, xanchor: 'center' },
-          margin: { l: 75, r: 40, t: 60, b: 75, pad: 4 },
+          legend: { orientation: 'h', y: -0.22, yanchor: 'top', x: 0.5, xanchor: 'center' },
+          margin: { l: 75, r: 45, t: 60, b: 85, pad: 6 },
         };
 
         return (
-          <div style={{ width: '100%', maxWidth: '860px', margin: '0 auto' }}>
+          <div style={{ width: '100%', maxWidth: '680px', margin: '0 auto' }}>
             <PlotlyChart data={data} layout={layout} style={{ height: '480px', width: '100%' }} />
           </div>
         );
@@ -658,7 +658,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             },
           ];
 
-          const varImpHeight = Math.max(440, diag.variableImportance.length * 48 + 140);
+          const varImpHeight = Math.max(460, diag.variableImportance.length * 50 + 140);
 
           const layout = {
             title: `Mức Độ Quan Trọng Của Biến Đầu Vào — ${currentCQA.name} (${currentCQA.code})`,
@@ -680,7 +680,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           };
 
           return (
-            <div style={{ width: '100%', maxWidth: '880px', margin: '0 auto' }}>
+            <div style={{ width: '100%', maxWidth: '760px', margin: '0 auto' }}>
               <PlotlyChart data={data} layout={layout} style={{ height: `${varImpHeight}px`, width: '100%' }} />
             </div>
           );
@@ -852,12 +852,12 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                   tickfont: { size: 11 },
                   automargin: true,
                 },
-                margin: { l: 260, r: 100, t: 60, b: 65, pad: 8 },
+                margin: { l: 250, r: 95, t: 60, b: 68, pad: 8 },
               };
 
               return (
                 <div>
-                  <div style={{ width: '100%', maxWidth: '920px', margin: '0 auto' }}>
+                  <div style={{ width: '100%', maxWidth: '780px', margin: '0 auto' }}>
                     <PlotlyChart data={beeswarmData} layout={beeswarmLayout} style={{ height: `${beeswarmHeight}px`, width: '100%' }} />
                   </div>
                   <div
@@ -954,8 +954,8 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                     </div>
                   </div>
 
-                  <div style={{ width: '100%', maxWidth: '860px', margin: '0 auto' }}>
-                    <PlotlyChart data={waterfallData} layout={waterfallLayout} style={{ height: '480px', width: '100%' }} />
+                  <div style={{ width: '100%', maxWidth: '720px', margin: '0 auto' }}>
+                    <PlotlyChart data={waterfallData} layout={waterfallLayout} style={{ height: '500px', width: '100%' }} />
                   </div>
 
                   <div style={{ marginTop: '0.5rem', padding: '0.5rem 0.8rem', backgroundColor: '#f8fafc', borderRadius: '0.375rem', fontSize: '0.74rem', color: '#64748b' }}>
@@ -1026,7 +1026,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
 
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div style={{ width: '100%', maxWidth: '920px', margin: '0 auto' }}>
+                  <div style={{ width: '100%', maxWidth: '780px', margin: '0 auto' }}>
                     <PlotlyChart data={comparisonPlotData} layout={comparisonPlotLayout} style={{ height: `${compHeight}px`, width: '100%' }} />
                   </div>
 
@@ -1727,7 +1727,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           )}
 
           {/* SVG Neural Network Topology Diagram (Lớp vào, Lớp ẩn 1, Lớp ẩn 2, Lớp ra Hợp nhất / Độc lập) */}
-          <div style={{ width: '100%', maxWidth: '1180px', margin: '0.85rem auto 0 auto' }}>
+          <div style={{ width: '100%', maxWidth: '960px', margin: '0.85rem auto 0 auto' }}>
             <NeuralNetworkTopologyDiagram
               factors={project.factors}
               cqas={project.cqas}
