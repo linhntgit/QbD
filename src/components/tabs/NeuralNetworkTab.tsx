@@ -423,7 +423,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           {
             type: 'scatter',
             mode: 'markers',
-            name: `Tập Huấn Luyện (Train, R²=${diag.rSquaredTrain.toFixed(4)})`,
+            name: `Tập huấn luyện (Train, R²=${diag.rSquaredTrain.toFixed(4)})`,
             x: trainPts.map((r) => r.predicted),
             y: trainPts.map((r) => r.actual),
             marker: { size: 9, color: '#1e3a8a' },
@@ -437,7 +437,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           data.push({
             type: 'scatter',
             mode: 'markers',
-            name: `Tập Kiểm Định (Validation, R²=${diag.rSquaredVal.toFixed(4)})`,
+            name: `Tập kiểm định (Validation, R²=${diag.rSquaredVal.toFixed(4)})`,
             x: valPts.map((r) => r.predicted),
             y: valPts.map((r) => r.actual),
             marker: { size: 9, color: '#dc2626', symbol: 'triangle-up' },
@@ -454,17 +454,17 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
 
         data.push({
           type: 'line',
-          name: 'Đường Chuẩn Y = Ý (Ideal 45°)',
+          name: 'Đường chuẩn Y = Ý (Ideal 45°)',
           x: [minVal, maxVal],
           y: [minVal, maxVal],
           line: { color: '#64748b', width: 1.5, dash: 'dash' },
         });
 
         const layout = {
-          title: `Đồ Thị Thực Tế vs. Dự Đoán — ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+          title: `Đồ thị thực tế vs. dự đoán — ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
           xaxis: {
             title: {
-              text: formatAxisTitle('Giá Trị Dự Đoán Ý', currentCQA.code, currentCQA.unit),
+              text: formatAxisTitle('Giá trị dự đoán Ý', currentCQA.code, currentCQA.unit),
               font: { size: 12, color: '#1e293b' },
               standoff: 12,
             },
@@ -474,7 +474,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           },
           yaxis: {
             title: {
-              text: formatAxisTitle('Giá Trị Thực Tế Y', currentCQA.code, currentCQA.unit),
+              text: formatAxisTitle('Giá trị thực tế Y', currentCQA.code, currentCQA.unit),
               font: { size: 12, color: '#1e293b' },
               standoff: 12,
             },
@@ -522,10 +522,10 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
         const maxX = Math.max(...xPred) * 1.05;
 
         const layout = {
-          title: `Phần Dư vs. Giá Trị Dự Đoán — ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+          title: `Phần dư vs. giá trị dự đoán — ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
           xaxis: {
             title: {
-              text: formatAxisTitle('Giá Trị Dự Đoán Ý', currentCQA.code, currentCQA.unit),
+              text: formatAxisTitle('Giá trị dự đoán Ý', currentCQA.code, currentCQA.unit),
               font: { size: 12, color: '#1e293b' },
               standoff: 12,
             },
@@ -534,7 +534,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           },
           yaxis: {
             title: {
-              text: formatAxisTitle('Phần Dư Y - Ý', currentCQA.code, currentCQA.unit),
+              text: formatAxisTitle('Phần dư Y - Ý', currentCQA.code, currentCQA.unit),
               font: { size: 12, color: '#1e293b' },
               standoff: 12,
             },
@@ -606,10 +606,10 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
         }
 
         const layout = {
-          title: `Đường Cong Hội Tụ Huấn Luyện (Loss History) — ${currentCQA.name} (${currentCQA.code}) [Tour #${diag.bestTourIndex}]`,
+          title: `Đường cong hội tụ huấn luyện (Loss history) — ${currentCQA.name} (${currentCQA.code}) [Tour #${diag.bestTourIndex}]`,
           xaxis: {
             title: {
-              text: 'Số Vòng Lặp Huấn Luyện (Epochs)',
+              text: 'Số vòng lặp huấn luyện (Epochs)',
               font: { size: 12, color: '#1e293b' },
               standoff: 12,
             },
@@ -618,7 +618,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           },
           yaxis: {
             title: {
-              text: 'Mean Squared Error (MSE Loss Chuẩn Hóa)',
+              text: 'Mean squared error (MSE loss chuẩn hóa)',
               font: { size: 12, color: '#1e293b' },
               standoff: 12,
             },
@@ -661,10 +661,10 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           const varImpHeight = Math.max(460, diag.variableImportance.length * 50 + 140);
 
           const layout = {
-            title: `Mức Độ Quan Trọng Của Biến Đầu Vào — ${currentCQA.name} (${currentCQA.code})`,
+            title: `Mức độ quan trọng của biến đầu vào — ${currentCQA.name} (${currentCQA.code})`,
             xaxis: {
               title: {
-                text: 'Tỷ Lệ Đóng Góp Ảnh Hưởng Tương Đối (Relative Importance %)',
+                text: 'Tỷ lệ đóng góp ảnh hưởng tương đối (Relative importance %)',
                 font: { size: 12, color: '#1e293b' },
                 standoff: 12,
               },
@@ -705,7 +705,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <Sparkles size={16} color="#7c3aed" />
                 <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#1e293b' }}>
-                  XAI Studio (Hộp Kính AI Bào Chế):
+                  XAI Studio (hộp kính AI bào chế):
                 </span>
               </div>
 
@@ -723,7 +723,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                     fontWeight: '600',
                   }}
                 >
-                  🐝 SHAP Beeswarm (Toàn Cục)
+                  🐝 SHAP Beeswarm (toàn cục)
                 </button>
                 <button
                   type="button"
@@ -738,7 +738,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                     fontWeight: '600',
                   }}
                 >
-                  💧 SHAP Waterfall (Cục Bộ)
+                  💧 SHAP Waterfall (cục bộ)
                 </button>
                 <button
                   type="button"
@@ -753,7 +753,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                     fontWeight: '600',
                   }}
                 >
-                  ⚖️ Đối Chiếu 3 Thuật Toán (Garson - Olden - SHAP)
+                  ⚖️ Đối chiếu 3 thuật toán (Garson - Olden - SHAP)
                 </button>
                 <button
                   type="button"
@@ -768,7 +768,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                     fontWeight: '600',
                   }}
                 >
-                  🎯 Ma Trận Ảnh Hưởng CPP - CQA
+                  🎯 Ma trận ảnh hưởng CPP - CQA
                 </button>
               </div>
             </div>
@@ -835,10 +835,10 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               const beeswarmHeight = Math.max(460, project.factors.length * 60 + 140);
 
               const beeswarmLayout = {
-                title: `SHAP Beeswarm Summary Plot — Tác Động Biên Của Yếu Tố Lên ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+                title: `SHAP Beeswarm summary plot — Tác động biên của yếu tố lên ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
                 xaxis: {
                   title: {
-                    text: 'Giá Trị SHAP (Shapley Value φ) — Mức độ làm tăng (+) hoặc giảm (-) đáp ứng dự báo',
+                    text: 'Giá trị SHAP (Shapley value φ) — Mức độ làm tăng (+) hoặc giảm (-) đáp ứng dự báo',
                     font: { size: 11, color: '#1e293b' },
                     standoff: 12,
                   },
@@ -919,7 +919,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               ];
 
               const waterfallLayout = {
-                title: `Đồ Thị Waterfall Phân Rã Đóng Góp — Run #${currentRunExp.runOrder} (${currentCQA.name}${currentCQA.unit ? ` [${currentCQA.unit}]` : ''})`,
+                title: `Đồ thị waterfall phân rã đóng góp — Run #${currentRunExp.runOrder} (${currentCQA.name}${currentCQA.unit ? ` [${currentCQA.unit}]` : ''})`,
                 xaxis: { tickfont: { size: 10 }, automargin: true },
                 yaxis: {
                   title: { text: `Giá trị đáp ứng ${currentCQA.name}${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`, font: { size: 11 } },
@@ -932,7 +932,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#1e293b' }}>Chọn Run Phân Tích:</span>
+                      <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#1e293b' }}>Chọn run phân tích:</span>
                       <select
                         value={currentRunExp.runOrder}
                         onChange={(e) => setWaterfallRunOrder(Number(e.target.value))}
@@ -1013,10 +1013,10 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               ];
 
               const comparisonPlotLayout = {
-                title: `Đối Chiếu 3 Thuật Toán XAI — Garson vs Olden vs SHAP (${currentCQA.name}${currentCQA.unit ? ` [${currentCQA.unit}]` : ''})`,
+                title: `Đối chiếu 3 thuật toán XAI — Garson vs Olden vs SHAP (${currentCQA.name}${currentCQA.unit ? ` [${currentCQA.unit}]` : ''})`,
                 barmode: 'group',
                 xaxis: {
-                  title: { text: 'Tỷ Lệ Đóng Góp Ảnh Hưởng Tương Đối (%)', font: { size: 11 } },
+                  title: { text: 'Tỷ lệ đóng góp ảnh hưởng tương đối (%)', font: { size: 11 } },
                   automargin: true,
                 },
                 yaxis: { autorange: 'reversed', tickfont: { size: 11 }, automargin: true },
@@ -1034,12 +1034,12 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                     <table className="qbd-table">
                       <thead>
                         <tr>
-                          <th>Yếu Tố Đầu Vào</th>
-                          <th style={{ textAlign: 'center' }}>Garson (Cấu Trúc)</th>
-                          <th style={{ textAlign: 'center' }}>Olden (Trọng Số & Chiều)</th>
-                          <th style={{ textAlign: 'center' }}>SHAP (Biên & Chiều)</th>
-                          <th style={{ textAlign: 'center' }}>Đồng Thuận (Consensus)</th>
-                          <th style={{ textAlign: 'center' }}>Mức Rủi Ro ICH Q8</th>
+                          <th>Yếu tố đầu vào</th>
+                          <th style={{ textAlign: 'center' }}>Garson (cấu trúc)</th>
+                          <th style={{ textAlign: 'center' }}>Olden (trọng số & chiều)</th>
+                          <th style={{ textAlign: 'center' }}>SHAP (biên & chiều)</th>
+                          <th style={{ textAlign: 'center' }}>Đồng thuận (Consensus)</th>
+                          <th style={{ textAlign: 'center' }}>Mức rủi ro ICH Q8</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1070,7 +1070,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                               </td>
                               <td style={{ textAlign: 'center' }}>
                                 <span className="badge" style={{ backgroundColor: badgeBg, color: badgeColor, fontSize: '0.72rem', fontWeight: '700' }}>
-                                  {row.riskCategory === 'High' ? '🔴 Cao (Critical)' : row.riskCategory === 'Medium' ? '🟡 Trung Bình' : '🟢 Thấp'}
+                                  {row.riskCategory === 'High' ? '🔴 Cao (Critical)' : row.riskCategory === 'Medium' ? '🟡 Trung bình' : '🟢 Thấp'}
                                 </span>
                               </td>
                             </tr>
@@ -1087,21 +1087,21 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             {xaiSubTab === 'matrix' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <div style={{ fontSize: '0.8rem', color: '#475569' }}>
-                  Ma trận đánh giá tổng hợp mức độ ảnh hưởng của các Thông Số Quy Trình (CPP/KPP) lên tất cả các Chỉ Tiêu Chất Lượng (CQA) theo hướng dẫn ICH Q8(R2):
+                  Ma trận đánh giá tổng hợp mức độ ảnh hưởng của các thông số quy trình (CPP/KPP) lên tất cả các chỉ tiêu chất lượng (CQA) theo hướng dẫn ICH Q8(R2):
                 </div>
 
                 <div className="table-container">
                   <table className="qbd-table">
                     <thead>
                       <tr>
-                        <th>Thông Số Quy Trình (Factor)</th>
+                        <th>Thông số quy trình (Factor)</th>
                         {project.cqas.map((c) => (
                           <th key={c.code} style={{ textAlign: 'center' }}>
                             {c.code}: {c.name}
                           </th>
                         ))}
-                        <th style={{ textAlign: 'center' }}>Ảnh Hưởng Lớn Nhất</th>
-                        <th style={{ textAlign: 'center' }}>Phân Loại ICH Q8</th>
+                        <th style={{ textAlign: 'center' }}>Ảnh hưởng lớn nhất</th>
+                        <th style={{ textAlign: 'center' }}>Phân loại ICH Q8</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1164,11 +1164,11 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <h2 style={{ fontSize: '1.2rem', fontWeight: '800', color: '#0f172a', margin: 0 }}>
-                    Phân Tích Dữ Liệu Thực Nghiệm Bằng Mạng Nơ-ron (Neural Network Platform)
+                    Phân tích dữ liệu thực nghiệm bằng mạng nơ-ron (Neural Network Platform)
                   </h2>
                   {modelingEngine === 'neural' && (
                     <span className="badge" style={{ backgroundColor: '#7c3aed', color: '#ffffff', fontSize: '0.72rem' }}>
-                      ✓ Đang Chọn Làm Mô Hình Chính (Bước 6, 7, 8)
+                      ✓ Đang chọn làm mô hình chính (Bước 6, 7, 8)
                     </span>
                   )}
                 </div>
@@ -1206,7 +1206,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               style={{ fontSize: '0.82rem', padding: '0.4rem 0.95rem', backgroundColor: '#7c3aed', borderColor: '#7c3aed', fontWeight: '700' }}
               title="Khóa mô hình Mạng Nơ-ron AI và chuyển tuần tự sang Bước 6: Mặt đáp"
             >
-              <span>Tiếp Tục Với Mạng Nơ-ron (Bước 6: Mặt Đáp)</span>
+              <span>Tiếp tục với mạng nơ-ron (Bước 6: Mặt đáp)</span>
               <ArrowRight size={16} />
             </button>
 
@@ -1262,7 +1262,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: '700', fontSize: '0.9rem', color: neuralTrainingMode === 'shared' ? '#6d28d9' : '#1e293b' }}>
                   <Network size={16} color={neuralTrainingMode === 'shared' ? '#7c3aed' : '#64748b'} />
-                  <span>1 Mạng Nơ-ron Hợp Nhất (Multi-Output MLP)</span>
+                  <span>1 mạng nơ-ron hợp nhất (Multi-Output MLP)</span>
                 </div>
                 <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '0.25rem', lineHeight: '1.4' }}>
                   Fit đồng thời toàn bộ <strong>{project.cqas.length} biến Y</strong> trong 1 mạng duy nhất. Học chung các biểu diễn ẩn và bắt trọn tương quan chéo giữa các chỉ tiêu chất lượng.
@@ -1299,7 +1299,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: '700', fontSize: '0.9rem', color: neuralTrainingMode === 'independent' ? '#6d28d9' : '#1e293b' }}>
                   <Target size={16} color={neuralTrainingMode === 'independent' ? '#7c3aed' : '#64748b'} />
-                  <span>Mạng Nơ-ron Độc Lập Cho Từng Biến Y</span>
+                  <span>Mạng nơ-ron độc lập cho từng biến Y</span>
                 </div>
                 <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '0.25rem', lineHeight: '1.4' }}>
                   Mỗi biến Y ({project.cqas.map((c) => c.code).join(', ')}) có 1 mạng nơ-ron riêng. Cho phép tùy chỉnh số neuron, hàm kích hoạt và tốc độ học khác nhau cho từng biến.
@@ -1331,7 +1331,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               title="Khôi phục cấu hình về mặc định"
             >
               <RotateCcw size={12} />
-              <span>Mặc Định</span>
+              <span>Mặc định</span>
             </button>
           </div>
 
@@ -1380,7 +1380,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                 value={localConfig.activation}
                 onChange={(e) => setLocalConfig({ ...localConfig, activation: e.target.value as NeuralActivation })}
               >
-                <option value="tanh">TanH (Chuẩn)</option>
+                <option value="tanh">TanH (chuẩn)</option>
                 <option value="gaussian">Gaussian (RBF)</option>
                 <option value="linear">Linear</option>
                 <option value="sigmoid">Sigmoid</option>
@@ -1651,7 +1651,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                     }}
                     title="Tự động đặt số nơ-ron ẩn Tầng 1 = h theo ngân sách tham số và tắt Tầng 2"
                   >
-                    💡 Áp Dụng Gợi Ý Kiến Trúc (h = {archMetrics.carpenterRecommended})
+                    💡 Áp dụng gợi ý kiến trúc (h = {archMetrics.carpenterRecommended})
                   </button>
                   {neuralTrainingMode === 'independent' && (
                     <button
@@ -1669,7 +1669,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                       title="Sao chép cấu hình hiện tại sang toàn bộ các CQA khác"
                     >
                       <Share2 size={15} />
-                      <span>Áp Dụng Cho Tất Cả CQA</span>
+                      <span>Áp dụng cho tất cả CQA</span>
                     </button>
                   )}
                 </div>
@@ -1775,12 +1775,12 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               {isTraining ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  <span>Đang Huấn Luyện ({trainingProgress ? `Tour ${trainingProgress.tour}/${trainingProgress.totalTours}` : '...'})</span>
+                  <span>Đang huấn luyện ({trainingProgress ? `Tour ${trainingProgress.tour}/${trainingProgress.totalTours}` : '...'})</span>
                 </>
               ) : (
                 <>
                   <RefreshCw size={16} />
-                  <span>{neuralTrainingMode === 'shared' ? '⚡ Huấn Luyện Mạng Chung (All Y)' : `⚡ Huấn Luyện ${currentCQA.code}`}</span>
+                  <span>{neuralTrainingMode === 'shared' ? '⚡ Huấn luyện mạng chung (All Y)' : `⚡ Huấn luyện ${currentCQA.code}`}</span>
                 </>
               )}
             </button>
@@ -2011,7 +2011,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <TrendingUp size={18} color="#1e3a8a" />
                 <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
-                  Đấu Trường Đa Mô Hình (Multi-Model Benchmarking Arena) — {currentCQA.name} ({currentCQA.code})
+                  Đấu trường đa mô hình (Multi-Model Benchmarking Arena) — {currentCQA.name} ({currentCQA.code})
                 </h3>
               </div>
               <div style={{ fontSize: '0.74rem', color: '#475569' }}>
@@ -2034,7 +2034,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: '700', color: '#7c3aed', marginBottom: '0.2rem' }}>
                   <Sparkles size={15} />
-                  <span>Khuyến Nghị Lựa Chọn Mô Hình Theo Thuyết Thông Tin Akaike & Hướng Dẫn ICH Q8:</span>
+                  <span>Khuyến nghị lựa chọn mô hình theo thuyết thông tin Akaike & hướng dẫn ICH Q8:</span>
                 </div>
                 <div>{cqaBenchmark.summaryRecommendation}</div>
               </div>
@@ -2044,18 +2044,18 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               <table className="qbd-table">
                 <thead>
                   <tr>
-                    <th>Phương Pháp Mô Hình Hóa</th>
-                    <th>Kiến Trúc / Tham Số</th>
-                    <th style={{ textAlign: 'center' }}>Tham Số (p) / df</th>
+                    <th>Phương pháp mô hình hóa</th>
+                    <th>Kiến trúc / tham số</th>
+                    <th style={{ textAlign: 'center' }}>Tham số (p) / df</th>
                     <th style={{ textAlign: 'center' }}>R² Train</th>
                     <th style={{ textAlign: 'center' }}>R²adj</th>
-                    <th style={{ textAlign: 'center' }}>Dự Báo (Q² / Val R²)</th>
+                    <th style={{ textAlign: 'center' }}>Dự báo (Q² / Val R²)</th>
                     <th style={{ textAlign: 'center' }}>RMSE</th>
                     <th style={{ textAlign: 'center' }}>AICc</th>
                     <th style={{ textAlign: 'center' }}>ΔAICc</th>
-                    <th style={{ textAlign: 'center' }}>Trọng Số Akaike (w_i)</th>
-                    <th style={{ textAlign: 'center' }}>Rủi Ro Overfit</th>
-                    <th style={{ textAlign: 'center' }}>Khuyến Nghị ICH Q8</th>
+                    <th style={{ textAlign: 'center' }}>Trọng số Akaike (w_i)</th>
+                    <th style={{ textAlign: 'center' }}>Rủi ro overfit</th>
+                    <th style={{ textAlign: 'center' }}>Khuyến nghị ICH Q8</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2070,18 +2070,18 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
 
                       const suitBadge =
                         cand.ichQ8Suitability === 'Recommended'
-                          ? { text: '⭐ Khuyến Nghị', bg: '#dcfce7', color: '#15803d' }
+                          ? { text: '⭐ Khuyến nghị', bg: '#dcfce7', color: '#15803d' }
                           : cand.ichQ8Suitability === 'Acceptable'
-                          ? { text: '✓ Chấp Nhận', bg: '#e0f2fe', color: '#0369a1' }
+                          ? { text: '✓ Chấp nhận', bg: '#e0f2fe', color: '#0369a1' }
                           : cand.ichQ8Suitability === 'Caution'
-                          ? { text: '⚠️ Thận Trọng', bg: '#fef9c3', color: '#854d0e' }
-                          : { text: '✕ Không Đạt', bg: '#fee2e2', color: '#b91c1c' };
+                          ? { text: '⚠️ Thận trọng', bg: '#fef9c3', color: '#854d0e' }
+                          : { text: '✕ Không đạt', bg: '#fee2e2', color: '#b91c1c' };
 
                       const overfitBadge =
                         cand.overfittingRisk === 'Low'
                           ? { text: 'Thấp', color: '#15803d' }
                           : cand.overfittingRisk === 'Moderate'
-                          ? { text: 'Trung Bình', color: '#d97706' }
+                          ? { text: 'Trung bình', color: '#d97706' }
                           : { text: 'Cao', color: '#dc2626' };
 
                       return (
@@ -2178,10 +2178,10 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Network size={18} color="#7c3aed" />
-                  <span>Bảng Tổng Hợp Chỉ Số Khớp Của Toàn Bộ {project.cqas.length} Biến Y (Multi-CQA Performance Overview)</span>
+                  <span>Bảng tổng hợp chỉ số khớp của toàn bộ {project.cqas.length} biến Y (Multi-CQA performance overview)</span>
                 </div>
                 <span className="badge" style={{ backgroundColor: neuralTrainingMode === 'shared' ? '#0284c7' : '#0f766e', color: '#ffffff', fontSize: '0.72rem' }}>
-                  {neuralTrainingMode === 'shared' ? '🌐 1 Mạng Nơ-ron Hợp Nhất (Shared)' : '🎯 Mạng Độc Lập (Per-CQA)'}
+                  {neuralTrainingMode === 'shared' ? '🌐 1 mạng nơ-ron hợp nhất (Shared)' : '🎯 Mạng độc lập (Per-CQA)'}
                 </span>
               </h3>
 
@@ -2190,15 +2190,15 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                   <thead>
                     <tr>
                       <th>Mã CQA</th>
-                      <th>Tên Chỉ Tiêu Chất Lượng</th>
-                      <th style={{ textAlign: 'center' }}>Kiến Trúc</th>
-                      <th style={{ textAlign: 'center' }}>Tham Số (P)</th>
+                      <th>Tên chỉ tiêu chất lượng</th>
+                      <th style={{ textAlign: 'center' }}>Kiến trúc</th>
+                      <th style={{ textAlign: 'center' }}>Tham số (P)</th>
                       <th style={{ textAlign: 'center' }}>Train R²</th>
                       <th style={{ textAlign: 'center' }}>Val R²</th>
                       <th style={{ textAlign: 'center' }}>Overall R²</th>
                       <th style={{ textAlign: 'center' }}>RMSE</th>
-                      <th style={{ textAlign: 'center' }}>Đánh Giá</th>
-                      <th style={{ textAlign: 'center' }}>Thao Tác</th>
+                      <th style={{ textAlign: 'center' }}>Đánh giá</th>
+                      <th style={{ textAlign: 'center' }}>Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2284,7 +2284,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Layers size={18} color="#7c3aed" />
                 <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a' }}>
-                  Đồ Thị Chẩn Đoán Mô Hình Nơ-ron (Neural Diagnostics)
+                  Đồ thị chẩn đoán mô hình nơ-ron (Neural diagnostics)
                 </h3>
               </div>
 
@@ -2294,28 +2294,28 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                   className={`btn ${activeDiagPlot === 'actPred' ? 'btn-primary' : 'btn-secondary'}`}
                   style={{ padding: '0.3rem 0.65rem', fontSize: '0.78rem', border: 'none' }}
                 >
-                  Thực Tế vs Dự Đoán
+                  Thực tế vs dự đoán
                 </button>
                 <button
                   onClick={() => setActiveDiagPlot('resPred')}
                   className={`btn ${activeDiagPlot === 'resPred' ? 'btn-primary' : 'btn-secondary'}`}
                   style={{ padding: '0.3rem 0.65rem', fontSize: '0.78rem', border: 'none' }}
                 >
-                  Phần Dư vs Dự Đoán
+                  Phần dư vs dự đoán
                 </button>
                 <button
                   onClick={() => setActiveDiagPlot('loss')}
                   className={`btn ${activeDiagPlot === 'loss' ? 'btn-primary' : 'btn-secondary'}`}
                   style={{ padding: '0.3rem 0.65rem', fontSize: '0.78rem', border: 'none' }}
                 >
-                  Đường Cong Hội Tụ Loss
+                  Đường cong hội tụ loss
                 </button>
                 <button
                   onClick={() => setActiveDiagPlot('varImp')}
                   className={`btn ${activeDiagPlot === 'varImp' ? 'btn-teal' : 'btn-secondary'}`}
                   style={{ padding: '0.3rem 0.65rem', fontSize: '0.78rem', border: 'none' }}
                 >
-                  Độ Quan Trọng & XAI (Explainable AI)
+                  Độ quan trọng & XAI (Explainable AI)
                 </button>
               </div>
             </div>
@@ -2330,7 +2330,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
                   <Compass size={20} color="#0f766e" />
                   <h3 style={{ fontSize: '1.02rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
-                    Khảo Sát Mặt Đáp Mô Phỏng Bằng Mạng Nơ-ron (Bước 6)
+                    Khảo sát mặt đáp mô phỏng bằng mạng nơ-ron (Bước 6)
                   </h3>
                   <span className="badge badge-teal" style={{ fontSize: '0.72rem' }}>3D Surface &amp; Contour</span>
                 </div>
@@ -2348,7 +2348,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                 style={{ fontSize: '0.85rem', padding: '0.55rem 1.25rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.45rem' }}
                 title="Chuyển sang Bước 6 để xem mặt đáp 3D và 2D Contour của Mạng Nơ-ron"
               >
-                <span>Mở Mặt Đáp Mạng Nơ-ron Tại Bước 6</span>
+                <span>Mở mặt đáp mạng nơ-ron tại Bước 6</span>
                 <ArrowRight size={16} />
               </button>
             </div>
@@ -2361,7 +2361,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
                   <Sliders size={20} color="#7c3aed" />
                   <h3 style={{ fontSize: '1.02rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
-                    Tối Ưu Hóa Đa Mục Tiêu &amp; Không Gian Thiết Kế (Bước 7)
+                    Tối ưu hóa đa mục tiêu &amp; không gian thiết kế (Bước 7)
                   </h3>
                   <span className="badge" style={{ backgroundColor: '#f3e8ff', color: '#6b21a8', border: '1px solid #e9d5ff', fontSize: '0.72rem' }}>
                     Desirability Profiler &amp; Design Space
@@ -2381,7 +2381,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                 style={{ fontSize: '0.85rem', padding: '0.55rem 1.25rem', backgroundColor: '#7c3aed', borderColor: '#7c3aed', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.45rem' }}
                 title="Chuyển sang Bước 7 để tối ưu hóa và xây dựng Design Space bằng Mạng Nơ-ron"
               >
-                <span>Mở Không Gian Thiết Kế Tại Bước 7</span>
+                <span>Mở không gian thiết kế tại Bước 7</span>
                 <ArrowRight size={16} />
               </button>
             </div>
@@ -2393,7 +2393,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Code2 size={18} color="#1e3a8a" />
                 <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a' }}>
-                  Xuất Công Thức & Mã Nguồn Suy Luận (Model Deployment & Formula Export)
+                  Xuất công thức & mã nguồn suy luận (Model Deployment & Formula Export)
                 </h3>
               </div>
 
@@ -2445,7 +2445,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                 style={{ fontSize: '0.85rem', padding: '0.5rem 1.25rem', backgroundColor: '#7c3aed', borderColor: '#7c3aed', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.45rem' }}
                 title="Khóa mô hình Mạng Nơ-ron AI và chuyển sang Bước 6: Mặt đáp"
               >
-                <span>Tiếp Tục Với Mạng Nơ-ron (Bước 6: Mặt Đáp)</span>
+                <span>Tiếp tục với mạng nơ-ron (Bước 6: Mặt đáp)</span>
                 <ArrowRight size={16} />
               </button>
 
@@ -2458,7 +2458,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                 style={{ fontSize: '0.85rem', padding: '0.5rem 1.1rem', color: '#6d28d9', borderColor: '#e9d5ff', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                 title="Bỏ qua khảo sát mặt đáp để sang thẳng Bước 7: Không gian thiết kế & Tối ưu hóa Desirability"
               >
-                <span>Sang Bước 7: Không Gian Thiết Kế</span>
+                <span>Sang Bước 7: Không gian thiết kế</span>
                 <ArrowRight size={14} />
               </button>
             </div>

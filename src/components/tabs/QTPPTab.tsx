@@ -97,9 +97,9 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({
   const handleAddQTPP = () => {
     const newItem: QTPPItem = {
       id: `qtpp-${Date.now()}`,
-      element: 'Chỉ tiêu mới (ví dụ: Độ hòa tan, Độ ổn định...)',
+      element: 'Chỉ tiêu mới (ví dụ: độ hòa tan, độ ổn định...)',
       target: 'Tiêu chuẩn mục tiêu',
-      justification: 'Căn cứ khoa học / Yêu cầu dược điển',
+      justification: 'Căn cứ khoa học / Yêu cầu Dược điển',
     };
     onUpdateProject({ qtpp: [...project.qtpp, newItem] });
   };
@@ -269,7 +269,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <FlaskConical size={20} color="#1e3a8a" />
             <h2 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#0f172a' }}>
-              Thông tin Tổng quan Dự án (Project Metadata)
+              Thông tin tổng quan dự án (Project Metadata)
             </h2>
           </div>
           <span className="badge badge-primary">QbD Framework</span>
@@ -278,7 +278,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
           <div>
             <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: '#475569', marginBottom: '0.3rem' }}>
-              Tên Dự án / Nghiên cứu
+              Tên dự án / nghiên cứu
             </label>
             <input
               type="text"
@@ -317,7 +317,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '1rem' }}>
           <div>
             <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: '#475569', marginBottom: '0.3rem' }}>
-              Tên Hoạt chất / Hoạt chất mục tiêu (API)
+              Tên hoạt chất / hoạt chất mục tiêu (API)
             </label>
             <input
               type="text"
@@ -342,7 +342,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({
           </div>
           <div>
             <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: '#475569', marginBottom: '0.3rem' }}>
-              Dạng bào chế & Đường dùng
+              Dạng bào chế & đường dùng
             </label>
             <input
               type="text"
@@ -362,7 +362,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Target size={19} color="#0f766e" />
               <h2 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#0f172a' }}>
-                1. Hồ sơ Chất lượng Sản phẩm Mục tiêu (QTPP - ICH Q8)
+                1. Hồ sơ chất lượng sản phẩm mục tiêu (QTPP - ICH Q8)
               </h2>
             </div>
             <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.2rem' }}>
@@ -371,7 +371,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({
           </div>
           <button onClick={handleAddQTPP} className="btn btn-teal" style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}>
             <Plus size={15} />
-            <span>Thêm Yếu tố QTPP</span>
+            <span>Thêm yếu tố QTPP</span>
           </button>
         </div>
 
@@ -380,8 +380,8 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({
             <thead>
               <tr>
                 <th style={{ width: '30%' }}>Yếu tố QTPP (Element)</th>
-                <th style={{ width: '35%' }}>Mục tiêu Đích (Target)</th>
-                <th style={{ width: '30%' }}>Căn cứ Khoa học / Dược điển (Justification)</th>
+                <th style={{ width: '35%' }}>Mục tiêu đích (Target)</th>
+                <th style={{ width: '30%' }}>Căn cứ khoa học / Dược điển (Justification)</th>
                 <th style={{ width: '5%', textAlign: 'center' }}>Xóa</th>
               </tr>
             </thead>
@@ -438,7 +438,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Sparkles size={19} color="#1e3a8a" />
               <h2 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#0f172a' }}>
-                2. Thuộc Tính Chất Lượng Trọng Yếu (CQAs)
+                2. Thuộc tính chất lượng trọng yếu (CQAs)
               </h2>
             </div>
             <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.2rem' }}>
@@ -457,10 +457,10 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({
               <tr>
                 <th style={{ width: '6%' }}>Mã</th>
                 <th style={{ width: '22%' }}>Tên CQA (Đáp ứng)</th>
-                <th style={{ width: '15%' }}>Bản Chất Dữ Liệu (Data Type)</th>
+                <th style={{ width: '15%' }}>Bản chất dữ liệu (Data Type)</th>
                 <th style={{ width: '7%' }}>Đơn vị</th>
                 <th colSpan={3} style={{ width: '33%' }}>Giới hạn định lượng / Các mức cho phép (tối đa 10)</th>
-                <th style={{ width: '12%' }}>Mục tiêu Tối ưu</th>
+                <th style={{ width: '12%' }}>Mục tiêu tối ưu</th>
                 <th style={{ width: '8%' }}>Trọng số</th>
                 <th style={{ width: '4%', textAlign: 'center' }}>Xóa</th>
               </tr>
@@ -577,7 +577,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({
                       <option value="maximize">📈 Càng lớn càng tốt (Max)</option>
                       <option value="minimize">📉 Càng nhỏ càng tốt (Min)</option>
                       <option value="range">📏 Nằm trong khoảng</option>
-                      <option value="pass_category">🏆 Đạt Tiêu Chuẩn</option>
+                      <option value="pass_category">🏆 Đạt tiêu chuẩn</option>
                     </select>
                   </td>
                   <td>
@@ -616,7 +616,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Sliders size={19} color="#b45309" />
               <h2 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#0f172a' }}>
-                3. Các Biến Đầu Vào Khảo Sát (CMA & CPP)
+                3. Các biến đầu vào khảo sát (CMA & CPP)
               </h2>
             </div>
             <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.2rem' }}>
@@ -625,7 +625,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({
           </div>
           <button onClick={handleAddFactor} className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}>
             <Plus size={15} />
-            <span>Thêm Yếu Tố (X)</span>
+            <span>Thêm yếu tố (X)</span>
           </button>
         </div>
 
@@ -655,7 +655,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({
                 <span style={{ fontSize: '1rem' }}>🧪</span>
                 <div>
                   <span style={{ fontWeight: '700', color: isValidRange ? '#166534' : '#854d0e' }}>
-                    {mixFactors.length} Biến Thành Phần Hỗn Hợp ({mixFactors.map((f) => f.code).join(', ')}):
+                    {mixFactors.length} biến thành phần hỗn hợp ({mixFactors.map((f) => f.code).join(', ')}):
                   </span>{' '}
                   <span style={{ color: '#334155' }}>
                     Tổng mức thấp Σ(L) = {sumLow.toFixed(1)}%, Tổng mức cao Σ(U) = {sumHigh.toFixed(1)}%. (Bảng thí nghiệm sẽ luôn đảm bảo Σ = 100%).
@@ -672,7 +672,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({
                   border: `1px solid ${isValidRange ? '#bbf7d0' : '#fef08a'}`,
                 }}
               >
-                {isValidRange ? '✓ Khoảng biên Hợp lệ (ΣL ≤ 100% ≤ ΣU)' : '⚠ Chú ý: Cần ΣL ≤ 100% ≤ ΣU'}
+                {isValidRange ? '✓ Khoảng biên hợp lệ (ΣL ≤ 100% ≤ ΣU)' : '⚠ Chú ý: Cần ΣL ≤ 100% ≤ ΣU'}
               </span>
             </div>
           );
@@ -683,10 +683,10 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({
             <thead>
               <tr>
                 <th style={{ width: '5%' }}>Mã</th>
-                <th style={{ width: '18%' }}>Tên Biến (Yếu tố X)</th>
-                <th style={{ width: '15%' }}>Vai Trò (Phân Loại X)</th>
-                <th style={{ width: '12%' }}>Bản Chất Dữ Liệu</th>
-                <th style={{ width: '14%' }}>Khả Năng Kiểm Soát</th>
+                <th style={{ width: '18%' }}>Tên biến (Yếu tố X)</th>
+                <th style={{ width: '15%' }}>Vai trò (Phân loại X)</th>
+                <th style={{ width: '12%' }}>Bản chất dữ liệu</th>
+                <th style={{ width: '14%' }}>Khả năng kiểm soát</th>
                 <th style={{ width: '6%' }}>Đơn vị</th>
                 <th colSpan={3} style={{ width: '27%' }}>Khoảng liên tục / Các mức cho phép (tối đa 10)</th>
                 <th style={{ width: '5%', textAlign: 'center' }}>Xóa</th>
@@ -734,7 +734,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({
                       value={f.role || (f.type === 'Mixture' ? 'mixture_component' : (f.type === 'CMA' || f.type === 'Formulation') ? 'formulation_other' : 'process_parameter')}
                       onChange={(e) => handleUpdateFactor(f.id, 'role', e.target.value)}
                     >
-                      <option value="mixture_component">🧪 Thành phần Hỗn hợp (Σ=100%)</option>
+                      <option value="mixture_component">🧪 Thành phần hỗn hợp (Σ=100%)</option>
                       <option value="formulation_other">💊 Biến công thức khác</option>
                       <option value="process_parameter">⚙️ Biến quy trình</option>
                     </select>
@@ -866,15 +866,15 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({
         <div style={{ marginTop: '0.75rem', display: 'flex', gap: '1.25rem', fontSize: '0.75rem', color: '#64748b', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
             <span style={{ width: '10px', height: '10px', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '2px', display: 'inline-block' }}></span>
-            <span>🎯 <strong>Biến Kiểm Soát Được (Control):</strong> Người vận hành có thể chủ động cài đặt (như lực dập, nhiệt độ sấy).</span>
+            <span>🎯 <strong>Biến kiểm soát được (Control):</strong> Người vận hành có thể chủ động cài đặt (như lực dập, nhiệt độ sấy).</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
             <span style={{ width: '10px', height: '10px', backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '2px', display: 'inline-block' }}></span>
-            <span>🌪️ <strong>Biến Không Kiểm Soát Được (Noise):</strong> Yếu tố nhiễu môi trường (như độ ẩm ngoài trời, biến thiên lô dược liệu).</span>
+            <span>🌪️ <strong>Biến không kiểm soát được (Noise):</strong> Yếu tố nhiễu môi trường (như độ ẩm ngoài trời, biến thiên lô dược liệu).</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
             <span style={{ width: '10px', height: '10px', backgroundColor: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '2px', display: 'inline-block' }}></span>
-            <span>🔒 <strong>Hằng Số Cố Định (Constant):</strong> Thông số được giữ nguyên không đổi trong toàn bộ nghiên cứu.</span>
+            <span>🔒 <strong>Hằng số cố định (Constant):</strong> Thông số được giữ nguyên không đổi trong toàn bộ nghiên cứu.</span>
           </div>
         </div>
 
@@ -892,7 +892,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({
                 fontWeight: '700',
               }}
             >
-              <span>Chuyển Sang Bước 2: Đánh Giá Rủi Ro FMEA</span>
+              <span>Chuyển sang Bước 2: Đánh giá rủi ro FMEA</span>
               <ArrowRight size={16} />
             </button>
           </div>

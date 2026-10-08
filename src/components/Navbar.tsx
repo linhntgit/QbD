@@ -97,7 +97,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="badge badge-primary">v2.5 ICH-aligned workflow</span>
               </div>
               <p style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                Thiết kế Thí nghiệm & Tối ưu hóa Đáp ứng Dược phẩm (ICH Q8, Q9, Q10, Q11)
+                Thiết kế thí nghiệm & tối ưu hóa đáp ứng dược phẩm (ICH Q8, Q9, Q10, Q11)
               </p>
             </div>
           </div>
@@ -148,10 +148,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                     backgroundColor: modelingEngine === 'polynomial' ? '#0f766e' : 'transparent',
                     color: modelingEngine === 'polynomial' ? '#ffffff' : '#64748b',
                   }}
-                  title="Chuyển toàn bộ phân tích sang Hồi quy Đa thức bậc ≤ 2"
+                  title="Chuyển toàn bộ phân tích sang hồi quy đa thức bậc ≤ 2"
                 >
                   <Calculator size={12} />
-                  <span>Đa Thức</span>
+                  <span>Đa thức</span>
                 </button>
                 <button
                   disabled={!hasTrainedNeuralModels}
@@ -176,12 +176,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                   }}
                   title={
                     hasTrainedNeuralModels
-                      ? 'Chuyển toàn bộ phân tích sang Mạng Nơ-ron Nhân Tạo'
-                      : 'Cần huấn luyện Mạng Nơ-ron tại Bước 5 trước khi kích hoạt'
+                      ? 'Chuyển toàn bộ phân tích sang mạng nơ-ron nhân tạo'
+                      : 'Cần huấn luyện mạng nơ-ron tại Bước 5 trước khi kích hoạt'
                   }
                 >
                   <BrainCircuit size={12} />
-                  <span>Mạng Nơ-ron</span>
+                  <span>Mạng nơ-ron</span>
                 </button>
               </div>
             )}
@@ -320,7 +320,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 title="Mở thanh trợ giúp & hướng dẫn chi tiết theo ngữ cảnh hiện tại"
               >
                 <HelpCircle size={16} color={isHelpOpen ? '#ffffff' : '#2563eb'} />
-                <span>Trợ Giúp</span>
+                <span>Trợ giúp</span>
               </button>
             )}
           </div>

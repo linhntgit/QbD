@@ -60,7 +60,7 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({
     },
     {
       key: 'neural' as TabKey,
-      label: '5. Mạng Nơ-ron',
+      label: '5. Mạng nơ-ron',
       subtitle: 'Mô hình hóa phi tuyến',
       icon: BrainCircuit,
       tag: 'AI Models',
@@ -74,14 +74,14 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({
     },
     {
       key: 'design_space' as TabKey,
-      label: '7. Không gian Thiết kế',
+      label: '7. Không gian thiết kế',
       subtitle: 'Profiler & Tối ưu',
       icon: Boxes,
       tag: 'ICH Q8/Q10',
     },
     {
       key: 'report' as TabKey,
-      label: '8. Báo Cáo Hồ Sơ',
+      label: '8. Báo cáo hồ sơ',
       subtitle: 'CTD 3.2.P.2 & Word',
       icon: FileCheck2,
       tag: 'Dossier',

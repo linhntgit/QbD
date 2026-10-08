@@ -57,7 +57,7 @@ export const ConsentBanner: React.FC = () => {
         <Shield size={18} color="#0f766e" style={{ flexShrink: 0, marginTop: '2px' }} />
         <div>
           <strong style={{ color: '#0f172a', fontSize: '0.82rem', display: 'block', marginBottom: '0.2rem' }}>
-            Quyền Riêng Tư &amp; Dữ Liệu Nghiên Cứu (R&amp;D Privacy)
+            Quyền riêng tư &amp; dữ liệu nghiên cứu (R&amp;D Privacy)
           </strong>
           <span>
             QbD Studio bảo mật toàn bộ dữ liệu công thức trên trình duyệt của bạn. Bạn có cho phép gửi thống kê ẩn danh về việc sử dụng tính năng để cải tiến công cụ không?
@@ -79,7 +79,7 @@ export const ConsentBanner: React.FC = () => {
           }}
         >
           <X size={13} />
-          <span>Từ Chối</span>
+          <span>Từ chối</span>
         </button>
         <button
           type="button"
@@ -94,7 +94,7 @@ export const ConsentBanner: React.FC = () => {
           }}
         >
           <Check size={13} />
-          <span>Đồng Ý</span>
+          <span>Đồng ý</span>
         </button>
       </div>
     </div>

@@ -128,7 +128,7 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
             }}
           />
           <span style={{ fontSize: '0.88rem', fontWeight: '700', color: '#0f172a' }}>
-            SƠ ĐỒ TRỰC QUAN KIẾN TRÚC MẠNG NƠ-RON (MLP TOPOLOGY)
+            Sơ đồ trực quan kiến trúc mạng nơ-ron (MLP topology)
           </span>
           <span
             className="font-mono"
@@ -170,7 +170,7 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
               padding: '0.2rem 0.55rem',
             }}
           >
-            {isShared ? '🌐 Mô hình Hợp Nhất (Fit All Y)' : `🎯 Mô hình Độc Lập (${currentCQA?.code || 'Single Y'})`}
+            {isShared ? '🌐 Mô hình hợp nhất (Fit All Y)' : `🎯 Mô hình độc lập (${currentCQA?.code || 'Single Y'})`}
           </span>
           <span
             className="badge"
@@ -181,7 +181,7 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
               padding: '0.2rem 0.5rem',
             }}
           >
-            Hàm Kích Hoạt: <strong>{config.activation.toUpperCase()}</strong>
+            Hàm kích hoạt: <strong>{config.activation.toUpperCase()}</strong>
           </span>
           {archMetrics && (
             <span
@@ -219,7 +219,7 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
           <g>
             <rect x="15" y="8" width={xInput - 10} height="28" rx="5" fill="#f1f5f9" stroke="#cbd5e1" strokeWidth="1" />
             <text x={(15 + xInput - 10) / 2} y="26" textAnchor="middle" fill="#334155" fontSize="11" fontWeight="700">
-              LỚP ĐẦU VÀO ({numInputs} Biến X)
+              Lớp đầu vào ({numInputs} biến X)
             </text>
           </g>
 
@@ -227,7 +227,7 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
           <g>
             <rect x={xH1 - 65} y="8" width="130" height="28" rx="5" fill="#ede9fe" stroke="#c4b5fd" strokeWidth="1" />
             <text x={xH1} y="26" textAnchor="middle" fill="#6b21a8" fontSize="11" fontWeight="700">
-              LỚP ẨN 1 ({numH1} Nơ-ron)
+              Lớp ẩn 1 ({numH1} nơ-ron)
             </text>
           </g>
 
@@ -236,7 +236,7 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
             <g>
               <rect x={xH2 - 65} y="8" width="130" height="28" rx="5" fill="#fae8ff" stroke="#e879f9" strokeWidth="1" />
               <text x={xH2} y="26" textAnchor="middle" fill="#86198f" fontSize="11" fontWeight="700">
-                LỚP ẨN 2 ({numH2} Nơ-ron)
+                Lớp ẩn 2 ({numH2} nơ-ron)
               </text>
             </g>
           )}
@@ -245,7 +245,7 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
           <g>
             <rect x={xOutput - 30} y="8" width={svgWidth - xOutput + 15} height="28" rx="5" fill="#ccfbf1" stroke="#99f6e4" strokeWidth="1" />
             <text x={(xOutput - 30 + svgWidth - 15) / 2} y="26" textAnchor="middle" fill="#0f766e" fontSize="11" fontWeight="700">
-              LỚP ĐẦU RA ({isShared ? `${numOutputs} CQAs Hợp nhất` : `${numOutputs} CQA Độc lập`})
+              Lớp đầu ra ({isShared ? `${numOutputs} CQA hợp nhất` : `${numOutputs} CQA độc lập`})
             </text>
           </g>
 

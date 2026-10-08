@@ -1139,7 +1139,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
 
     return {
       title: {
-        text: `Không Gian Thiết Kế (Design Space Overlay) — Biên: ${modeBadge}${feasibleText}`,
+        text: `Không gian thiết kế (Design Space Overlay) — Biên: ${modeBadge}${feasibleText}`,
         font: { size: 13, color: '#0f172a', family: 'Inter' },
       },
       xaxis: {
@@ -1281,7 +1281,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                   borderColor: modelingEngine === 'neural' ? '#7c3aed' : undefined,
                 }}
               >
-                🧠 Mạng Nơ-ron AI
+                🧠 Mạng nơ-ron AI
               </button>
             </div>
 
@@ -1291,7 +1291,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
               style={{ fontSize: '0.78rem', padding: '0.38rem 0.8rem', gap: '0.35rem' }}
               title="Chuyển sang Tab Báo Cáo QbD & Xuất Word"
             >
-              <span>Xem Báo Cáo QbD</span>
+              <span>Xem báo cáo QbD</span>
               <ArrowRight size={14} />
             </button>
           </div>
@@ -1326,7 +1326,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
           <h2 style={{ fontSize: '1.05rem', fontWeight: '700', marginBottom: '0.35rem' }}>Design Space chưa thể được tính</h2>
           <p style={{ margin: '0 auto 1.25rem', fontSize: '0.82rem', maxWidth: '620px', lineHeight: 1.5 }}>
             {missingModelCodes.length > 0
-              ? `Thiếu mô hình khả định cho: ${missingModelCodes.join(', ')}. ${modelingEngine === 'neural' ? 'Vui lòng sang Bước 5 để huấn luyện Mạng Nơ-ron cho các CQA này, hoặc bấm nút bên dưới để quay lại mô hình Đa thức (ANOVA).' : 'Hãy chọn mô hình đơn giản hơn, bổ sung run hoặc xử lý block trước khi tạo overlay/PAR.'}`
+              ? `Thiếu mô hình khả định cho: ${missingModelCodes.join(', ')}. ${modelingEngine === 'neural' ? 'Vui lòng sang Bước 5 để huấn luyện mạng nơ-ron cho các CQA này, hoặc bấm nút bên dưới để quay lại mô hình đa thức (ANOVA).' : 'Hãy chọn mô hình đơn giản hơn, bổ sung run hoặc xử lý block trước khi tạo overlay/PAR.'}`
               : 'Chưa tìm được nghiệm desirability khả thi cho toàn bộ CQA.'}
           </p>
           {onToggleEngine && modelingEngine === 'neural' && (
@@ -1337,7 +1337,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                 style={{ fontSize: '0.85rem', padding: '0.5rem 1.25rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.45rem' }}
               >
                 <Calculator size={16} />
-                <span>Quay Lại Mô Hình Đa Thức (ANOVA)</span>
+                <span>Quay lại mô hình đa thức (ANOVA)</span>
               </button>
             </div>
           )}
@@ -1369,7 +1369,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Boxes size={20} color="#1e3a8a" />
                 <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a' }}>
-                  Không Gian Thiết Kế (Design Space Overlay)
+                  Không gian thiết kế (Design Space Overlay)
                 </h3>
               </div>
               <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.15rem' }}>
@@ -1405,7 +1405,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                     style={{ fontSize: '0.72rem', padding: '0.25rem 0.5rem', fontWeight: '700' }}
                   >
                     <FlaskConical size={12} style={{ display: 'inline', marginRight: '0.2rem' }} />
-                    <span>Tam Giác Hỗn Hợp</span>
+                    <span>Tam giác hỗn hợp</span>
                   </button>
                   )}
               </div>
@@ -1418,7 +1418,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                     { label: 'Nhanh', val: 100, desc: '100x100' },
                     { label: 'Chuẩn', val: 180, desc: '180x180' },
                     { label: 'Mịn', val: 260, desc: '260x260' },
-                    { label: 'Cực Mịn', val: 320, desc: '320x320' },
+                    { label: 'Cực mịn', val: 320, desc: '320x320' },
                   ].map((preset) => (
                     <button
                       key={preset.val}
@@ -1639,7 +1639,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                 }}
               />
               <span style={{ fontWeight: '600', color: '#166534' }}>
-                Vùng Xanh: miền dự báo đạt chuẩn cho các CQA đã mô hình hóa
+                Vùng xanh: miền dự báo đạt chuẩn cho các CQA đã mô hình hóa
               </span>
             </div>
 
@@ -1655,7 +1655,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                 }}
               />
               <span style={{ fontWeight: '600', color: '#991b1b' }}>
-                Vùng Đỏ: Không đạt tiêu chuẩn (OOS)
+                Vùng đỏ: không đạt tiêu chuẩn (OOS)
               </span>
             </div>
 
@@ -1663,7 +1663,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                 <span style={{ color: '#1e3a8a', fontSize: '1rem', lineHeight: 1 }}>★</span>
                 <span style={{ fontWeight: '700', color: '#1e3a8a' }}>
-                  Điểm Vận Hành Đề Xuất (Target)
+                  Điểm vận hành đề xuất (Target)
                 </span>
               </div>
             )}
@@ -1753,7 +1753,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Sliders size={16} color="#0f766e" />
                   <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#0f172a' }}>
-                    Thanh Trượt Lát Cắt Động Yếu Tố Thứ 3 (Dynamic Slicing X₃):
+                    Thanh trượt lát cắt động yếu tố thứ 3 (Dynamic slicing X₃):
                   </span>
                   <select
                     className="input-field"
@@ -1786,7 +1786,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                     title={isPlayingScan ? 'Tạm dừng quét động' : 'Tự động quét lát cắt biến X3 qua toàn bộ dải vận hành'}
                   >
                     {isPlayingScan ? <Pause size={12} /> : <Play size={12} />}
-                    <span>{isPlayingScan ? 'Tạm Dừng' : 'Quét Tự Động'}</span>
+                    <span>{isPlayingScan ? 'Tạm dừng' : 'Quét tự động'}</span>
                   </button>
 
                   <div style={{ display: 'flex', gap: '0.15rem' }}>
@@ -1978,13 +1978,13 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
           {/* Axis / Vertices Selector Card */}
           <div className="qbd-card">
             <h3 style={{ fontSize: '0.88rem', fontWeight: '700', color: '#0f172a', marginBottom: '0.5rem' }}>
-              {overlayMode === 'ternary' ? '3 Đỉnh Tam Giác Sweet Spot' : 'Trục Tọa Độ Sweet Spot'}
+              {overlayMode === 'ternary' ? '3 đỉnh tam giác sweet spot' : 'Trục tọa độ sweet spot'}
             </h3>
 
             {overlayMode === 'ternary' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <div>
-                  <label style={{ fontSize: '0.75rem', color: '#0f766e', fontWeight: '600' }}>🔺 Đỉnh A (Đỉnh Trên):</label>
+                  <label style={{ fontSize: '0.75rem', color: '#0f766e', fontWeight: '600' }}>🔺 Đỉnh A (đỉnh trên):</label>
                   <select className="input-field" value={ternaryA} onChange={(e) => setTernaryA(e.target.value)}>
                     {mixtureFactors.map((f) => (
                       <option key={f.code} value={f.code} disabled={f.code === ternaryB || f.code === ternaryC}>
@@ -1994,7 +1994,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label style={{ fontSize: '0.75rem', color: '#1e40af', fontWeight: '600' }}>◀️ Đỉnh B (Đỉnh Trái):</label>
+                  <label style={{ fontSize: '0.75rem', color: '#1e40af', fontWeight: '600' }}>◀️ Đỉnh B (đỉnh trái):</label>
                   <select className="input-field" value={ternaryB} onChange={(e) => setTernaryB(e.target.value)}>
                     {mixtureFactors.map((f) => (
                       <option key={f.code} value={f.code} disabled={f.code === ternaryA || f.code === ternaryC}>
@@ -2004,7 +2004,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label style={{ fontSize: '0.75rem', color: '#b45309', fontWeight: '600' }}>▶️ Đỉnh C (Đỉnh Phải):</label>
+                  <label style={{ fontSize: '0.75rem', color: '#b45309', fontWeight: '600' }}>▶️ Đỉnh C (đỉnh phải):</label>
                   <select className="input-field" value={ternaryC} onChange={(e) => setTernaryC(e.target.value)}>
                     {mixtureFactors.map((f) => (
                       <option key={f.code} value={f.code} disabled={f.code === ternaryA || f.code === ternaryB}>
@@ -2045,7 +2045,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
             <div className="qbd-card" style={{ backgroundColor: '#fffbeb', border: '1px solid #fef3c7' }}>
               <div style={{ fontSize: '0.8rem', fontWeight: '700', color: '#b45309', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                 <FlaskConical size={14} />
-                <span>GIỚI HẠN KHẢO SÁT 3 BIẾN HỖN HỢP:</span>
+                <span>Giới hạn khảo sát 3 biến hỗn hợp:</span>
               </div>
               <div style={{ fontSize: '0.76rem', color: '#92400e', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -2069,7 +2069,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.4rem' }}>
               <h3 style={{ fontSize: '0.88rem', fontWeight: '700', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <Sliders size={16} color="#b45309" />
-                <span>Điều Chỉnh Các Biến X Còn Lại</span>
+                <span>Điều chỉnh các biến X còn lại</span>
               </h3>
               {optimum && fixedFactorsList.length > 0 && (
                 <button
@@ -2081,7 +2081,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                   title="Khôi phục toàn bộ các biến về điểm tối ưu"
                 >
                   <Sparkles size={11} color="#b45309" />
-                  <span>Về Điểm Tối Ưu</span>
+                  <span>Về điểm tối ưu</span>
                 </button>
               )}
             </div>
@@ -2222,7 +2222,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
           {/* Control Strategy Concept Card (ICH Q10) */}
           <div className="qbd-card" style={{ backgroundColor: '#f8fafc' }}>
             <h3 style={{ fontSize: '0.88rem', fontWeight: '700', color: '#1e3a8a', marginBottom: '0.5rem' }}>
-              Phân Cấp Phạm Vi (ICH Q8 / Q10)
+              Phân cấp phạm vi (ICH Q8 / Q10)
             </h3>
             <div style={{ fontSize: '0.75rem', color: '#334155', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               <div>
@@ -2249,7 +2249,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <ShieldCheck size={20} color="#0f766e" />
               <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a' }}>
-                Xác Minh Độ Tin Cậy Bằng Mô Phỏng Monte Carlo (ICH Q9 Risk Verification)
+                Xác minh độ tin cậy bằng mô phỏng Monte Carlo (ICH Q9 Risk Verification)
               </h3>
             </div>
             <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.2rem' }}>
@@ -2260,7 +2260,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
             {/* Batch Count Presets */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', backgroundColor: '#f8fafc', padding: '0.2rem 0.4rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
-              <span style={{ fontSize: '0.73rem', color: '#475569', fontWeight: '600' }}>Số Lô:</span>
+              <span style={{ fontSize: '0.73rem', color: '#475569', fontWeight: '600' }}>Số lô:</span>
               <div style={{ display: 'flex', gap: '0.15rem' }}>
                 {[
                   { label: '1k', val: 1000, desc: '1,000 lô (⚡ Nhanh)' },
@@ -2316,7 +2316,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                 style={{ fontSize: '0.68rem', padding: '0.18rem 0.45rem', borderRadius: '0.25rem', border: 'none' }}
                 title="Áp dụng một hệ số % RSD chung cho tất cả các thông số quy trình X"
               >
-                RSD Chung
+                RSD chung
               </button>
               <button
                 type="button"
@@ -2328,7 +2328,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                 style={{ fontSize: '0.68rem', padding: '0.18rem 0.45rem', borderRadius: '0.25rem', border: 'none' }}
                 title="Tùy chỉnh riêng SD/RSD cho từng biến X và sai số đo phân tích lặp lại cho từng CQA (ICH Q14)"
               >
-                Từng Biến (ICH Q14)
+                Từng biến (ICH Q14)
               </button>
             </div>
 
@@ -2384,12 +2384,12 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
               {isSimulating ? (
                 <>
                   <Loader2 className="animate-spin" size={14} />
-                  <span>Đang Mô Phỏng {simProgress}%...</span>
+                  <span>Đang mô phỏng {simProgress}%...</span>
                 </>
               ) : (
                 <>
                   <Play size={14} />
-                  <span>Chạy Mô Phỏng ({mcSimulations.toLocaleString()} Lô)</span>
+                  <span>Chạy mô phỏng ({mcSimulations.toLocaleString()} lô)</span>
                 </>
               )}
             </button>
@@ -2474,16 +2474,16 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <SlidersHorizontal size={16} color="#0f766e" />
                   <span style={{ fontWeight: '700', fontSize: '0.88rem', color: '#0f172a' }}>
-                    Cấu Hình Dao Động Từng Biến (X) &amp; Sai Số Đo Phân Tích (Y) - ICH Q8 / ICH Q14
+                    Cấu hình dao động từng biến (X) &amp; sai số đo phân tích (Y) - ICH Q8 / ICH Q14
                   </span>
                   <span className="badge badge-teal" style={{ fontSize: '0.65rem' }}>
-                    {mcVariabilityMode === 'component_wise' ? 'Chế độ Từng Biến Kích Hoạt' : 'Chế độ RSD Chung'}
+                    {mcVariabilityMode === 'component_wise' ? 'Chế độ từng biến kích hoạt' : 'Chế độ RSD chung'}
                   </span>
                 </div>
                 <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '0.15rem 0 0 0' }}>
                   {mcVariabilityMode === 'component_wise'
                     ? 'Mô phỏng sử dụng độ lệch chuẩn (SD) hoặc % RSD riêng cho từng yếu tố quy trình (X), cộng thêm sai số đo phân tích lặp lại (Y).'
-                    : 'Ở chế độ "RSD Chung", hệ số % RSD ở thanh công cụ sẽ tự động nhân tỉ lệ với độ dao động cơ bản của từng biến. Chuyển sang "Từng biến (ICH Q14)" để chỉnh độc lập từng biến.'}
+                    : 'Ở chế độ "RSD chung", hệ số % RSD ở thanh công cụ sẽ tự động nhân tỉ lệ với độ dao động cơ bản của từng biến. Chuyển sang "Từng biến (ICH Q14)" để chỉnh độc lập từng biến.'}
                 </p>
               </div>
 
@@ -2509,7 +2509,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
               {/* Table 1: Factors Xi */}
               <div style={{ backgroundColor: '#ffffff', borderRadius: '0.375rem', border: '1px solid #e2e8f0', padding: '0.65rem' }}>
                 <div style={{ fontWeight: '700', fontSize: '0.78rem', color: '#1e3a8a', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <span>⚙️ 1. Dao Động Yếu Tố Quy Trình (X - Process Variability)</span>
+                  <span>⚙️ 1. Dao động yếu tố quy trình (X - Process variability)</span>
                 </div>
                 <div style={{ overflowX: 'auto' }}>
                   <table className="data-table" style={{ fontSize: '0.72rem', width: '100%' }}>
@@ -2589,7 +2589,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
               {/* Table 2: CQAs Y Analytical Measurement Noise */}
               <div style={{ backgroundColor: '#ffffff', borderRadius: '0.375rem', border: '1px solid #e2e8f0', padding: '0.65rem' }}>
                 <div style={{ fontWeight: '700', fontSize: '0.78rem', color: '#7c3aed', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <span>🧪 2. Sai Số Phép Đo Phân Tích CQA (Y - Analytical Noise ICH Q14)</span>
+                  <span>🧪 2. Sai số phép đo phân tích CQA (Y - Analytical noise ICH Q14)</span>
                 </div>
                 <div style={{ overflowX: 'auto' }}>
                   <table className="data-table" style={{ fontSize: '0.72rem', width: '100%' }}>
@@ -2894,7 +2894,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                       <Layers size={16} color="#0f766e" />
                       <span style={{ fontWeight: '700', fontSize: '0.85rem', color: '#0f172a' }}>
-                        Phân Rã Phương Sai Chất Lượng (Variance Decomposition - ICH Q14 / Six Sigma)
+                        Phân rã phương sai chất lượng (Variance decomposition - ICH Q14 / Six Sigma)
                       </span>
                     </div>
                     <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '0.15rem 0 0 0' }}>
@@ -2995,7 +2995,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
               }}
             >
               <div style={{ fontWeight: '700', color: '#0f172a', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <span>📊 Thang Đo Hiệu Năng &amp; Năng Lực Quy Trình (Ppk / Cpk Benchmarks - ICH Q9 &amp; Six Sigma):</span>
+                <span>📊 Thang đo hiệu năng &amp; năng lực quy trình (Ppk / Cpk benchmarks - ICH Q9 &amp; Six Sigma):</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.5rem' }}>
                 <div style={{ padding: '0.35rem 0.5rem', backgroundColor: '#fef2f2', borderRadius: '0.375rem', border: '1px solid #fecaca' }}>
@@ -3080,7 +3080,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <ClipboardList size={20} color="#0f766e" />
             <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a' }}>
-              Bảng Chiến Lược Kiểm Soát Toàn Diện (ICH Q10 Control Strategy Dashboard)
+              Bảng chiến lược kiểm soát toàn diện (ICH Q10 Control Strategy Dashboard)
             </h3>
           </div>
           <span className="badge badge-success" style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}>
@@ -3096,14 +3096,14 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
           <table className="qbd-table">
             <thead>
               <tr>
-                <th>Phân Loại</th>
-                <th>Thông Số / Thuộc Tính</th>
-                <th>Đơn Vị</th>
-                <th>Mục Tiêu (Target)</th>
-                <th>Khoảng Vận Hành Thông Thường (NOR)</th>
+                <th>Phân loại</th>
+                <th>Thông số / thuộc tính</th>
+                <th>Đơn vị</th>
+                <th>Mục tiêu (Target)</th>
+                <th>Khoảng vận hành thông thường (NOR)</th>
                 <th>Khoảng PAR sàng lọc</th>
-                <th>Giới Hạn Design Space</th>
-                <th>Phương Pháp Kiểm Soát</th>
+                <th>Giới hạn Design Space</th>
+                <th>Phương pháp kiểm soát</th>
               </tr>
             </thead>
             <tbody>
@@ -3170,7 +3170,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                 style={{ fontSize: '0.85rem', padding: '0.5rem 1.25rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.45rem' }}
                 title="Chuyển sang Bước 8 để xem báo cáo hồ sơ phát triển dược phẩm CTD 3.2.P.2"
               >
-                <span>Xem Báo Cáo Hồ Sơ QbD (Bước 8)</span>
+                <span>Xem báo cáo hồ sơ QbD (Bước 8)</span>
                 <ArrowRight size={16} />
               </button>
             </div>

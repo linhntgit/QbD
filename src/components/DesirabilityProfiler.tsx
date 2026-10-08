@@ -795,7 +795,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
               title="Mở bảng cấu hình mục tiêu và hàm hình dạng (s/t shapes)"
             >
               <Settings size={14} />
-              <span>Mục Tiêu & Trọng Số</span>
+              <span>Mục tiêu & trọng số</span>
               {showGoalEditor ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
             <button
@@ -818,7 +818,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
               title="Tìm nghiệm tối ưu toàn cục Derringer-Suich D (tôn trọng các biến đã khóa)"
             >
               <Sparkles size={16} />
-              <span>Tối Đa Hóa Thỏa Dụng (Max D)</span>
+              <span>Tối đa hóa thỏa dụng (Max D)</span>
             </button>
 
             <button
@@ -840,7 +840,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
               title="Lưu lại điểm cài đặt hiện tại để so sánh kịch bản (Remember Settings)"
             >
               <BookmarkPlus size={15} />
-              <span>Lưu Kịch Bản ({savedSettings.length})</span>
+              <span>Lưu kịch bản ({savedSettings.length})</span>
             </button>
 
             <button
@@ -862,7 +862,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
               title="Đặt lại tất cả các yếu tố về mức tâm (0)"
             >
               <RotateCcw size={14} />
-              <span>Về Tâm (0)</span>
+              <span>Về tâm (0)</span>
             </button>
 
           </div>
@@ -883,7 +883,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Target size={18} color="#1e40af" />
               <h4 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
-                Cấu Hình Hàm Hài Lòng Từng Phần (dᵢ) & Tham Số Hình Dạng (s, t)
+                Cấu hình hàm hài lòng từng phần (dᵢ) & tham số hình dạng (s, t)
               </h4>
             </div>
             <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
@@ -897,14 +897,14 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                 <tr>
                   <th style={{ width: '6%' }}>Mã</th>
                   <th style={{ width: '18%' }}>Tên CQA</th>
-                  <th style={{ width: '15%' }}>Mục Tiêu (Goal)</th>
-                  <th style={{ width: '10%' }}>Giới Hạn Dưới (L)</th>
+                  <th style={{ width: '15%' }}>Mục tiêu (Goal)</th>
+                  <th style={{ width: '10%' }}>Giới hạn dưới (L)</th>
                   <th style={{ width: '10%' }}>Đích (Target T)</th>
-                  <th style={{ width: '10%' }}>Giới Hạn Trên (U)</th>
+                  <th style={{ width: '10%' }}>Giới hạn trên (U)</th>
                   <th style={{ width: '9%' }}>Shape $s$</th>
                   <th style={{ width: '9%' }}>Shape $t$</th>
-                  <th style={{ width: '8%' }}>Trọng Số $w_i$</th>
-                  <th style={{ width: '5%', textAlign: 'center' }}>$d_i$ Hiện Tại</th>
+                  <th style={{ width: '8%' }}>Trọng số $w_i$</th>
+                  <th style={{ width: '5%', textAlign: 'center' }}>$d_i$ hiện tại</th>
                 </tr>
               </thead>
               <tbody>
@@ -1058,7 +1058,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                 <TrendingUp size={17} color="#2563eb" />
                 <h5 style={{ fontSize: '0.9rem', fontWeight: '700', color: '#1e3a8a', margin: 0 }}>
-                  Đồ Thị Minh Họa Hàm Hài Lòng Từng Phần (dᵢ(Y) theo Y)
+                  Đồ thị minh họa hàm hài lòng từng phần (dᵢ(Y) theo Y)
                 </h5>
               </div>
               <span className="badge badge-primary" style={{ fontSize: '0.72rem', backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
@@ -1126,7 +1126,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                         <strong>🟢 Thỏa mãn 100% ($d_{cqa.code} = 1.0$): </strong>
                         {cqa.objective === 'maximize' && `Khi ${cqa.code} ≥ ${T ?? U ?? 0} ${cqa.unit || ''} (Càng lớn càng tốt)`}
                         {cqa.objective === 'minimize' && `Khi ${cqa.code} ≤ ${T ?? L ?? 0} ${cqa.unit || ''} (Càng nhỏ càng tốt)`}
-                        {cqa.objective === 'target' && `Khi ${cqa.code} = ${T ?? ((L ?? 0) + (U ?? 100)) / 2} ${cqa.unit || ''} (Đạt chính xác Đích)`}
+                        {cqa.objective === 'target' && `Khi ${cqa.code} = ${T ?? ((L ?? 0) + (U ?? 100)) / 2} ${cqa.unit || ''} (Đạt chính xác đích)`}
                         {cqa.objective === 'range' && `Khi ${L ?? 0} ≤ ${cqa.code} ≤ ${U ?? 100} ${cqa.unit || ''}`}
                       </div>
 
@@ -1176,7 +1176,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <TrendingUp size={20} color="#1e3a8a" />
             <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
-              Ma Trận Đồ Thị Dự Báo (Prediction Profiler Matrix)
+              Ma trận đồ thị dự báo (Prediction Profiler Matrix)
             </h3>
           </div>
           <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
@@ -1536,7 +1536,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                   D = {currentEvaluation?.overallD.toFixed(4)}
                 </div>
                 <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
-                  Hàm Thỏa Dụng Tổng Thể
+                  Hàm thỏa dụng tổng thể
                 </span>
               </div>
 
@@ -1640,7 +1640,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Layers size={18} color="#0f766e" />
               <h4 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
-                Bảng So Sánh Các Phương Án Tối Ưu Đã Lưu (Saved Optimization Candidates)
+                Bảng so sánh các phương án tối ưu đã lưu (Saved Optimization Candidates)
               </h4>
             </div>
             <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
@@ -1652,12 +1652,12 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
             <table className="qbd-table">
               <thead>
                 <tr>
-                  <th style={{ width: '18%' }}>Tên Kịch Bản</th>
-                  <th style={{ width: '12%' }}>Thời Gian</th>
-                  <th style={{ width: '12%' }}>Thỏa Dụng (D)</th>
-                  <th style={{ width: '30%' }}>Thông Số Cài Đặt (X)</th>
-                  <th style={{ width: '20%' }}>Đáp Ứng Dự Đoán (Y)</th>
-                  <th style={{ width: '8%', textAlign: 'center' }}>Thao Tác</th>
+                  <th style={{ width: '18%' }}>Tên kịch bản</th>
+                  <th style={{ width: '12%' }}>Thời gian</th>
+                  <th style={{ width: '12%' }}>Thỏa dụng (D)</th>
+                  <th style={{ width: '30%' }}>Thông số cài đặt (X)</th>
+                  <th style={{ width: '20%' }}>Đáp ứng dự đoán (Y)</th>
+                  <th style={{ width: '8%', textAlign: 'center' }}>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -1720,7 +1720,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                           style={{ fontSize: '0.72rem', padding: '0.2rem 0.45rem' }}
                           title="Tải lại kịch bản này vào Profiler"
                         >
-                          Tải Lại
+                          Tải lại
                         </button>
                         {onCreateConfirmation && <button className="btn btn-secondary" onClick={() => onCreateConfirmation(s)}>Xác nhận</button>}
                         <button

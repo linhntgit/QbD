@@ -105,7 +105,7 @@ export const FMEATab: React.FC<FMEATabProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <ShieldAlert size={22} color="#b45309" />
               <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#0f172a' }}>
-                Đánh giá Quản lý Rủi ro Chất lượng (Quality Risk Management - ICH Q9)
+                Đánh giá quản lý rủi ro chất lượng (Quality Risk Management - ICH Q9)
               </h2>
             </div>
             <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.2rem' }}>
@@ -127,7 +127,7 @@ export const FMEATab: React.FC<FMEATabProps> = ({
                 className={`btn ${activeSubView === 'fishbone' ? 'btn-primary' : 'btn-secondary'}`}
                 style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', border: 'none' }}
               >
-                Sơ đồ Xương cá (Ishikawa)
+                Sơ đồ xương cá (Ishikawa)
               </button>
             </div>
 
@@ -169,11 +169,11 @@ export const FMEATab: React.FC<FMEATabProps> = ({
         <div className="qbd-card">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
             <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a' }}>
-              Bảng Phân Tích Dạng Sai Lỗi & Tác Động (FMEA Matrix)
+              Bảng phân tích dạng sai lỗi & tác động (FMEA Matrix)
             </h3>
             <button onClick={handleAddRiskItem} className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}>
               <Plus size={15} />
-              <span>Thêm Hàng Đánh Giá Rủi Ro</span>
+              <span>Thêm hàng đánh giá rủi ro</span>
             </button>
           </div>
 
@@ -182,13 +182,13 @@ export const FMEATab: React.FC<FMEATabProps> = ({
               <thead>
                 <tr>
                   <th style={{ width: '15%' }}>Yếu tố (Factor)</th>
-                  <th style={{ width: '15%' }}>CQA Bị Ảnh Hưởng</th>
+                  <th style={{ width: '15%' }}>CQA bị ảnh hưởng</th>
                   <th style={{ width: '22%' }}>Dạng sai lỗi / Cơ chế rủi ro</th>
                   <th style={{ width: '7%', textAlign: 'center' }} title="Severity - Mức độ nghiêm trọng (1-10)">S (Mức nghiêm trọng)</th>
                   <th style={{ width: '7%', textAlign: 'center' }} title="Occurrence - Khả năng xảy ra / Tần suất (1-10)">O (Khả năng xảy ra)</th>
                   <th style={{ width: '7%', textAlign: 'center' }} title="Detection - Khả năng phát hiện (1-10)">D (Khả năng phát hiện)</th>
                   <th style={{ width: '8%', textAlign: 'center' }} title="RPN = S x O x D">RPN</th>
-                  <th style={{ width: '10%', textAlign: 'center' }}>Mức Rủi Ro</th>
+                  <th style={{ width: '10%', textAlign: 'center' }}>Mức rủi ro</th>
                   <th style={{ width: '9%', textAlign: 'center' }}>Khảo sát DoE</th>
                   <th style={{ width: '5%', textAlign: 'center' }}>Xóa</th>
                 </tr>
@@ -330,7 +330,7 @@ export const FMEATab: React.FC<FMEATabProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <HelpCircle size={18} color="#0f766e" />
                 <h4 style={{ fontSize: '0.92rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
-                  💡 Ghi Chú Phân Loại Mức Rủi Ro &amp; Cách Đánh Giá Chỉ Số RPN (ICH Q9)
+                  💡 Ghi chú phân loại mức rủi ro &amp; cách đánh giá chỉ số RPN (ICH Q9)
                 </h4>
               </div>
               <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#0f766e', backgroundColor: '#ccfbf1', padding: '0.2rem 0.6rem', borderRadius: '4px', border: '1px solid #99f6e4' }}>
@@ -489,7 +489,7 @@ export const FMEATab: React.FC<FMEATabProps> = ({
               fontWeight: '700',
             }}
           >
-            <span>Chuyển Sang Bước 3: Thiết Kế DoE (Ma Trận Thí Nghiệm)</span>
+            <span>Chuyển sang Bước 3: Thiết kế DoE (Ma trận thí nghiệm)</span>
             <ArrowRight size={16} />
           </button>
         </div>

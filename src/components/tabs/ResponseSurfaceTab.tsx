@@ -365,7 +365,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
           const LSL = currentCQA.lowerLimit;
           traces.push({
             type: 'surface',
-            name: `🔴 Giới Hạn Dưới (LSL = ${LSL} ${currentCQA.unit || ''})`,
+            name: `🔴 Giới hạn dưới (LSL = ${LSL} ${currentCQA.unit || ''})`,
             x: [xMin, xMax],
             y: [yMin, yMax],
             z: [
@@ -392,7 +392,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
             traces.push({
               type: 'scatter3d',
               mode: 'lines',
-              name: `🔴 Đường Cắt LSL = ${LSL} ${currentCQA.unit || ''}`,
+              name: `🔴 Đường cắt LSL = ${LSL} ${currentCQA.unit || ''}`,
               x: lslSegs.flatMap((s) => [s.x1, s.x2, null]),
               y: lslSegs.flatMap((s) => [s.y1, s.y2, null]),
               z: lslSegs.flatMap(() => [LSL, LSL, null]),
@@ -408,7 +408,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
           const USL = currentCQA.upperLimit;
           traces.push({
             type: 'surface',
-            name: `🔴 Giới Hạn Trên (USL = ${USL} ${currentCQA.unit || ''})`,
+            name: `🔴 Giới hạn trên (USL = ${USL} ${currentCQA.unit || ''})`,
             x: [xMin, xMax],
             y: [yMin, yMax],
             z: [
@@ -435,7 +435,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
             traces.push({
               type: 'scatter3d',
               mode: 'lines',
-              name: `🔴 Đường Cắt USL = ${USL} ${currentCQA.unit || ''}`,
+              name: `🔴 Đường cắt USL = ${USL} ${currentCQA.unit || ''}`,
               x: uslSegs.flatMap((s) => [s.x1, s.x2, null]),
               y: uslSegs.flatMap((s) => [s.y1, s.y2, null]),
               z: uslSegs.flatMap(() => [USL, USL, null]),
@@ -451,7 +451,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
           const T = currentCQA.target;
           traces.push({
             type: 'surface',
-            name: `🟢 Mục Tiêu (Target = ${T} ${currentCQA.unit || ''})`,
+            name: `🟢 Mục tiêu (Target = ${T} ${currentCQA.unit || ''})`,
             x: [xMin, xMax],
             y: [yMin, yMax],
             z: [
@@ -555,7 +555,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
             traces.push({
               type: 'scatter',
               mode: 'lines',
-              name: `🔴 Giới Hạn Dưới (LSL = ${LSL} ${currentCQA.unit || ''})`,
+              name: `🔴 Giới hạn dưới (LSL = ${LSL} ${currentCQA.unit || ''})`,
               x: lslSegs.flatMap((s) => [s.x1, s.x2, null]),
               y: lslSegs.flatMap((s) => [s.y1, s.y2, null]),
               line: { color: '#dc2626', width: contourLineWidth + 1, dash: 'dash' },
@@ -578,7 +578,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
             traces.push({
               type: 'scatter',
               mode: 'lines',
-              name: `🔴 Giới Hạn Trên (USL = ${USL} ${currentCQA.unit || ''})`,
+              name: `🔴 Giới hạn trên (USL = ${USL} ${currentCQA.unit || ''})`,
               x: uslSegs.flatMap((s) => [s.x1, s.x2, null]),
               y: uslSegs.flatMap((s) => [s.y1, s.y2, null]),
               line: { color: '#b91c1c', width: contourLineWidth + 1, dash: 'dash' },
@@ -601,7 +601,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
             traces.push({
               type: 'scatter',
               mode: 'lines',
-              name: `🟢 Mục Tiêu (Target = ${T} ${currentCQA.unit || ''})`,
+              name: `🟢 Mục tiêu (Target = ${T} ${currentCQA.unit || ''})`,
               x: targetSegs.flatMap((s) => [s.x1, s.x2, null]),
               y: targetSegs.flatMap((s) => [s.y1, s.y2, null]),
               line: { color: '#059669', width: contourLineWidth + 1, dash: 'solid' },
@@ -618,7 +618,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
 
     plotlyLayout = {
       title: {
-        text: `${plotType === '3d' ? 'Mặt Đáp 3D' : 'Đường Đồng Mức 2D'}: ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+        text: `${plotType === '3d' ? 'Mặt đáp 3D' : 'Đường đồng mức 2D'}: ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
         font: { size: 13, color: '#0f172a', family: 'Inter, sans-serif' },
       },
       autosize: true,
@@ -692,7 +692,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <Compass size={22} color="#0f766e" />
               <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#0f172a' }}>
-                Trực Quan Hóa Mặt Đáp & Contour Plots (Response Surface 3D & 2D Contour)
+                Trực quan hóa mặt đáp & contour plots (Response Surface 3D & 2D Contour)
               </h2>
             </div>
             <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.2rem' }}>
@@ -708,10 +708,10 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                   onClick={() => onToggleEngine('polynomial')}
                   className={`btn ${modelingEngine === 'polynomial' ? 'btn-teal' : 'btn-secondary'}`}
                   style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', border: 'none', fontWeight: '700' }}
-                  title="Hiển thị mặt đáp từ mô hình Hồi quy Đa thức bậc ≤ 2 (ANOVA)"
+                  title="Hiển thị mặt đáp từ mô hình hồi quy đa thức bậc ≤ 2 (ANOVA)"
                 >
                   <Calculator size={14} />
-                  <span>Đa Thức (ANOVA)</span>
+                  <span>Đa thức (ANOVA)</span>
                 </button>
                 <button
                   onClick={() => onToggleEngine('neural')}
@@ -724,10 +724,10 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                     backgroundColor: modelingEngine === 'neural' ? '#7c3aed' : undefined,
                     borderColor: modelingEngine === 'neural' ? '#7c3aed' : undefined,
                   }}
-                  title="Hiển thị mặt đáp từ mô hình Mạng Nơ-ron Nhân Tạo"
+                  title="Hiển thị mặt đáp từ mô hình mạng nơ-ron nhân tạo"
                 >
                   <BrainCircuit size={14} />
-                  <span>Mạng Nơ-ron AI</span>
+                  <span>Mạng nơ-ron AI</span>
                 </button>
               </div>
             )}
@@ -781,10 +781,10 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                     backgroundColor: plotType === 'ternary' ? '#0f766e' : undefined,
                     color: plotType === 'ternary' ? '#ffffff' : undefined,
                   }}
-                  title="Đồ thị Contour Tam Giác Hỗn Hợp 3 Thành Phần (Ternary 3-Component Mixture Plot)"
+                  title="Đồ thị contour tam giác hỗn hợp 3 thành phần (Ternary 3-Component Mixture Plot)"
                 >
                   <FlaskConical size={14} style={{ display: 'inline', marginRight: '0.2rem' }} />
-                  <span>Tam Giác Hỗn Hợp</span>
+                  <span>Tam giác hỗn hợp</span>
                 </button>
               )}
             </div>
@@ -810,7 +810,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
               className="btn btn-teal"
               style={{ fontSize: '0.82rem', padding: '0.4rem 0.85rem' }}
             >
-              <span>Không Gian Thiết Kế (Design Space)</span>
+              <span>Không gian thiết kế (Design Space)</span>
               <ArrowRight size={16} />
             </button>
           </div>
@@ -822,12 +822,12 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
           <AlertTriangle size={40} color="#d97706" style={{ margin: '0 auto 0.75rem' }} />
           <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#92400e', marginBottom: '0.4rem' }}>
             {modelingEngine === 'neural'
-              ? `Chưa có mô hình Mạng Nơ-ron cho đáp ứng ${currentCQA?.name || selectedCQA}`
-              : `Chưa có mô hình Đa thức cho đáp ứng ${currentCQA?.name || selectedCQA}`}
+              ? `Chưa có mô hình mạng nơ-ron cho đáp ứng ${currentCQA?.name || selectedCQA}`
+              : `Chưa có mô hình đa thức cho đáp ứng ${currentCQA?.name || selectedCQA}`}
           </h3>
           <p style={{ fontSize: '0.85rem', color: '#475569', maxWidth: '620px', margin: '0 auto 1.5rem', lineHeight: 1.5 }}>
             {modelingEngine === 'neural'
-              ? 'Vui lòng sang Bước 5 để khởi tạo và huấn luyện mạng nơ-ron trước khi khảo sát mặt đáp phi tuyến, hoặc bấm nút bên dưới để quay lại sử dụng mô hình Đa thức (ANOVA).'
+              ? 'Vui lòng sang Bước 5 để khởi tạo và huấn luyện mạng nơ-ron trước khi khảo sát mặt đáp phi tuyến, hoặc bấm nút bên dưới để quay lại sử dụng mô hình đa thức (ANOVA).'
               : 'Vui lòng kiểm tra lại ma trận DoE ở Bước 3 và kết quả hồi quy ANOVA ở Bước 4.'}
           </p>
           {onToggleEngine && modelingEngine === 'neural' && (
@@ -838,7 +838,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                 style={{ fontSize: '0.85rem', padding: '0.5rem 1.25rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.45rem' }}
               >
                 <Calculator size={16} />
-                <span>Quay Lại Mô Hình Đa Thức (ANOVA)</span>
+                <span>Quay lại mô hình đa thức (ANOVA)</span>
               </button>
             </div>
           )}
@@ -855,7 +855,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
           <div className="qbd-card">
             <h3 style={{ fontSize: '0.9rem', fontWeight: '700', color: '#0f172a', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <Layers size={16} color="#1e3a8a" />
-              <span>{plotType === 'ternary' ? '3 Đỉnh Tam Giác Hỗn Hợp' : 'Trục Tọa Độ Khảo Sát'}</span>
+              <span>{plotType === 'ternary' ? '3 đỉnh tam giác hỗn hợp' : 'Trục tọa độ khảo sát'}</span>
             </h3>
 
             {plotType === 'ternary' ? (
@@ -867,7 +867,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                 {/* Vertex A */}
                 <div>
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: '#1e293b', marginBottom: '0.2rem' }}>
-                    🔺 Đỉnh A (Vertex A - Đỉnh Trên):
+                    🔺 Đỉnh A (Vertex A - đỉnh trên):
                   </label>
                   <select
                     className="input-field"
@@ -886,7 +886,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                 {/* Vertex B */}
                 <div>
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: '#1e293b', marginBottom: '0.2rem' }}>
-                    ◀️ Đỉnh B (Vertex B - Đỉnh Trái):
+                    ◀️ Đỉnh B (Vertex B - đỉnh trái):
                   </label>
                   <select
                     className="input-field"
@@ -905,7 +905,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                 {/* Vertex C */}
                 <div>
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: '#1e293b', marginBottom: '0.2rem' }}>
-                    ▶️ Đỉnh C (Vertex C - Đỉnh Phải):
+                    ▶️ Đỉnh C (Vertex C - đỉnh phải):
                   </label>
                   <select
                     className="input-field"
@@ -925,7 +925,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: '#475569', marginBottom: '0.3rem' }}>
-                    Trục Hoành X (X-Axis):
+                    Trục hoành X (X-axis):
                   </label>
                   <select
                     className="input-field"
@@ -942,7 +942,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: '#475569', marginBottom: '0.3rem' }}>
-                    Trục Tung Y (Y-Axis):
+                    Trục tung Y (Y-axis):
                   </label>
                   <select
                     className="input-field"
@@ -965,7 +965,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
             <div className="qbd-card" style={{ borderLeft: '4px solid #0f766e' }}>
               <h3 style={{ fontSize: '0.88rem', fontWeight: '700', color: '#0f172a', marginBottom: '0.65rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <Eye size={16} color="#0f766e" />
-                <span>Tùy Chọn Đồ Thị Tam Giác</span>
+                <span>Tùy chọn đồ thị tam giác</span>
               </h3>
 
               {/* Display Mode */}
@@ -986,7 +986,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                     className={`btn ${ternaryDisplayMode === 'lines_only' ? 'btn-teal' : 'btn-secondary'}`}
                     style={{ fontSize: '0.72rem', padding: '0.3rem 0.4rem', justifyContent: 'center' }}
                   >
-                    Chỉ Đường Isolines
+                    Chỉ đường isolines
                   </button>
                 </div>
               </div>
@@ -1036,7 +1036,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                     { label: 'Nhanh', val: 100, desc: '100x100' },
                     { label: 'Chuẩn', val: 180, desc: '180x180' },
                     { label: 'Mịn', val: 260, desc: '260x260' },
-                    { label: 'Cực Mịn', val: 320, desc: '320x320' },
+                    { label: 'Cực mịn', val: 320, desc: '320x320' },
                   ].map((preset) => (
                     <button
                       key={preset.val}
@@ -1133,7 +1133,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                     onChange={(e) => setShowOptimum(e.target.checked)}
                     style={{ cursor: 'pointer' }}
                   />
-                  <span>Hiện Điểm Tối Ưu Desirability (★)</span>
+                  <span>Hiện điểm tối ưu Desirability (★)</span>
                 </label>
               </div>
             </div>
@@ -1145,7 +1145,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
                 <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                   <Target size={15} color="#dc2626" />
-                  <span>Tiêu Chuẩn Giới Hạn CQA ({currentCQA.code})</span>
+                  <span>Tiêu chuẩn giới hạn CQA ({currentCQA.code})</span>
                 </span>
               </div>
               <div style={{ fontSize: '0.75rem', color: '#475569', marginBottom: '0.5rem' }}>
@@ -1204,7 +1204,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
             <div className="qbd-card" style={{ backgroundColor: '#fffbeb', border: '1px solid #fef3c7' }}>
               <div style={{ fontSize: '0.8rem', fontWeight: '700', color: '#b45309', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                 <FlaskConical size={14} />
-                <span>GIỚI HẠN KHẢO SÁT 3 BIẾN HỖN HỢP:</span>
+                <span>Giới hạn khảo sát 3 biến hỗn hợp:</span>
               </div>
               <div style={{ fontSize: '0.76rem', color: '#92400e', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -1228,7 +1228,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
               <h3 style={{ fontSize: '0.88rem', fontWeight: '700', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <Sliders size={16} color="#b45309" />
-                <span>Cố Định Các Yếu Tố Còn Lại</span>
+                <span>Cố định các yếu tố còn lại</span>
               </h3>
 
               {fixedFactorsList.length > 0 && (
@@ -1241,7 +1241,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                       title="Gán tất cả các biến cố định theo giá trị tối ưu của Desirability"
                     >
                       <Sparkles size={12} />
-                      <span>Gán Tối Ưu</span>
+                      <span>Gán tối ưu</span>
                     </button>
                   )}
                   <button
@@ -1407,7 +1407,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
           <div className="qbd-card" style={{ backgroundColor: '#f0fdfa', border: '1px solid #ccfbf1' }}>
             <div style={{ fontSize: '0.8rem', fontWeight: '700', color: '#0f766e', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
               <Target size={14} />
-              <span>TIÊU CHUẨN CỦA {currentCQA.code} ({currentCQA.name}):</span>
+              <span>Tiêu chuẩn của {currentCQA.code} ({currentCQA.name}):</span>
             </div>
             <div style={{ fontSize: '0.78rem', color: '#134e4a', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
               <div>• Mục tiêu (Target): <strong>{currentCQA.target !== undefined ? `${currentCQA.target} ${currentCQA.unit}` : 'N/A'}</strong></div>
@@ -1431,7 +1431,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Activity size={18} style={{ color: '#0f766e' }} />
               <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
-                Phân tích Chính tắc Mặt đáp ứng (Canonical Analysis - RSM)
+                Phân tích chính tắc mặt đáp ứng (Canonical Analysis - RSM)
               </h3>
               <span
                 style={{
@@ -1473,7 +1473,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
             <div style={{ backgroundColor: '#f8fafc', padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
               <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', marginBottom: '0.25rem' }}>
-                ĐÁP ỨNG DỰ ĐOÁN TẠI ĐIỂM DỪNG (ŷ₀)
+                Đáp ứng dự đoán tại điểm dừng (ŷ₀)
               </div>
               <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#0f766e' }}>
                 {canonical.predictedAtStationaryPoint.toFixed(4)} {currentCQA.unit || ''}
@@ -1485,7 +1485,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
 
             <div style={{ backgroundColor: '#f8fafc', padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
               <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', marginBottom: '0.25rem' }}>
-                ĐẶC TÍNH MẶT CONG
+                Đặc tính mặt cong
               </div>
               <div style={{ fontSize: '0.95rem', fontWeight: '600', color: '#1e293b' }}>
                 {canonical.surfaceNature === 'maximum' && 'Đỉnh đáp ứng - tất cả λᵢ < 0'}
@@ -1500,7 +1500,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
 
             <div style={{ backgroundColor: '#f8fafc', padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
               <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', marginBottom: '0.25rem' }}>
-                PHƯƠNG TRÌNH CHÍNH TẮC (CANONICAL FORM)
+                Phương trình chính tắc (Canonical form)
               </div>
               <div className="font-mono" style={{ fontSize: '0.85rem', fontWeight: '700', color: '#2563eb', overflowX: 'auto', whiteSpace: 'nowrap' }}>
                 {canonical.canonicalEquation}
@@ -1516,7 +1516,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
             {/* Stationary Point Coordinates Table */}
             <div style={{ border: '1px solid #e2e8f0', borderRadius: '0.5rem', overflow: 'hidden' }}>
               <div style={{ backgroundColor: '#f1f5f9', padding: '0.5rem 0.75rem', fontSize: '0.8rem', fontWeight: '700', color: '#334155' }}>
-                TỌA ĐỘ ĐIỂM DỪNG (STATIONARY POINT x₀ = -½ B⁻¹ a)
+                Tọa độ điểm dừng (Stationary point x₀ = -½ B⁻¹ a)
               </div>
               <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
                 <thead>
@@ -1567,7 +1567,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
             {/* Eigenvalues & Eigenvectors Table */}
             <div style={{ border: '1px solid #e2e8f0', borderRadius: '0.5rem', overflow: 'hidden' }}>
               <div style={{ backgroundColor: '#f1f5f9', padding: '0.5rem 0.75rem', fontSize: '0.8rem', fontWeight: '700', color: '#334155' }}>
-                CÁC TRỤC CHÍNH & HỆ SỐ TRỊ RIÊNG (EIGENVALUES λᵢ & EIGENVECTORS)
+                Các trục chính & hệ số trị riêng (Eigenvalues λᵢ & eigenvectors)
               </div>
               <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
                 <thead>
@@ -1621,7 +1621,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                 style={{ fontSize: '0.85rem', padding: '0.5rem 1.25rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.45rem' }}
                 title="Chuyển sang Bước 7 để tối ưu hóa và xây dựng Design Space"
               >
-                <span>Chuyển Sang Bước 7: Không Gian Thiết Kế</span>
+                <span>Chuyển sang Bước 7: Không gian thiết kế</span>
                 <ArrowRight size={16} />
               </button>
             </div>

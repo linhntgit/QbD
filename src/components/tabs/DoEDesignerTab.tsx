@@ -972,7 +972,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <LayoutGrid size={22} color="#0284c7" />
               <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#0f172a' }}>
-                Thiết Kế Thí Nghiệm (Design of Experiments - DoE)
+                Thiết kế thí nghiệm (Design of Experiments - DoE)
               </h2>
             </div>
             <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.2rem' }}>
@@ -987,7 +987,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               style={{ fontSize: '0.82rem', padding: '0.45rem 1rem' }}
             >
               <RefreshCw size={15} />
-              <span>Tạo Ma Trận Thí Nghiệm</span>
+              <span>Tạo ma trận thí nghiệm</span>
             </button>
 
             <button
@@ -995,7 +995,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               className="btn btn-teal"
               style={{ fontSize: '0.82rem', padding: '0.45rem 1rem' }}
             >
-              <span>Phân Tích ANOVA</span>
+              <span>Phân tích ANOVA</span>
               <ArrowRight size={16} />
             </button>
           </div>
@@ -1120,7 +1120,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
               <Sliders size={16} color="#0284c7" />
               <span style={{ fontSize: '0.84rem', fontWeight: '700', color: '#0f172a' }}>
-                Cấu Hình Ma Trận Thiết Kế (Design Matrix Setup)
+                Cấu hình ma trận thiết kế (Design Matrix Setup)
               </span>
             </div>
             <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
@@ -1310,7 +1310,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', minHeight: '20px', gap: '0.35rem' }}>
                   <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#334155', whiteSpace: 'nowrap' }}>
-                    Số Điểm Tâm
+                    Số điểm tâm
                   </label>
                   <span style={{ fontSize: '0.7rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>0 - 10</span>
                 </div>
@@ -1511,7 +1511,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
 
             <div style={{ backgroundColor: '#f8fafc', padding: '0.85rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
               <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#475569', textTransform: 'uppercase' }}>
-                Thông Số Ma Trận (Matrix)
+                Thông số ma trận (Matrix)
               </div>
               <div style={{ fontSize: '0.82rem', marginTop: '0.35rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                 <div><strong>Số lần chạy (N):</strong> {designMetrics.numRuns}</div>
@@ -1535,7 +1535,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Layers size={18} color="#0284c7" />
               <h4 style={{ fontSize: '0.92rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
-                Cấu Trúc Gộp Hiệu Ứng &amp; Ma Trận Alias (Confounding &amp; Alias Chains)
+                Cấu trúc gộp hiệu ứng &amp; ma trận Alias (Confounding &amp; Alias Chains)
               </h4>
             </div>
             <span style={{
@@ -1561,7 +1561,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
             {aliasStructure.mainEffectAliases.length > 0 && (
               <div style={{ backgroundColor: '#ffffff', borderRadius: '0.375rem', padding: '0.65rem', border: '1px solid #e2e8f0' }}>
                 <div style={{ fontSize: '0.78rem', fontWeight: '700', color: '#b91c1c', marginBottom: '0.35rem' }}>
-                  Hiệu Ứng Chính Bị Gộp (Main Effects Aliased):
+                  Hiệu ứng chính bị gộp (Main Effects Aliased):
                 </div>
                 <div style={{ maxHeight: '140px', overflowY: 'auto', fontSize: '0.74rem', color: '#334155' }}>
                   {aliasStructure.mainEffectAliases.map((item) => (
@@ -1576,7 +1576,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
             {aliasStructure.twoFactorAliases.length > 0 && (
               <div style={{ backgroundColor: '#ffffff', borderRadius: '0.375rem', padding: '0.65rem', border: '1px solid #e2e8f0' }}>
                 <div style={{ fontSize: '0.78rem', fontWeight: '700', color: '#0284c7', marginBottom: '0.35rem' }}>
-                  Chuỗi Tương Tác 2 Yếu Tố Bị Gộp (2FI Alias Chains):
+                  Chuỗi tương tác 2 yếu tố bị gộp (2FI Alias Chains):
                 </div>
                 <div style={{ maxHeight: '140px', overflowY: 'auto', fontSize: '0.74rem', color: '#334155' }}>
                   {aliasStructure.twoFactorAliases.map((item) => (
@@ -1606,7 +1606,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
             <FileSpreadsheet size={22} color="#16a34a" />
             <div>
               <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
-                Bảng Tính Ma Trận Thực Nghiệm &amp; Kết Quả ({project.runs.length} lần chạy)
+                Bảng tính ma trận thực nghiệm &amp; kết quả ({project.runs.length} lần chạy)
               </h3>
               <p style={{ fontSize: '0.75rem', color: '#64748b', margin: 0, marginTop: '0.1rem' }}>
                 Hỗ trợ chọn/bôi đen vùng dữ liệu 2D, Copy (Ctrl+C), Paste 2 chiều từ MS Excel (Ctrl+V) &amp; Xóa (Del).
@@ -1851,7 +1851,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               title="Sao chép vùng ô đang chọn (hoặc toàn bộ bảng nếu chưa chọn) sang Clipboard (Ctrl+C)"
             >
               <Copy size={14} color="#2563eb" />
-              <span>📋 Copy Vùng (Ctrl+C)</span>
+              <span>📋 Copy vùng (Ctrl+C)</span>
             </button>
 
             {/* Paste from Clipboard */}
@@ -1870,7 +1870,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               title="Dán dữ liệu từ Clipboard vào ô/vùng đang chọn (Ctrl+V)"
             >
               <Clipboard size={14} color="#16a34a" />
-              <span>📥 Dán Dữ Liệu (Ctrl+V)</span>
+              <span>📥 Dán dữ liệu (Ctrl+V)</span>
             </button>
 
             {/* Clear Selected Cells */}
@@ -1890,7 +1890,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               title="Xóa giá trị trong các ô đang chọn (Delete)"
             >
               <Trash2 size={13} />
-              <span>Xóa Ô (Del)</span>
+              <span>Xóa ô (Del)</span>
             </button>
 
             {/* Upload CSV */}
@@ -1902,7 +1902,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               disabled={isProcessingFile}
             >
               <Upload size={14} />
-              <span>{isProcessingFile ? 'Đang đọc...' : '📤 Tải Lên'}</span>
+              <span>{isProcessingFile ? 'Đang đọc...' : '📤 Tải lên'}</span>
             </button>
 
             {/* Randomize Run Order */}
@@ -1913,7 +1913,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               title="Sinh ngẫu nhiên số thứ tự thực hiện thí nghiệm (Randomized Run Order) theo chuẩn DoE"
             >
               <Shuffle size={13} />
-              <span>🎲 Xáo Run</span>
+              <span>🎲 Xáo run</span>
             </button>
 
             {/* Sort Runs by Run Order */}
@@ -1936,7 +1936,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               title="Tự động sinh số liệu thực nghiệm mô phỏng dựa trên mô hình hóa dược phẩm để test nhanh"
             >
               <Sparkles size={13} />
-              <span>{isSimulating ? 'Đang mô phỏng…' : 'Điền Mô Phỏng'}</span>
+              <span>{isSimulating ? 'Đang mô phỏng…' : 'Điền mô phỏng'}</span>
             </button>
 
             {/* Export Dropdown Menu */}
@@ -1948,7 +1948,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                 title="Tải bảng số liệu về máy tính dưới các định dạng"
               >
                 <Download size={13} />
-                <span>Xuất File</span>
+                <span>Xuất file</span>
                 <ChevronDown size={12} />
               </button>
 
@@ -1992,7 +1992,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                   >
                     <FileSpreadsheet size={15} color="#16a34a" />
                     <div>
-                      <div style={{ fontWeight: '600' }}>Xuất File CSV (.csv) Đầy Đủ</div>
+                      <div style={{ fontWeight: '600' }}>Xuất file CSV (.csv) đầy đủ</div>
                       <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Tương thích Excel; gồm biến X, mã hóa, đáp ứng Y</div>
                     </div>
                   </button>
@@ -2021,7 +2021,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                   >
                     <FileText size={15} color="#0284c7" />
                     <div>
-                      <div style={{ fontWeight: '600' }}>Xuất Ma Trận Rút Gọn (.csv)</div>
+                      <div style={{ fontWeight: '600' }}>Xuất ma trận rút gọn (.csv)</div>
                       <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Chuẩn UTF-8 BOM, chỉ gồm X thực tế và Y</div>
                     </div>
                   </button>
@@ -2049,7 +2049,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                   >
                     <FileDown size={15} color="#d97706" />
                     <div>
-                      <div style={{ fontWeight: '600' }}>Tải Mẫu Nhập Liệu Lab (.csv)</div>
+                      <div style={{ fontWeight: '600' }}>Tải mẫu nhập liệu lab (.csv)</div>
                       <div style={{ fontSize: '0.7rem', color: '#64748b' }}>File CSV mẫu để kỹ thuật viên điền trong lab</div>
                     </div>
                   </button>
@@ -2173,7 +2173,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
             <LayoutGrid size={40} color="#cbd5e1" style={{ margin: '0 auto 0.75rem' }} />
             <p style={{ fontWeight: '600' }}>Chưa có ma trận thí nghiệm</p>
             <p style={{ fontSize: '0.82rem', marginTop: '0.25rem' }}>
-              Vui lòng nhấn nút <strong>"Tạo Ma Trận Thí Nghiệm"</strong> ở phía trên để sinh bảng chạy.
+              Vui lòng nhấn nút <strong>"Tạo ma trận thí nghiệm"</strong> ở phía trên để sinh bảng chạy.
             </p>
           </div>
         ) : (
@@ -2849,7 +2849,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                     <Trash2 size={13} />
                     <span>
                       Xóa {normalizedRange.maxR - normalizedRange.minR + 1 > 1
-                        ? `${normalizedRange.maxR - normalizedRange.minR + 1} Dòng Đã Chọn`
+                        ? `${normalizedRange.maxR - normalizedRange.minR + 1} dòng đã chọn`
                         : `Dòng ${normalizedRange.minR + 1}`}
                     </span>
                   </button>
@@ -2860,7 +2860,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                 <span>Tổng cộng: <strong style={{ color: '#0f172a' }}>{project.runs.length}</strong> lần chạy thí nghiệm</span>
                 <span style={{ color: '#94a3b8' }}>|</span>
                 <span style={{ color: '#16a34a', fontWeight: '600' }}>
-                  ✓ Tự động đồng bộ sang ANOVA &amp; Mạng Nơ-ron AI
+                  ✓ Tự động đồng bộ sang ANOVA &amp; Mạng nơ-ron AI
                 </span>
                 <button
                   onClick={onNavigateToANOVA}
@@ -2876,7 +2876,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                   }}
                   title="Chuyển sang Bước 4 để phân tích phương sai ANOVA và xây dựng mô hình"
                 >
-                  <span>Tiếp Tục: Phân Tích ANOVA (Bước 4)</span>
+                  <span>Tiếp tục: Phân tích ANOVA (Bước 4)</span>
                   <ArrowRight size={14} />
                 </button>
               </div>

@@ -165,7 +165,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
         const paretoHeight = Math.max(460, names.length * 36 + 130);
 
         const layout = {
-          title: `Biểu đồ Pareto các Hiệu ứng Chuẩn hóa (|t-value|) — ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+          title: `Biểu đồ Pareto các hiệu ứng chuẩn hóa (|t-value|) — ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
           xaxis: {
             title: {
               text: 'T-Value of Effect (Chuẩn hóa |t-value|)',
@@ -234,10 +234,10 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
         const lineX1 = maxX + 0.05 * spanX;
 
         const layout = {
-          title: `Phần dư Chuẩn hóa vs. Giá trị Dự đoán — ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+          title: `Phần dư chuẩn hóa vs. giá trị dự đoán — ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
           xaxis: {
             title: {
-              text: formatAxisTitle('Giá trị Dự đoán Ý', currentCQA.code, currentCQA.unit),
+              text: formatAxisTitle('Giá trị dự đoán Ý', currentCQA.code, currentCQA.unit),
               font: { size: 12, color: '#1e293b' },
               standoff: 12,
             },
@@ -311,12 +311,12 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
             x: [-3, 3],
             y: [-3, 3],
             line: { color: '#dc2626', width: 2 },
-            name: 'Đường Chuẩn (Normal Line)',
+            name: 'Đường chuẩn (Normal line)',
           },
         ];
 
         const layout = {
-          title: `Biểu đồ Xác suất Chuẩn của Phần dư (Normal QQ-Plot) — ${currentCQA.name} (${currentCQA.code})`,
+          title: `Biểu đồ xác suất chuẩn của phần dư (Normal QQ-plot) — ${currentCQA.name} (${currentCQA.code})`,
           xaxis: {
             title: {
               text: 'Internally Studentized Residuals (Phần dư Student hóa)',
@@ -365,7 +365,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
         ];
 
         const layout = {
-          title: `Khoảng cách Cook (Cook's Distance) — ${currentCQA.name} (${currentCQA.code})`,
+          title: `Khoảng cách Cook (Cook's distance) — ${currentCQA.name} (${currentCQA.code})`,
           xaxis: {
             title: {
               text: 'Số thứ tự lần chạy thực nghiệm (Run Order)',
@@ -427,11 +427,11 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <Calculator size={22} color="#1e3a8a" />
               <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#0f172a' }}>
-                Phân Tích Thống Kê & Mô Hình Hóa ANOVA
+                Phân tích thống kê & mô hình hóa ANOVA
               </h2>
               {modelingEngine === 'polynomial' && (
                 <span className="badge badge-teal" style={{ fontSize: '0.72rem' }}>
-                  ✓ Đang Chọn Làm Mô Hình Chính (Bước 6, 7, 8)
+                  ✓ Đang chọn làm mô hình chính (Bước 6, 7, 8)
                 </span>
               )}
             </div>
@@ -467,8 +467,8 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                 value={modelTypes[selectedCQA] || 'Quadratic'}
                 onChange={(e) => onModelTypeChange(selectedCQA, e.target.value as ModelType)}
               >
-                <option value="Quadratic">Đa thức Bậc 2 (Quadratic)</option>
-                <option value="2FI">Tương tác 2 Yếu tố (2FI)</option>
+                <option value="Quadratic">Đa thức bậc 2 (Quadratic)</option>
+                <option value="2FI">Tương tác 2 yếu tố (2FI)</option>
                 <option value="Linear">Tuyến tính (Linear)</option>
                 <option value="Reduced">Rút gọn (Reduced RSM)</option>
               </select>
@@ -481,7 +481,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                 title="Rút gọn mô hình từng bước tự động (Stepwise Backward Elimination, alpha=0.10, giữ nguyên phân cấp bậc đa thức)"
               >
                 <Wand2 size={14} color="#0f766e" />
-                <span>{isReducing ? 'Đang rút gọn...' : 'Rút Gọn (Backward)'}</span>
+                <span>{isReducing ? 'Đang rút gọn...' : 'Rút gọn (Backward)'}</span>
               </button>
             </div>
 
@@ -493,7 +493,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                 title="Chuyển sang Tab Mạng Nơ-ron AI để thử nghiệm mô hình học sâu"
               >
                 <BrainCircuit size={16} color="#7c3aed" />
-                <span>Thử Mạng Nơ-ron</span>
+                <span>Thử mạng nơ-ron</span>
               </button>
             )}
 
@@ -506,7 +506,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
               style={{ fontSize: '0.82rem', padding: '0.4rem 0.85rem', fontWeight: '700' }}
               title="Chọn mô hình Hồi quy Đa thức bậc ≤ 2 làm phương pháp chính cho các bước tiếp theo (Bước 6: Mặt đáp, Bước 7: Không gian thiết kế, Bước 8: Báo cáo)"
             >
-              <span>Tiếp Tục Với Đa Thức (Bước 6, 7, 8)</span>
+              <span>Tiếp tục với đa thức (Bước 6, 7, 8)</span>
               <ArrowRight size={16} />
             </button>
           </div>
@@ -783,7 +783,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
             <div className="qbd-card">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
-                  Bảng Phân Tích Phương Sai (ANOVA Table)
+                  Bảng phân tích phương sai (ANOVA table)
                 </h3>
                 {model.type3Anova && model.type3Anova.length > 0 && (
                   <div style={{ display: 'flex', backgroundColor: '#f1f5f9', borderRadius: '0.375rem', padding: '0.15rem', gap: '0.15rem' }}>
@@ -927,18 +927,18 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
             {/* Regression Term Estimates */}
             <div className="qbd-card">
               <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a', marginBottom: '0.75rem' }}>
-                Hệ Số Hồi Quy (Coefficients & Significance)
+                Hệ số hồi quy (Coefficients & significance)
               </h3>
               <div className="table-container">
                 <table className="qbd-table">
                   <thead>
                     <tr>
-                      <th>Số Hạng (Term)</th>
+                      <th>Số hạng (Term)</th>
                       <th>Hệ số (β)</th>
                       <th>Sai số (SE)</th>
                       <th style={{ textAlign: 'center' }}>t-value</th>
                       <th style={{ textAlign: 'center' }}>p-value</th>
-                      <th style={{ textAlign: 'center' }}>Ý Nghĩa</th>
+                      <th style={{ textAlign: 'center' }}>Ý nghĩa</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -979,7 +979,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <BarChart3 size={19} color="#1e3a8a" />
                 <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a' }}>
-                  Đồ Thị Chẩn Đoán Mô Hình (Model Diagnostic Plots)
+                  Đồ thị chẩn đoán mô hình (Model diagnostic plots)
                 </h3>
               </div>
 
@@ -1003,7 +1003,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                   className={`btn ${activeDiagPlot === 'normProb' ? 'btn-primary' : 'btn-secondary'}`}
                   style={{ padding: '0.3rem 0.65rem', fontSize: '0.78rem', border: 'none' }}
                 >
-                  Xác suất Chuẩn (Normal Plot)
+                  Xác suất chuẩn (Normal plot)
                 </button>
                 <button
                   onClick={() => setActiveDiagPlot('cooks')}
@@ -1025,7 +1025,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <BrainCircuit size={20} color="#7c3aed" />
                   <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
-                    Gợi Ý Bước Tiếp Theo: Mô Hình Hóa Phi Tuyến Bằng Mạng Nơ-ron (Bước 5)
+                    Gợi ý bước tiếp theo: Mô hình hóa phi tuyến bằng mạng nơ-ron (Bước 5)
                   </h3>
                 </div>
                 <span className="badge" style={{ backgroundColor: '#e9d5ff', color: '#6b21a8', fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}>
@@ -1051,7 +1051,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                     style={{ fontSize: '0.78rem', padding: '0.35rem 0.8rem', backgroundColor: '#7c3aed', borderColor: '#7c3aed', fontWeight: '600' }}
                   >
                     <BrainCircuit size={15} />
-                    <span>Chuyển Sang Bước 5: Thử Mạng Nơ-ron</span>
+                    <span>Chuyển sang Bước 5: Thử mạng nơ-ron</span>
                     <ArrowRight size={14} />
                   </button>
                 )}
@@ -1063,7 +1063,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <BrainCircuit size={20} color="#7c3aed" />
                   <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
-                    Bảng So Sánh Đối Chiếu Hiệu Năng: Mô Hình Đa Thức vs Mạng Nơ-ron
+                    Bảng so sánh đối chiếu hiệu năng: Mô hình đa thức vs mạng nơ-ron
                   </h3>
                 </div>
                 <span className="badge" style={{ backgroundColor: '#dcfce7', color: '#15803d', fontSize: '0.75rem', padding: '0.25rem 0.6rem', fontWeight: '700' }}>
@@ -1079,14 +1079,14 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                 <table className="qbd-table">
                   <thead>
                     <tr style={{ backgroundColor: '#f8fafc' }}>
-                      <th rowSpan={2} style={{ verticalAlign: 'middle' }}>Chỉ Tiêu (CQA)</th>
+                      <th rowSpan={2} style={{ verticalAlign: 'middle' }}>Chỉ tiêu (CQA)</th>
                       <th colSpan={5} style={{ textAlign: 'center', backgroundColor: '#eff6ff', color: '#1e40af', borderBottom: '2px solid #bfdbfe' }}>
-                        📐 Mô Hình Đa Thức (MLR / OLS)
+                        📐 Mô hình đa thức (MLR / OLS)
                       </th>
                       <th colSpan={4} style={{ textAlign: 'center', backgroundColor: '#faf5ff', color: '#6b21a8', borderBottom: '2px solid #e9d5ff' }}>
-                        🧠 Mạng Nơ-ron (ANN - Bước 5)
+                        🧠 Mạng nơ-ron (ANN - Bước 5)
                       </th>
-                      <th rowSpan={2} style={{ textAlign: 'center', verticalAlign: 'middle' }}>Khuyến Nghị Tối Ưu</th>
+                      <th rowSpan={2} style={{ textAlign: 'center', verticalAlign: 'middle' }}>Khuyến nghị tối ưu</th>
                     </tr>
                     <tr style={{ fontSize: '0.75rem', backgroundColor: '#f1f5f9' }}>
                       {/* MLR subheaders */}
@@ -1117,17 +1117,17 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
 
                       if (ols && ann) {
                         if (annValidationR2 > olsQ2 + 0.05 || (annAIC < olsAIC - 2 && annValidationR2 >= olsQ2)) {
-                          recommendation = '🧠 Ưu tiên Mạng Nơ-ron (ANN)';
+                          recommendation = '🧠 Ưu tiên mạng nơ-ron (ANN)';
                           recBadge = 'badge-purple';
                         } else {
-                          recommendation = '📐 Ưu tiên Đa thức (MLR)';
+                          recommendation = '📐 Ưu tiên đa thức (MLR)';
                           recBadge = 'badge-blue';
                         }
                       } else if (ols) {
                         recommendation = '📐 Đa thức (MLR)';
                         recBadge = 'badge-blue';
                       } else if (ann) {
-                        recommendation = '🧠 Mạng Nơ-ron (ANN)';
+                        recommendation = '🧠 Mạng nơ-ron (ANN)';
                         recBadge = 'badge-purple';
                       }
 
@@ -1202,7 +1202,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <ShieldCheck size={20} color="#15803d" />
                 <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a' }}>
-                  Đánh Giá Rủi Ro Cập Nhật Sau DoE (Updated Risk Assessment - ICH Q9 & FDA)
+                  Đánh giá rủi ro cập nhật sau DoE (Updated Risk Assessment - ICH Q9 & FDA)
                 </h3>
               </div>
               <span className="badge badge-success" style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}>
@@ -1218,12 +1218,12 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
               <table className="qbd-table">
                 <thead>
                   <tr>
-                    <th>Yếu Tố (Factor)</th>
-                    <th>Chỉ Tiêu (CQA)</th>
-                    <th style={{ textAlign: 'center' }}>Rủi Ro Ban Đầu (Initial)</th>
-                    <th style={{ textAlign: 'center' }}>Ảnh Hưởng DoE</th>
-                    <th style={{ textAlign: 'center' }}>Rủi Ro Cập Nhật (Updated)</th>
-                    <th>Luận Giải Khoa Học Giảm Rủi Ro (Justification for Reduced Risk)</th>
+                    <th>Yếu tố (Factor)</th>
+                    <th>Chỉ tiêu (CQA)</th>
+                    <th style={{ textAlign: 'center' }}>Rủi ro ban đầu (Initial)</th>
+                    <th style={{ textAlign: 'center' }}>Ảnh hưởng DoE</th>
+                    <th style={{ textAlign: 'center' }}>Rủi ro cập nhật (Updated)</th>
+                    <th>Luận giải khoa học giảm rủi ro (Justification for Reduced Risk)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1269,7 +1269,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                   title="Chuyển sang Bước 5 để thử nghiệm mô hình mạng nơ-ron phi tuyến"
                 >
                   <BrainCircuit size={16} color="#7c3aed" />
-                  <span>Chuyển Sang Bước 5: Thử Mạng Nơ-ron AI</span>
+                  <span>Chuyển sang Bước 5: Thử mạng nơ-ron AI</span>
                 </button>
               )}
 
@@ -1282,7 +1282,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                 style={{ fontSize: '0.85rem', padding: '0.5rem 1.25rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.45rem' }}
                 title="Khóa mô hình đa thức và chuyển sang Bước 6: Mặt đáp"
               >
-                <span>Tiếp Tục Với Đa Thức (Bước 6: Mặt Đáp)</span>
+                <span>Tiếp tục với đa thức (Bước 6: Mặt đáp)</span>
                 <ArrowRight size={16} />
               </button>
             </div>

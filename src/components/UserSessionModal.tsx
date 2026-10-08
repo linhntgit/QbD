@@ -64,7 +64,7 @@ export const UserSessionModal: React.FC<UserSessionModalProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <User size={20} color="#0f766e" />
             <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
-              Thiết Lập Phiên Người Dùng (GxP User Session)
+              Thiết lập phiên người dùng (GxP User Session)
             </h3>
           </div>
           <button
@@ -173,7 +173,7 @@ export const UserSessionModal: React.FC<UserSessionModalProps> = ({
             style={{ fontSize: '0.8rem', padding: '0.4rem 1rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
           >
             <Check size={14} />
-            <span>Lưu Phiên Làm Việc</span>
+            <span>Lưu phiên làm việc</span>
           </button>
         </div>
       </div>

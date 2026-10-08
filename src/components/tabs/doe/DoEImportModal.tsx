@@ -142,7 +142,7 @@ export const DoEImportModal: React.FC<DoEImportModalProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <FileSpreadsheet size={22} color="#1d4ed8" />
             <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
-              Nhập &amp; Đối Soát Bảng Số Liệu Thực Nghiệm Từ Excel / CSV
+              Nhập &amp; đối soát bảng số liệu thực nghiệm từ Excel / CSV
             </h3>
           </div>
           <button
@@ -171,7 +171,7 @@ export const DoEImportModal: React.FC<DoEImportModalProps> = ({
             style={{ fontSize: '0.82rem', padding: '0.4rem 0.9rem', borderRadius: '0.375rem 0.375rem 0 0' }}
           >
             <Upload size={14} />
-            <span>2. Tải Lên File CSV</span>
+            <span>2. Tải lên file CSV</span>
           </button>
         </div>
 
@@ -273,7 +273,7 @@ export const DoEImportModal: React.FC<DoEImportModalProps> = ({
             {/* Column Mappings Badges */}
             <div>
               <div style={{ fontSize: '0.72rem', fontWeight: '700', color: '#475569', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
-                Đối Soát Ánh Xạ Cột (Column Schema Matching):
+                Đối soát ánh xạ cột (Column Schema Matching):
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
                 {parsedData.columnMappings.map((map, idx) => {
@@ -325,7 +325,7 @@ export const DoEImportModal: React.FC<DoEImportModalProps> = ({
             {/* Data Preview Table (First 5 Rows) */}
             <div>
               <div style={{ fontSize: '0.72rem', fontWeight: '700', color: '#475569', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
-                Xem Trước Dữ Liệu Sau Khi Chuyển Đổi (5 dòng đầu):
+                Xem trước dữ liệu sau khi chuyển đổi (5 dòng đầu):
               </div>
               <div style={{ maxHeight: '160px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '0.375rem' }}>
                 <table className="qbd-table" style={{ fontSize: '0.72rem' }}>
@@ -368,7 +368,7 @@ export const DoEImportModal: React.FC<DoEImportModalProps> = ({
             className="btn btn-secondary"
             style={{ fontSize: '0.82rem', padding: '0.45rem 1rem' }}
           >
-            Hủy Bỏ
+            Hủy bỏ
           </button>
 
           <button
@@ -383,7 +383,7 @@ export const DoEImportModal: React.FC<DoEImportModalProps> = ({
             }}
           >
             <CheckCircle2 size={16} />
-            <span>Áp Dụng Dữ Liệu Vào Bảng DoE</span>
+            <span>Áp dụng dữ liệu vào bảng DoE</span>
           </button>
         </div>
       </div>

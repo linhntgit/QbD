@@ -779,7 +779,7 @@ export function buildTernaryPlotlyData(
     traces.push({
       type: 'scatter',
       mode: 'lines',
-      name: '🔶 Vùng Thực Nghiệm DoE (Khả Thi)',
+      name: '🔶 Vùng thực nghiệm DoE (khả thi)',
       x: polyX,
       y: polyY,
       line: {
@@ -811,11 +811,11 @@ export function buildTernaryPlotlyData(
         const lineColor = isTarget ? '#059669' : isLSL ? '#dc2626' : isUSL ? '#b91c1c' : '#334155';
         const lineDash = isTarget ? 'solid' : (isLSL || isUSL) ? 'dash' : 'solid';
         const label = isLSL
-          ? `🔴 Giới Hạn Dưới (LSL = ${sl.level} ${cqa.unit || ''})`
+          ? `🔴 Giới hạn dưới (LSL = ${sl.level} ${cqa.unit || ''})`
           : isUSL
-          ? `🔴 Giới Hạn Trên (USL = ${sl.level} ${cqa.unit || ''})`
+          ? `🔴 Giới hạn trên (USL = ${sl.level} ${cqa.unit || ''})`
           : isTarget
-          ? `🟢 Mục Tiêu (Target = ${sl.level} ${cqa.unit || ''})`
+          ? `🟢 Mục tiêu (Target = ${sl.level} ${cqa.unit || ''})`
           : `Y = ${sl.level.toFixed(3)} ${cqa.unit || ''}`;
 
         traces.push({
@@ -949,7 +949,7 @@ export function buildTernaryPlotlyData(
         // Keep the simplex readable when several DoE runs occupy nearby compositions.
         // Run identifiers remain available in the hover card rather than overlapping the markers.
         mode: 'markers',
-        name: 'Điểm Thực Nghiệm DoE (◆)',
+        name: 'Điểm thực nghiệm DoE (◆)',
         x: runX,
         y: runY,
         hoverinfo: 'text',
@@ -990,7 +990,7 @@ export function buildTernaryPlotlyData(
     traces.push({
       type: 'scatter',
       mode: 'markers',
-      name: '★ Điểm Tối Ưu (Optimum)',
+      name: '★ Điểm tối ưu (Optimum)',
       x: [cart.x],
       y: [cart.y],
       hoverinfo: 'text',
@@ -1510,7 +1510,7 @@ export function generateTernaryDesignSpace(
   sweetSpotTraces.push({
     type: 'scatter',
     mode: 'lines',
-    name: 'Vùng Ngoài Tiêu Chuẩn (OOS)',
+    name: 'Vùng ngoài tiêu chuẩn (OOS)',
     x: [null],
     y: [null],
     line: { color: '#f87171', width: 2.5 },
@@ -1560,7 +1560,7 @@ export function generateTernaryDesignSpace(
         // IDs are intentionally available on hover only; this avoids collisions
         // between close experimental compositions.
         mode: 'markers',
-        name: 'Điểm Thực Nghiệm DoE (◆)',
+        name: 'Điểm thực nghiệm DoE (◆)',
         x: runX,
         y: runY,
         hoverinfo: 'text',

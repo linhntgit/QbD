@@ -75,67 +75,67 @@ export const ReportTab: React.FC<ReportTabProps> = ({
   const tocSections = useMemo(() => {
     const hasNeural = Boolean(neuralModels && Object.keys(neuralModels).length > 0);
     const list: Array<{ id: string; title: string; subtitle: string; icon: any; badge?: string }> = [
-      { id: 'sec-metadata', title: 'Thông tin Dự Án', subtitle: 'Tổng quan & Phương pháp', icon: BookOpen, badge: 'Info' },
-      { id: 'sec-0', title: '0. Protocol & Traceability', subtitle: 'Lịch sử & Phê duyệt', icon: CheckCircle2, badge: 'Trace' },
-      { id: 'sec-1', title: '1. Hồ Sơ QTPP', subtitle: 'Mục tiêu chất lượng', icon: Layers, badge: 'ICH Q8' },
-      { id: 'sec-2', title: '2. Thuộc Tính CQAs', subtitle: 'Chỉ tiêu & Desirability', icon: Sliders, badge: 'CQAs' },
-      { id: 'sec-3', title: '3. Rủi Ro Ban Đầu (FMEA)', subtitle: 'Sàng lọc biến số', icon: ShieldAlert, badge: 'ICH Q9' },
-      { id: 'sec-4', title: '4. Thiết Kế DoE', subtitle: `${project.doeConfig.designType} (${project.runs.length} runs)`, icon: FileSpreadsheet, badge: 'DoE' },
-      { id: 'sec-5a', title: '5a. ANOVA & Hồi Quy Đa Thức', subtitle: 'Mô hình OLS & Lack of Fit', icon: Calculator, badge: 'ANOVA' },
+      { id: 'sec-metadata', title: 'Thông tin dự án', subtitle: 'Tổng quan & phương pháp', icon: BookOpen, badge: 'Info' },
+      { id: 'sec-0', title: '0. Protocol & Traceability', subtitle: 'Lịch sử & phê duyệt', icon: CheckCircle2, badge: 'Trace' },
+      { id: 'sec-1', title: '1. Hồ sơ QTPP', subtitle: 'Mục tiêu chất lượng', icon: Layers, badge: 'ICH Q8' },
+      { id: 'sec-2', title: '2. Thuộc tính CQAs', subtitle: 'Chỉ tiêu & Desirability', icon: Sliders, badge: 'CQAs' },
+      { id: 'sec-3', title: '3. Rủi ro ban đầu (FMEA)', subtitle: 'Sàng lọc biến số', icon: ShieldAlert, badge: 'ICH Q9' },
+      { id: 'sec-4', title: '4. Thiết kế DoE', subtitle: `${project.doeConfig.designType} (${project.runs.length} runs)`, icon: FileSpreadsheet, badge: 'DoE' },
+      { id: 'sec-5a', title: '5a. ANOVA & hồi quy đa thức', subtitle: 'Mô hình OLS & Lack of Fit', icon: Calculator, badge: 'ANOVA' },
       {
         id: 'sec-5b',
-        title: '5b. Mạng Nơ-ron AI (ANN)',
+        title: '5b. Mạng nơ-ron AI (ANN)',
         subtitle: hasNeural ? 'MLP Architecture & Metrics' : 'Chưa có mô hình hợp lệ',
         icon: BrainCircuit,
         badge: hasNeural ? 'ANN' : 'Optional',
       },
       {
         id: 'sec-5c',
-        title: '5c. Mặt Đáp & Phân Tích Điểm Dừng',
+        title: '5c. Mặt đáp & phân tích điểm dừng',
         subtitle: 'Response Surface & Canonical Analysis',
         icon: Activity,
         badge: 'RSM',
       },
       {
         id: 'sec-6',
-        title: '6a. Tối Ưu Desirability',
+        title: '6a. Tối ưu Desirability',
         subtitle: optimum ? `Overall D = ${optimum.overallDesirability}` : 'Chưa thiết lập',
         icon: Activity,
         badge: optimum ? 'Optimum' : 'Pending',
       },
       {
         id: 'sec-6b',
-        title: '6b. Rủi Ro Sau DoE',
+        title: '6b. Rủi ro sau DoE',
         subtitle: 'Đánh giá cập nhật',
         icon: ShieldAlert,
         badge: 'ICH Q9',
       },
-      { id: 'sec-6c', title: '6c. Thí Nghiệm Xác Nhận', subtitle: `${project.confirmationStudies?.length ?? 0} hồ sơ`, icon: CheckCircle2, badge: 'Confirm' },
+      { id: 'sec-6c', title: '6c. Thí nghiệm xác nhận', subtitle: `${project.confirmationStudies?.length ?? 0} hồ sơ`, icon: CheckCircle2, badge: 'Confirm' },
       {
         id: 'sec-7',
-        title: '7. Chiến Lược Kiểm Soát',
+        title: '7. Chiến lược kiểm soát',
         subtitle: 'ICH Q10 Comprehensive',
         icon: Boxes,
         badge: 'ICH Q10',
       },
       {
         id: 'sec-8',
-        title: '8. Độ Bền Vững Monte Carlo',
+        title: '8. Độ bền vững Monte Carlo',
         subtitle: monteCarlo ? `Đạt ${monteCarlo.reliabilityPercent}% (${monteCarlo.customVariability?.mode === 'component_wise' ? 'ICH Q14' : 'RSD chung'})` : 'Chưa chạy mô phỏng',
         icon: Activity,
         badge: monteCarlo ? 'Risk' : 'Pending',
       },
       {
         id: 'sec-9',
-        title: '9. Ký Duyệt & Phê Chuẩn',
+        title: '9. Ký duyệt & phê chuẩn',
         subtitle: 'Sign-off & Approval',
         icon: FileCheck2,
         badge: 'Sign',
       },
       {
         id: 'sec-governance',
-        title: 'Quản Trị & Audit Trail',
-        subtitle: 'Snapshots & Kiểm tra',
+        title: 'Quản trị & Audit Trail',
+        subtitle: 'Snapshots & kiểm tra',
         icon: BookOpen,
         badge: 'Audit',
       },
@@ -236,7 +236,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <FileCheck2 size={22} color="#0f766e" />
             <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#0f172a' }}>
-              Bản Thảo Báo Cáo Phát Triển Dược Phẩm (tham khảo CTD 3.2.P.2)
+              Bản thảo báo cáo phát triển dược phẩm (tham khảo CTD 3.2.P.2)
             </h2>
           </div>
           <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.2rem' }}>
@@ -254,7 +254,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                 style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', border: 'none', fontWeight: '700' }}
               >
                 <Calculator size={14} />
-                <span>Đa Thức (ANOVA)</span>
+                <span>Đa thức (ANOVA)</span>
               </button>
               <button
                 onClick={() => onToggleEngine('neural')}
@@ -269,7 +269,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                 }}
               >
                 <BrainCircuit size={14} />
-                <span>Mạng Nơ-ron AI</span>
+                <span>Mạng nơ-ron AI</span>
               </button>
             </div>
           )}
@@ -280,7 +280,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
             style={{ fontSize: '0.82rem', padding: '0.4rem 0.85rem' }}
           >
             <Printer size={16} />
-            <span>In / Xuất PDF</span>
+            <span>In / xuất PDF</span>
           </button>
 
           <button
@@ -299,7 +299,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
             title="Xuất tệp PDF lưu trữ (Archival PDF / XMP) có nhúng mã băm kiểm toán SHA-256 (tham chiếu ISO 19005)"
           >
             <FileText size={16} />
-            <span>{isExportingPdf ? 'Đang tạo PDF Lưu Trữ...' : 'Xuất Báo Cáo Lưu Trữ (Archival PDF)'}</span>
+            <span>{isExportingPdf ? 'Đang tạo PDF lưu trữ...' : 'Xuất báo cáo lưu trữ (Archival PDF)'}</span>
           </button>
 
           <button
@@ -310,7 +310,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
             title={reportReadiness.readyForScientificReport ? 'Xuất bản thảo để rà soát khoa học/QA' : 'Cần hoàn tất và kiểm tra dữ liệu trước khi xuất'}
           >
             <Download size={16} />
-            <span>{isExportingWord ? 'Đang tạo Word...' : 'Tải Bản Thảo Word (.docx)'}</span>
+            <span>{isExportingWord ? 'Đang tạo Word...' : 'Tải bản thảo Word (.docx)'}</span>
           </button>
         </div>
       </div>
@@ -334,8 +334,8 @@ export const ReportTab: React.FC<ReportTabProps> = ({
           <ShieldCheck size={18} color={auditVerification.isValid ? '#16a34a' : '#dc2626'} />
           <span style={{ fontSize: '0.82rem', fontWeight: '700', color: auditVerification.isValid ? '#166534' : '#991b1b' }}>
             {auditVerification.isValid
-              ? 'Mã Băm Toàn Vẹn Kiểm Toán (Tham Chiếu 21 CFR Part 11 / EU Annex 11):'
-              : 'Cảnh Báo Toàn Vẹn Kiểm Toán (Audit Trail Integrity Alert):'}
+              ? 'Mã băm toàn vẹn kiểm toán (tham chiếu 21 CFR Part 11 / EU Annex 11):'
+              : 'Cảnh báo toàn vẹn kiểm toán (Audit Trail Integrity Alert):'}
           </span>
           <code
             className="font-mono"
@@ -365,7 +365,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
               border: `1px solid ${auditVerification.isValid ? '#86efac' : '#fca5a5'}`,
             }}
           >
-            {auditVerification.isValid ? '✓ Chuỗi Hash Bất Biến Hợp Lệ' : '⚠ Dữ Liệu Bị Can Thiệp'}
+            {auditVerification.isValid ? '✓ Chuỗi hash bất biến hợp lệ' : '⚠ Dữ liệu bị can thiệp'}
           </span>
           <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
             ({auditHistory.length} bản ghi phiên bản)
@@ -387,7 +387,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem', paddingBottom: '0.45rem', borderBottom: '1px solid #e2e8f0' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#1e3a8a', fontWeight: '700', fontSize: '0.82rem' }}>
               <ListOrdered size={16} color="#1e3a8a" />
-              <span>MỤC LỤC BÁO CÁO</span>
+              <span>Mục lục báo cáo</span>
             </div>
             <span style={{ fontSize: '0.68rem', backgroundColor: '#f1f5f9', color: '#64748b', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '600' }}>
               {tocSections.length} mục
@@ -484,39 +484,39 @@ export const ReportTab: React.FC<ReportTabProps> = ({
           <table className="qbd-table" style={{ border: '1px solid #cbd5e1' }}>
             <tbody>
               <tr>
-                <td style={{ width: '30%', fontWeight: '700', backgroundColor: '#f8fafc' }}>Tên Dự Án</td>
+                <td style={{ width: '30%', fontWeight: '700', backgroundColor: '#f8fafc' }}>Tên dự án</td>
                 <td style={{ fontWeight: '600', color: '#1e3a8a' }}>{project.name}</td>
               </tr>
               <tr>
-                <td style={{ fontWeight: '700', backgroundColor: '#f8fafc' }}>Hoạt Chất (API)</td>
+                <td style={{ fontWeight: '700', backgroundColor: '#f8fafc' }}>Hoạt chất (API)</td>
                 <td>{project.moleculeName}</td>
               </tr>
               <tr>
-                <td style={{ fontWeight: '700', backgroundColor: '#f8fafc' }}>Hàm Lượng / Nồng Độ</td>
+                <td style={{ fontWeight: '700', backgroundColor: '#f8fafc' }}>Hàm lượng / nồng độ</td>
                 <td>{project.strength || 'Chưa nhập'}</td>
               </tr>
               <tr>
-                <td style={{ fontWeight: '700', backgroundColor: '#f8fafc' }}>Dạng Bào Chế & Đường Dùng</td>
+                <td style={{ fontWeight: '700', backgroundColor: '#f8fafc' }}>Dạng bào chế & đường dùng</td>
                 <td>{project.dosageForm}</td>
               </tr>
               <tr>
-                <td style={{ fontWeight: '700', backgroundColor: '#f8fafc' }}>Ngày Bắt Đầu Dự Án</td>
+                <td style={{ fontWeight: '700', backgroundColor: '#f8fafc' }}>Ngày bắt đầu dự án</td>
                 <td>{project.createdDate || 'Chưa nhập'}</td>
               </tr>
               <tr>
-                <td style={{ fontWeight: '700', backgroundColor: '#f8fafc' }}>Nhóm Nghiên Cứu</td>
+                <td style={{ fontWeight: '700', backgroundColor: '#f8fafc' }}>Nhóm nghiên cứu</td>
                 <td>{project.author}</td>
               </tr>
               <tr>
-                <td style={{ fontWeight: '700', backgroundColor: '#f8fafc' }}>Phương Pháp Mô Hình Hóa</td>
+                <td style={{ fontWeight: '700', backgroundColor: '#f8fafc' }}>Phương pháp mô hình hóa</td>
                 <td style={{ fontWeight: '700', color: modelingEngine === 'neural' ? '#7c3aed' : '#0f766e' }}>
                   {modelingEngine === 'neural'
-                    ? '🧠 Mạng Nơ-ron Nhân Tạo AI (Neural Network Platform)'
-                    : '📐 Hồi Quy Đa Thức Bậc ≤ 2 (Classical ANOVA / Response Surface)'}
+                    ? '🧠 Mạng nơ-ron nhân tạo AI (Neural Network Platform)'
+                    : '📐 Hồi quy đa thức bậc ≤ 2 (Classical ANOVA / Response Surface)'}
                 </td>
               </tr>
               <tr>
-                <td style={{ fontWeight: '700', backgroundColor: '#f8fafc' }}>Ngày Lập Báo Cáo</td>
+                <td style={{ fontWeight: '700', backgroundColor: '#f8fafc' }}>Ngày lập báo cáo</td>
                 <td>{new Date().toLocaleDateString('vi-VN')}</td>
               </tr>
             </tbody>
@@ -538,14 +538,14 @@ export const ReportTab: React.FC<ReportTabProps> = ({
         {/* 1. QTPP */}
         <div id="sec-1" className="report-section" style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
-            1. Hồ Sơ Chất Lượng Sản Phẩm Mục Tiêu (QTPP - ICH Q8)
+            1. Hồ sơ chất lượng sản phẩm mục tiêu (QTPP - ICH Q8)
           </h2>
           <table className="qbd-table">
             <thead>
               <tr style={{ backgroundColor: '#f1f5f9' }}>
-                <th style={{ width: '30%' }}>Yếu Tố QTPP</th>
-                <th style={{ width: '35%' }}>Mục Tiêu Đích</th>
-                <th style={{ width: '35%' }}>Căn Cứ Khoa Học</th>
+                <th style={{ width: '30%' }}>Yếu tố QTPP</th>
+                <th style={{ width: '35%' }}>Mục tiêu đích</th>
+                <th style={{ width: '35%' }}>Căn cứ khoa học</th>
               </tr>
             </thead>
             <tbody>
@@ -563,19 +563,19 @@ export const ReportTab: React.FC<ReportTabProps> = ({
         {/* 2. CQAs & Desirability Configuration */}
         <div id="sec-2" className="report-section" style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
-            2. Thuộc Tính Chất Lượng Trọng Yếu (CQAs) & Cấu Hình Hàm Thỏa Dụng
+            2. Thuộc tính chất lượng trọng yếu (CQAs) & cấu hình hàm thỏa dụng
           </h2>
           <table className="qbd-table">
             <thead>
               <tr style={{ backgroundColor: '#f1f5f9' }}>
                 <th>Mã</th>
                 <th>Tên CQA</th>
-                <th>Bản Chất</th>
-                <th>Đơn Vị</th>
-                <th>Mục Tiêu (Goal)</th>
-                <th>Giới Hạn (LSL - Target - USL)</th>
-                <th>Hình Dạng (s, t)</th>
-                <th>Trọng Số (w)</th>
+                <th>Bản chất</th>
+                <th>Đơn vị</th>
+                <th>Mục tiêu (Goal)</th>
+                <th>Giới hạn (LSL - Target - USL)</th>
+                <th>Hình dạng (s, t)</th>
+                <th>Trọng số (w)</th>
               </tr>
             </thead>
             <tbody>
@@ -609,19 +609,19 @@ export const ReportTab: React.FC<ReportTabProps> = ({
         {/* 3. FMEA Risk Assessment */}
         <div id="sec-3" className="report-section" style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
-            3. Đánh Giá Quản Lý Rủi Ro Ban Đầu (FMEA - ICH Q9)
+            3. Đánh giá quản lý rủi ro ban đầu (FMEA - ICH Q9)
           </h2>
           <table className="qbd-table">
             <thead>
               <tr style={{ backgroundColor: '#f1f5f9' }}>
-                <th>Yếu Tố</th>
-                <th>CQA Bị Ảnh Hưởng</th>
+                <th>Yếu tố</th>
+                <th>CQA bị ảnh hưởng</th>
                 <th style={{ textAlign: 'center' }}>S</th>
                 <th style={{ textAlign: 'center' }} title="Occurrence (Khả năng xảy ra)">O</th>
                 <th style={{ textAlign: 'center' }}>D</th>
                 <th style={{ textAlign: 'center' }}>RPN</th>
-                <th style={{ textAlign: 'center' }}>Mức Rủi Ro</th>
-                <th style={{ textAlign: 'center' }}>Khảo Sát DoE</th>
+                <th style={{ textAlign: 'center' }}>Mức rủi ro</th>
+                <th style={{ textAlign: 'center' }}>Khảo sát DoE</th>
               </tr>
             </thead>
             <tbody>
@@ -652,7 +652,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
         {/* 4. DoE Matrix */}
         <div id="sec-4" className="report-section" style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
-            4. Thiết Kế Thí Nghiệm (DoE: {project.doeConfig.designType})
+            4. Thiết kế thí nghiệm (DoE: {project.doeConfig.designType})
           </h2>
 
           <div style={{ marginBottom: '1rem' }}>
@@ -660,12 +660,12 @@ export const ReportTab: React.FC<ReportTabProps> = ({
               <thead>
                 <tr style={{ backgroundColor: '#f1f5f9' }}>
                   <th>Mã</th>
-                  <th>Tên Biến Đầu Vào</th>
-                  <th>Vai Trò (QbD Role)</th>
-                  <th>Bản Chất Dữ Liệu</th>
-                  <th>Khả Năng Kiểm Soát</th>
-                  <th>Đơn Vị</th>
-                  <th>Phạm Vi Khảo Sát / Hằng Số</th>
+                  <th>Tên biến đầu vào</th>
+                  <th>Vai trò (QbD Role)</th>
+                  <th>Bản chất dữ liệu</th>
+                  <th>Khả năng kiểm soát</th>
+                  <th>Đơn vị</th>
+                  <th>Phạm vi khảo sát / hằng số</th>
                 </tr>
               </thead>
               <tbody>
@@ -706,7 +706,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
             return (
               <div style={{ marginBottom: '1rem', backgroundColor: '#f8fafc', padding: '0.85rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
                 <h4 style={{ fontSize: '0.9rem', fontWeight: '700', color: '#0369a1', marginBottom: '0.5rem' }}>
-                  ⚡ Đánh Giá Hiệu Quả Thiết Kế (Design Optimality Diagnostics)
+                  ⚡ Đánh giá hiệu quả thiết kế (Design Optimality Diagnostics)
                 </h4>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem' }}>
                   <div><strong>D-Efficiency:</strong> <span style={{ color: '#0284c7', fontWeight: '700' }}>{metrics.dEfficiency}%</span> ({metrics.rating})</div>
@@ -734,7 +734,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                         <th key={f.code}>{f.name} ({f.code}){f.unit ? ` [${f.unit}]` : ''}</th>
                       ))}
                       {hasMixture && (
-                        <th style={{ backgroundColor: '#ecfdf5', color: '#065f46', textAlign: 'center' }}>Σ Hỗn Hợp (%)</th>
+                        <th style={{ backgroundColor: '#ecfdf5', color: '#065f46', textAlign: 'center' }}>Σ Hỗn hợp (%)</th>
                       )}
                       {project.cqas.map((c) => (
                         <th key={c.code} style={{ backgroundColor: '#ccfbf1', color: '#0f766e' }}>{c.name} ({c.code}){c.unit ? ` [${c.unit}]` : ''}</th>
@@ -785,7 +785,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
         {/* 5a. Statistical Models & ANOVA */}
         <div id="sec-5a" className="report-section" style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
-            5a. Mô Hình Hồi Quy Đa Thức & Phân Tích Phương Sai (ANOVA - Lack of Fit)
+            5a. Mô hình hồi quy đa thức & phân tích phương sai (ANOVA - Lack of Fit)
           </h2>
           {new Set(project.runs.map((run) => Math.max(1, Math.floor(run.block ?? 1)))).size > 1 && (
             <p style={{ fontSize: '0.78rem', color: '#0f766e', marginBottom: '0.75rem' }}>
@@ -895,10 +895,10 @@ export const ReportTab: React.FC<ReportTabProps> = ({
             <div id="sec-5b" className="report-section" style={{ marginBottom: '2rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#7c3aed', margin: 0 }}>
-                  5b. Mô Hình Mạng Nơ-ron Nhân Tạo AI (Artificial Neural Network - ANN)
+                  5b. Mô hình mạng nơ-ron nhân tạo AI (Artificial Neural Network - ANN)
                 </h2>
                 <span className="badge" style={{ backgroundColor: actualTrainingMode === 'shared' ? '#0284c7' : '#0f766e', color: '#ffffff', fontSize: '0.74rem', padding: '0.25rem 0.55rem' }}>
-                  {actualTrainingMode === 'shared' ? '🌐 Mạng Hợp Nhất (Multi-Output MLP)' : '🎯 Mạng Độc Lập Từng Biến Y (Per-CQA MLP)'}
+                  {actualTrainingMode === 'shared' ? '🌐 Mạng hợp nhất (Multi-Output MLP)' : '🎯 Mạng độc lập từng biến Y (Per-CQA MLP)'}
                 </span>
               </div>
 
@@ -906,7 +906,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                 {actualTrainingMode === 'shared' ? (
                   <span>Mô hình áp dụng kiến trúc <strong>Multi-Output Shared MLP</strong>, tối ưu hóa đồng thời toàn bộ các biến đáp ứng CQA trên cùng một mạng nơ-ron chia sẻ các tầng ẩn.</span>
                 ) : (
-                  <span>Mô hình áp dụng kiến trúc <strong>Mạng Nơ-ron Độc Lập Cho Từng Biến Y</strong>, cho phép tối ưu hóa riêng biệt số nơ-ron ẩn và hàm kích hoạt phù hợp nhất với đặc tính phi tuyến của từng CQA.</span>
+                  <span>Mô hình áp dụng kiến trúc <strong>mạng nơ-ron độc lập cho từng biến Y</strong>, cho phép tối ưu hóa riêng biệt số nơ-ron ẩn và hàm kích hoạt phù hợp nhất với đặc tính phi tuyến của từng CQA.</span>
                 )}
               </div>
 
@@ -962,7 +962,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                 return (
                   <div key={nm.cqaCode} style={{ backgroundColor: '#faf5ff', padding: '1rem', borderRadius: '0.5rem', marginBottom: '1rem', border: '1px solid #e9d5ff' }}>
                     <div style={{ fontWeight: '700', color: '#6b21a8', marginBottom: '0.3rem' }}>
-                      {cqa?.name} ({nm.cqaCode}) — Kiến trúc MLP [{nm.config.hiddenNodes1}{nm.config.hiddenNodes2 > 0 ? `, ${nm.config.hiddenNodes2}` : ''}] ({nm.config.activation.toUpperCase()}) {nm.architectureMode === 'shared' ? '(Mạng Hợp Nhất)' : '(Mạng Độc Lập)'}
+                      {cqa?.name} ({nm.cqaCode}) — Kiến trúc MLP [{nm.config.hiddenNodes1}{nm.config.hiddenNodes2 > 0 ? `, ${nm.config.hiddenNodes2}` : ''}] ({nm.config.activation.toUpperCase()}) {nm.architectureMode === 'shared' ? '(Mạng hợp nhất)' : '(Mạng độc lập)'}
                     </div>
                     <div style={{ fontSize: '0.8rem', color: '#475569', marginBottom: '0.4rem' }}>
                       Train R² = <strong style={{ color: '#1e3a8a' }}>{nm.diagnostics.rSquaredTrain}</strong> | Val R² = <strong style={{ color: '#dc2626' }}>{nm.diagnostics.rSquaredVal}</strong> | Overall R² = <strong style={{ color: '#7c3aed' }}>{nm.diagnostics.rSquaredOverall}</strong> | RMSE = <strong>{nm.diagnostics.rmseOverall}</strong> (Tour #{nm.diagnostics.bestTourIndex})
@@ -984,7 +984,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
           <div id="sec-5b" className="report-section" style={{ marginBottom: '2rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#7c3aed', margin: 0 }}>
-                5b. Mô Hình Mạng Nơ-ron Nhân Tạo AI (Artificial Neural Network - ANN)
+                5b. Mô hình mạng nơ-ron nhân tạo AI (Artificial Neural Network - ANN)
               </h2>
               <span className="badge" style={{ backgroundColor: '#64748b', color: '#ffffff', fontSize: '0.74rem', padding: '0.25rem 0.55rem' }}>
                 Chưa có mô hình hợp lệ
@@ -992,10 +992,10 @@ export const ReportTab: React.FC<ReportTabProps> = ({
             </div>
             <div style={{ backgroundColor: '#faf5ff', border: '1px dashed #d8b4fe', borderRadius: '0.5rem', padding: '1rem', fontSize: '0.85rem', color: '#581c87' }}>
               <div style={{ fontWeight: '600', marginBottom: '0.3rem' }}>
-                ℹ️ Chưa có mô hình Mạng Nơ-ron AI hợp lệ trong dự án này.
+                ℹ️ Chưa có mô hình mạng nơ-ron AI hợp lệ trong dự án này.
               </div>
               <div>
-                Xem kết quả hồi quy đa thức ở mục 5a. Để tạo mô hình MLP, chuyển sang <strong>Bước 5 (Mạng Nơ-ron)</strong>. Mỗi lượt huấn luyện cần số mẫu có kết quả Y hợp lệ sau khi chia validation <strong>lớn hơn</strong> số tham số mạng. Nếu không đạt, hãy giảm H1/H2 bằng nút gợi ý kiến trúc hoặc bổ sung thí nghiệm có kết quả Y rồi huấn luyện lại; chỉ dùng mô hình ANN trong kết luận khi Bước 5 hiển thị kết quả mô hình.
+                Xem kết quả hồi quy đa thức ở mục 5a. Để tạo mô hình MLP, chuyển sang <strong>Bước 5 (Mạng nơ-ron)</strong>. Mỗi lượt huấn luyện cần số mẫu có kết quả Y hợp lệ sau khi chia validation <strong>lớn hơn</strong> số tham số mạng. Nếu không đạt, hãy giảm H1/H2 bằng nút gợi ý kiến trúc hoặc bổ sung thí nghiệm có kết quả Y rồi huấn luyện lại; chỉ dùng mô hình ANN trong kết luận khi Bước 5 hiển thị kết quả mô hình.
               </div>
             </div>
           </div>
@@ -1005,7 +1005,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
         <div id="sec-5c" className="report-section" style={{ marginBottom: '2rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#0f766e', margin: 0 }}>
-              5c. Khảo Sát Mặt Đáp &amp; Phân Tích Điểm Dừng (Response Surface &amp; Canonical Analysis)
+              5c. Khảo sát mặt đáp &amp; phân tích điểm dừng (Response Surface &amp; Canonical Analysis)
             </h2>
             <span className="badge" style={{ backgroundColor: '#0f766e', color: '#ffffff', fontSize: '0.74rem', padding: '0.25rem 0.55rem' }}>
               ICH Q8 (R2) RSM
@@ -1083,7 +1083,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '0.75rem' }}>
                       <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem 0.8rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
                         <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '600' }}>
-                          ĐÁP ỨNG DỰ ĐOÁN TẠI ĐIỂM DỪNG (ŷ₀)
+                          Đáp ứng dự đoán tại điểm dừng (ŷ₀)
                         </div>
                         <div style={{ fontSize: '1.1rem', fontWeight: '700', color: '#0f766e', marginTop: '0.15rem' }}>
                           {canonical.predictedAtStationaryPoint.toFixed(4)} {cqa.unit || ''}
@@ -1095,7 +1095,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
 
                       <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem 0.8rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
                         <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '600' }}>
-                          ĐẶC TÍNH HÌNH HỌC MẶT CONG
+                          Đặc tính hình học mặt cong
                         </div>
                         <div style={{ fontSize: '0.85rem', fontWeight: '600', color: '#1e293b', marginTop: '0.15rem' }}>
                           {canonical.surfaceNature === 'maximum' && 'Đỉnh đáp ứng — Tất cả λᵢ < 0'}
@@ -1110,7 +1110,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
 
                       <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem 0.8rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
                         <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: '600' }}>
-                          PHƯƠNG TRÌNH CHÍNH TẮC (CANONICAL FORM)
+                          Phương trình chính tắc (Canonical form)
                         </div>
                         <div className="font-mono" style={{ fontSize: '0.78rem', fontWeight: '700', color: '#2563eb', marginTop: '0.15rem', overflowX: 'auto', whiteSpace: 'nowrap' }}>
                           {canonical.canonicalEquation}
@@ -1125,7 +1125,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                       {/* Stationary coordinates */}
                       <div style={{ border: '1px solid #e2e8f0', borderRadius: '0.375rem', overflow: 'hidden' }}>
                         <div style={{ backgroundColor: '#f1f5f9', padding: '0.4rem 0.6rem', fontSize: '0.75rem', fontWeight: '700', color: '#334155' }}>
-                          TỌA ĐỘ ĐIỂM DỪNG (STATIONARY POINT x₀ = -½ B⁻¹ a)
+                          Tọa độ điểm dừng (Stationary point x₀ = -½ B⁻¹ a)
                         </div>
                         <table style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse' }}>
                           <thead>
@@ -1176,7 +1176,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                       {/* Eigenvalues */}
                       <div style={{ border: '1px solid #e2e8f0', borderRadius: '0.375rem', overflow: 'hidden' }}>
                         <div style={{ backgroundColor: '#f1f5f9', padding: '0.4rem 0.6rem', fontSize: '0.75rem', fontWeight: '700', color: '#334155' }}>
-                          CÁC TRỤC CHÍNH &amp; HỆ SỐ TRỊ RIÊNG (EIGENVALUES λᵢ)
+                          Các trục chính &amp; hệ số trị riêng (Eigenvalues λᵢ)
                         </div>
                         <table style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse' }}>
                           <thead>
@@ -1233,7 +1233,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                 {neuralModel && (
                   <div style={{ marginTop: '0.75rem', padding: '0.6rem 0.8rem', backgroundColor: '#faf5ff', borderRadius: '0.375rem', border: '1px solid #e9d5ff', fontSize: '0.75rem', color: '#6b21a8' }}>
                     <div style={{ fontWeight: '700', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      <BrainCircuit size={14} /> Khảo sát mặt đáp phi tuyến qua Mạng Nơ-ron AI (ANN MLP):
+                      <BrainCircuit size={14} /> Khảo sát mặt đáp phi tuyến qua mạng nơ-ron AI (ANN MLP):
                     </div>
                     <div>
                       Bề mặt đáp ứng phi tuyến tính được ước lượng bởi mạng nơ-ron MLP [{neuralModel.config.hiddenNodes1}{neuralModel.config.hiddenNodes2 > 0 ? `, ${neuralModel.config.hiddenNodes2}` : ''}] ({neuralModel.config.activation.toUpperCase()}) với Train R² = {neuralModel.diagnostics.rSquaredTrain}, Val R² = {neuralModel.diagnostics.rSquaredVal}. Mặt đáp mạng nơ-ron có khả năng mô tả các vùng uốn lượn phi tuyến phức tạp vượt ra ngoài dạng paraboloid cổ điển.
@@ -1248,7 +1248,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
         {/* 6a. Optimum & Prediction Profiler */}
         <div id="sec-6" className="report-section" style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
-            6a. Tối Ưu Hóa Đa Mục Tiêu (Desirability Profiler{optimum ? `: Overall D = ${optimum.overallDesirability}` : ''})
+            6a. Tối ưu hóa đa mục tiêu (Desirability Profiler{optimum ? `: Overall D = ${optimum.overallDesirability}` : ''})
           </h2>
           
           {optimum ? (
@@ -1256,7 +1256,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
               {/* Factors setpoints */}
               <div style={{ border: '1px solid #cbd5e1', borderRadius: '0.375rem', padding: '0.75rem', backgroundColor: '#f8fafc' }}>
                 <div style={{ fontWeight: '700', fontSize: '0.85rem', color: '#1e3a8a', marginBottom: '0.5rem' }}>
-                  Thông Số Cài Đặt Tối Ưu (Coded & Actual Setpoint):
+                  Thông số cài đặt tối ưu (Coded & Actual setpoint):
                 </div>
                 {project.factors.map((f) => (
                   <div key={f.code} style={{ fontSize: '0.82rem', display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
@@ -1272,7 +1272,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
               {/* CQAs predictions with SE, 95% CI, and individual desirability */}
               <div style={{ border: '1px solid #cbd5e1', borderRadius: '0.375rem', padding: '0.75rem', backgroundColor: '#f8fafc' }}>
                 <div style={{ fontWeight: '700', fontSize: '0.85rem', color: '#0f766e', marginBottom: '0.5rem' }}>
-                  Đáp Ứng CQAs Dự Đoán & Thỏa Dụng Từng Phần (d_i):
+                  Đáp ứng CQAs dự đoán & thỏa dụng từng phần (d_i):
                 </div>
                 {project.cqas.map((cqa) => {
                   const pred = optimum.predictedResponses[cqa.code];
@@ -1298,7 +1298,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                 ⏳ Chưa thiết lập điểm tối ưu hóa đa mục tiêu.
               </div>
               <div>
-                Chuyển sang <strong>Bước 7 (Không gian Thiết kế)</strong>: thiết lập Mục Tiêu &amp; Trọng Số, bấm Tối Đa Hóa Thỏa Dụng (Max D), rồi chọn phương án tối ưu trước khi tạo thí nghiệm xác nhận.
+                Chuyển sang <strong>Bước 7 (Không gian thiết kế)</strong>: thiết lập mục tiêu &amp; trọng số, bấm tối đa hóa thỏa dụng (Max D), rồi chọn phương án tối ưu trước khi tạo thí nghiệm xác nhận.
               </div>
             </div>
           )}
@@ -1307,18 +1307,18 @@ export const ReportTab: React.FC<ReportTabProps> = ({
         {/* 6b. Updated Risk Assessment Table (ICH Q9 & FDA ANDA) */}
         <div id="sec-6b" className="report-section" style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
-            6b. Đánh Giá Rủi Ro Cập Nhật Sau DoE (Updated Risk Assessment - ICH Q9 & FDA)
+            6b. Đánh giá rủi ro cập nhật sau DoE (Updated Risk Assessment - ICH Q9 & FDA)
           </h2>
           <div className="table-container">
             <table className="qbd-table">
               <thead>
                 <tr style={{ backgroundColor: '#f1f5f9' }}>
-                  <th>Yếu Tố (Factor)</th>
-                  <th>Chỉ Tiêu (CQA)</th>
-                  <th style={{ textAlign: 'center' }}>Rủi Ro Ban Đầu</th>
-                  <th style={{ textAlign: 'center' }}>Ý Nghĩa DoE</th>
-                  <th style={{ textAlign: 'center' }}>Rủi Ro Cập Nhật</th>
-                  <th>Luận Giải Khoa Học Giảm Rủi Ro</th>
+                  <th>Yếu tố (Factor)</th>
+                  <th>Chỉ tiêu (CQA)</th>
+                  <th style={{ textAlign: 'center' }}>Rủi ro ban đầu</th>
+                  <th style={{ textAlign: 'center' }}>Ý nghĩa DoE</th>
+                  <th style={{ textAlign: 'center' }}>Rủi ro cập nhật</th>
+                  <th>Luận giải khoa học giảm rủi ro</th>
                 </tr>
               </thead>
               <tbody>
@@ -1378,18 +1378,18 @@ export const ReportTab: React.FC<ReportTabProps> = ({
         {/* 7. Comprehensive Control Strategy (ICH Q10) */}
         <div id="sec-7" className="report-section" style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
-            7. Bảng Chiến Lược Kiểm Soát Toàn Diện (ICH Q10 Comprehensive Control Strategy)
+            7. Bảng chiến lược kiểm soát toàn diện (ICH Q10 Comprehensive Control Strategy)
           </h2>
           <div className="table-container">
             <table className="qbd-table">
               <thead>
                 <tr style={{ backgroundColor: '#f1f5f9' }}>
-                  <th>Phân Loại</th>
-                  <th>Thông Số / Thuộc Tính</th>
-                  <th>Mục Tiêu (Target)</th>
+                  <th>Phân loại</th>
+                  <th>Thông số / thuộc tính</th>
+                  <th>Mục tiêu (Target)</th>
                   <th>Khoảng NOR</th>
                   <th>Khoảng PAR</th>
-                  <th>Phương Pháp Kiểm Soát</th>
+                  <th>Phương pháp kiểm soát</th>
                 </tr>
               </thead>
               <tbody>
@@ -1415,7 +1415,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
         {/* 8. Monte Carlo Reliability & Variance Decomposition (ICH Q9 / ICH Q14) */}
         <div id="sec-8" className="report-section" style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
-            8. Đánh Giá Độ Bền Vững Miền Dự Báo (Mô Phỏng Monte Carlo &amp; Phân Rã Phương Sai, tham chiếu ICH Q9 &amp; ICH Q14)
+            8. Đánh giá độ bền vững miền dự báo (Mô phỏng Monte Carlo &amp; phân rã phương sai, tham chiếu ICH Q9 &amp; ICH Q14)
           </h2>
           {monteCarlo ? (
             <div>
@@ -1423,8 +1423,8 @@ export const ReportTab: React.FC<ReportTabProps> = ({
               {(() => {
                 const isGlobal = monteCarlo.customVariability?.mode !== 'component_wise';
                 const modeText = isGlobal
-                  ? `Chế độ RSD Chung (Global RSD ±${monteCarlo.variabilityPercent ?? 2.0}%)`
-                  : 'Chế độ Từng Biến (Component-wise & Analytical Measurement Noise - ICH Q14)';
+                  ? `Chế độ RSD chung (Global RSD ±${monteCarlo.variabilityPercent ?? 2.0}%)`
+                  : 'Chế độ từng biến (Component-wise & Analytical Measurement Noise - ICH Q14)';
                 return (
                   <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '0.5rem', padding: '1rem', fontSize: '0.85rem', color: '#14532d', marginBottom: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.6rem' }}>
@@ -1477,17 +1477,17 @@ export const ReportTab: React.FC<ReportTabProps> = ({
               {monteCarlo.cqaStats && Object.keys(monteCarlo.cqaStats).length > 0 && (
                 <div style={{ marginBottom: '1.25rem' }}>
                   <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a', marginBottom: '0.4rem' }}>
-                    Bảng Năng Lực &amp; Hiệu Năng Quy Trình Theo Từng CQA (Ppk / Cpk Benchmarks):
+                    Bảng năng lực &amp; hiệu năng quy trình theo từng CQA (Ppk / Cpk Benchmarks):
                   </h3>
                   <div className="table-container">
                     <table className="qbd-table">
                       <thead>
                         <tr style={{ backgroundColor: '#f1f5f9' }}>
-                          <th>Chỉ Tiêu CQA</th>
-                          <th>Trung Bình ± SD</th>
-                          <th>Hiệu Năng Ppk (Cpk)</th>
-                          <th>Ngoài Chuẩn (% OOS)</th>
-                          <th>Đánh Giá 6σ</th>
+                          <th>Chỉ tiêu CQA</th>
+                          <th>Trung bình ± SD</th>
+                          <th>Hiệu năng Ppk (Cpk)</th>
+                          <th>Ngoài chuẩn (% OOS)</th>
+                          <th>Đánh giá 6σ</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1534,7 +1534,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
               {monteCarlo.varianceDecomposition && Object.keys(monteCarlo.varianceDecomposition).length > 0 && (
                 <div style={{ marginBottom: '1rem' }}>
                   <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a', marginBottom: '0.4rem' }}>
-                    Bảng Phân Rã Phương Sai Chất Lượng (Variance Decomposition - ICH Q14 / Six Sigma):
+                    Bảng phân rã phương sai chất lượng (Variance Decomposition - ICH Q14 / Six Sigma):
                   </h3>
                   <p style={{ fontSize: '0.78rem', color: '#475569', marginBottom: '0.5rem' }}>
                     Phân tích đóng góp phương sai thành phần: Phương sai quy trình (Process Variance <span className="font-mono">s²<sub>process</sub></span>), Sai số mô hình (Model Residual <span className="font-mono">s²<sub>residual</sub></span>), và Sai số phép đo phân tích lặp lại (Analytical Measurement Noise <span className="font-mono">s²<sub>meas</sub></span> - ICH Q14) theo công thức <span className="font-mono font-bold">s²<sub>total</sub> = s²<sub>process</sub> + s²<sub>residual</sub> + s²<sub>meas</sub></span>.
@@ -1543,12 +1543,12 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                     <table className="qbd-table">
                       <thead>
                         <tr style={{ backgroundColor: '#f1f5f9' }}>
-                          <th>Chỉ Tiêu CQA</th>
-                          <th>Phương Sai Tổng (s²<sub>total</sub>)</th>
-                          <th>Quy Trình (Process %)</th>
-                          <th>Mô Hình (Residual %)</th>
-                          <th>Đo Lường (Meas %)</th>
-                          <th>Khuyến Cáo ICH Q14</th>
+                          <th>Chỉ tiêu CQA</th>
+                          <th>Phương sai tổng (s²<sub>total</sub>)</th>
+                          <th>Quy trình (Process %)</th>
+                          <th>Mô hình (Residual %)</th>
+                          <th>Đo lường (Meas %)</th>
+                          <th>Khuyến cáo ICH Q14</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1598,7 +1598,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                 ⏳ Chưa thực hiện mô phỏng Monte Carlo để xác nhận độ bền vững miền dự báo.
               </div>
               <div>
-                Theo khuyến cáo ICH Q9 &amp; US FDA, chuyển sang <strong>Bước 7 (Không gian Thiết kế)</strong>, chọn chế độ biến thiên (RSD chung hoặc từng biến theo ICH Q14) và bấm <strong>Chạy Mô Phỏng</strong> (5.000 – 10.000 lô ảo) để ước lượng tỷ lệ lỗi (Defect Rate PPM), chỉ số hiệu năng Ppk/Cpk và đánh giá rủi ro trước khi chuyển giao sản xuất. Kết quả mô phỏng cần được đọc cùng dữ liệu thí nghiệm xác nhận và phạm vi mô hình đã kiểm tra.
+                Theo khuyến cáo ICH Q9 &amp; US FDA, chuyển sang <strong>Bước 7 (Không gian thiết kế)</strong>, chọn chế độ biến thiên (RSD chung hoặc từng biến theo ICH Q14) và bấm <strong>Chạy mô phỏng</strong> (5.000 – 10.000 lô ảo) để ước lượng tỷ lệ lỗi (Defect Rate PPM), chỉ số hiệu năng Ppk/Cpk và đánh giá rủi ro trước khi chuyển giao sản xuất. Kết quả mô phỏng cần được đọc cùng dữ liệu thí nghiệm xác nhận và phạm vi mô hình đã kiểm tra.
               </div>
             </div>
           )}
@@ -1607,12 +1607,12 @@ export const ReportTab: React.FC<ReportTabProps> = ({
         {/* 9. Sign-off & Regulatory Approval Block */}
         <div id="sec-9" className="report-section">
           <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem', marginBottom: '0.75rem' }}>
-            9. Ký Duyệt & Phê Chuẩn Hồ Sơ Phát Triển Dược Phẩm (Sign-off & Approval)
+            9. Ký duyệt & phê chuẩn hồ sơ phát triển dược phẩm (Sign-off & Approval)
           </h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(180px, 100%), 1fr))', gap: '1rem', marginTop: '1rem' }}>
             <div style={{ border: '1px solid #cbd5e1', borderRadius: '0.375rem', padding: '1rem', textAlign: 'center', backgroundColor: '#f8fafc' }}>
               <div style={{ fontWeight: '700', fontSize: '0.82rem', color: '#1e3a8a', marginBottom: '3rem' }}>
-                NGƯỜI LẬP BÁO CÁO (Scientist)
+                Người lập báo cáo (Scientist)
               </div>
               <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Ký & Ghi rõ họ tên</div>
               <div style={{ fontWeight: '600', color: '#0f172a', marginTop: '0.25rem' }}>{project.author || 'Nghiên cứu viên'}</div>
@@ -1620,7 +1620,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
 
             <div style={{ border: '1px solid #cbd5e1', borderRadius: '0.375rem', padding: '1rem', textAlign: 'center', backgroundColor: '#f8fafc' }}>
               <div style={{ fontWeight: '700', fontSize: '0.82rem', color: '#1e3a8a', marginBottom: '3rem' }}>
-                TRƯỞNG PHÒNG R&D (Formulation Lead)
+                Trưởng phòng R&D (Formulation Lead)
               </div>
               <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Ký & Ghi rõ họ tên</div>
               <div style={{ fontWeight: '600', color: '#0f172a', marginTop: '0.25rem' }}>..........................................</div>
@@ -1628,7 +1628,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
 
             <div style={{ border: '1px solid #cbd5e1', borderRadius: '0.375rem', padding: '1rem', textAlign: 'center', backgroundColor: '#f8fafc' }}>
               <div style={{ fontWeight: '700', fontSize: '0.82rem', color: '#1e3a8a', marginBottom: '3rem' }}>
-                GIÁM ĐỐC QA (Quality Assurance)
+                Giám đốc QA (Quality Assurance)
               </div>
               <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Ký & Ghi rõ họ tên</div>
               <div style={{ fontWeight: '600', color: '#0f172a', marginTop: '0.25rem' }}>..........................................</div>
@@ -1648,7 +1648,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
             lineHeight: '1.5',
           }}>
             <div style={{ fontWeight: '700', marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <span>⚖</span> TUYÊN BỐ PHÁP LÝ &amp; THÔNG CÁO TUÂN THỦ GxP (21 CFR PART 11 / EU ANNEX 11)
+              <span>⚖</span> Tuyên bố pháp lý &amp; thông cáo tuân thủ GxP (21 CFR Part 11 / EU Annex 11)
             </div>
             <div>
               Ứng dụng <strong>QbD Studio™ Pharma DoE Suite</strong> phiên bản client-side được thiết kế chuyên biệt cho mục đích <strong>Nghiên cứu &amp; Phát triển Khám phá (Exploratory Formulation R&amp;D)</strong> và tối ưu hóa quy trình. Hệ thống này <strong>chưa cấu thành</strong> một giải pháp lưu trữ hồ sơ điện tử tuân thủ đầy đủ US FDA 21 CFR Part 11 hoặc EU GMP Annex 11 (chưa tích hợp máy chủ eDMS xác thực tập trung, phân quyền đa cấp LDAP/SSO và chữ ký số PKI trên đám mây). <em>Báo cáo số R&amp;D phục vụ lưu trữ nội bộ và nghiên cứu phát triển, không thay thế hệ thống eDMS/LIMS thẩm định GAMP 5.</em> Mọi báo cáo hoặc kết quả xuất ra cần được in ấn, ký ướt (wet signature) hoặc thẩm định lại trên hệ thống quản lý hồ sơ đạt chuẩn của doanh nghiệp trước khi sử dụng cho hồ sơ nộp cơ quan quản lý y tế.
