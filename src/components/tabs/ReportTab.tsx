@@ -950,6 +950,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                 <NeuralNetworkTopologyDiagram
                   factors={project.factors}
                   cqas={project.cqas}
+                  runs={project.runs}
                   selectedCQA={currentCQA}
                   config={displayNM.config}
                   trainingMode={actualTrainingMode}

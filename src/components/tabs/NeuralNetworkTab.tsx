@@ -124,11 +124,19 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
     () => project.factors.filter((f) => f.controllability !== 'constant'),
     [project.factors]
   );
-  const numInputs = useMemo(() => {
-    const treatmentInputs = buildFactorFeatures(activeFactors).length;
-    const blockCount = new Set(project.runs.map((run) => Math.max(1, Math.floor(run.block ?? 1)))).size;
-    return treatmentInputs + Math.max(0, blockCount - 1);
-  }, [activeFactors, project.runs]);
+  const blockLevels = useMemo(
+    () => [...new Set(project.runs.map((run) => Math.max(1, Math.floor(run.block ?? 1))))].sort((a, b) => a - b),
+    [project.runs]
+  );
+  const blockFeaturesCount = Math.max(0, blockLevels.length - 1);
+  const treatmentInputsCount = useMemo(
+    () => buildFactorFeatures(activeFactors).length,
+    [activeFactors]
+  );
+  const numInputs = useMemo(
+    () => treatmentInputsCount + blockFeaturesCount,
+    [treatmentInputsCount, blockFeaturesCount]
+  );
   const numOutputs = neuralTrainingMode === 'shared' ? project.cqas.length : 1;
   const numSamples = project.runs.length;
 
@@ -1519,7 +1527,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                 KIẾN TRÚC MẠNG HIỆN TẠI:
               </span>
               <span className="font-mono" style={{ fontSize: '0.82rem', fontWeight: '700', color: '#7c3aed', backgroundColor: '#ede9fe', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>
-                [{numInputs} Inputs] ➔ [H1: {localConfig.hiddenNodes1}] {localConfig.hiddenNodes2 > 0 ? `➔ [H2: ${localConfig.hiddenNodes2}] ` : ''}➔ [{numOutputs} Output{numOutputs > 1 ? 's' : ''}] ({localConfig.activation.toUpperCase()})
+                [{numInputs} Inputs{blockFeaturesCount > 0 ? ` (${treatmentInputsCount}X + ${blockFeaturesCount}Block)` : ''}] ➔ [H1: {localConfig.hiddenNodes1}] {localConfig.hiddenNodes2 > 0 ? `➔ [H2: ${localConfig.hiddenNodes2}] ` : ''}➔ [{numOutputs} Output{numOutputs > 1 ? 's' : ''}] ({localConfig.activation.toUpperCase()})
               </span>
             </div>
 
@@ -1535,8 +1543,29 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           {/* Parameter Metrics Chips Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem', marginBottom: '0.75rem' }}>
             <div style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '0.375rem', padding: '0.5rem 0.75rem' }}>
-              <div style={{ fontSize: '0.68rem', fontWeight: '700', color: '#64748b' }}>BIẾN ĐẦU VÀO (dX)</div>
-              <div style={{ fontSize: '1.1rem', fontWeight: '800', color: '#0f172a' }}>{archMetrics.numInputs} yếu tố</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.15rem' }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: '700', color: '#64748b' }}>BIẾN ĐẦU VÀO (dX)</div>
+                {blockFeaturesCount > 0 && (
+                  <span
+                    title={`Đầu vào mô hình gồm: ${treatmentInputsCount} yếu tố thực nghiệm (${activeFactors.map((f) => f.code).join(', ')}) và ${blockFeaturesCount} biến giả hiệu chỉnh cho ${blockLevels.length} Khối (Block 2, Block 3).`}
+                    style={{ fontSize: '0.72rem', color: '#7c3aed', cursor: 'help' }}
+                  >
+                    ℹ️
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: '1.1rem', fontWeight: '800', color: '#0f172a' }}>
+                {archMetrics.numInputs} biến
+              </div>
+              <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '0.15rem', lineHeight: '1.2' }}>
+                {blockFeaturesCount > 0 ? (
+                  <>
+                    <strong style={{ color: '#0f172a' }}>{treatmentInputsCount} yếu tố X</strong> + <strong style={{ color: '#7c3aed' }}>{blockFeaturesCount} biến Block</strong>
+                  </>
+                ) : (
+                  <span>{treatmentInputsCount} yếu tố thực nghiệm</span>
+                )}
+              </div>
             </div>
 
             <div style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '0.375rem', padding: '0.5rem 0.75rem' }}>
@@ -1720,9 +1749,33 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             </div>
           )}
 
-          {new Set(project.runs.map((run) => Math.max(1, Math.floor(run.block ?? 1)))).size > 1 && (
-            <div style={{ marginTop: '0.65rem', padding: '0.6rem 0.8rem', borderRadius: '0.45rem', background: '#f0fdfa', border: '1px solid #99f6e4', color: '#115e59', fontSize: '0.76rem' }}>
-              Mô hình đã thêm biến giả cho block khi huấn luyện và đánh giá phần dư. Block không được xem là biến vận hành; đồ thị và tối ưu hóa dùng Block 1 làm mốc tham chiếu.
+          {blockFeaturesCount > 0 && (
+            <div
+              style={{
+                marginTop: '0.75rem',
+                padding: '0.75rem 0.95rem',
+                borderRadius: '0.45rem',
+                background: '#f5f3ff',
+                border: '1px solid #ddd6fe',
+                color: '#4c1d95',
+                fontSize: '0.78rem',
+                lineHeight: '1.5',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: '700', marginBottom: '0.3rem', color: '#5b21b6', fontSize: '0.82rem' }}>
+                <Layers size={16} color="#7c3aed" />
+                <span>Giải thích về 2 biến đầu vào Block (Hiệu chỉnh khối thí nghiệm):</span>
+              </div>
+              <div style={{ color: '#334155' }}>
+                Dự án gồm <strong>{treatmentInputsCount} yếu tố công nghệ (X: {activeFactors.map((f) => f.code).join(', ')})</strong> được thực hiện trên <strong>{blockLevels.length} khối thí nghiệm</strong> (Block 1, Block 2, Block 3 - ví dụ: thực hiện theo các ngày, lô nguyên liệu hoặc thiết bị khác nhau).
+                Để loại trừ sai lệch ngoại cảnh giữa các khối (block effects) mà không làm méo mó tác động thực tế của các yếu tố X, mạng nơ-ron tự động bổ sung <strong>{blockFeaturesCount} biến chỉ thị (dummy contrast: Block 2, Block 3)</strong> vào tập đầu vào:
+                <code style={{ margin: '0 0.25rem', padding: '0.1rem 0.35rem', backgroundColor: '#ede9fe', color: '#6d28d9', borderRadius: '3px', fontSize: '0.75rem', fontFamily: 'monospace' }}>
+                  dX = {treatmentInputsCount} yếu tố X + {blockFeaturesCount} biến Block = {numInputs}
+                </code>.
+              </div>
+              <div style={{ marginTop: '0.35rem', color: '#6d28d9', fontSize: '0.74rem' }}>
+                💡 <strong>Nguyên tắc dự đoán & tối ưu hóa:</strong> Biến khối chỉ phục vụ cô lập sai số khi huấn luyện (training). Khi khảo sát Mặt đáp (Bước 6) hoặc Tối ưu hóa (Bước 7), hệ thống luôn cố định mốc chuẩn <strong>Block 1</strong> (các biến giả = 0), đảm bảo điều kiện vận hành tối ưu hoàn toàn độc lập với sai lệch ngoại cảnh.
+              </div>
             </div>
           )}
 
@@ -1731,6 +1784,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             <NeuralNetworkTopologyDiagram
               factors={project.factors}
               cqas={project.cqas}
+              runs={project.runs}
               selectedCQA={selectedCQA}
               config={localConfig}
               trainingMode={neuralTrainingMode}

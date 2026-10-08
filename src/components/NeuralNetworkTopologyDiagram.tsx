@@ -1,9 +1,10 @@
 import React, { useMemo } from 'react';
-import type { Factor, CQA, NeuralNetConfig, NeuralTrainingMode, NeuralArchitectureMetrics } from '../types/qbd';
+import type { Factor, CQA, NeuralNetConfig, NeuralTrainingMode, NeuralArchitectureMetrics, DoERun } from '../types/qbd';
 
 interface NeuralNetworkTopologyDiagramProps {
   factors: Factor[];
   cqas: CQA[];
+  runs?: DoERun[];
   selectedCQA: string;
   config: NeuralNetConfig;
   trainingMode?: NeuralTrainingMode;
@@ -34,6 +35,7 @@ function getNodeYs(count: number, topPadding: number, usableHeight: number): num
 export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagramProps> = ({
   factors,
   cqas,
+  runs,
   selectedCQA,
   config,
   trainingMode = 'independent',
@@ -46,6 +48,13 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
     [factors]
   );
 
+  const blockLevels = useMemo(() => {
+    if (!runs || runs.length === 0) return [1];
+    return [...new Set(runs.map((r) => Math.max(1, Math.floor(r.block ?? 1))))].sort((a, b) => a - b);
+  }, [runs]);
+
+  const blockFeatures = useMemo(() => blockLevels.slice(1), [blockLevels]);
+
   const isShared = trainingMode === 'shared';
   const currentCQA = cqas.find((c) => c.code === selectedCQA) || cqas[0];
   const outputCQAs = isShared ? cqas : currentCQA ? [currentCQA] : [];
@@ -56,7 +65,7 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
     return str.length > maxLen ? str.slice(0, maxLen - 1) + '…' : str;
   };
 
-  const numInputs = activeFactors.length;
+  const numInputs = activeFactors.length + blockFeatures.length;
   const numH1 = config.hiddenNodes1 || 3;
   const numH2 = config.hiddenNodes2 || 0;
   const numOutputs = outputCQAs.length;
@@ -141,7 +150,7 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
               borderRadius: '4px',
             }}
           >
-            [{numInputs} Inputs] ➔ [{numH1} H1]{hasH2 ? ` ➔ [${numH2} H2]` : ''} ➔ [{numOutputs} Output{numOutputs > 1 ? 's' : ''}]
+            [{numInputs} Inputs{blockFeatures.length > 0 ? ` (${activeFactors.length}X + ${blockFeatures.length}Block)` : ''}] ➔ [{numH1} H1]{hasH2 ? ` ➔ [${numH2} H2]` : ''} ➔ [{numOutputs} Output{numOutputs > 1 ? 's' : ''}]
           </span>
           {isTraining && trainingProgress && (
             <span
@@ -219,7 +228,7 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
           <g>
             <rect x="15" y="8" width={xInput - 10} height="28" rx="5" fill="#f1f5f9" stroke="#cbd5e1" strokeWidth="1" />
             <text x={(15 + xInput - 10) / 2} y="26" textAnchor="middle" fill="#334155" fontSize="11" fontWeight="700">
-              Lớp đầu vào ({numInputs} biến X)
+              Lớp đầu vào ({numInputs} biến{blockFeatures.length > 0 ? `: ${activeFactors.length} X + ${blockFeatures.length} Block` : ' X'})
             </text>
           </g>
 
@@ -381,6 +390,68 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
                   fontFamily="monospace"
                 >
                   {factor.code}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* 1B. BLOCK CONTRAST DUMMY NODES */}
+          {blockFeatures.map((blockNum, bIdx) => {
+            const nodeIdx = activeFactors.length + bIdx;
+            const y = inputYs[nodeIdx];
+            const color = '#6366f1'; // Indigo for block dummy contrast
+
+            return (
+              <g key={`input-node-block-${blockNum}`}>
+                {/* Node Label on Left */}
+                <text
+                  x={xInput - 22}
+                  y={y - 4}
+                  textAnchor="end"
+                  fill="#0f172a"
+                  fontSize="11"
+                  fontWeight="700"
+                >
+                  Block {blockNum}: Hiệu chỉnh Khối {blockNum}
+                </text>
+                <text
+                  x={xInput - 22}
+                  y={y + 10}
+                  textAnchor="end"
+                  fill="#64748b"
+                  fontSize="9.5"
+                >
+                  [0 hoặc 1] • <tspan fill={color} fontWeight="600">Khối ngoại cảnh</tspan>
+                </text>
+
+                {/* Animated Pulsing Ring when Training */}
+                {isTraining && (
+                  <circle
+                    cx={xInput}
+                    cy={y}
+                    r="14"
+                    fill="none"
+                    stroke={color}
+                    strokeWidth="2"
+                    className="neural-node-ring"
+                  />
+                )}
+
+                {/* Outer Glow */}
+                <circle cx={xInput} cy={y} r="16" fill={color} fillOpacity="0.15" />
+                {/* Circle Node */}
+                <circle cx={xInput} cy={y} r="12" fill={color} stroke="#ffffff" strokeWidth="2" />
+                {/* Text inside node */}
+                <text
+                  x={xInput}
+                  y={y + 3.5}
+                  textAnchor="middle"
+                  fill="#ffffff"
+                  fontSize="9"
+                  fontWeight="bold"
+                  fontFamily="monospace"
+                >
+                  B{blockNum}
                 </text>
               </g>
             );
@@ -569,6 +640,12 @@ export const NeuralNetworkTopologyDiagram: React.FC<NeuralNetworkTopologyDiagram
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#d97706', display: 'inline-block' }} />
             <span>Biến quy trình</span>
           </div>
+          {blockFeatures.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#6366f1', display: 'inline-block' }} />
+              <span>Biến kiểm soát khối (Block dummy)</span>
+            </div>
+          )}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#7c3aed', display: 'inline-block' }} />
             <span>Nơ-ron ẩn ({config.activation.toUpperCase()})</span>
