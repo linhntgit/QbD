@@ -35,6 +35,19 @@ const SCALE_TRACE_TYPES = new Set([
 
 const wrapPlotlyText = (value: string, maxLineLength: number) => {
   if (!value || value.includes('<br>') || value.length <= maxLineLength) return value;
+
+  // Nếu tiêu đề có dấu gạch ngang phân tách ngữ nghĩa ' — ', ưu tiên ngắt dòng tại đó
+  if (value.includes(' — ')) {
+    const parts = value.split(' — ');
+    if (parts.length === 2) {
+      const part1 = parts[0].trim();
+      const part2 = `— ${parts[1].trim()}`;
+      if (part1.length <= maxLineLength + 10 && part2.length <= maxLineLength + 10) {
+        return `${part1}<br>${part2}`;
+      }
+    }
+  }
+
   const words = value.split(/\s+/);
   const lines: string[] = [];
   let line = '';
@@ -179,12 +192,16 @@ function normaliseChart(data: any[], layout: any, compact = false) {
   const is3D = Boolean(scene);
   const isTernary = (layout.xaxis?.showticklabels === false && layout.yaxis?.showticklabels === false) || data.some((t) => t.type === 'scatterternary');
   const isSmallChart = (layout.height && layout.height <= 250) || (margin.t !== undefined && margin.t <= 20 && !layout.title);
+  const hasTitle = Boolean(layout.title);
 
   // Tính lề thông minh theo loại đồ thị để tối ưu không gian hiển thị
   let computedMargin = {
     l: Math.max(margin.l ?? 0, compact ? 60 : 75),
     r: Math.max(margin.r ?? 0, hasColorbar ? (compact ? 90 : 115) : compact ? 25 : 35),
-    t: Math.max(margin.t ?? 0, isTopLegend ? (compact ? 94 : 90) : compact ? 58 : 68),
+    t: Math.max(
+      margin.t ?? 0,
+      isTopLegend ? (compact ? 98 : 96) : hasTitle ? (compact ? 72 : 80) : compact ? 45 : 55
+    ),
     b: Math.max(margin.b ?? 0, isBottomLegend ? (compact ? 85 : 92) : compact ? 55 : 68),
     pad: Math.max(margin.pad ?? 0, compact ? 2 : 4),
   };
@@ -202,7 +219,7 @@ function normaliseChart(data: any[], layout: any, compact = false) {
     computedMargin = {
       l: Math.max(margin.l ?? 0, compact ? 25 : 35),
       r: Math.max(margin.r ?? 0, hasColorbar ? (compact ? 70 : 85) : compact ? 20 : 35),
-      t: Math.max(margin.t ?? 0, isTopLegend ? (compact ? 94 : 90) : compact ? 50 : 60),
+      t: Math.max(margin.t ?? 0, isTopLegend ? (compact ? 94 : 90) : hasTitle ? (compact ? 62 : 72) : compact ? 45 : 55),
       b: Math.max(margin.b ?? 0, isBottomLegend ? (compact ? 75 : 85) : compact ? 30 : 40),
       pad: Math.max(margin.pad ?? 0, 2),
     };
@@ -210,7 +227,7 @@ function normaliseChart(data: any[], layout: any, compact = false) {
     computedMargin = {
       l: Math.max(margin.l ?? 0, compact ? 25 : 35),
       r: Math.max(margin.r ?? 0, hasColorbar ? (compact ? 75 : 95) : compact ? 20 : 35),
-      t: Math.max(margin.t ?? 0, isTopLegend ? (compact ? 94 : 90) : compact ? 65 : 75),
+      t: Math.max(margin.t ?? 0, isTopLegend ? (compact ? 94 : 90) : hasTitle ? (compact ? 72 : 80) : compact ? 55 : 65),
       b: Math.max(margin.b ?? 0, isBottomLegend ? (compact ? 80 : 88) : compact ? 55 : 65),
       pad: Math.max(margin.pad ?? 0, 2),
     };
@@ -231,12 +248,14 @@ function normaliseChart(data: any[], layout: any, compact = false) {
     margin: computedMargin,
     title: layout.title
       ? {
-          ...mergeTitle(layout.title, compact ? 13 : 15, compact ? 45 : 75),
+          ...mergeTitle(layout.title, compact ? 13 : 15, compact ? 42 : 62),
           x: layout.title?.x ?? (hasColorbar ? (compact ? 0.44 : 0.46) : 0.5),
           xanchor: layout.title?.xanchor || 'center',
-          y: layout.title?.y ?? (compact ? 0.985 : 0.99),
+          y: layout.title?.y ?? (isSmallChart ? (compact ? 0.97 : 0.98) : compact ? 0.95 : 0.96),
           yanchor: layout.title?.yanchor || 'top',
-          pad: { t: 2, b: 2, ...(typeof layout.title === 'object' ? layout.title?.pad || {} : {}) },
+          yref: layout.title?.yref || 'container',
+          pad: { t: 6, b: 4, ...(typeof layout.title === 'object' ? layout.title?.pad || {} : {}) },
+          automargin: layout.title?.automargin ?? true,
         }
       : undefined,
     legend: showLegend

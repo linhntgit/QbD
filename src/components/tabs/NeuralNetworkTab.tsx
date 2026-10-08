@@ -485,7 +485,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             automargin: true,
           },
           legend: { orientation: 'h', y: -0.24, yanchor: 'top', x: 0.5, xanchor: 'center' },
-          margin: { l: 75, r: 40, t: 60, b: 90, pad: 4 },
+          margin: { l: 75, r: 40, t: 80, b: 90, pad: 4 },
         };
 
         return (
@@ -566,7 +566,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               font: { color: '#dc2626', size: 10 },
             },
           ],
-          margin: { l: 75, r: 55, t: 60, b: 70, pad: 6 },
+          margin: { l: 75, r: 55, t: 80, b: 70, pad: 6 },
         };
 
         return (
@@ -627,7 +627,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             automargin: true,
           },
           legend: { orientation: 'h', y: -0.22, yanchor: 'top', x: 0.5, xanchor: 'center' },
-          margin: { l: 75, r: 45, t: 60, b: 85, pad: 6 },
+          margin: { l: 75, r: 45, t: 80, b: 85, pad: 6 },
         };
 
         return (
@@ -676,7 +676,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               tickfont: { size: 11 },
               automargin: true,
             },
-            margin: { l: 260, r: 50, t: 60, b: 65, pad: 8 },
+            margin: { l: 260, r: 50, t: 80, b: 65, pad: 8 },
           };
 
           return (
@@ -852,7 +852,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                   tickfont: { size: 11 },
                   automargin: true,
                 },
-                margin: { l: 250, r: 95, t: 60, b: 68, pad: 8 },
+                margin: { l: 250, r: 95, t: 80, b: 68, pad: 8 },
               };
 
               return (
@@ -925,7 +925,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                   title: { text: `Giá trị đáp ứng ${currentCQA.name}${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`, font: { size: 11 } },
                   automargin: true,
                 },
-                margin: { l: 75, r: 40, t: 60, b: 85, pad: 8 },
+                margin: { l: 75, r: 40, t: 80, b: 85, pad: 8 },
               };
 
               return (
@@ -1021,7 +1021,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                 },
                 yaxis: { autorange: 'reversed', tickfont: { size: 11 }, automargin: true },
                 legend: { orientation: 'h', y: -0.20, yanchor: 'top', x: 0.5, xanchor: 'center' },
-                margin: { l: 260, r: 50, t: 60, b: 85, pad: 8 },
+                margin: { l: 260, r: 50, t: 80, b: 85, pad: 8 },
               };
 
               return (

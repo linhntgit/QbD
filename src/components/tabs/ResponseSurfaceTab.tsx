@@ -622,7 +622,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
         font: { size: 13, color: '#0f172a', family: 'Inter, sans-serif' },
       },
       autosize: true,
-      margin: plotType === '3d' ? { l: 40, r: 40, b: 40, t: 50 } : { l: 85, r: 60, t: 60, b: 75, pad: 4 },
+      margin: plotType === '3d' ? { l: 40, r: 40, b: 40, t: 60 } : { l: 85, r: 60, t: 80, b: 75, pad: 4 },
       scene: {
         xaxis: {
           title: {

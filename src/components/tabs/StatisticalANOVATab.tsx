@@ -202,7 +202,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
               font: { color: '#dc2626', size: 11 },
             },
           ],
-          margin: { l: 260, r: 50, t: 60, b: 65, pad: 8 },
+          margin: { l: 260, r: 50, t: 80, b: 65, pad: 8 },
         };
 
         return (
@@ -279,7 +279,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
               font: { color: '#dc2626', size: 10 },
             },
           ],
-          margin: { l: 75, r: 55, t: 60, b: 70, pad: 6 },
+          margin: { l: 75, r: 55, t: 80, b: 70, pad: 6 },
         };
 
         return (
@@ -340,7 +340,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
             automargin: true,
           },
           legend: { orientation: 'h', y: -0.24, yanchor: 'top', x: 0.5, xanchor: 'center' },
-          margin: { l: 75, r: 40, t: 60, b: 90, pad: 4 },
+          margin: { l: 75, r: 40, t: 80, b: 90, pad: 4 },
         };
 
         return (
@@ -405,7 +405,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
               font: { color: '#dc2626', size: 10 },
             },
           ],
-          margin: { l: 75, r: 50, t: 60, b: 70, pad: 4 },
+          margin: { l: 75, r: 50, t: 80, b: 70, pad: 4 },
         };
 
         return (
