@@ -461,13 +461,14 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
         });
 
         const layout = {
-          title: `Đồ Thị Thực Tế vs. Dự Đoán - ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+          title: `Đồ Thị Thực Tế vs. Dự Đoán — ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
           xaxis: {
             title: {
               text: formatAxisTitle('Giá Trị Dự Đoán Ý', currentCQA.code, currentCQA.unit),
               font: { size: 12, color: '#1e293b' },
-              standoff: 10,
+              standoff: 12,
             },
+            range: [minVal, maxVal],
             tickfont: { size: 10 },
             automargin: true,
           },
@@ -475,16 +476,23 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             title: {
               text: formatAxisTitle('Giá Trị Thực Tế Y', currentCQA.code, currentCQA.unit),
               font: { size: 12, color: '#1e293b' },
-              standoff: 10,
+              standoff: 12,
             },
+            range: [minVal, maxVal],
+            scaleanchor: 'x',
+            scaleratio: 1,
             tickfont: { size: 10 },
             automargin: true,
           },
-          legend: { orientation: 'h', y: -0.35, yanchor: 'top', x: 0.5, xanchor: 'center' },
-          margin: { l: 80, r: 40, t: 65, b: 115, pad: 4 },
+          legend: { orientation: 'h', y: -0.22, yanchor: 'top', x: 0.5, xanchor: 'center' },
+          margin: { l: 75, r: 40, t: 60, b: 85, pad: 4 },
         };
 
-        return <PlotlyChart data={data} layout={layout} style={{ height: '400px' }} />;
+        return (
+          <div style={{ width: '100%', maxWidth: '680px', margin: '0 auto' }}>
+            <PlotlyChart data={data} layout={layout} style={{ height: '540px', width: '100%' }} />
+          </div>
+        );
       }
 
       case 'resPred': {
@@ -514,12 +522,12 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
         const maxX = Math.max(...xPred) * 1.05;
 
         const layout = {
-          title: `Phần Dư vs. Giá Trị Dự Đoán - ${currentCQA.name} (${currentCQA.code})`,
+          title: `Phần Dư vs. Giá Trị Dự Đoán — ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
           xaxis: {
             title: {
               text: formatAxisTitle('Giá Trị Dự Đoán Ý', currentCQA.code, currentCQA.unit),
               font: { size: 12, color: '#1e293b' },
-              standoff: 10,
+              standoff: 12,
             },
             tickfont: { size: 10 },
             automargin: true,
@@ -528,20 +536,44 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             title: {
               text: formatAxisTitle('Phần Dư Y - Ý', currentCQA.code, currentCQA.unit),
               font: { size: 12, color: '#1e293b' },
-              standoff: 10,
+              standoff: 12,
             },
             tickfont: { size: 10 },
             automargin: true,
           },
           shapes: [
             { type: 'line', x0: minX, x1: maxX, y0: 0, y1: 0, line: { color: '#64748b', width: 1.5 } },
-            { type: 'line', x0: minX, x1: maxX, y0: 2 * rmse, y1: 2 * rmse, line: { color: '#dc2626', width: 1, dash: 'dot' } },
-            { type: 'line', x0: minX, x1: maxX, y0: -2 * rmse, y1: -2 * rmse, line: { color: '#dc2626', width: 1, dash: 'dot' } },
+            { type: 'line', x0: minX, x1: maxX, y0: 2 * rmse, y1: 2 * rmse, line: { color: '#dc2626', width: 1.5, dash: 'dot' } },
+            { type: 'line', x0: minX, x1: maxX, y0: -2 * rmse, y1: -2 * rmse, line: { color: '#dc2626', width: 1.5, dash: 'dot' } },
           ],
-          margin: { l: 80, r: 40, t: 65, b: 70, pad: 4 },
+          annotations: [
+            {
+              x: maxX,
+              y: 2 * rmse,
+              text: `+2 RMSE (+${(2 * rmse).toFixed(2)}${currentCQA.unit ? ` ${currentCQA.unit}` : ''})`,
+              showarrow: false,
+              xanchor: 'right',
+              yanchor: 'bottom',
+              font: { color: '#dc2626', size: 10 },
+            },
+            {
+              x: maxX,
+              y: -2 * rmse,
+              text: `-2 RMSE (-${(2 * rmse).toFixed(2)}${currentCQA.unit ? ` ${currentCQA.unit}` : ''})`,
+              showarrow: false,
+              xanchor: 'right',
+              yanchor: 'top',
+              font: { color: '#dc2626', size: 10 },
+            },
+          ],
+          margin: { l: 75, r: 40, t: 60, b: 65, pad: 4 },
         };
 
-        return <PlotlyChart data={data} layout={layout} style={{ height: '360px' }} />;
+        return (
+          <div style={{ width: '100%', maxWidth: '850px', margin: '0 auto' }}>
+            <PlotlyChart data={data} layout={layout} style={{ height: '480px', width: '100%' }} />
+          </div>
+        );
       }
 
       case 'loss': {
@@ -574,12 +606,12 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
         }
 
         const layout = {
-          title: `Đường Cong Hội Tụ Huấn Luyện (Loss History) - ${currentCQA.name} (${currentCQA.code}) [Tour #${diag.bestTourIndex}]`,
+          title: `Đường Cong Hội Tụ Huấn Luyện (Loss History) — ${currentCQA.name} (${currentCQA.code}) [Tour #${diag.bestTourIndex}]`,
           xaxis: {
             title: {
               text: 'Số Vòng Lặp Huấn Luyện (Epochs)',
               font: { size: 12, color: '#1e293b' },
-              standoff: 10,
+              standoff: 12,
             },
             tickfont: { size: 10 },
             automargin: true,
@@ -588,17 +620,21 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             title: {
               text: 'Mean Squared Error (MSE Loss Chuẩn Hóa)',
               font: { size: 12, color: '#1e293b' },
-              standoff: 10,
+              standoff: 12,
             },
             type: 'log',
             tickfont: { size: 10 },
             automargin: true,
           },
-          legend: { orientation: 'h', y: -0.30, yanchor: 'top', x: 0.5, xanchor: 'center' },
-          margin: { l: 80, r: 40, t: 65, b: 100, pad: 4 },
+          legend: { orientation: 'h', y: -0.20, yanchor: 'top', x: 0.5, xanchor: 'center' },
+          margin: { l: 75, r: 40, t: 60, b: 75, pad: 4 },
         };
 
-        return <PlotlyChart data={data} layout={layout} style={{ height: '390px' }} />;
+        return (
+          <div style={{ width: '100%', maxWidth: '860px', margin: '0 auto' }}>
+            <PlotlyChart data={data} layout={layout} style={{ height: '480px', width: '100%' }} />
+          </div>
+        );
       }
 
       case 'varImp': {
@@ -622,13 +658,15 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             },
           ];
 
+          const varImpHeight = Math.max(440, diag.variableImportance.length * 48 + 140);
+
           const layout = {
-            title: `Mức Độ Quan Trọng Của Biến Đầu Vào (Independent Variable Importance)`,
+            title: `Mức Độ Quan Trọng Của Biến Đầu Vào — ${currentCQA.name} (${currentCQA.code})`,
             xaxis: {
               title: {
                 text: 'Tỷ Lệ Đóng Góp Ảnh Hưởng Tương Đối (Relative Importance %)',
                 font: { size: 12, color: '#1e293b' },
-                standoff: 10,
+                standoff: 12,
               },
               tickfont: { size: 10 },
               automargin: true,
@@ -638,10 +676,14 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               tickfont: { size: 11 },
               automargin: true,
             },
-            margin: { l: 280, r: 40, t: 65, b: 70, pad: 10 },
+            margin: { l: 260, r: 50, t: 60, b: 65, pad: 8 },
           };
 
-          return <PlotlyChart data={data} layout={layout} style={{ height: '360px' }} />;
+          return (
+            <div style={{ width: '100%', maxWidth: '880px', margin: '0 auto' }}>
+              <PlotlyChart data={data} layout={layout} style={{ height: `${varImpHeight}px`, width: '100%' }} />
+            </div>
+          );
         }
 
         return (
@@ -790,13 +832,15 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                 },
               ];
 
+              const beeswarmHeight = Math.max(460, project.factors.length * 60 + 140);
+
               const beeswarmLayout = {
-                title: `SHAP Beeswarm Summary Plot - Tác Động Biên Của Yếu Tố Lên ${currentCQA.name}`,
+                title: `SHAP Beeswarm Summary Plot — Tác Động Biên Của Yếu Tố Lên ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
                 xaxis: {
                   title: {
                     text: 'Giá Trị SHAP (Shapley Value φ) — Mức độ làm tăng (+) hoặc giảm (-) đáp ứng dự báo',
                     font: { size: 11, color: '#1e293b' },
-                    standoff: 10,
+                    standoff: 12,
                   },
                   zeroline: true,
                   zerolinecolor: '#64748b',
@@ -808,12 +852,14 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                   tickfont: { size: 11 },
                   automargin: true,
                 },
-                margin: { l: 260, r: 50, t: 55, b: 65, pad: 8 },
+                margin: { l: 260, r: 100, t: 60, b: 65, pad: 8 },
               };
 
               return (
                 <div>
-                  <PlotlyChart data={beeswarmData} layout={beeswarmLayout} style={{ height: '370px' }} />
+                  <div style={{ width: '100%', maxWidth: '920px', margin: '0 auto' }}>
+                    <PlotlyChart data={beeswarmData} layout={beeswarmLayout} style={{ height: `${beeswarmHeight}px`, width: '100%' }} />
+                  </div>
                   <div
                     style={{
                       marginTop: '0.5rem',
@@ -873,13 +919,13 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               ];
 
               const waterfallLayout = {
-                title: `Đồ Thị Waterfall Phân Rã Đóng Góp — Run #${currentRunExp.runOrder} (${currentCQA.name})`,
+                title: `Đồ Thị Waterfall Phân Rã Đóng Góp — Run #${currentRunExp.runOrder} (${currentCQA.name}${currentCQA.unit ? ` [${currentCQA.unit}]` : ''})`,
                 xaxis: { tickfont: { size: 10 }, automargin: true },
                 yaxis: {
-                  title: { text: `Giá trị đáp ứng ${currentCQA.name}${currentCQA.unit ? ` (${currentCQA.unit})` : ''}`, font: { size: 11 } },
+                  title: { text: `Giá trị đáp ứng ${currentCQA.name}${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`, font: { size: 11 } },
                   automargin: true,
                 },
-                margin: { l: 70, r: 40, t: 55, b: 85, pad: 8 },
+                margin: { l: 75, r: 40, t: 60, b: 85, pad: 8 },
               };
 
               return (
@@ -908,7 +954,9 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                     </div>
                   </div>
 
-                  <PlotlyChart data={waterfallData} layout={waterfallLayout} style={{ height: '370px' }} />
+                  <div style={{ width: '100%', maxWidth: '860px', margin: '0 auto' }}>
+                    <PlotlyChart data={waterfallData} layout={waterfallLayout} style={{ height: '480px', width: '100%' }} />
+                  </div>
 
                   <div style={{ marginTop: '0.5rem', padding: '0.5rem 0.8rem', backgroundColor: '#f8fafc', borderRadius: '0.375rem', fontSize: '0.74rem', color: '#64748b' }}>
                     Định lý Lloyd Shapley (1953): Giá trị kỳ vọng nền E[f(X)] = <strong>{currentRunExp.baseValue.toFixed(3)}</strong>. Tổng đóng góp biên của các biến thực nghiệm = <strong>{currentRunExp.sumShap > 0 ? '+' : ''}{currentRunExp.sumShap.toFixed(3)}</strong>, dẫn tới giá trị dự báo cuối cùng f(x) = <strong>{currentRunExp.prediction.toFixed(3)}</strong>.
@@ -928,6 +976,8 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               const garsonX = comp.map((c) => c.garsonImportance);
               const oldenX = comp.map((c) => c.oldenImportance);
               const shapX = comp.map((c) => c.shapImportance);
+
+              const compHeight = Math.max(480, comp.length * 75 + 160);
 
               const comparisonPlotData = [
                 {
@@ -963,20 +1013,22 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               ];
 
               const comparisonPlotLayout = {
-                title: `Đối Chiếu 3 Thuật Toán XAI — Garson vs Olden vs SHAP (${currentCQA.name})`,
+                title: `Đối Chiếu 3 Thuật Toán XAI — Garson vs Olden vs SHAP (${currentCQA.name}${currentCQA.unit ? ` [${currentCQA.unit}]` : ''})`,
                 barmode: 'group',
                 xaxis: {
                   title: { text: 'Tỷ Lệ Đóng Góp Ảnh Hưởng Tương Đối (%)', font: { size: 11 } },
                   automargin: true,
                 },
                 yaxis: { autorange: 'reversed', tickfont: { size: 11 }, automargin: true },
-                legend: { orientation: 'h', y: -0.22, yanchor: 'top', x: 0.5, xanchor: 'center' },
-                margin: { l: 260, r: 40, t: 55, b: 70, pad: 8 },
+                legend: { orientation: 'h', y: -0.20, yanchor: 'top', x: 0.5, xanchor: 'center' },
+                margin: { l: 260, r: 50, t: 60, b: 85, pad: 8 },
               };
 
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <PlotlyChart data={comparisonPlotData} layout={comparisonPlotLayout} style={{ height: '360px' }} />
+                  <div style={{ width: '100%', maxWidth: '920px', margin: '0 auto' }}>
+                    <PlotlyChart data={comparisonPlotData} layout={comparisonPlotLayout} style={{ height: `${compHeight}px`, width: '100%' }} />
+                  </div>
 
                   <div className="table-container">
                     <table className="qbd-table">
@@ -1675,7 +1727,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           )}
 
           {/* SVG Neural Network Topology Diagram (Lớp vào, Lớp ẩn 1, Lớp ẩn 2, Lớp ra Hợp nhất / Độc lập) */}
-          <div style={{ marginTop: '0.85rem' }}>
+          <div style={{ width: '100%', maxWidth: '1180px', margin: '0.85rem auto 0 auto' }}>
             <NeuralNetworkTopologyDiagram
               factors={project.factors}
               cqas={project.cqas}

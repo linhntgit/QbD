@@ -1148,11 +1148,15 @@ export function generateTernaryDesignSpace(
   const H = TERNARY_HEIGHT;
 
   const validCQAs = cqas.filter((c) => models[c.code]);
+  const isCpk1 = boundaryMode === 'probabilistic' && Math.abs(probThreshold - 0.9973) < 0.0001;
+  const isCpk133 = boundaryMode === 'probabilistic' && Math.abs(probThreshold - 0.999937) < 0.00001;
   const modeBadge = boundaryMode === 'mean'
     ? 'Mean'
     : boundaryMode === 'pi95'
     ? 'PI 95%'
-    : Math.abs(probThreshold - 0.9973) < 0.0001
+    : isCpk133
+    ? 'Ppk/Cpk ≥ 1.33 (4σ)'
+    : isCpk1
     ? 'Cpk ≥ 1 (3σ)'
     : `P ≥ ${(probThreshold * 100).toFixed(0)}%`;
 

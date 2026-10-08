@@ -786,11 +786,14 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
         hoverY.push(yAct);
 
         const isCpk1 = boundaryMode === 'probabilistic' && Math.abs(probThreshold - 0.9973) < 0.0001;
+        const isCpk133 = boundaryMode === 'probabilistic' && Math.abs(probThreshold - 0.999937) < 0.00001;
         const boundaryTag =
           boundaryMode === 'mean'
             ? 'Mean'
             : boundaryMode === 'pi95'
             ? 'PI 95%'
+            : isCpk133
+            ? 'Ppk/Cpk ≥ 1.33 (4σ / lỗi ≤ 63 PPM)'
             : isCpk1
             ? 'Cpk ≥ 1.0 (3σ / lỗi ≤ 0.27%)'
             : `P ≥ ${(probThreshold * 100).toFixed(0)}%`;
@@ -1007,10 +1010,13 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
     ];
 
     const isCpk1 = boundaryMode === 'probabilistic' && Math.abs(probThreshold - 0.9973) < 0.0001;
+    const isCpk133 = boundaryMode === 'probabilistic' && Math.abs(probThreshold - 0.999937) < 0.00001;
     const modeBadge = boundaryMode === 'mean'
       ? 'Mean'
       : boundaryMode === 'pi95'
       ? 'PI 95%'
+      : isCpk133
+      ? 'Ppk/Cpk ≥ 1.33 (4σ)'
       : isCpk1
       ? 'Cpk ≥ 1 (3σ)'
       : `P ≥ ${(probThreshold * 100).toFixed(0)}%`;
@@ -1104,10 +1110,13 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
     }
 
     const isCpk1 = boundaryMode === 'probabilistic' && Math.abs(probThreshold - 0.9973) < 0.0001;
+    const isCpk133 = boundaryMode === 'probabilistic' && Math.abs(probThreshold - 0.999937) < 0.00001;
     const modeBadge = boundaryMode === 'mean'
       ? 'Mean'
       : boundaryMode === 'pi95'
       ? 'PI 95%'
+      : isCpk133
+      ? 'Ppk/Cpk ≥ 1.33 (4σ)'
       : isCpk1
       ? 'Cpk ≥ 1 (3σ)'
       : `P ≥ ${(probThreshold * 100).toFixed(0)}%`;
@@ -1466,28 +1475,60 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                     }}
                     title="Biên chuẩn 3 Sigma (Cpk = 1.0): Quy trình 3σ với P(in-spec) ≥ 99.73%, dự kiến tỷ lệ lỗi ngoài tiêu chuẩn ≤ 0.27% (2.700 PPM)"
                   >
-                    Cpk ≥ 1 (3σ / lỗi ≤ 0.27%)
+                    Cpk ≥ 1.0 (3σ / lỗi ≤ 0.27%)
                   </button>
                   <button
                     type="button"
                     onClick={() => {
-                      if (boundaryMode === 'probabilistic' && Math.abs(probThreshold - 0.9973) >= 0.0001) {
+                      setBoundaryMode('probabilistic');
+                      setProbThreshold(0.999937);
+                    }}
+                    className={`btn ${boundaryMode === 'probabilistic' && Math.abs(probThreshold - 0.999937) < 0.00001 ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{
+                      fontSize: '0.68rem',
+                      padding: '0.18rem 0.45rem',
+                      borderRadius: '0.25rem',
+                      fontWeight: boundaryMode === 'probabilistic' && Math.abs(probThreshold - 0.999937) < 0.00001 ? '700' : '500',
+                    }}
+                    title="Biên năng lực công nghiệp 4 Sigma (Ppk / Cpk ≥ 1.33): Quy trình 4σ với P(in-spec) ≥ 99.9937%, dự kiến tỷ lệ lỗi ngoài tiêu chuẩn ≤ 63 PPM"
+                  >
+                    Ppk / Cpk ≥ 1.33 (4σ / lỗi ≤ 63 PPM)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (
+                        boundaryMode === 'probabilistic' &&
+                        Math.abs(probThreshold - 0.9973) >= 0.0001 &&
+                        Math.abs(probThreshold - 0.999937) >= 0.00001
+                      ) {
                         setProbThreshold((prev) => (prev === 0.95 ? 0.99 : prev === 0.99 ? 0.90 : 0.95));
                       } else {
                         setBoundaryMode('probabilistic');
                         setProbThreshold(0.95);
                       }
                     }}
-                    className={`btn ${boundaryMode === 'probabilistic' && Math.abs(probThreshold - 0.9973) >= 0.0001 ? 'btn-primary' : 'btn-secondary'}`}
+                    className={`btn ${
+                      boundaryMode === 'probabilistic' &&
+                      Math.abs(probThreshold - 0.9973) >= 0.0001 &&
+                      Math.abs(probThreshold - 0.999937) >= 0.00001
+                        ? 'btn-primary'
+                        : 'btn-secondary'
+                    }`}
                     style={{
                       fontSize: '0.68rem',
                       padding: '0.18rem 0.45rem',
                       borderRadius: '0.25rem',
-                      fontWeight: boundaryMode === 'probabilistic' && Math.abs(probThreshold - 0.9973) >= 0.0001 ? '700' : '500',
+                      fontWeight:
+                        boundaryMode === 'probabilistic' &&
+                        Math.abs(probThreshold - 0.9973) >= 0.0001 &&
+                        Math.abs(probThreshold - 0.999937) >= 0.00001
+                          ? '700'
+                          : '500',
                     }}
                     title="Biên theo Xác suất đạt tùy chọn P(in-spec) ≥ π (Bấm để chuyển đổi 90%, 95%, 99%)"
                   >
-                    P ≥ {Math.abs(probThreshold - 0.9973) < 0.0001 ? '95' : (probThreshold * 100).toFixed(0)}%
+                    P ≥ {Math.abs(probThreshold - 0.9973) < 0.0001 || Math.abs(probThreshold - 0.999937) < 0.00001 ? '95' : (probThreshold * 100).toFixed(0)}%
                   </button>
                 </div>
                 {feasiblePercentage !== null && (
@@ -1643,6 +1684,8 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
                     ? 'Mean dự đoán'
                     : boundaryMode === 'pi95'
                     ? 'Khoảng dự đoán PI 95%'
+                    : Math.abs(probThreshold - 0.999937) < 0.00001
+                    ? 'Chuẩn 4σ (Ppk / Cpk ≥ 1.33 • Lỗi dự kiến ≤ 63 PPM)'
                     : Math.abs(probThreshold - 0.9973) < 0.0001
                     ? 'Chuẩn 3σ (Cpk = 1.0 • Lỗi dự kiến ≤ 0.27% / 2.700 PPM)'
                     : `Xác suất P(in-spec) ≥ ${(probThreshold * 100).toFixed(0)}%`}
