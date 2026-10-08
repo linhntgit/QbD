@@ -426,8 +426,8 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <Calculator size={22} color="#1e3a8a" />
-              <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#0f172a' }}>
-                Phân tích thống kê & mô hình hóa ANOVA
+              <h2 style={{ fontSize: '1.18rem', fontWeight: '700', color: '#0f172a' }}>
+                Bước 4: Phân tích thống kê &amp; mô hình hóa ANOVA (Polynomial Regression)
               </h2>
               {modelingEngine === 'polynomial' && (
                 <span className="badge badge-teal" style={{ fontSize: '0.72rem' }}>

@@ -691,8 +691,8 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <Compass size={22} color="#0f766e" />
-              <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#0f172a' }}>
-                Trực quan hóa mặt đáp & contour plots (Response Surface 3D & 2D Contour)
+              <h2 style={{ fontSize: '1.18rem', fontWeight: '700', color: '#0f172a' }}>
+                Bước 6: Khảo sát mặt đáp &amp; đồ thị đường mức (Response Surface &amp; Contour Plots)
               </h2>
             </div>
             <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.2rem' }}>
@@ -808,9 +808,9 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
             <button
               onClick={onNavigateToDesignSpace}
               className="btn btn-teal"
-              style={{ fontSize: '0.82rem', padding: '0.4rem 0.85rem' }}
+              style={{ fontSize: '0.82rem', padding: '0.45rem 1rem', fontWeight: '600' }}
             >
-              <span>Không gian thiết kế (Design Space)</span>
+              <span>Không gian thiết kế (Bước 7)</span>
               <ArrowRight size={16} />
             </button>
           </div>

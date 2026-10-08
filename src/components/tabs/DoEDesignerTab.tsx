@@ -991,7 +991,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <LayoutGrid size={22} color="#0284c7" />
               <h2 style={{ fontSize: '1.18rem', fontWeight: '700', color: '#0f172a' }}>
-                Bước 3: Thiết kế thí nghiệm (Design of Experiments - DoE)
+                Bước 3: Thiết kế ma trận thực nghiệm (Design of Experiments - DoE)
               </h2>
             </div>
             <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>
@@ -1022,7 +1022,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                 </>
               ) : (
                 <span className="badge" style={{ backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', fontSize: '0.76rem', padding: '0.25rem 0.65rem' }}>
-                  Chưa tạo ma trận — Thiết lập thông số ở Bước 3.1 &amp; 3.2 bên dưới, sau đó bấm &quot;Tạo ma trận thí nghiệm&quot;
+                  Chưa tạo ma trận — Thiết lập thông số ở mục 1 &amp; 2 bên dưới, sau đó bấm &quot;Tạo ma trận thí nghiệm&quot;
                 </span>
               )}
             </div>
@@ -1051,7 +1051,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                 <Sparkles size={16} color="#0284c7" />
                 <span style={{ fontWeight: '800', color: '#0c4a6e', fontSize: '0.94rem' }}>
-                  Bước 3.1: Gợi ý phương án nhanh theo mục tiêu (Design Wizard)
+                  1. Gợi ý phương án nhanh theo mục tiêu (Design Wizard)
                 </span>
               </div>
               <div style={{ fontSize: '0.76rem', color: '#475569', marginTop: '0.2rem' }}>
@@ -1145,7 +1145,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
               <Sliders size={16} color="#0284c7" />
               <span style={{ fontSize: '0.86rem', fontWeight: '700', color: '#0f172a' }}>
-                Bước 3.2: Tùy chỉnh thông số chi tiết (Design Parameters Setup)
+                2. Cấu hình chi tiết thông số thiết kế (Design Parameters Setup)
               </span>
             </div>
             <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
@@ -1519,7 +1519,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               </div>
               <div>
                 <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#0c4a6e' }}>
-                  Bước 3.3: Sinh ma trận thực nghiệm (Generate Matrix)
+                  3. Sinh ma trận thực nghiệm (Generate Matrix)
                 </div>
                 <div style={{ fontSize: '0.75rem', color: '#0369a1', marginTop: '0.1rem' }}>
                   Cấu hình: <strong>{designConfig.designType}</strong> ({designConfig.category})
@@ -2335,7 +2335,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
             <LayoutGrid size={40} color="#cbd5e1" style={{ margin: '0 auto 0.75rem' }} />
             <p style={{ fontWeight: '600' }}>Chưa có ma trận thí nghiệm</p>
             <p style={{ fontSize: '0.82rem', marginTop: '0.25rem' }}>
-              Vui lòng hoàn tất thiết lập thông số và nhấn nút <strong>&quot;Tạo ma trận thí nghiệm&quot;</strong> tại mục Bước 3.3 phía trên để sinh bảng chạy.
+              Vui lòng hoàn tất thiết lập thông số và nhấn nút <strong>&quot;Tạo ma trận thí nghiệm&quot;</strong> tại mục 3 (Sinh ma trận) phía trên để sinh bảng chạy.
             </p>
           </div>
         ) : (

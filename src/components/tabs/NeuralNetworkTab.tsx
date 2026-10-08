@@ -1172,7 +1172,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <h2 style={{ fontSize: '1.2rem', fontWeight: '800', color: '#0f172a', margin: 0 }}>
-                    Phân tích dữ liệu thực nghiệm bằng mạng nơ-ron (Neural Network Platform)
+                    Bước 5: Mô hình hóa phi tuyến bằng mạng nơ-ron (Neural Network Platform)
                   </h2>
                   {modelingEngine === 'neural' && (
                     <span className="badge" style={{ backgroundColor: '#7c3aed', color: '#ffffff', fontSize: '0.72rem' }}>
@@ -1237,7 +1237,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
         <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0' }}>
           <div style={{ fontSize: '0.82rem', fontWeight: '700', color: '#1e293b', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <Layers size={16} color="#7c3aed" />
-            <span>LỰA CHỌN CHẾ ĐỘ CẤU HÌNH & HUẤN LUYỆN KIẾN TRÚC MẠNG NƠ-RON:</span>
+            <span>1. Lựa chọn chế độ cấu hình &amp; huấn luyện kiến trúc mạng:</span>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.85rem' }}>
@@ -1330,7 +1330,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.82rem', fontWeight: '700', color: '#1e293b' }}>
               <Sliders size={16} color="#7c3aed" />
-              <span>CÀI ĐẶT THAM SỐ HUẤN LUYỆN (HYPERPARAMETERS):</span>
+              <span>2. Cài đặt tham số huấn luyện (Hyperparameters):</span>
             </div>
             <button
               onClick={() => setLocalConfig(DEFAULT_NEURAL_CONFIG)}
@@ -1524,7 +1524,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Cpu size={18} color="#7c3aed" />
               <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#0f172a' }}>
-                KIẾN TRÚC MẠNG HIỆN TẠI:
+                3. Kiến trúc mạng hiện tại &amp; Đánh giá quá khớp:
               </span>
               <span className="font-mono" style={{ fontSize: '0.82rem', fontWeight: '700', color: '#7c3aed', backgroundColor: '#ede9fe', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>
                 [{numInputs} Inputs{blockFeaturesCount > 0 ? ` (${treatmentInputsCount}X + ${blockFeaturesCount}Block)` : ''}] ➔ [H1: {localConfig.hiddenNodes1}] {localConfig.hiddenNodes2 > 0 ? `➔ [H2: ${localConfig.hiddenNodes2}] ` : ''}➔ [{numOutputs} Output{numOutputs > 1 ? 's' : ''}] ({localConfig.activation.toUpperCase()})

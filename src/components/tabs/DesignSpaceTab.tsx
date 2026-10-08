@@ -1300,7 +1300,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
 
       <section className="step7-overview" aria-label="Tiến trình Bước 7">
         <div className="step7-overview-heading">
-          <div><h2>Bước 7 · Chọn, kiểm tra và xác nhận phương án</h2><p>Đi theo từng chặng hoặc quay lại đúng phần đang cần làm.</p></div>
+          <div><h2>Bước 7: Thiết lập không gian thiết kế &amp; tối ưu hóa (Design Space &amp; Optimization)</h2><p>Lựa chọn phương án tối ưu (Desirability), khảo sát miền đạt chất lượng (Overlay/PAR), mô phỏng rủi ro Monte Carlo và lập kế hoạch xác nhận.</p></div>
           <span className="step7-engine">Mô hình: {modelingEngine === 'neural' ? 'Mạng nơ-ron' : 'Hồi quy đa thức'}</span>
         </div>
         <nav className="step7-journey" aria-label="Các chặng Bước 7">

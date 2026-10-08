@@ -234,13 +234,13 @@ export const ReportTab: React.FC<ReportTabProps> = ({
       <div className="qbd-card no-print" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <FileCheck2 size={22} color="#0f766e" />
-            <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#0f172a' }}>
-              Bản thảo báo cáo phát triển dược phẩm (tham khảo CTD 3.2.P.2)
+            <FileCheck2 size={22} color="#15803d" />
+            <h2 style={{ fontSize: '1.18rem', fontWeight: '700', color: '#0f172a' }}>
+              Bước 8: Báo cáo hồ sơ phát triển dược phẩm (CTD 3.2.P.2 &amp; Export Word)
             </h2>
           </div>
           <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.2rem' }}>
-            Tài liệu làm việc cần được chuyên gia khoa học và QA rà soát; không phải hồ sơ đã được cơ quan quản lý phê duyệt.
+            Tổng hợp toàn diện dữ liệu nghiên cứu phát triển theo cấu trúc hồ sơ đăng ký thuốc CTD Phần 3.2.P.2, hỗ trợ xuất văn bản MS Word (.docx).
           </p>
         </div>
 

@@ -263,16 +263,52 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       
+      {/* Top Header Card: Bước 1 */}
+      <div className="qbd-card">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <Target size={22} color="#1e3a8a" />
+              <h2 style={{ fontSize: '1.18rem', fontWeight: '700', color: '#0f172a' }}>
+                Bước 1: Hồ sơ chất lượng mục tiêu &amp; Biến nghiên cứu (QTPP, CQAs &amp; Factors)
+              </h2>
+            </div>
+            <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>
+              Thiết lập mục tiêu chất lượng sản phẩm (ICH Q8), phân loại đáp ứng CQA và xác định các biến đầu vào công thức/quy trình (CMA &amp; CPP).
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <span className="badge badge-primary" style={{ fontSize: '0.74rem', padding: '0.3rem 0.65rem' }}>
+              ICH Q8 Guidelines
+            </span>
+            {onNavigateToFMEA && (
+              <button
+                onClick={onNavigateToFMEA}
+                className="btn btn-teal"
+                style={{ fontSize: '0.82rem', padding: '0.45rem 1rem', fontWeight: '600' }}
+                title="Chuyển sang Bước 2 để phân tích rủi ro FMEA"
+              >
+                <span>Đánh giá rủi ro FMEA (Bước 2)</span>
+                <ArrowRight size={16} />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Project Metadata Card */}
       <div className="qbd-card">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <FlaskConical size={20} color="#1e3a8a" />
-            <h2 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#0f172a' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+            <FlaskConical size={18} color="#1e3a8a" />
+            <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
               Thông tin tổng quan dự án (Project Metadata)
-            </h2>
+            </h3>
           </div>
-          <span className="badge badge-primary">QbD Framework</span>
+          <span className="badge" style={{ backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', fontSize: '0.72rem' }}>
+            Hồ sơ nghiên cứu
+          </span>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>

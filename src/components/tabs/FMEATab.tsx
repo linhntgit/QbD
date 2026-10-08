@@ -104,8 +104,8 @@ export const FMEATab: React.FC<FMEATabProps> = ({
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <ShieldAlert size={22} color="#b45309" />
-              <h2 style={{ fontSize: '1.15rem', fontWeight: '700', color: '#0f172a' }}>
-                Đánh giá quản lý rủi ro chất lượng (Quality Risk Management - ICH Q9)
+              <h2 style={{ fontSize: '1.18rem', fontWeight: '700', color: '#0f172a' }}>
+                Bước 2: Đánh giá &amp; quản lý rủi ro chất lượng (Quality Risk Management - ICH Q9)
               </h2>
             </div>
             <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.2rem' }}>
@@ -134,9 +134,9 @@ export const FMEATab: React.FC<FMEATabProps> = ({
             <button
               onClick={onNavigateToDoE}
               className="btn btn-teal"
-              style={{ fontSize: '0.82rem', padding: '0.4rem 0.85rem' }}
+              style={{ fontSize: '0.82rem', padding: '0.45rem 1rem', fontWeight: '600' }}
             >
-              <span>Chuyển sang DoE</span>
+              <span>Thiết kế DoE (Bước 3)</span>
               <ArrowRight size={16} />
             </button>
           </div>
@@ -168,9 +168,12 @@ export const FMEATab: React.FC<FMEATabProps> = ({
         /* FMEA Matrix Table */
         <div className="qbd-card">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a' }}>
-              Bảng phân tích dạng sai lỗi & tác động (FMEA Matrix)
-            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <ShieldAlert size={18} color="#b45309" />
+              <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
+                Bảng phân tích dạng sai lỗi &amp; tác động (FMEA Matrix)
+              </h3>
+            </div>
             <button onClick={handleAddRiskItem} className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}>
               <Plus size={15} />
               <span>Thêm hàng đánh giá rủi ro</span>
