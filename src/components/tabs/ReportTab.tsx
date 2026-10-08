@@ -908,6 +908,16 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                 ) : (
                   <span>Mô hình áp dụng kiến trúc <strong>mạng nơ-ron độc lập cho từng biến Y</strong>, cho phép tối ưu hóa riêng biệt số nơ-ron ẩn và hàm kích hoạt phù hợp nhất với đặc tính phi tuyến của từng CQA.</span>
                 )}
+                {(() => {
+                  const observedBlocks = [...new Set(project.runs.map((r) => Math.max(1, Math.floor(r.block ?? 1))))].sort((a, b) => a - b);
+                  const hasBlocks = observedBlocks.length > 1;
+                  const totalInputs = project.factors.length + (hasBlocks ? observedBlocks.length - 1 : 0);
+                  return (
+                    <div style={{ marginTop: '0.4rem', color: '#0369a1', fontSize: '0.78rem' }}>
+                      Cấu trúc lớp đầu vào (<strong>dX = {totalInputs} biến</strong>): gồm {project.factors.length} yếu tố công thức/quy trình (Factors){hasBlocks ? ` và ${observedBlocks.length - 1} biến giả tương phản khối (${observedBlocks.length} blocks) để cô lập sai số hệ thống giữa các khối thực nghiệm; khi dự báo mặt đáp 3D và tối ưu hóa Desirability, Block ${observedBlocks[0]} được cố định làm mốc quy chiếu chuẩn.` : '.'}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Neural Network Architecture Diagram */}
@@ -1253,6 +1263,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
           </h2>
           
           {optimum ? (
+            <>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
               {/* Factors setpoints */}
               <div style={{ border: '1px solid #cbd5e1', borderRadius: '0.375rem', padding: '0.75rem', backgroundColor: '#f8fafc' }}>
@@ -1293,6 +1304,11 @@ export const ReportTab: React.FC<ReportTabProps> = ({
                 })}
               </div>
             </div>
+
+            <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '0.375rem', padding: '0.6rem 0.8rem', fontSize: '0.78rem', color: '#166534', marginBottom: '1rem', lineHeight: 1.5 }}>
+              <strong>Nguyên tắc ranh giới Design Space (ICH Q8/Q9):</strong> Hỗ trợ các tiêu chuẩn ranh giới: <em>Mean</em> (trung bình), <em>PI 95%</em> (khoảng dự báo cá thể), và <em>Chuẩn năng lực xác suất 4-sigma Ppk/Cpk ≥ 1.33</em> (xác suất đạt chuẩn P ≥ 99.9937%, tỷ lệ lỗi khuyết tật ≤ 63 PPM). Với các chỉ tiêu CQA có giới hạn hai phía [LSL, USL], ranh giới Design Space được bao bọc bởi 2 đường cong đẳng trị tạo thành dải hành lang vận hành an toàn.
+            </div>
+            </>
           ) : (
             <div style={{ backgroundColor: '#f8fafc', border: '1px dashed #94a3b8', borderRadius: '0.5rem', padding: '1rem', fontSize: '0.85rem', color: '#475569' }}>
               <div style={{ fontWeight: '600', color: '#334155', marginBottom: '0.3rem' }}>

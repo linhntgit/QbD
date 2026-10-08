@@ -769,11 +769,16 @@ export async function buildQBDWordDocument(
     const firstNM = Object.values(neuralModels)[0];
     const actualTrainingMode = firstNM?.architectureMode ?? (project.analysisSettings?.neuralTrainingMode ?? 'independent');
     const isShared = actualTrainingMode === 'shared';
+    const totalInputs = project.factors.length + (hasMultipleBlocks ? observedBlocks.length - 1 : 0);
 
     sections.push(
       new Paragraph({
-        text: `Chế độ mô hình hóa: ${isShared ? 'Mạng Nơ-ron Hợp Nhất Đa Đầu Ra (Multi-Output Shared MLP)' : 'Mạng Nơ-ron Độc Lập Cho Từng Biến Y (Independent Per-CQA MLP)'}. Áp dụng kiến trúc Multi-Layer Perceptron (MLP) với thuật toán tối ưu hóa đa vòng lặp (Multi-Tour Optimization) để mô phỏng tương tác phi tuyến tính phức tạp.${hasMultipleBlocks ? ` Hiệu ứng block (${observedBlocks.length} block) được mã hóa như biến nuisance trong huấn luyện và chẩn đoán; đồ thị/tối ưu hóa tham chiếu Block ${observedBlocks[0]}.` : ''}`,
-        spacing: { after: 150 },
+        text: `Chế độ mô hình hóa: ${isShared ? 'Mạng Nơ-ron Hợp Nhất Đa Đầu Ra (Multi-Output Shared MLP)' : 'Mạng Nơ-ron Độc Lập Cho Từng Biến Y (Independent Per-CQA MLP)'}. Áp dụng kiến trúc Multi-Layer Perceptron (MLP) với thuật toán tối ưu hóa đa vòng lặp (Multi-Tour Optimization) để mô phỏng tương tác phi tuyến tính phức tạp.`,
+        spacing: { after: 100 },
+      }),
+      new Paragraph({
+        text: `Cấu trúc lớp đầu vào (dX = ${totalInputs} biến): Gồm ${project.factors.length} yếu tố công thức/quy trình (Factors)${hasMultipleBlocks ? ` và ${observedBlocks.length - 1} biến giả tương phản khối (Block contrast dummy variables từ ${observedBlocks.length} blocks) để cô lập sai số hệ thống giữa các khối thực nghiệm mà không làm biến dạng các quy luật phi tuyến tính thực chất; khi dự báo mặt đáp 3D và tối ưu hóa Desirability, Block ${observedBlocks[0]} được cố định làm mốc quy chiếu chuẩn.` : '.'}`,
+        spacing: { after: 100 },
       }),
       new Paragraph({
         text: `Validation và kiến trúc: ${Object.values(neuralModels).map((model) => `${model.cqaCode}: ${model.config.validationMethod === 'kfold' ? `K-fold (K=${model.config.kFolds ?? 5})` : `holdout ${(model.config.holdoutRatio * 100).toFixed(0)}%`}; ${model.architectureMode === 'shared' ? 'Mạng Hợp Nhất' : 'Mạng Độc Lập'}`).join(' | ')}.`,
@@ -944,7 +949,16 @@ export async function buildQBDWordDocument(
         width: { size: 100, type: WidthType.PERCENTAGE },
         rows: predCQARows,
       }),
-      new Paragraph({ text: '', spacing: { after: 250 } })
+      new Paragraph({ text: '', spacing: { after: 150 } }),
+      new Paragraph({
+        text: 'Nguyên Tắc Xác Định Ranh Giới Không Gian Thiết Kế (Design Space Boundary Principles - ICH Q8/Q9):',
+        heading: HeadingLevel.HEADING_2,
+        spacing: { before: 150, after: 100 },
+      }),
+      new Paragraph({
+        text: 'Không gian thiết kế (Design Space) là sự kết hợp đa chiều của các biến đầu vào đã được chứng minh bảo đảm chất lượng. Hệ thống hỗ trợ các tiêu chuẩn ranh giới: (1) Mean (Kỳ vọng trung bình), (2) PI 95% (Khoảng dự báo cá thể có tính đến phương sai phần dư và sai số mô hình), và (3) Chuẩn năng lực xác suất 4-sigma Ppk/Cpk ≥ 1.33 (xác suất đạt chuẩn P ≥ 99.9937%, tỷ lệ lỗi khuyết tật ≤ 63 PPM). Khi một chỉ tiêu CQA có đặc tính kỹ thuật 2 phía (cả LSL và USL), ranh giới Design Space được định hình bởi 2 đường cong đẳng trị tạo thành dải hành lang vận hành an toàn.',
+        spacing: { after: 200 },
+      })
     );
   }
 

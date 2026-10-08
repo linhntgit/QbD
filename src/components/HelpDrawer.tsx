@@ -645,9 +645,9 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 </p>
                 <div style={{ backgroundColor: '#f0fdf4', padding: '0.6rem 0.8rem', borderRadius: '0.4rem', border: '1px solid #bbf7d0', fontSize: '0.78rem', color: '#166534', lineHeight: 1.6 }}>
                   <strong>Thứ tự thao tác chuẩn:</strong>
-                  <br />1. Chọn <em>Mục tiêu nghiên cứu</em> (Sàng lọc / Tối ưu hóa / Robustness) và <em>Ngân sách run</em> trong <strong>Design Wizard</strong> &rarr; Bấm <strong>"Chọn phương án"</strong> (hoặc tự chọn dạng thiết kế như <strong>Definitive Screening Design (DSD)</strong>, Box-Behnken, Central Composite, Simplex D-Optimal).
-                  <br />2. Cấu hình điểm tâm (Center points), số mẻ lặp, hoặc giới hạn trên/dưới cho biến hỗn hợp (<InlineMath math="L_i \le x_i \le U_i" /> theo chuẩn Piepel).
-                  <br />3. Bấm <strong>"Tạo ma trận thí nghiệm"</strong> để tạo bảng chạy thực nghiệm.
+                  <br />1. <strong>Mục 1 (Design Wizard - Gợi ý phương án nhanh):</strong> Chọn <em>Mục tiêu nghiên cứu</em> (Sàng lọc / Tối ưu hóa / Robustness) và <em>Ngân sách tối đa</em> &rarr; Bấm <strong>"Chọn phương án"</strong> tương ứng.
+                  <br />2. <strong>Mục 2 (Cấu hình thông số chi tiết):</strong> Kiểm tra hoặc tùy biến dạng thiết kế (DSD, Box-Behnken, Central Composite, Simplex D-Optimal...). Nếu chọn D-Optimal, có thể nhập trực tiếp số mẻ chạy mong muốn (hệ thống cho phép gõ số tự do và tự căn chỉnh an toàn khi chuyển ô). Cấu hình điểm tâm (Center points), số mẻ lặp, khối (Blocks) hoặc giới hạn hỗn hợp (<InlineMath math="L_i \le x_i \le U_i" /> theo chuẩn Piepel).
+                  <br />3. <strong>Mục 3 (Sinh ma trận thực nghiệm):</strong> Bấm <strong>"Tạo ma trận thí nghiệm"</strong> (ở thanh thao tác đầu trang hoặc tại Mục 3) để tạo bảng thực nghiệm.
                   <br />4. (Tùy chọn) Bấm <strong>"+ Thêm run thông tin nhất"</strong> nếu cần bổ sung tuần tự (Sequential DoE).
                   <br />5. Xem chẩn đoán ma trận: tính khả định (rank/term), bậc tự do phần dư, đòn bẩy Leverage, Condition Number và D-efficiency.
                   <br />6. Nhập số liệu thực nghiệm vào các cột CQA màu xanh ngọc (hoặc bấm <strong>"Điền mô phỏng"</strong> / dán từ Excel bằng <strong>"📥 Dán dữ liệu (Ctrl+V)"</strong>).
@@ -665,11 +665,14 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 <div style={{ backgroundColor: '#f8fafc', padding: '0.6rem', borderRadius: '0.375rem', border: '1px solid #e2e8f0' }}>
                   <strong style={{ color: '#1e3a8a' }}>1. Khung điều khiển đầu trang &amp; kiểu thiết kế DoE:</strong>
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
-                    <li><strong>Nút "Tạo ma trận thí nghiệm":</strong> Khởi tạo toàn bộ ma trận thí nghiệm theo cấu hình đã chọn.</li>
+                    <li><strong>Nút "Tạo ma trận thí nghiệm":</strong> Khởi tạo toàn bộ ma trận thí nghiệm theo cấu hình đã chọn (có thể bấm nhanh ở thanh công cụ đầu trang hoặc tại Mục 3).</li>
                     <li><strong>Nút "Tiếp tục: Phân tích ANOVA (Bước 4)" &amp; "Phân tích ANOVA":</strong> Chuyển sang Tab 4 để phân tích mô hình hồi quy OLS và bảng ANOVA.</li>
+                    <li><strong>Mục 1 - Design Wizard:</strong> Nhập <em>Mục tiêu nghiên cứu</em> và <em>Ngân sách tối đa (run)</em> &rarr; Bấm nút <strong>"Chọn phương án"</strong> tương ứng.</li>
+                    <li><strong>Mục 2 - Cấu hình thông số DoE:</strong> Cho phép chọn dạng thiết kế (DSD, RSM, Hỗn hợp, Thừa số toàn phần/bán phần, D-Optimal).</li>
+                    <li><strong>Nhập số mẻ chạy D-optimal tự do (Free typing với onBlur auto-clamping):</strong> Người dùng có thể xóa trắng và gõ trực tiếp số mong muốn (ví dụ "24" thay vì phải gõ mẹo "124" rồi xóa 1). Ứng dụng tự động kẹp về ngưỡng khả định tối thiểu (<InlineMath math="p + 1" />) khi chuyển trỏ chuột ra ngoài (onBlur) để đảm bảo an toàn toán học.</li>
+                    <li><strong>Phân chia khối thực nghiệm (Blocks):</strong> Hỗ trợ thiết kế đa khối để cô lập sai số hệ thống do thời gian, mẻ nguyên liệu hoặc ca thao tác.</li>
                     <li><strong>Definitive Screening Design (DSD - Jones &amp; Nachtsheim 2011):</strong> Thiết kế sàng lọc hiện đại 3 mức. Hiệu ứng chính trực giao tuyệt đối, hoàn toàn không bị nhiễu chập với tương tác 2 yếu tố (2FI) và độ cong bậc hai. Ước lượng độ cong với số mẻ tối thiểu (<InlineMath math="2k+1" /> hoặc <InlineMath math="2k+3" /> mẻ).</li>
                     <li><strong>Ràng buộc hỗn hợp đa giác (Piepel Bounds):</strong> Tự động kiểm tra tính nhất quán (<InlineMath math="\sum L_i \le 1 \le \sum U_i" />) và sinh các đỉnh cực trị (extreme vertices) bên trong miền khả thi.</li>
-                    <li><strong>Design Wizard:</strong> Nhập <em>Mục tiêu nghiên cứu</em> và <em>Ngân sách tối đa (run)</em> &rarr; Bấm nút <strong>"Chọn phương án"</strong> tương ứng.</li>
                     <li><strong>Khung "Bổ sung tuần tự D-optimal (Sequential DoE)":</strong> Nhập <em>Số run bổ sung</em> &rarr; Bấm nút <strong>"+ Thêm run thông tin nhất"</strong> để bổ sung điểm thực nghiệm tối ưu thông tin Fisher.</li>
                   </ul>
                 </div>
@@ -1117,6 +1120,15 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                     <li><strong>Thẻ điều hướng không gian thiết kế:</strong> Hướng dẫn người dùng sang Bước 7 để xây dựng miền Sweet Spot, điều chỉnh lát cắt động X3 và thẩm định độ bền bằng Monte Carlo.</li>
                   </ul>
                 </div>
+
+                <div style={{ backgroundColor: '#f0f9ff', padding: '0.6rem', borderRadius: '0.375rem', border: '1px solid #bae6fd' }}>
+                  <strong style={{ color: '#0369a1' }}>5. Biến đầu vào (dX) &amp; Cơ chế khử sai số khối (Block contrast variables):</strong>
+                  <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#0c4a6e', lineHeight: 1.5 }}>
+                    <li><strong>Tại sao dX có thể nhiều hơn số yếu tố X (ví dụ: 7 đầu vào dù chỉ có 5 yếu tố)?</strong> Khi thiết kế DoE có <InlineMath math="B" /> khối thực nghiệm (<InlineMath math="B > 1" />), mạng nơ-ron tự động bổ sung <InlineMath math="B - 1" /> <em>biến giả tương phản khối (Block contrast dummy variables)</em> vào lớp đầu vào (<InlineMath math="d_X = k + B - 1" />).</li>
+                    <li><strong>Mục đích khoa học:</strong> Giúp mạng nơ-ron nhận diện và bóc tách sai số hệ thống giữa các khối (do khác biệt về ngày thí nghiệm, kỹ thuật viên, lô tá dược thô). Nhờ đó, mạng chỉ học mối quan hệ phi tuyến thực chất giữa các yếu tố công thức/quy trình (<InlineMath math="X" />) và thuộc tính chất lượng (<InlineMath math="Y" />) mà không bị thiên lệch bởi hiệu ứng khối.</li>
+                    <li><strong>Mốc quy chiếu chuẩn khi dự báo:</strong> Khi sang Bước 6 (Mặt đáp 3D) và Bước 7 (Không gian thiết kế), hệ thống luôn cố định các biến giả khối về <strong>Block 1 làm mốc quy chiếu chuẩn</strong> (Block baseline reference = 0), đảm bảo mô phỏng tối ưu hóa phản ánh điều kiện chuẩn của xưởng sản xuất.</li>
+                  </ul>
+                </div>
               </div>
             ),
           },
@@ -1556,7 +1568,16 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
                     <li><strong>Nút "3D Surface":</strong> Chuyển sang bề mặt 3D tương tác biểu diễn biên an toàn chất lượng <InlineMath math="Z = \text{Margin}_{\min}" />. Bề mặt nằm trên mặt phẳng <InlineMath math="Z = 0" /> tương ứng với vùng đạt chuẩn toàn diện (Sweet Spot).</li>
                     <li><strong>Nút "2D Contour":</strong> Bản đồ chiếu phẳng 2 chiều với vùng xanh lá (<InlineMath math="\text{Margin}_i \ge 0 \quad \forall i" />) và vùng đỏ (vượt giới hạn CQA).</li>
-                    <li>★ <strong>Ngôi sao xanh:</strong> Điểm vận hành mục tiêu tối ưu (Target Setpoint).</li>
+                    <li><strong>Bộ chọn Chế độ ranh giới Design Space (Boundary Mode):</strong>
+                      <ul style={{ paddingLeft: '1rem', marginTop: '0.2rem' }}>
+                        <li><em>Mean (Trung bình dự báo):</em> Ranh giới định nghĩa theo giá trị kỳ vọng trung bình <InlineMath math="\hat{y} \in [\text{LSL}, \text{USL}]" />.</li>
+                        <li><em>PI 95% (Khoảng dự báo cá thể):</em> Ranh giới thận trọng, tính gộp cả sai số mô hình và phương sai phần dư (<InlineMath math="\hat{y} \pm t_{\text{crit}} \cdot \sigma_{\text{ind}}" />).</li>
+                        <li><em><InlineMath math="C_{pk} \ge 1.0" /> (3σ / lỗi &le; 0.27%):</em> Ranh giới xác suất đảm bảo tỷ lệ sản phẩm trong tiêu chuẩn <InlineMath math="P \ge 99.73\%" />.</li>
+                        <li><em><InlineMath math="P_{pk} / C_{pk} \ge 1.33" /> (4σ / lỗi &le; 63 PPM):</em> Chuẩn mực kiểm soát nghiêm ngặt của ngành dược (ICH Q8/Q9), ranh giới xác suất đảm bảo <InlineMath math="P \ge 99.9937\%" />.</li>
+                      </ul>
+                    </li>
+                    <li><strong>Tại sao Design Space có 2 đường biên màu xanh lá cây?</strong> Khi một CQA có tiêu chuẩn kỹ thuật hai phía (cả Cận dưới LSL và Cận trên USL, ví dụ Hàm lượng 95.0% – 105.0%), điều kiện năng lực <InlineMath math="C_{pk} \ge 1.33" /> đòi hỏi giá trị trung bình vừa phải cách LSL ít nhất <InlineMath math="4\sigma" />, vừa phải cách USL ít nhất <InlineMath math="4\sigma" />. Do đó, đồ thị xuất hiện <strong>2 đường biên ranh giới</strong>: một đường chặn cận dưới và một đường chặn cận trên. Vùng Design Space màu xanh lá cây chính là <em>hành lang an toàn nằm kẹp giữa 2 đường biên đó</em>.</li>
+                    <li>★ <strong>Ngôi sao xanh / vàng:</strong> Điểm vận hành mục tiêu tối ưu (Target Setpoint).</li>
                   </ul>
                 </div>
 
@@ -1617,6 +1638,13 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 </p>
                 <p>
                   Chỉ số <InlineMath math="P_{pk} / C_{pk} = 1.0" /> về cơ bản là quy trình <strong>3 sigma (3&sigma;)</strong>, nghĩa là dự kiến có <strong>0.27%</strong> sản phẩm đầu ra (tương đương 2.700 PPM) nằm ngoài thông số kỹ thuật (OOS). Trong công nghiệp dược phẩm (ICH Q8/Q9), quy trình đạt năng lực xuất sắc thường yêu cầu <InlineMath math="P_{pk} / C_{pk} \ge 1.33" /> (tương đương 4&sigma;, tỷ lệ lỗi &le; 0.0063% hay 63 PPM).
+                </p>
+                <p style={{ marginTop: '0.35rem' }}>
+                  <strong>Cơ chế toán học của 2 đường biên Design Space (<InlineMath math="P_{pk}/C_{pk} \ge 1.33" />):</strong>
+                </p>
+                <BlockMath math="\text{Margin}_{\text{prob}} = P(\text{LSL} \le Y \le \text{USL}) - 0.999937 = \left[ \Phi\left(\frac{\text{USL} - \hat{y}}{\sigma_{\text{ind}}}\right) - \Phi\left(\frac{\text{LSL} - \hat{y}}{\sigma_{\text{ind}}}\right) \right] - 0.999937" />
+                <p>
+                  Đường ranh giới hiển thị trên đồ thị là tập hợp các điểm mà tại đó <InlineMath math="\text{Margin}_{\text{prob}} = 0" />. Đối với tiêu chuẩn kỹ thuật 2 phía [LSL, USL], phương trình này thỏa mãn tại 2 giá trị dự báo đối xứng: một giá trị tiệm cận cận dưới LSL và một giá trị tiệm cận cận trên USL. Do đó, đồ thị sẽ vẽ ra <strong>2 đường cong đẳng trị màu xanh lá cây</strong> làm ranh giới bao quanh vùng an toàn 4-sigma.
                 </p>
 
                 <p style={{ marginTop: '0.5rem' }}><strong>5. Mô hình phân rã phương sai chất lượng 3 thành phần (ICH Q14 &amp; Six Sigma variance decomposition):</strong></p>
@@ -1737,6 +1765,17 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   }
                 />
                 <GlossaryTermCard
+                  term="Design Space Boundary Mode (4-sigma / Cpk ≥ 1.33)"
+                  vietnamese="Chế độ ranh giới xác suất 4-sigma (Cpk ≥ 1.33)"
+                  tag="Ranh giới Design Space"
+                  tagColor="teal"
+                  definition={
+                    <>
+                      Tiêu chuẩn ranh giới xác suất nghiêm ngặt theo ICH Q8(R2)/Q9. Thay vì chỉ dùng giá trị trung bình đơn thuần, chế độ này đòi hỏi xác suất đáp ứng nằm trọn trong tiêu chuẩn kỹ thuật <InlineMath math="P(\text{LSL} \le Y \le \text{USL}) \ge 99.9937\%" /> (tỷ lệ lỗi &le; 63 PPM). Với các chỉ tiêu có cả cận dưới và cận trên, ranh giới hiển thị là 2 đường cong đẳng trị tạo thành hành lang an toàn.
+                    </>
+                  }
+                />
+                <GlossaryTermCard
                   term="PPM (Parts Per Million)"
                   vietnamese="Tỷ lệ lỗi phần triệu"
                   tag="Chỉ số khuyết tật"
@@ -1793,7 +1832,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   <strong>Thứ tự thao tác chuẩn (Standard Operating Procedure):</strong>
                   <br />1. <strong>Kiểm tra cổng sẵn sàng khoa học (Scientific Readiness Gate):</strong> Xác nhận hệ thống đã thỏa mãn 4 điều kiện cốt lõi (dữ liệu thực nghiệm đầy đủ, mô hình hợp lệ, điểm tối ưu Desirability &gt; 0, và hoàn thành mô phỏng Monte Carlo).
                   <br />2. <strong>Chọn công cụ mô hình hóa nguồn:</strong> Bấm nút <em>"Đa thức (ANOVA)"</em> hoặc <em>"Mạng nơ-ron AI"</em> để chỉ định tập mô hình sẽ đưa vào bảng biểu và kết luận của báo cáo.
-                  <br />3. <strong>Rà soát các mục báo cáo:</strong> Kiểm tra tên dự án, hoạt chất, hàm lượng/nồng độ, dạng bào chế và ngày bắt đầu trong bảng đầu báo cáo. Dùng mục lục bên trái, đặc biệt mục <strong>5b. Mạng nơ-ron</strong> và <strong>6c. Thí nghiệm xác nhận phương án tối ưu</strong>, để đối chiếu tình trạng mô hình, điều kiện kế hoạch, giá trị dự đoán, giá trị thực tế và từng kết luận riêng.
+                  <br />3. <strong>Rà soát các mục báo cáo:</strong> Kiểm tra tên dự án, hoạt chất, hàm lượng/nồng độ, dạng bào chế và ngày bắt đầu trong bảng đầu báo cáo. Dùng mục lục bên trái, đặc biệt mục <strong>5b. Mạng nơ-ron</strong> (chi tiết cấu trúc số chiều đầu vào <InlineMath math="d_X" /> và cơ chế khử nhiễu block), <strong>6c. Thí nghiệm xác nhận phương án tối ưu</strong>, <strong>7. Bảng chiến lược kiểm soát (ICH Q10)</strong> và <strong>8. Đánh giá độ bền vững &amp; phân rã phương sai (ICH Q14)</strong>, để đối chiếu toàn diện tính vững chắc của hồ sơ trước khi ban hành.
                   <br />4. <strong>Thực hiện ký duyệt điện tử 3 cấp (21 CFR Part 11 sign-off):</strong> Ký theo phân quyền nghiêm ngặt <em>Analyst (Tác giả)</em> &rarr; <em>Reviewer (Thẩm định kỹ thuật)</em> &rarr; <em>Approver (Phê duyệt pháp lý)</em>. Sau khi Approver ký, hồ sơ được khóa mật mã học (Cryptographic Record Lock).
                   <br />5. <strong>Xuất báo cáo lưu trữ pháp lý:</strong>
                   <ul style={{ paddingLeft: '1.2rem', margin: '0.2rem 0' }}>
