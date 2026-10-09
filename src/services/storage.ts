@@ -9,6 +9,15 @@ const STORE_ANCHORS = 'anchors';
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;
 
+function mirrorToLocalStorage(key: string, value: unknown): boolean {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function isIndexedDBAvailable(): boolean {
   try {
     return typeof window !== 'undefined' && typeof window.indexedDB !== 'undefined';
@@ -41,13 +50,20 @@ function getDB(): Promise<IDBDatabase | null> {
       };
 
       request.onsuccess = () => {
-        resolve(request.result);
+        const db = request.result;
+        db.onversionchange = () => {
+          db.close();
+          dbPromise = null;
+        };
+        resolve(db);
       };
 
       request.onerror = () => {
+        dbPromise = null;
         resolve(null);
       };
     } catch {
+      dbPromise = null;
       resolve(null);
     }
   });
@@ -82,24 +98,21 @@ export async function idbGetProject(id: string): Promise<QBDProject | null> {
 
 export async function idbSaveProject(project: QBDProject): Promise<boolean> {
   // Always mirror in localStorage for synchronous fallback
-  try {
-    window.localStorage.setItem(`qbd.project.${project.id}`, JSON.stringify(project));
-  } catch {
-    // LocalStorage quota may be exceeded, continue to IndexedDB
-  }
+  const localSaved = mirrorToLocalStorage(`qbd.project.${project.id}`, project);
 
   const db = await getDB();
-  if (!db) return true;
+  if (!db) return localSaved;
 
   return new Promise((resolve) => {
     try {
       const tx = db.transaction(STORE_PROJECTS, 'readwrite');
       const store = tx.objectStore(STORE_PROJECTS);
-      const req = store.put(project);
-      req.onsuccess = () => resolve(true);
-      req.onerror = () => resolve(false);
+      store.put(project);
+      tx.oncomplete = () => resolve(true);
+      tx.onabort = () => resolve(localSaved);
+      tx.onerror = () => resolve(localSaved);
     } catch {
-      resolve(false);
+      resolve(localSaved);
     }
   });
 }
@@ -132,24 +145,21 @@ export async function idbGetHistory(projectId: string): Promise<ProjectVersionSn
 }
 
 export async function idbSaveHistory(projectId: string, snapshots: ProjectVersionSnapshot[]): Promise<boolean> {
-  try {
-    window.localStorage.setItem(`qbd.project.history.${projectId}`, JSON.stringify(snapshots.slice(0, 10)));
-  } catch {
-    // ignore quota error
-  }
+  const localSaved = mirrorToLocalStorage(`qbd.project.history.${projectId}`, snapshots.slice(0, 10));
 
   const db = await getDB();
-  if (!db) return true;
+  if (!db) return localSaved;
 
   return new Promise((resolve) => {
     try {
       const tx = db.transaction(STORE_HISTORY, 'readwrite');
       const store = tx.objectStore(STORE_HISTORY);
-      const req = store.put({ projectId, snapshots, updatedAt: new Date().toISOString() });
-      req.onsuccess = () => resolve(true);
-      req.onerror = () => resolve(false);
+      store.put({ projectId, snapshots, updatedAt: new Date().toISOString() });
+      tx.oncomplete = () => resolve(true);
+      tx.onabort = () => resolve(localSaved);
+      tx.onerror = () => resolve(localSaved);
     } catch {
-      resolve(false);
+      resolve(localSaved);
     }
   });
 }
@@ -182,24 +192,21 @@ export async function idbGetAnchor(projectId: string): Promise<ProjectAuditAncho
 }
 
 export async function idbSaveAnchor(projectId: string, anchor: ProjectAuditAnchor): Promise<boolean> {
-  try {
-    window.localStorage.setItem(`qbd.project.anchor.${projectId}`, JSON.stringify(anchor));
-  } catch {
-    // ignore
-  }
+  const localSaved = mirrorToLocalStorage(`qbd.project.anchor.${projectId}`, anchor);
 
   const db = await getDB();
-  if (!db) return true;
+  if (!db) return localSaved;
 
   return new Promise((resolve) => {
     try {
       const tx = db.transaction(STORE_ANCHORS, 'readwrite');
       const store = tx.objectStore(STORE_ANCHORS);
-      const req = store.put({ projectId, ...anchor });
-      req.onsuccess = () => resolve(true);
-      req.onerror = () => resolve(false);
+      store.put({ projectId, ...anchor });
+      tx.oncomplete = () => resolve(true);
+      tx.onabort = () => resolve(localSaved);
+      tx.onerror = () => resolve(localSaved);
     } catch {
-      resolve(false);
+      resolve(localSaved);
     }
   });
 }
@@ -224,8 +231,9 @@ export async function migrateLocalStorageToIndexedDB(): Promise<number> {
         if (val) {
           try {
             const project = JSON.parse(val);
-            if (project && project.id) {
-              await idbSaveProject(project);
+            // Migration is additive: the IndexedDB copy may be newer than
+            // the old localStorage mirror after an interrupted write.
+            if (project && typeof project.id === 'string' && !await idbGetProject(project.id) && await idbSaveProject(project)) {
               count++;
             }
           } catch {
@@ -238,8 +246,7 @@ export async function migrateLocalStorageToIndexedDB(): Promise<number> {
         if (val) {
           try {
             const history = JSON.parse(val);
-            if (Array.isArray(history)) {
-              await idbSaveHistory(projectId, history);
+            if (Array.isArray(history) && (await idbGetHistory(projectId)).length === 0 && await idbSaveHistory(projectId, history)) {
               count++;
             }
           } catch {
@@ -252,8 +259,7 @@ export async function migrateLocalStorageToIndexedDB(): Promise<number> {
         if (val) {
           try {
             const anchor = JSON.parse(val);
-            if (anchor && typeof anchor.sequenceNumber === 'number') {
-              await idbSaveAnchor(projectId, anchor);
+            if (anchor && typeof anchor.sequenceNumber === 'number' && !await idbGetAnchor(projectId) && await idbSaveAnchor(projectId, anchor)) {
               count++;
             }
           } catch {

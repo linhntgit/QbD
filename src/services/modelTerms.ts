@@ -1,4 +1,4 @@
-import type { Factor, ModelType } from '../types/qbd';
+import type { Factor, ModelType, RegressionTerm } from '../types/qbd';
 import { getConfiguredFactorCodes, getConfiguredFactorLevels, snapFactorCoded } from './doeGenerator';
 
 export type PolynomialModelOrder = 'Linear' | '2FI' | 'Quadratic';
@@ -50,6 +50,36 @@ export function buildFactorFeatures(factors: Factor[]): FactorFeatureDefinition[
 
 export const isMixtureFactor = (factor: Factor): boolean =>
   factor.role === 'mixture_component' || factor.type === 'Mixture';
+
+/** Keep the model basis in sync with the factor selection used during OLS fitting. */
+export function getRegressionModelFactors(factors: Factor[]): Factor[] {
+  const controllable = factors.filter((factor) =>
+    factor.controllability === 'controllable' || factor.controllability === undefined
+  );
+  return controllable.length > 0
+    ? controllable
+    : factors.filter((factor) => factor.controllability !== 'constant');
+}
+
+/**
+ * Recover the exact basis used by fitModel, including categorical contrasts,
+ * quadratic terms and mixture-process interactions. Block effects are nuisance
+ * columns and evaluate to zero for predictions at the reference block.
+ */
+export function buildRegressionTermEvaluators(
+  factors: Factor[],
+  modelType: ModelType,
+  terms: Pick<RegressionTerm, 'name' | 'factorCodes'>[],
+): Array<(coded: Record<string, number>) => number> {
+  const canonical = buildModelTerms(getRegressionModelFactors(factors), modelType);
+  const evaluatorByName = new Map(canonical.map((term) => [term.name, term.evaluator]));
+  return terms.map((term) => {
+    if (term.name.startsWith('Block ') && term.factorCodes.length === 0) return () => 0;
+    const evaluator = evaluatorByName.get(term.name);
+    if (!evaluator) throw new Error(`Unknown OLS regression term: ${term.name}`);
+    return evaluator;
+  });
+}
 
 /**
  * Canonical estimable polynomial basis for ordinary and mixture-process DoE.

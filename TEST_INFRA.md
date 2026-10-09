@@ -3,7 +3,7 @@
 ## 1. Executive Overview & Testing Philosophy
 
 ### 1.1. Core Mission
-The **Quality by Design (QbD) & DoE Pharmaceutical Formulation Suite** is a mission-critical scientific software platform intended for pharmaceutical formulation design, critical process parameter (CPP) screening, critical quality attribute (CQA) optimization, and regulatory dossier submission (ICH Q8(R2), ICH Q9(R1), ICH Q10, FDA 21 CFR Part 11, EU GMP Annex 11, ISO 19005 PDF/A).
+The **Quality by Design (QbD) & DoE Pharmaceutical Formulation Suite** is a research software platform for pharmaceutical formulation design, critical process parameter (CPP) screening, and critical quality attribute (CQA) optimization. Outputs can inform dossier preparation under ICH guidelines, but the app, its internal sign-off workflow, and PDF exports are **not validated for regulatory submission, 21 CFR Part 11, EU GMP Annex 11, or PDF/A conformance**.
 
 In regulated pharmaceutical environments, scientific calculations and audit records must be **strictly reproducible, mathematically provable, and tamper-evident**. This document defines the four-tier opaque-box, requirement-driven test infrastructure governing all validation across the platform.
 
@@ -54,9 +54,9 @@ Verifies nominal happy-path functionality for every feature identified in `ORIGI
 - **Feature 5: Multi-Model Benchmarking Table**: Head-to-head performance comparison of Polynomial RSM, ANN MLP, Support Vector Regression (SVR with SMO), and Ensemble Stacking (Akaike weights $w_i \propto \exp(-0.5 \Delta AICc_i)$) reporting $R^2, R^2_{adj}, RMSE, AICc, BIC$.
 - **Feature 6: Cryptographic SHA-256 Tamper-Evident Audit Trail**: Pure TypeScript zero-dependency SHA-256 (FIPS 180-4), deterministic canonical JSON stringification, sequential hash-chain linkage $H(\text{prev} + \text{payload} + \text{action})$.
 - **Feature 7: Integrity Verification Checksum Engine**: Sequential verification of chain continuity, instantaneous detection of 1-character modifications in historical entries or state snapshots.
-- **Feature 8: 21 CFR Part 11 Electronic Sign-Off Workflow**: 3-tier sequential approval (Analyst $\to$ Reviewer $\to$ Approver), cryptographic signature binding, record locking, and tamper rejection.
+- **Feature 8: Internal Sign-Off Workflow**: 3-tier recorded approvals (Analyst $\to$ Reviewer $\to$ Approver), SHA-256 checksum, and local UI record lock. No identity authentication or regulatory electronic-signature validation.
 - **Feature 9: Interactive 3D Design Space & Dynamic Slicing**: Sweet-spot surface mapping ($Z = \text{Margin}_{\min}$), zero-boundary reference plane ($Z = 0$), 3rd factor ($X_3$) dynamic slicing with PAR/NOR color range classification.
-- **Feature 10: Regulatory Archival PDF/A & Word Exporter**: ISO 19005 compliant PDF/A container with embedded XMP metadata and SHA-256 audit root checksum, alongside Word .docx with 21 CFR Part 11 signature block.
+- **Feature 10: Research PDF & Word Exporter**: Research PDF with XMP metadata and SHA-256 checksum (not verified as ISO 19005 PDF/A), and Word .docx with internal sign-off history.
 
 ### Tier 2: Boundary & Corner Cases ($\ge 5$ tests per feature)
 Stresses the system at mathematical and operational extremes:
@@ -72,8 +72,8 @@ Validates seamless data transfer and contract compliance between interconnected 
 - **DSD $\to$ RSM / ANOVA**: Verifying that a DSD dataset with $2m+1$ runs correctly fits main effects and identifies active quadratic terms without matrix inversion breakdown.
 - **Mixture Bounds $\to$ GA Optimizer**: Verifying that continuous metaheuristic search strictly respects polyhedral mixture constraints during SBX crossover and Nelder-Mead simplex steps without generating infeasible formulations.
 - **ANN Training $\to$ XAI $\to$ Multi-Model Benchmarking**: Verifying that trained neural models feed exact weights into Garson/Olden/SHAP and produce consistent AICc/BIC metrics in the benchmarking table.
-- **Project Snapshot $\to$ SHA-256 Hash Chain $\to$ 21 CFR Sign-Off $\to$ Lock Enforcement**: Verifying that signing a project updates the audit chain, locks subsequent modifications, and validates integrity.
-- **3D Design Space $\to$ Proven Acceptable Range (PAR) $\to$ PDF/A & Word Reporting**: Verifying that PAR coordinates and sweet-spot boundaries are embedded faithfully into export reports.
+- **Project Snapshot $\to$ SHA-256 Hash Chain $\to$ Internal Sign-Off $\to$ Local Lock Enforcement**: Verifying that sign-off updates the audit chain, locks edits in the app, and checks integrity.
+- **3D Design Space $\to$ Proven Acceptable Range (PAR) $\to$ Research PDF & Word Reporting**: Verifying that PAR coordinates and sweet-spot boundaries are embedded faithfully into export reports.
 
 ### Tier 4: Real-World Pharmaceutical Formulation Scenarios
 Executes end-to-end, multi-step industry workflows modeled after actual drug development programs:
@@ -90,7 +90,7 @@ Executes end-to-end, multi-step industry workflows modeled after actual drug dev
 - **Scenario 3: Monoclonal Antibody (mAb) Lyophilization Cycle Optimization**:
   - Formulation excipients + Freeze-drying process parameters (Freezing Shelf Temp, Primary Drying Temp, Chamber Pressure).
   - 3D interactive design space sweet-spot surface generation with dynamic slicing across shelf temperature.
-  - Regulatory archival PDF/A export embedding cryptographically verifiable audit root checksum.
+  - Research PDF export containing a checksum suitable for local comparison, without PDF/A validation.
 
 ---
 
@@ -106,9 +106,9 @@ Executes end-to-end, multi-step industry workflows modeled after actual drug dev
 | F06 | Multi-Model Benchmarking Table | $\ge 5$ tests | $\ge 5$ tests | Benchmarking $\to$ Ensemble | Scenario 2 (Liposome) | `src/services/modelBenchmarking.ts` |
 | F07 | Cryptographic SHA-256 Audit Trail | $\ge 5$ tests | $\ge 5$ tests | Hash Chain $\to$ Snapshot | Scenario 1 & 3 | `src/services/cryptoSha256.ts` |
 | F08 | Integrity Checksum Engine | $\ge 5$ tests | $\ge 5$ tests | Checksum $\to$ Tamper Alarm | Scenario 1 & 3 | `src/services/projectGovernance.ts` |
-| F09 | 21 CFR Part 11 Electronic Sign-Off | $\ge 5$ tests | $\ge 5$ tests | Sign-Off $\to$ State Lock | Scenario 1 & 3 | `src/services/projectGovernance.ts` |
+| F09 | Internal Sign-Off (unvalidated) | $\ge 5$ tests | $\ge 5$ tests | Sign-Off $\to$ State Lock | Scenario 1 & 3 | `src/services/projectGovernance.ts` |
 | F10 | 3D Design Space & Dynamic Slicing | $\ge 5$ tests | $\ge 5$ tests | 3D Space $\to$ PAR Bounds | Scenario 3 (Lyophilization) | `src/components/tabs/DesignSpaceTab.tsx` |
-| F11 | Regulatory Archival PDF/A & Word | $\ge 5$ tests | $\ge 5$ tests | Report $\to$ Audit Digest | Scenario 3 (Lyophilization) | `src/services/pdfReportGenerator.ts` |
+| F11 | Research PDF & Word | $\ge 5$ tests | $\ge 5$ tests | Report $\to$ Audit Digest | Scenario 3 (Lyophilization) | `src/services/pdfReportGenerator.ts` |
 
 ---
 
@@ -144,7 +144,7 @@ src/test/
   5. Exact preservation of mixture sum-to-one constraint ($\sum x_i = 1.0$) across all GA iterations.
 
 ### 4.3. Suite 3: `gxpGovernanceWorkflow.test.ts`
-- **Scope**: Project initialization, canonical JSON stringification, sequential SHA-256 hash-chain ledger, single-character tamper detection, and 21 CFR Part 11 / EU GMP Annex 11 electronic sign-off workflow.
+- **Scope**: Project initialization, canonical JSON stringification, sequential SHA-256 hash-chain ledger, single-character tamper detection, and the internal three-role sign-off workflow; this is functional testing, not 21 CFR Part 11 / EU GMP Annex 11 qualification.
 - **Key Invariants Tested**:
   1. SHA-256 implementation conforms strictly to NIST FIPS 180-4 test vectors.
   2. Canonical JSON stringification produces identical hashes regardless of object key order.

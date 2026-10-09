@@ -1,5 +1,6 @@
 import { runMonteCarloSimulation, optimizeDesirability } from '../services/statistics';
 import { createNeuralPredictor } from '../services/neuralNetwork';
+import { buildRegressionTermEvaluators } from '../services/modelTerms';
 import type { Factor, CQA, StatisticalModelResult, NeuralNetModelResult } from '../types/qbd';
 import type { WorkerRequestMessage, WorkerResponseMessage } from './workerProtocol';
 
@@ -12,53 +13,35 @@ export function rebuildModels(
 
   Object.entries(modelsPayload).forEach(([code, m]) => {
     if (m.kind === 'ols') {
-      const coeffs = m.coefficients || {};
-      const reconstructedTerms = Array.isArray(m.terms)
-        ? m.terms.map((t: any) => ({
-            ...t,
-            evaluator: (coded: Record<string, number>) => {
-              if (t.name === 'Intercept' || t.name === '(Intercept)') return 1;
-              if (t.factorCodes && t.power) {
-                return t.factorCodes.reduce((prod: number, code: string, idx: number) => {
-                  const pow = t.power[idx] ?? 1;
-                  return prod * Math.pow(coded[code] ?? 0, pow);
-                }, 1);
-              }
-              if (t.name.includes('*')) {
-                return t.name.split('*').reduce((p: number, f: string) => p * (coded[f] ?? 0), 1);
-              }
-              if (t.name.includes('^2')) {
-                const f = t.name.replace('^2', '');
-                return Math.pow(coded[f] ?? 0, 2);
-              }
-              return coded[t.name] ?? 0;
-            },
-          }))
-        : undefined;
+      const serializedTerms = m.terms ?? [];
+      const evaluators = buildRegressionTermEvaluators(factors ?? [], m.modelType, serializedTerms);
+      const reconstructedTerms = serializedTerms.map((term: any, index: number) => ({
+        ...term,
+        evaluator: evaluators[index],
+      }));
+      const covariance: number[][] | undefined = m.predictionCovariance;
+      if (covariance && (covariance.length !== evaluators.length ||
+        covariance.some((row) => row.length !== evaluators.length))) {
+        throw new Error(`Invalid prediction covariance dimensions for ${code}`);
+      }
 
       result[code] = {
         ...m,
         terms: reconstructedTerms,
-        predictionCovariance: m.predictionCovariance,
+        predictionCovariance: covariance,
         predict: (coded: Record<string, number>) => {
-          let sum = coeffs.Intercept ?? coeffs['(Intercept)'] ?? 0;
-          Object.entries(coeffs).forEach(([term, b]) => {
-            if (term === 'Intercept' || term === '(Intercept)') return;
-            const termVal = Number(b);
-            if (term.includes('*')) {
-              const parts = term.split('*');
-              const prod = parts.reduce((p, fCode) => p * (coded[fCode] ?? 0), 1);
-              sum += termVal * prod;
-            } else if (term.includes('^2')) {
-              const fCode = term.replace('^2', '');
-              const val = coded[fCode] ?? 0;
-              sum += termVal * val * val;
-            } else {
-              sum += termVal * (coded[term] ?? 0);
-            }
-          });
-          return sum;
+          return serializedTerms.reduce(
+            (sum: number, term: { coefficient: number }, index: number) =>
+              sum + term.coefficient * evaluators[index](coded),
+            0,
+          );
         },
+        predictStandardError: covariance ? (coded: Record<string, number>) => {
+          const x0 = evaluators.map((evaluate) => evaluate(coded));
+          const variance = x0.reduce((sum, value, i) =>
+            sum + value * x0.reduce((inner, other, j) => inner + covariance[i][j] * other, 0), 0);
+          return Math.sqrt(Math.max(0, variance));
+        } : undefined,
       };
     } else if (m.kind === 'ann' || m.weights) {
       result[code] = {

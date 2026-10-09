@@ -7,6 +7,9 @@ export default defineConfig({
   define: {
     global: 'globalThis',
   },
+  resolve: {
+    preserveSymlinks: true,
+  },
   base: './', // relative path ensures seamless hosting on GitHub Pages, Vercel, or custom domains
   server: {
     watch: {

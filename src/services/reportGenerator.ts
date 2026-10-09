@@ -177,7 +177,7 @@ export async function buildQBDWordDocument(
     }),
     new TableRow({
       children: [
-        createDataCell('Tính toàn vẹn kiểm toán (21 CFR Part 11)', false, 30),
+        createDataCell('Kiểm tra tính toàn vẹn dữ liệu cục bộ', false, 30),
         createDataCell(
           auditVerification.isValid
             ? '✓ Đạt xác thực mật mã học: Chuỗi kiểm toán toàn vẹn không bị can thiệp'
@@ -1216,19 +1216,19 @@ export async function buildQBDWordDocument(
     );
   }
 
-  // SECTION 9: Lifecycle Management & 21 CFR Part 11 Regulatory Sign-off
+  // SECTION 9: Internal sign-off history; not a regulated electronic signature.
   sections.push(
     new Paragraph({
-      text: '9. Ký Duyệt & Phê Chuẩn Hồ Sơ Phát Triển Dược Phẩm (21 CFR Part 11 Sign-off & Approval)',
+      text: '9. Lịch Sử Xác Nhận Nội Bộ & Rà Soát Hồ Sơ Phát Triển Dược Phẩm',
       heading: HeadingLevel.HEADING_1,
       spacing: { before: 300, after: 150 },
     }),
     new Paragraph({
-      text: 'Sản phẩm sẽ được theo dõi liên tục trong suốt vòng đời thương mại thông qua chương trình Xác thực Quy trình Tiếp diễn (Continued Process Verification - CPV). Báo cáo này xác nhận Không Gian Thiết Kế và Chiến Lược Kiểm Soát đã được xây dựng trên nền tảng khoa học vững chắc và quản lý rủi ro chất lượng, đáp ứng đầy đủ yêu cầu đăng ký thuốc theo hướng dẫn ICH CTD Module 3.2.P.2 của US FDA và EMA.',
+      text: 'Tài liệu này là bản thảo nghiên cứu, cấu trúc tham khảo CTD Module 3.2.P.2. Không Gian Thiết Kế, Chiến Lược Kiểm Soát và kết quả tính toán cần được chuyên gia thẩm định độc lập, bổ sung bằng chứng thực nghiệm và phê duyệt qua hệ thống phù hợp trước khi dùng trong hồ sơ đăng ký. Lịch sử xác nhận dưới đây chỉ phục vụ truy xuất nội bộ, chưa đáp ứng 21 CFR Part 11 hay EU GMP Annex 11.',
       spacing: { after: 150 },
     }),
     new Paragraph({
-      text: 'Bảng Thể Hiện Chữ Ký Điện Tử Hợp Chuẩn 21 CFR Part 11 / EU GMP Annex 11 (Electronic Signature Manifestation):',
+      text: 'Bảng Ghi Nhận Xác Nhận Nội Bộ (Internal Sign-off Records — chưa xác thực độc lập người ký):',
       heading: HeadingLevel.HEADING_2,
       spacing: { before: 150, after: 120 },
     })
@@ -1241,7 +1241,7 @@ export async function buildQBDWordDocument(
         createHeaderCell('Cán Bộ Ký & Phòng Ban', 25),
         createHeaderCell('Vai Trò GxP', 15),
         createHeaderCell('Thời Điểm Ký UTC', 20),
-        createHeaderCell('Tuyên Bố Ý Nghĩa Pháp Lý (§ 11.50)', 25),
+        createHeaderCell('Lý Do Xác Nhận Nội Bộ', 25),
         createHeaderCell('Mã Băm Chữ Ký (Checksum)', 15),
       ],
     }),
@@ -1370,7 +1370,7 @@ export async function buildQBDWordDocument(
         new TableRow({ children: [createDataCell('Mã Dự Án (Project ID)', false, 35), createDataCell(project.id, false, 65)] }),
         new TableRow({ children: [createDataCell('Protocol ID', true, 35), createDataCell(traceability.protocolId, true, 65)] }),
         new TableRow({ children: [createDataCell('Mã Băm Toàn Vẹn Hệ Thống (Root Checksum)', false, 35), createDataCell(rootChecksum, false, 65)] }),
-        new TableRow({ children: [createDataCell('Trạng Thái Toàn Vẹn Chuỗi (21 CFR Part 11)', true, 35), createDataCell(auditVerification.isValid ? '✓ Toàn vẹn — Chuỗi kiểm toán mật mã học không bị can thiệp' : `⚠ Lỗi toàn vẹn: ${auditVerification.reason}`, true, 65)] }),
+        new TableRow({ children: [createDataCell('Kiểm tra chuỗi mã băm nội bộ', true, 35), createDataCell(auditVerification.isValid ? '✓ Chuỗi mã băm nhất quán với dữ liệu đang lưu' : `⚠ Lỗi toàn vẹn: ${auditVerification.reason}`, true, 65)] }),
         new TableRow({ children: [createDataCell('Tổng Số Bản Ghi Kiểm Toán (Audit Snapshots)', false, 35), createDataCell(`${auditHistory.length} bản ghi phiên bản đã lưu trữ`, false, 65)] }),
         new TableRow({ children: [createDataCell('Kiểm Tra Cấu Trúc (Validation)', true, 35), createDataCell(traceability.validation.valid ? 'Đạt kiểm tra cấu trúc cục bộ' : `Cần rà soát: ${traceability.validation.errors.join('; ')}`, true, 65)] }),
         new TableRow({ children: [createDataCell('Tiến Độ Thực Nghiệm DoE', false, 35), createDataCell(`${project.runs.filter((r) => Object.keys(r.responses).length > 0).length} / ${project.runs.length} mẻ đã nhập kết quả (${traceability.runStatus})`, false, 65)] }),

@@ -11,13 +11,13 @@ The system consists of 4 core pillars:
    - `src/services/neuralNetwork.ts`: ANN MLP with diagnostics (AICc, BIC, $R^2_{adj}$, log-likelihood) via Hurvich-Tsai small-sample correction.
    - `src/services/explainableAI.ts`: Feature importance engine (Garson's algorithm, Olden's connection weight method, Exact/Permutation SHAP values for $k \le 8$).
    - `src/services/modelBenchmarking.ts`: Multi-Model Benchmarking engine comparing Polynomial RSM (Linear, 2FI, Quadratic), ANN MLP, SVR (pure TypeScript SMO), and Ensemble Stacking (Akaike weights), calculating $R^2, R^2_{adj}, RMSE, AICc, BIC$.
-3. **Pillar 3 — GxP Governance, Data Integrity & 21 CFR Part 11 / EU GMP Annex 11**:
+3. **Pillar 3 — Local Governance & Data Integrity (GxP principles; compliance not validated)**:
    - `src/services/cryptoSha256.ts`: Deterministic pure TypeScript SHA-256 and canonical JSON stringifier (`canonicalJsonStringify`).
    - `src/services/projectGovernance.ts`: Cryptographic tamper-evident hash-chain audit trail, integrity verification engine (`verifyAuditTrailIntegrity`), and 3-tier electronic sign-off workflow (Analyst -> Reviewer -> Approver).
-4. **Pillar 4 — Interactive 3D Design Space & Regulatory Archival Reporting**:
+4. **Pillar 4 — Interactive 3D Design Space & Research Reporting**:
    - `src/components/tabs/DesignSpaceTab.tsx`: Interactive 3D sweet-spot surface view (Plotly) with $Z = \text{Margin}_{\min}$, $Z = 0$ boundary reference plane, dynamic slicing slider for 3rd factor ($X_3$) with PAR/NOR color-coded range bar and auto-scan animation player.
-   - `src/services/pdfReportGenerator.ts`: Regulatory Archival PDF/A (ISO 19005) export embedding XMP metadata and SHA-256 audit root checksum.
-   - `src/services/reportGenerator.ts`: Enhanced Word (.docx) export with 21 CFR Part 11 electronic signature block and cryptographic audit trail ledger.
+   - `src/services/pdfReportGenerator.ts`: Research PDF export containing XMP metadata and SHA-256 checksum; **PDF/A conformance has not been established**.
+   - `src/services/reportGenerator.ts`: Word (.docx) research draft with internal sign-off records and local audit history; not a validated 21 CFR Part 11 signature.
 
 ---
 
@@ -34,11 +34,11 @@ Every feature identified from the authoritative request (`ORIGINAL_REQUEST.md §
 | 6 | Multi-Model Benchmarking Table | Head-to-head comparison of Polynomial RSM, ANN MLP, SVR, and Ensemble Stacking with $R^2, R^2_{adj}, RMSE, AICc, BIC$ | M2 | ORIGINAL_REQUEST R2 |
 | 7 | Cryptographic SHA-256 Tamper-Evident Audit Trail | Cryptographic hash chain tracking experiment changes, DoE settings, and model training parameters with canonical JSON serialization | M3 | ORIGINAL_REQUEST R3 |
 | 8 | Integrity Verification Checksum Engine | Instant detection of unauthorized alterations, single-character tampering in audit history or state (`verifyAuditTrailIntegrity`) | M3 | ORIGINAL_REQUEST R3 |
-| 9 | 21 CFR Part 11 / Annex 11 Electronic Sign-Off | 3-tier electronic sign-off workflow (Analyst / Reviewer / Approver) with cryptographic binding, reason for signing, and record locking | M3 | ORIGINAL_REQUEST R3 |
+| 9 | Internal electronic sign-off (Part 11/Annex 11 validation outstanding) | 3-tier recorded sign-off workflow (Analyst / Reviewer / Approver), checksum, reasons, and local edit lock without independent signer authentication | M3 | ORIGINAL_REQUEST R3 |
 | 10 | Interactive 3D Design Space Surface | Plotly 3D sweet-spot surface view with $Z = \text{Margin}_{\min}$ and semi-transparent acceptance boundary plane at $Z = 0$ | M4 | ORIGINAL_REQUEST R4 |
 | 11 | Dynamic Slicing Slider for 3rd Factor | Real-time slider for $X_3$ with PAR/NOR color-coded range indicator and auto-scan animation player | M4 | ORIGINAL_REQUEST R4 |
-| 12 | Regulatory Archival PDF/A Export | Export compliant with ISO 19005 (PDF/A) embedding XMP metadata and SHA-256 audit root checksum | M4 | ORIGINAL_REQUEST R4 |
-| 13 | Enhanced Regulatory Word (.docx) Export | Word export containing cryptographic audit ledger and 21 CFR Part 11 electronic signature manifestation | M4 | ORIGINAL_REQUEST R4 |
+| 12 | Research PDF Export (PDF/A validation outstanding) | PDF export with XMP metadata and SHA-256 checksum; no ISO 19005 conformance claim | M4 | ORIGINAL_REQUEST R4 |
+| 13 | Word (.docx) Research Draft | Word export containing local audit history and internal sign-off records | M4 | ORIGINAL_REQUEST R4 |
 | 14 | Automated Scientific Test Suite & Quality Gates | Comprehensive Vitest suites (`definitiveScreening.test.ts`, `geneticOptimizer.test.ts`, `mixturePolytope.test.ts`, `explainableAI.test.ts`, `modelBenchmarking.test.ts`, `projectGovernance.test.ts`), zero TypeScript build errors, zero ESLint warnings | M5 | Acceptance Criteria |
 
 ---
@@ -49,10 +49,10 @@ Every feature identified from the authoritative request (`ORIGINAL_REQUEST.md §
 |---|------|-------|-------------|--------|
 | M1 | Advanced DoE & Metaheuristic Optimization | DSD generator, Continuous GA + Nelder-Mead desirability optimizer, Piepel mixture polyhedral bounds | none | DONE (34 unit + 30 E2E tests passing) |
 | M2 | Explainable AI & Multi-Model Benchmarking | ANN AICc/BIC/$R^2_{adj}$, Garson/Olden/SHAP XAI engine, SVR + Ensemble benchmarking table | none | DONE (20 unit + 13 E2E tests passing) |
-| M3 | GxP Governance & 21 CFR Part 11 Audit Trail | Pure TypeScript SHA-256, canonical JSON, tamper-evident hash chain, integrity verification, 3-tier sign-off workflow | none | DONE (42 unit + 13 E2E tests passing) |
-| M4 | 3D Design Space & Regulatory Archival Reporting | Plotly 3D sweet-spot surface view, slice factor slider & auto-scan, Archival PDF/A (ISO 19005-1), Word (.docx) export with audit trail | none | DONE (9 unit + 14 E2E tests passing) |
+| M3 | Local Governance & Integrity Tracking | Pure TypeScript SHA-256, canonical JSON, local hash chain, integrity checking, 3-tier sign-off UI; Part 11 compliance requires separate validation | none | FUNCTIONAL WORKFLOW DONE (42 unit + 13 E2E tests originally reported) |
+| M4 | 3D Design Space & Research Reporting | Plotly 3D sweet-spot surface view, slice factor slider & auto-scan, research PDF and Word (.docx) export; PDF/A conformance not established | none | FUNCTIONAL WORKFLOW DONE (9 unit + 14 E2E tests originally reported) |
 | M5 | Final E2E Integration & Verification Gates | 100% E2E test pass, adversarial test hardening, zero TypeScript build errors, zero lint warnings | M1, M2, M3, M4 | DONE (Reviewers, Challengers, and Forensic Auditor APPROVED — Gate Result: PASS) |
-| P0-P2 | Remediation & Production Hardening | P0 Hotfixes (Zod, Scheffé, D-optimal, Desirability), P1 Scale (IndexedDB, Web Worker, Code Splitting), P2 Compliance (Calibrated GxP Claims, User Session, WebCrypto, Consent Mode v2) | none | DONE (29 test files, 372 tests passing — 100% Pass) |
+| P0-P2 | Remediation & Research Workflow Hardening | P0 Hotfixes (Zod, Scheffé, D-optimal, Desirability), P1 Scale (IndexedDB, Web Worker, Code Splitting), P2 GxP-scoping and local governance workflows | none | IMPLEMENTED FOR RESEARCH (35 test files, 419 tests passing as of 2026-10-09; formal CSV/Part 11 validation outstanding) |
 
 ---
 

@@ -273,7 +273,7 @@ describe('Monte Carlo Robustness & Statistical Coherence', () => {
     expect(mc.varianceDecomposition!['Y1'].measurementVariance).toBeGreaterThan(0);
     expect(mc.varianceDecomposition!['Y2'].measurementVariance).toBeGreaterThan(0);
 
-    // Verify PDF/A generation with this MC result
+    // Verify research PDF generation with this MC result
     const pdfBytes = generateRegulatoryPDFABuffer(cs, { monteCarlo: mc });
     expect(pdfBytes).toBeInstanceOf(Uint8Array);
     const pdfText = new TextDecoder('utf-8').decode(pdfBytes);

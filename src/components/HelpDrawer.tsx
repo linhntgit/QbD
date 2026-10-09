@@ -244,7 +244,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
     { key: 'neural', label: '5. Mạng nơ-ron', short: 'Neural & XAI', icon: BrainCircuit, standard: 'ANN & XAI (SHAP)' },
     { key: 'rsm', label: '6. Mặt đáp', short: 'Response Surface & 3D', icon: Compass, standard: 'ICH Q8(R2) & 3D' },
     { key: 'design_space', label: '7. Không gian thiết kế', short: 'Design Space & 3D', icon: Boxes, standard: 'ICH Q8/Q9/Q10 & 3D' },
-    { key: 'report', label: '8. Báo cáo hồ sơ', short: 'CTD & PDF/A', icon: FileCheck2, standard: 'CTD & ISO 19005 PDF/A' },
+    { key: 'report', label: '8. Báo cáo hồ sơ', short: 'CTD & PDF', icon: FileCheck2, standard: 'CTD tham khảo & PDF nghiên cứu' },
   ];
 
   const currentCQAObj = project.cqas.find((c) => c.code === selectedCQA) || project.cqas[0];
@@ -1833,10 +1833,10 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   <br />1. <strong>Kiểm tra cổng sẵn sàng khoa học (Scientific Readiness Gate):</strong> Xác nhận hệ thống đã thỏa mãn 4 điều kiện cốt lõi (dữ liệu thực nghiệm đầy đủ, mô hình hợp lệ, điểm tối ưu Desirability &gt; 0, và hoàn thành mô phỏng Monte Carlo).
                   <br />2. <strong>Chọn công cụ mô hình hóa nguồn:</strong> Bấm nút <em>"Đa thức (ANOVA)"</em> hoặc <em>"Mạng nơ-ron AI"</em> để chỉ định tập mô hình sẽ đưa vào bảng biểu và kết luận của báo cáo.
                   <br />3. <strong>Rà soát các mục báo cáo:</strong> Kiểm tra tên dự án, hoạt chất, hàm lượng/nồng độ, dạng bào chế và ngày bắt đầu trong bảng đầu báo cáo. Dùng mục lục bên trái, đặc biệt mục <strong>5b. Mạng nơ-ron</strong> (chi tiết cấu trúc số chiều đầu vào <InlineMath math="d_X" /> và cơ chế khử nhiễu block), <strong>6c. Thí nghiệm xác nhận phương án tối ưu</strong>, <strong>7. Bảng chiến lược kiểm soát (ICH Q10)</strong> và <strong>8. Đánh giá độ bền vững &amp; phân rã phương sai (ICH Q14)</strong>, để đối chiếu toàn diện tính vững chắc của hồ sơ trước khi ban hành.
-                  <br />4. <strong>Thực hiện ký duyệt điện tử 3 cấp (21 CFR Part 11 sign-off):</strong> Ký theo phân quyền nghiêm ngặt <em>Analyst (Tác giả)</em> &rarr; <em>Reviewer (Thẩm định kỹ thuật)</em> &rarr; <em>Approver (Phê duyệt pháp lý)</em>. Sau khi Approver ký, hồ sơ được khóa mật mã học (Cryptographic Record Lock).
-                  <br />5. <strong>Xuất báo cáo lưu trữ pháp lý:</strong>
+                  <br />4. <strong>Ghi nhận xác nhận nội bộ 3 cấp:</strong> Nhập vai trò <em>Analyst</em> &rarr; <em>Reviewer</em> &rarr; <em>Approver</em>. Khi chọn Approver, hồ sơ được khóa chỉnh sửa trong giao diện. Ứng dụng chưa xác thực độc lập danh tính, quyền hạn người ký hoặc đáp ứng 21 CFR Part 11.
+                  <br />5. <strong>Xuất báo cáo nghiên cứu để rà soát:</strong>
                   <ul style={{ paddingLeft: '1.2rem', margin: '0.2rem 0' }}>
-                    <li>Bấm nút <strong>"Xuất PDF/A pháp lý (ISO 19005)"</strong> để tạo file PDF/A-1b đạt chuẩn nộp hồ sơ eCTD cho US FDA/EMA với mã băm SHA-256 nhúng trong siêu dữ liệu XMP.</li>
+                    <li>Bấm nút <strong>"Xuất báo cáo nghiên cứu (PDF)"</strong> để tạo PDF có nhúng mã băm SHA-256 trong siêu dữ liệu XMP. Tệp chưa được xác nhận đạt PDF/A-1b và không sẵn sàng nộp eCTD.</li>
                     <li>Bấm nút <strong>"Tải bản thảo Word (.docx)"</strong> để xuất tài liệu Word giàu định dạng phục vụ trao đổi và rà soát nội bộ.</li>
                     <li>Bấm nút <strong>"In / xuất PDF"</strong> để in trực tiếp qua hộp thoại in của trình duyệt.</li>
                   </ul>
@@ -1855,19 +1855,19 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.3rem', color: '#334155', lineHeight: 1.5 }}>
                     <li><strong>Đa thức (ANOVA):</strong> Chuyển nguồn dữ liệu báo cáo sang mô hình hồi quy OLS bậc hai cổ điển, bảng phân tích ANOVA, hệ số hồi quy và đồ thị tương tác.</li>
                     <li><strong>Mạng nơ-ron AI:</strong> Chuyển nguồn dữ liệu báo cáo sang mô hình học sâu nhân tạo (ANN MLP), kiến trúc topo nơ-ron, ma trận trọng số và phân tích tầm quan trọng biến XAI.</li>
-                    <li><strong>Xuất PDF/A pháp lý (ISO 19005):</strong> Tạo tệp tài liệu số theo tiêu chuẩn quốc tế ISO 19005-1:2005 (PDF/A-1b), tự động nhúng toàn bộ bảng chữ ký điện tử 21 CFR Part 11, chuỗi kiểm toán bất biến và mã băm SHA-256 Root Checksum.</li>
+                    <li><strong>Xuất báo cáo nghiên cứu (PDF):</strong> Tạo tài liệu PDF chứa bảng thông tin chữ ký nội bộ, lịch sử phiên bản và mã băm SHA-256. Đây chưa phải tệp PDF/A được xác nhận tuân thủ ISO 19005 hoặc chứng từ chữ ký số đáp ứng 21 CFR Part 11.</li>
                     <li><strong>Tải bản thảo Word (.docx):</strong> Xuất tài liệu Microsoft Word hoàn chỉnh chứa đầy đủ các bảng chỉ tiêu, công thức toán học KaTeX, cấu trúc QTPP, FMEA và chiến lược kiểm soát.</li>
                     <li><strong>In / xuất PDF:</strong> Mở hộp thoại in ấn tiêu chuẩn của trình duyệt để in ra giấy hoặc lưu bản in nhanh.</li>
                   </ul>
                 </div>
 
                 <div style={{ backgroundColor: '#f0fdf4', padding: '0.6rem', borderRadius: '0.375rem', border: '1px solid #bbf7d0' }}>
-                  <strong style={{ color: '#166534' }}>2. Banner mã băm kiểm toán mật mã học (21 CFR Part 11 Root Checksum):</strong>
+                  <strong style={{ color: '#166534' }}>2. Banner mã băm kiểm tra tính toàn vẹn nội bộ (Root Checksum):</strong>
                   <p style={{ marginTop: '0.3rem', color: '#14532d', lineHeight: 1.5 }}>
                     Hiển thị mã băm SHA-256 (64 ký tự hex) được tính toán tự động theo thời gian thực từ toàn bộ cấu trúc dự án sau khi đã chuẩn hóa qua lược đồ RFC 8785 JCS. Kèm huy hiệu xác thực:
                   </p>
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.2rem', color: '#14532d', lineHeight: 1.5 }}>
-                    <li><strong>✓ Chuỗi hash bất biến hợp lệ (Xanh lá):</strong> Xác nhận mọi mắt xích trong chuỗi khối lịch sử đều bảo toàn vẹn toàn bộ dữ liệu, không có bất kỳ thao tác sửa đổi ngầm nào ngoài hệ thống.</li>
+                    <li><strong>✓ Chuỗi hash nhất quán (Xanh lá):</strong> Kiểm tra chuỗi mã băm hiện lưu không phát hiện sai lệch; kết quả không loại trừ việc thay thế toàn bộ dữ liệu và chuỗi hash trên thiết bị.</li>
                     <li><strong>⚠ Dữ liệu bị can thiệp (Đỏ):</strong> Cảnh báo cấu trúc dự án đã bị thay đổi hoặc sai lệch so với chuỗi kiểm toán, chỉ rõ mắt xích vi phạm để QA thanh tra.</li>
                   </ul>
                 </div>
@@ -1889,7 +1889,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                     <li><strong>6c. Thí nghiệm xác nhận phương án tối ưu:</strong> Điều kiện thực hiện, nguồn mô hình, số mẻ; dự đoán và trung bình thực tế ± SD, bias, RMSE; kết luận riêng về tiêu chuẩn, ngưỡng sai lệch thực tiễn, khoảng dự đoán và tương đương. Có chi tiết và cảnh báo theo từng mẻ; nếu chưa tạo hồ sơ, báo cáo ghi rõ chưa có dữ liệu xác nhận.</li>
                     <li><strong>7. Chiến lược kiểm soát toàn diện (ICH Q10):</strong> Phân loại CMA, CPP, IPC, tiêu chuẩn xuất xưởng thành phẩm, dải vận hành thường quy (NOR) và dải chứng minh chấp nhận được (PAR).</li>
                     <li><strong>8. Độ bền vững quy trình (Monte Carlo &amp; phân rã phương sai ICH Q14):</strong> Kết quả mô phỏng hàng ngàn lô ảo theo chế độ RSD chung hoặc từng biến; bảng đánh giá năng lực &amp; hiệu năng quy trình từng CQA (Ppk/Cpk) đối chiếu mốc chuẩn 3σ (0.27% lỗi / 2.700 PPM) và chuẩn dược phẩm 4σ (≥ 1.33 / ≤ 63 PPM); bảng phân rã phương sai thành phần (s²process, s²residual, s²meas) cùng khuyến cáo thẩm định phương pháp phân tích theo ICH Q14.</li>
-                    <li><strong>9. Ký duyệt điện tử &amp; Audit Trail:</strong> Bảng biểu chữ ký điện tử 3 cấp độ (Analyst, Reviewer, Approver) tuân thủ 21 CFR Part 11 và sổ cái chuỗi khối bất biến.</li>
+                    <li><strong>9. Xác nhận nội bộ &amp; Audit Trail:</strong> Bảng thông tin xác nhận 3 cấp (Analyst, Reviewer, Approver) và lịch sử mã băm nội bộ; chưa được thẩm định tuân thủ 21 CFR Part 11.</li>
                     <li><strong>Quản trị dự án &amp; lịch sử phiên bản:</strong> Tạo snapshot lưu trữ, đối chiếu sai khác và kiểm tra tính toàn vẹn chuỗi kiểm toán.</li>
                   </ol>
                 </div>
@@ -1903,13 +1903,13 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
             content: (
               <div style={{ fontSize: '0.78rem', color: '#334155', lineHeight: 1.6 }}>
                 <p>
-                  Hệ thống báo cáo tích hợp kiến trúc bảo mật cấp doanh nghiệp dược phẩm, đáp ứng nghiêm ngặt hướng dẫn US FDA 21 CFR Part 11, EU GMP Annex 11 và tiêu chuẩn lưu trữ số ISO 19005-1:
+                  Hệ thống hỗ trợ theo dõi mã băm, lịch sử thay đổi và soạn báo cáo phục vụ nghiên cứu. Việc tuân thủ US FDA 21 CFR Part 11, EU GMP Annex 11 hoặc ISO 19005-1 cần được thẩm định độc lập trong môi trường vận hành phù hợp:
                 </p>
 
                 <div style={{ backgroundColor: '#f1f5f9', padding: '0.6rem', borderRadius: '0.375rem', marginTop: '0.5rem', border: '1px solid #cbd5e1' }}>
                   <strong style={{ color: '#1e3a8a' }}>1. Thuật toán băm mật mã học FIPS 180-4 SHA-256:</strong>
                   <p style={{ marginTop: '0.2rem' }}>
-                    Sử dụng hàm băm mật mã học tiêu chuẩn liên bang Hoa Kỳ (Federal Information Processing Standard) <strong>SHA-256</strong> với độ dài khóa 256-bit, tạo ra chuỗi định danh 64 ký tự thập lục phân (hexadecimal). Thuật toán có tính chất một chiều (one-way function) và khả năng chống va chạm (collision resistance) tuyệt đối, đảm bảo không thể tái lập hay giả mạo dữ liệu.
+                    Sử dụng hàm băm <strong>SHA-256</strong> để tạo chuỗi định danh 64 ký tự thập lục phân (hexadecimal). Mã băm giúp phát hiện thay đổi dữ liệu khi có bản tham chiếu tin cậy; không thay thế xác thực người dùng, chữ ký số hoặc kiểm soát truy cập.
                   </p>
                 </div>
 
@@ -1926,7 +1926,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 </div>
 
                 <div style={{ backgroundColor: '#f1f5f9', padding: '0.6rem', borderRadius: '0.375rem', marginTop: '0.5rem', border: '1px solid #cbd5e1' }}>
-                  <strong style={{ color: '#15803d' }}>3. Mô hình chuỗi khối kiểm toán bất biến (Tamper-Evident Hash Chain):</strong>
+                  <strong style={{ color: '#15803d' }}>3. Chuỗi mã băm kiểm tra thay đổi nội bộ (Tamper-Evident Hash Chain):</strong>
                   <p style={{ marginTop: '0.2rem' }}>
                     Mỗi hành động thay đổi dữ liệu hoặc lưu snapshot được ghi lại thành một mắt xích (block) liên kết chặt chẽ với mắt xích trước đó qua công thức:
                   </p>
@@ -1935,14 +1935,14 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                     <BlockMath math="\text{PayloadHash}_n = \text{SHA256}\Big(\text{JCS}\big(\text{ProjectPayload}_n\big)\Big)" />
                   </div>
                   <p>
-                    Mắt xích đầu tiên (Genesis Block) có <InlineMath math="\text{EntryHash}_0 = 00000000\dots0000" /> (64 số 0). Khi kiểm toán viên hoặc hệ thống kiểm tra tính toàn vẹn (Integrity Check), thuật toán sẽ duyệt từ mắt xích 1 đến mắt xích <InlineMath math="N" />. Nếu bất kỳ byte dữ liệu nào trong quá khứ bị chỉnh sửa trái phép, mã băm tại mắt xích đó sẽ sai khác ngay lập tức, làm đứt gãy chuỗi và chỉ đích danh chỉ số vi phạm (<InlineMath math="\text{tamperedIndex}" />).
+                    Mắt xích đầu tiên (Genesis Block) có <InlineMath math="\text{EntryHash}_0 = 00000000\dots0000" /> (64 số 0). Khi kiểm tra tính toàn vẹn (Integrity Check), thuật toán duyệt từ mắt xích 1 đến mắt xích <InlineMath math="N" /> để tìm sai lệch so với các mã băm đang lưu và trả về vị trí nghi vấn (<InlineMath math="\text{tamperedIndex}" />). Cần đối chiếu với bản sao lưu tin cậy để phát hiện trường hợp toàn bộ dữ liệu và chuỗi hash bị thay thế cùng lúc.
                   </p>
                 </div>
 
                 <div style={{ backgroundColor: '#f1f5f9', padding: '0.6rem', borderRadius: '0.375rem', marginTop: '0.5rem', border: '1px solid #cbd5e1' }}>
-                  <strong style={{ color: '#7c3aed' }}>4. Quy chuẩn ký duyệt điện tử 3 cấp &amp; khóa bản ghi (21 CFR Part 11):</strong>
+                  <strong style={{ color: '#7c3aed' }}>4. Quy trình xác nhận nội bộ 3 cấp &amp; khóa giao diện:</strong>
                   <p style={{ marginTop: '0.2rem' }}>
-                    Mỗi chữ ký điện tử tạo ra một bản ghi mật mã học không thể phủ nhận (non-repudiation) với mã băm chữ ký:
+                    Mỗi lần xác nhận bằng tên và vai trò do người dùng nhập tạo ra bản ghi có mã băm; mã băm không chứng thực danh tính, không bảo đảm tính không thể phủ nhận (non-repudiation):
                   </p>
                   <div style={{ margin: '0.4rem 0' }}>
                     <BlockMath math="\text{SignatureChecksum} = \text{SHA256}\Big(\text{JCS}\big(\{\text{Signer}, \text{Role}, \text{Timestamp}, \text{Reason}, \text{PayloadHash}\}\big)\Big)" />
@@ -1950,18 +1950,18 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.2rem' }}>
                     <li><strong>Cấp 1 - Analyst (Authorship):</strong> Xác nhận thiết kế DoE, số liệu thực nghiệm và xây dựng mô hình.</li>
                     <li><strong>Cấp 2 - Reviewer (Technical Review):</strong> Thẩm định phương pháp thống kê ANOVA/ANN, dư sai và tính phù hợp.</li>
-                    <li><strong>Cấp 3 - Approver (Regulatory Approval):</strong> Phê chuẩn chính thức Design Space, PAR/NOR và Chiến lược kiểm soát. Khi hoàn thành cấp 3, dự án được chuyển sang chế độ <strong>Khóa bản ghi bất biến (Cryptographic Record Lock)</strong>. Mọi chỉnh sửa tiếp theo bắt buộc phải qua quy trình mở khóa có giải trình (QA Justification).</li>
+                    <li><strong>Cấp 3 - Approver (Internal Approval):</strong> Xác nhận nội bộ Design Space, PAR/NOR và Chiến lược kiểm soát. Ứng dụng bật <strong>cờ khóa chỉnh sửa giao diện</strong> và yêu cầu ghi lý do khi mở khóa; thao tác này không thay thế phân quyền và kiểm soát truy cập phía máy chủ.</li>
                   </ul>
                 </div>
 
                 <div style={{ backgroundColor: '#f1f5f9', padding: '0.6rem', borderRadius: '0.375rem', marginTop: '0.5rem', border: '1px solid #cbd5e1' }}>
-                  <strong style={{ color: '#b45309' }}>5. Tiêu chuẩn lưu trữ tài liệu pháp lý ISO 19005-1 (PDF/A-1b):</strong>
+                  <strong style={{ color: '#b45309' }}>5. Lưu trữ PDF và yêu cầu xác nhận PDF/A (ISO 19005-1):</strong>
                   <p style={{ marginTop: '0.2rem' }}>
-                    Định dạng PDF/A-1b là chuẩn bắt buộc cho lưu trữ điện tử dài hạn và nộp hồ sơ eCTD cho US FDA và EMA:
+                    PDF/A-1b là một tiêu chuẩn lưu trữ tài liệu dài hạn. Bộ xuất PDF hiện tại chưa nhúng font và cấu hình màu theo yêu cầu PDF/A, vì vậy cần chuyển đổi và xác nhận bằng công cụ kiểm định PDF/A trước khi dùng trong quy trình lưu trữ có kiểm soát:
                   </p>
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.2rem' }}>
                     <li>Tự chứa hoàn toàn (Self-contained): Nhúng trực tiếp font chữ và từ điển màu chuẩn DeviceRGB Color Intent.</li>
-                    <li>Nhúng luồng siêu dữ liệu XMP Metadata (Extensible Metadata Platform) chuẩn hóa với lược đồ PDF/A Extension Schema, lưu trữ vĩnh viễn mã băm gốc <code style={{ fontSize: '0.72rem' }}>urn:sha256:rootChecksum</code>.</li>
+                    <li>PDF nghiên cứu của ứng dụng hiện nhúng siêu dữ liệu XMP cùng mã băm gốc SHA-256; đây không phải chứng nhận PDF/A.</li>
                     <li>Nghiêm cấm các đoạn mã JavaScript động, tập tin âm thanh/video hoặc mã thực thi không an toàn nhằm đảm bảo tài liệu hiển thị đồng nhất qua hàng thập kỷ.</li>
                   </ul>
                 </div>
@@ -1969,7 +1969,7 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                 <div style={{ backgroundColor: '#f1f5f9', padding: '0.6rem', borderRadius: '0.375rem', marginTop: '0.5rem', border: '1px solid #cbd5e1' }}>
                   <strong style={{ color: '#1e3a8a' }}>6. Cổng sẵn sàng khoa học (Scientific Readiness Gate):</strong>
                   <p style={{ marginTop: '0.2rem' }}>
-                    Nút xuất báo cáo PDF/A và Word được kiểm soát nghiêm ngặt bởi 4 điều kiện kỹ thuật tự động:
+                    Nút xuất báo cáo PDF và Word sử dụng bộ điều kiện sẵn sàng khoa học sau (không tương đương quy trình xác nhận tuân thủ pháp lý):
                   </p>
                   <ul style={{ paddingLeft: '1.2rem', marginTop: '0.2rem' }}>
                     <li>✓ Có đủ số liệu thực nghiệm cho tất cả các CQA trong bảng DoE Runs.</li>
@@ -1987,10 +1987,10 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
             icon: Lightbulb,
             content: (
               <ul style={{ paddingLeft: '1.2rem', fontSize: '0.78rem', color: '#334155', lineHeight: 1.6 }}>
-                <li><strong>Trình tự ký duyệt chuẩn mực:</strong> Luôn tuân thủ tuần tự ký từ Analyst &rarr; Reviewer &rarr; Approver. Việc ký đúng phân quyền bảo đảm hồ sơ sẵn sàng cho mọi cuộc thanh tra từ Cục Quản lý Dược (DAV), US FDA hoặc EMA.</li>
+                <li><strong>Trình tự rà soát nội bộ:</strong> Ghi nhận tuần tự Analyst &rarr; Reviewer &rarr; Approver và đối chiếu danh tính trong quy trình quản lý riêng của đơn vị. Việc chọn vai trò trong app không chứng minh phân quyền và không làm hồ sơ tự động sẵn sàng cho thanh tra.</li>
                 <li><strong>Cơ chế mở khóa có giải trình (QA Unlock Justification):</strong> Sau khi Approver đã ký phê duyệt và khóa bản ghi, nếu phát sinh nhu cầu sửa đổi tham số nghiên cứu, hệ thống yêu cầu chuyên gia QA nhập lý do giải trình. Thao tác mở khóa này sẽ tự động ghi một mắt xích mới vào Audit Trail và hủy bỏ trạng thái phê chuẩn trước đó, yêu cầu quy trình ký duyệt lại từ đầu.</li>
                 <li><strong>Lưu giữ &amp; Đối chiếu Root Checksum:</strong> Hãy ghi lại chuỗi 64 ký tự SHA-256 Root Checksum vào sổ tay lô hoặc biên bản thẩm định. Bất kỳ sự thay đổi nào đối với file JSON dự án đều có thể phát hiện ngay lập tức bằng cách so sánh mã băm này.</li>
-                <li><strong>Phối hợp PDF/A và Word (.docx):</strong> Sử dụng tệp PDF/A-1b làm tài liệu pháp lý lưu trữ vĩnh viễn và đính kèm hồ sơ kỹ thuật; sử dụng tệp Word (.docx) làm tài liệu làm việc linh hoạt trong các buổi bảo vệ hội đồng hoặc bổ sung phụ lục thực nghiệm.</li>
+                <li><strong>Phối hợp PDF và Word (.docx):</strong> Dùng tệp PDF nghiên cứu để rà soát và chia sẻ nội bộ, Word để chỉnh sửa. Quy trình lưu trữ pháp lý đòi hỏi tài liệu và hệ thống được xác nhận riêng.</li>
                 <li><strong>Sao lưu định kỳ (JSON Snapshots):</strong> Luôn bấm nút <em>"Lưu"</em> trên thanh điều hướng để tải file JSON về máy tính và lưu trữ vào hệ thống quản lý tài liệu điện tử (EDMS) có phân quyền của viện nghiên cứu / nhà máy.</li>
               </ul>
             ),
@@ -2025,18 +2025,18 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   vietnamese="Định dạng tài liệu lưu trữ điện tử pháp lý"
                   tag="Chuẩn lưu trữ quốc tế"
                   tagColor="primary"
-                  definition="Tiêu chuẩn ISO chuyên biệt dành cho việc bảo tồn và lưu trữ hồ sơ điện tử dài hạn độc lập với thiết bị. PDF/A-1b bắt buộc nhúng font chữ, từ điển màu sắc DeviceRGB và siêu dữ liệu XMP, đồng thời loại trừ triệt để mã lệnh động nhằm đảm bảo tài liệu giữ nguyên vẹn hình thức và nội dung khi mở lại sau hàng chục năm trong hồ sơ eCTD của US FDA và EMA."
+                  definition="Tiêu chuẩn ISO 19005 về lưu trữ tài liệu điện tử dài hạn, yêu cầu tài liệu tự chứa tài nguyên cần thiết (như phông chữ), quản lý màu bằng hồ sơ ICC và siêu dữ liệu phù hợp, đồng thời hạn chế nội dung động. Xuất PDF có XMP chưa đồng nghĩa đạt PDF/A; cần kiểm định tệp cụ thể bằng công cụ phù hợp."
                 />
                 <GlossaryTermCard
                   term="21 CFR Part 11 Electronic Sign-off"
                   vietnamese="Quy chuẩn chữ ký điện tử US FDA"
-                  tag="Tuân thủ pháp lý GxP"
+                  tag="Quy định tham khảo"
                   tagColor="teal"
-                  definition="Quy định của Cục Quản lý Thực phẩm và Dược phẩm Hoa Kỳ về hồ sơ điện tử và chữ ký điện tử. Quy định rằng chữ ký số có giá trị pháp lý tương đương chữ ký tay khi đáp ứng đủ các yếu tố: danh tính người ký, vai trò (Analyst, Reviewer, Approver), tem thời gian chính xác, lý do ký và liên kết mật mã học không thể tách rời với nội dung dự án."
+                  definition="21 CFR Part 11 quy định về hồ sơ điện tử và chữ ký điện tử trong phạm vi áp dụng của US FDA, bao gồm kiểm soát truy cập, nhận dạng người ký, quy trình thẩm định và lưu giữ hồ sơ. Bản ghi tên/vai trò và mã băm SHA-256 tại máy khách của ứng dụng chưa đáp ứng các yêu cầu đó."
                 />
                 <GlossaryTermCard
                   term="Tamper-Evident SHA-256 Hash Chain"
-                  vietnamese="Chuỗi khối băm kiểm toán bất biến"
+                  vietnamese="Chuỗi mã băm phát hiện thay đổi cục bộ"
                   tag="Mật mã học FIPS 180-4"
                   tagColor="purple"
                   definition="Cấu trúc dữ liệu chuỗi khối an toàn mật mã học, trong đó mỗi thao tác hoặc snapshot kế thừa mã băm của mắt xích liền trước. Mọi nỗ lực can thiệp hoặc sửa đổi dữ liệu dù chỉ 1 ký tự sẽ làm thay đổi toàn bộ chuỗi hash từ mắt xích đó trở về sau, cho phép hệ thống lập tức phát hiện sự xâm phạm và định vị chính xác vị trí bị can thiệp."
@@ -2049,11 +2049,11 @@ export const HelpDrawer: React.FC<HelpDrawerProps> = ({
                   definition="Tiêu chuẩn quốc tế chuẩn hóa cấu trúc JSON (sắp xếp khóa từ điển, biểu diễn số học thống nhất) trước khi đưa vào hàm băm mật mã học. JCS bảo đảm cùng một đối tượng dự án sẽ luôn tạo ra một chuỗi byte duy nhất và mã băm SHA-256 đồng nhất 100% trên mọi trình duyệt, hệ điều hành và nền tảng runtime."
                 />
                 <GlossaryTermCard
-                  term="Cryptographic Record Lock"
-                  vietnamese="Khóa bản ghi mật mã học"
+                  term="Local Record Lock"
+                  vietnamese="Khóa chỉnh sửa nội bộ"
                   tag="Bảo mật hồ sơ"
                   tagColor="danger"
-                  definition="Cơ chế bảo vệ dữ liệu tự động kích hoạt ngay sau khi hồ sơ nhận đủ chữ ký phê duyệt cấp cao nhất (Approver). Khi đã khóa, mọi thuộc tính của dự án không thể bị chỉnh sửa trực tiếp. Để tái mở quy trình nghiên cứu, bắt buộc phải có thẩm quyền QA mở khóa kèm lý do giải trình lưu vết vĩnh viễn."
+                  definition="Sau khi chọn Approver, ứng dụng bật cờ khóa và chặn thao tác chỉnh sửa thông thường trong giao diện. Người sử dụng có thể mở khóa kèm lý do trong lịch sử nội bộ. Cơ chế này không xác thực vai trò QA, không ngăn sửa dữ liệu ngoài ứng dụng và không bảo đảm lưu vết vĩnh viễn."
                 />
                 <GlossaryTermCard
                   term="CTD Module 3.2.P.2"

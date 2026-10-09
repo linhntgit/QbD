@@ -224,8 +224,8 @@ function createMockProject(): QBDProject {
   };
 }
 
-describe('Regulatory Archival PDF/A Generator (ISO 19005 & Checksum)', () => {
-  it('should generate valid PDF/A byte stream with ISO 19005 conformance and embedded SHA-256 root checksum', async () => {
+describe('Research PDF Generator (checksum and provenance)', () => {
+  it('generates a research PDF without falsely asserting PDF/A compliance', async () => {
     const project = createMockProject();
     const bytes = generateRegulatoryPDFABuffer(project);
 
@@ -234,22 +234,23 @@ describe('Regulatory Archival PDF/A Generator (ISO 19005 & Checksum)', () => {
 
     const pdfText = new TextDecoder('utf-8').decode(bytes);
 
-    // 1. Check ISO 19005 PDF/A-1b Header & binary comment
+    // 1. PDF 1.4 header
     expect(pdfText.startsWith('%PDF-1.4')).toBe(true);
-    expect(pdfText).toContain('%\xE2\xE3\xCF\xD3');
+    expect(pdfText).toContain('%QbD Studio Research Report');
 
-    // 2. Check Document Catalog & OutputIntents
+    // 2. No unvalidated PDF/A OutputIntent or identification metadata
     expect(pdfText).toContain('/Type /Catalog');
-    expect(pdfText).toContain('/OutputIntents [3 0 R]');
-    expect(pdfText).toContain('/S /GTS_PDFA1');
-    expect(pdfText).toContain('/OutputConditionIdentifier (sRGB IEC61966-2.1)');
+    expect(pdfText).not.toContain('/OutputIntents');
+    expect(pdfText).not.toContain('/GTS_PDFA1');
 
     // 3. Check Embedded XMP Metadata Stream
     expect(pdfText).toContain('<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>');
-    expect(pdfText).toContain('<pdfaid:part>1</pdfaid:part>');
-    expect(pdfText).toContain('<pdfaid:conformance>B</pdfaid:conformance>');
+    expect(pdfText).not.toContain('<pdfaid:part>');
+    expect(pdfText).not.toContain('<pdfaid:conformance>');
     expect(pdfText).toContain('<dc:identifier>urn:sha256:');
-    expect(pdfText).toContain('sha256AuditRoot');
+    expect(pdfText).toContain('<qbd:sha256AuditRoot>');
+    expect(pdfText).toContain('PDF/A CONFORMANCE NOT VALIDATED');
+    expect(pdfText).toContain(computeProjectPayloadHash(project));
     expect(pdfText).toContain('<?xpacket end="w"?>');
 
     // 4. Check Trailer, Document ID and EOF
@@ -283,7 +284,7 @@ describe('Regulatory Archival PDF/A Generator (ISO 19005 & Checksum)', () => {
     expect(pdfText).toContain('QTPP');
     expect(pdfText).toContain('CQAs');
     expect(pdfText).toContain('CPPs');
-    expect(pdfText).toContain('21 CFR PART 11');
+    expect(pdfText).toContain('Electronic Signature Record');
 
     // Verify electronic signature manifestation
     expect(pdfText).toContain('Dr. Jane Smith');
@@ -460,7 +461,7 @@ describe('Tamper-Evident Reporting Integrity Workflow', () => {
 });
 
 describe('Regulatory Reports with Monte Carlo Custom Variability and Variance Decomposition (Phase 4 & 5)', () => {
-  it('should generate PDF/A report including Monte Carlo custom variability mode, capability table, and variance decomposition', () => {
+  it('generates a research report including Monte Carlo custom variability, capability table, and variance decomposition', () => {
     const project = createMockProject();
 
     const mockMonteCarlo = {

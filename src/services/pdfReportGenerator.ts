@@ -1,16 +1,16 @@
 /**
- * Regulatory Archival PDF/A (ISO 19005-1/2 PDF/A-1b) Report Generator.
+ * Research PDF report generator with XMP metadata and an audit checksum.
  *
- * Pure TypeScript, zero-dependency client-side PDF/A engine designed for
- * US FDA eCTD Module 3.2.P.2 (Pharmaceutical Development) and EMA electronic submissions.
+ * Pure TypeScript client-side PDF report inspired by CTD Module 3.2.P.2.
+ * This exporter does not embed its Type 1 fonts or an ICC output profile;
+ * its output is NOT validated PDF/A and is not a regulatory submission artifact.
  *
- * Key Compliance Features:
- * - ISO 19005-1:2005 (PDF/A-1b) Conformance specification.
- * - Embedded XMP Metadata stream with PDF/A Identification Schema and PDF/A Extension Schema.
+ * Features:
+ * - Embedded XMP metadata for provenance and checksums.
  * - Prominently embedded Cryptographic SHA-256 Audit Root Checksum (urn:sha256:...).
  * - CTD 3.2.P.2 Sections: QTPP, CQAs, CMAs/CPPs, DoE Runs, Statistical Models, Design Space (PAR/NOR),
  *   FMEA Risk Matrix, Control Strategy, Monte Carlo Robustness.
- * - Section 9: 21 CFR Part 11 Electronic Signature Manifestation Table.
+ * - Section 9: Electronic signature information for internal review.
  * - Section 10: Complete Cryptographic Tamper-Evident Audit Trail Ledger Block.
  */
 
@@ -85,9 +85,9 @@ interface PdfPageContent {
 }
 
 /**
- * Builder class for generating compliant ISO 19005 PDF/A-1b documents.
+ * Minimal PDF 1.4 builder; this is not a PDF/A implementation.
  */
-class PdfADocumentBuilder {
+class PdfDocumentBuilder {
   private pages: PdfPageContent[] = [];
   private currentPage: PdfPageContent | null = null;
   private currentY: number = 780; // Start near top of A4 (595 x 842 pt)
@@ -117,7 +117,7 @@ class PdfADocumentBuilder {
       const p = this.currentPage.stream;
       p.push('q');
       p.push('0.12 0.23 0.54 rg'); // Deep Navy Blue
-      p.push('BT /F2 8 Tf 42 815 Td (' + sanitizePdfText('QbD Studio™ — CTD 3.2.P.2 Regulatory Archival Dossier (ISO 19005 PDF/A-1b)') + ') Tj ET');
+      p.push('BT /F2 8 Tf 42 815 Td (' + sanitizePdfText('QbD Studio - CTD 3.2.P.2 Research Report (PDF/A not validated)') + ') Tj ET');
       p.push('0.4 0.45 0.5 rg');
       p.push(`BT /F1 7.5 Tf 400 815 Td (Audit Root: ${this.rootChecksum.slice(0, 16)}...) Tj ET`);
       p.push('0.85 0.88 0.92 RG 0.5 w');
@@ -222,14 +222,14 @@ class PdfADocumentBuilder {
       page.stream.push('0.85 0.88 0.92 RG 0.5 w');
       page.stream.push('42 42 m 553 42 l S');
       page.stream.push('0.4 0.45 0.5 rg');
-      page.stream.push(`BT /F1 7.5 Tf 42 30 Td (ISO 19005-1 PDF/A-1b Archival Dossier | Root Checksum: ${this.rootChecksum.slice(0, 16)}...) Tj ET`);
+      page.stream.push(`BT /F1 7.5 Tf 42 30 Td (Research PDF - PDF/A not validated | Root Checksum: ${this.rootChecksum.slice(0, 16)}...) Tj ET`);
       page.stream.push(`BT /F2 8 Tf 500 30 Td (Trang ${i + 1} / ${totalPages}) Tj ET`);
       page.stream.push('Q');
     }
   }
 
   /**
-   * Builds the complete ISO 19005 PDF/A-1b document with XMP metadata and cross-reference table.
+   * Builds a PDF 1.4 document with XMP metadata and cross-reference table.
    */
   public generatePdfBytes(): Uint8Array {
     this.finishPages();
@@ -247,13 +247,13 @@ class PdfADocumentBuilder {
       return idx;
     };
 
-    // PDF Header per ISO 19005-1 (PDF-1.4 + binary bytes)
-    const headerStr = '%PDF-1.4\n%\xE2\xE3\xCF\xD3\n';
+    // ASCII header. A PDF/A conformance marker is intentionally omitted.
+    const headerStr = '%PDF-1.4\n%QbD Studio Research Report\n';
     currentOffset = new TextEncoder().encode(headerStr).length;
 
     // 1: Catalog
     // 2: Pages tree
-    // 3: OutputIntent
+    // 3: Reserved object to preserve stable object numbering
     // 4: XMP Metadata
     // 5: Font F1 (Helvetica)
     // 6: Font F2 (Helvetica-Bold)
@@ -273,7 +273,6 @@ class PdfADocumentBuilder {
       `  /Type /Catalog\n` +
       `  /Pages 2 0 R\n` +
       `  /Metadata 4 0 R\n` +
-      `  /OutputIntents [3 0 R]\n` +
       `>>`
     );
 
@@ -286,47 +285,27 @@ class PdfADocumentBuilder {
       `>>`
     );
 
-    // 3 0 obj: OutputIntent for PDF/A-1b
-    append(
-      `<<\n` +
-      `  /Type /OutputIntent\n` +
-      `  /S /GTS_PDFA1\n` +
-      `  /OutputConditionIdentifier (sRGB IEC61966-2.1)\n` +
-      `  /Info (sRGB IEC61966-2.1)\n` +
-      `  /RegistryName (http://www.color.org)\n` +
-      `>>`
-    );
+    // 3 0 obj: Unreferenced dictionary; stable object numbering
+    append('<< /Producer (QbD Studio Research PDF) >>');
 
-    // 4 0 obj: Embedded XMP Metadata stream per ISO 19005-1
+    // 4 0 obj: Embedded XMP Metadata stream (no PDF/A assertion)
     const xmpPacket =
       `<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>\n` +
       `<x:xmpmeta xmlns:x="adobe:ns:meta/">\n` +
       `  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">\n` +
-      `    <rdf:Description rdf:about="" xmlns:pdfaid="http://www.aiim.org/pdfa/ns/id/">\n` +
-      `      <pdfaid:part>1</pdfaid:part>\n` +
-      `      <pdfaid:conformance>B</pdfaid:conformance>\n` +
-      `    </rdf:Description>\n` +
       `    <rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/">\n` +
       `      <dc:title><rdf:Alt><rdf:li xml:lang="x-default">${escapeXml(this.title)}</rdf:li></rdf:Alt></dc:title>\n` +
       `      <dc:creator><rdf:Seq><rdf:li>QbD Studio Formulation Suite</rdf:li></rdf:Seq></dc:creator>\n` +
-      `      <dc:description><rdf:Alt><rdf:li xml:lang="x-default">Regulatory Archival Dossier CTD Section 3.2.P.2 with Cryptographic Audit Trail</rdf:li></rdf:Alt></dc:description>\n` +
+      `      <dc:description><rdf:Alt><rdf:li xml:lang="x-default">Research report with CTD 3.2.P.2 sections and local audit history; not validated for regulatory submission</rdf:li></rdf:Alt></dc:description>\n` +
       `      <dc:identifier>urn:sha256:${this.rootChecksum}</dc:identifier>\n` +
       `    </rdf:Description>\n` +
       `    <rdf:Description rdf:about="" xmlns:xmp="http://ns.adobe.com/xap/1.0/">\n` +
       `      <xmp:CreateDate>${new Date().toISOString()}</xmp:CreateDate>\n` +
       `      <xmp:ModifyDate>${new Date().toISOString()}</xmp:ModifyDate>\n` +
-      `      <xmp:CreatorTool>QbD Studio Regulatory Archival Engine (ISO 19005)</xmp:CreatorTool>\n` +
+      `      <xmp:CreatorTool>QbD Studio Research PDF Engine</xmp:CreatorTool>\n` +
       `    </rdf:Description>\n` +
-      `    <rdf:Description rdf:about="" xmlns:pdfaExtension="http://www.aiim.org/pdfa/ns/extension/" xmlns:pdfaProperty="http://www.aiim.org/pdfa/ns/property#">\n` +
-      `      <pdfaExtension:schemas>\n` +
-      `        <rdf:Bag>\n` +
-      `          <rdf:li rdf:parseType="Resource">\n` +
-      `            <pdfaProperty:name>sha256AuditRoot</pdfaProperty:name>\n` +
-      `            <pdfaProperty:valueType>Text</pdfaProperty:valueType>\n` +
-      `            <pdfaProperty:description>SHA-256 Tamper-Evident Audit Root Checksum</pdfaProperty:description>\n` +
-      `          </rdf:li>\n` +
-      `        </rdf:Bag>\n` +
-      `      </pdfaExtension:schemas>\n` +
+      `    <rdf:Description rdf:about="" xmlns:qbd="https://qbd-studio.local/ns/audit/">\n` +
+      `      <qbd:sha256AuditRoot>${this.rootChecksum}</qbd:sha256AuditRoot>\n` +
       `    </rdf:Description>\n` +
       `  </rdf:RDF>\n` +
       `</x:xmpmeta>\n` +
@@ -397,7 +376,7 @@ class PdfADocumentBuilder {
       `<<\n` +
       `  /Size ${objects.length + 1}\n` +
       `  /Root 1 0 R\n` +
-      `  /Info << /Producer (QbD Studio Regulatory Engine) /CreationDate (D:${new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)}Z) >>\n` +
+      `  /Info << /Producer (QbD Studio Research PDF Exporter) /CreationDate (D:${new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)}Z) >>\n` +
       `  /ID [<${docIdHex}> <${docIdHex}>]\n` +
       `>>\n` +
       `startxref\n` +
@@ -410,7 +389,7 @@ class PdfADocumentBuilder {
 }
 
 /**
- * Builds the complete CTD 3.2.P.2 Regulatory Archival Dossier in PDF/A format.
+ * Builds a research dossier PDF. Legacy API naming is retained for callers.
  */
 export function generateRegulatoryPDFABuffer(
   project: QBDProject,
@@ -425,41 +404,47 @@ export function generateRegulatoryPDFABuffer(
   // Retrieve audit trail and compute cryptographic root hash
   const history = options.auditHistory ?? getProjectHistory(project.id);
   const auditVerification = verifyAuditTrailIntegrity(history, project);
-  const rootChecksum = auditVerification.rootHash || computeProjectPayloadHash(project);
+  // An empty audit trail returns the all-zero genesis sentinel. It is not
+  // a checksum of the current project's contents.
+  const rootChecksum = history.length > 0 && auditVerification.rootHash
+    ? auditVerification.rootHash
+    : computeProjectPayloadHash(project);
 
-  const doc = new PdfADocumentBuilder(
+  const doc = new PdfDocumentBuilder(
     `CTD 3.2.P.2 - ${project.name} (${project.moleculeName})`,
     rootChecksum
   );
 
   // =========================================================================
-  // PAGE 1: OFFICIAL REGULATORY COVER & DIGITAL GXP SEAL
+  // PAGE 1: RESEARCH COVER AND LOCAL AUDIT CHECKSUM
   // =========================================================================
   doc.addSpacer(20);
 
   // Regulatory Header Banner
-  doc.addParagraph('UNITED STATES FOOD AND DRUG ADMINISTRATION (US FDA) / EMA eCTD FORMAT', 'F2', 8, 12, 0.4, 0.45, 0.5);
+  doc.addParagraph('RESEARCH DOCUMENT - CTD-INSPIRED STRUCTURE - NOT VALIDATED FOR SUBMISSION', 'F2', 8, 12, 0.4, 0.45, 0.5);
   doc.addParagraph('COMMON TECHNICAL DOCUMENT (CTD) — MODULE 3.2.P.2 PHARMACEUTICAL DEVELOPMENT', 'F2', 9, 14, 0.12, 0.23, 0.54);
   doc.addSpacer(12);
 
   // Main Title Box
   doc.addParagraph('QUALITY BY DESIGN (QbD) PHARMACEUTICAL DEVELOPMENT DOSSIER', 'F2', 15, 20, 0.08, 0.15, 0.35);
-  doc.addParagraph('REGULATORY ARCHIVAL SPECIFICATION — ISO 19005-1 (PDF/A-1b COMPLIANT)', 'F2', 10, 15, 0.05, 0.58, 0.53);
+  doc.addParagraph('RESEARCH PDF - PDF/A CONFORMANCE NOT VALIDATED', 'F2', 10, 15, 0.05, 0.58, 0.53);
   doc.addSpacer(15);
 
   // Digital GxP Seal Box (Tamper-evident verification block)
   doc.addTableRow([
-    { text: 'DIGITAL GxP AUDIT SEAL & INTEGRITY VERIFICATION (21 CFR PART 11 / EU ANNEX 11)', width: 511, isHeader: true, bg: [0.12, 0.23, 0.54] },
+    { text: 'LOCAL HASH-CHAIN INTEGRITY CHECK (NOT A VALIDATED GxP SIGNATURE)', width: 511, isHeader: true, bg: [0.12, 0.23, 0.54] },
   ], 20);
   doc.addTableRow([
-    { text: 'Cryptographic SHA-256 Audit Root Checksum:', width: 220, bold: true, bg: [0.94, 0.96, 0.98] },
+    { text: 'SHA-256 Project / Audit Checksum:', width: 220, bold: true, bg: [0.94, 0.96, 0.98] },
     { text: rootChecksum, width: 291, bold: true, bg: [0.98, 0.98, 1.0] },
   ], 18);
   doc.addTableRow([
     { text: 'Audit Trail Hash-Chain Integrity Status:', width: 220, bold: true, bg: [0.94, 0.96, 0.98] },
     {
-      text: auditVerification.isValid
-        ? '✓ VERIFIED & UNTAMPERED (Full 21 CFR Part 11 Hash Chain Intact)'
+      text: history.length === 0
+        ? 'NO AUDIT ENTRIES - PROJECT CHECKSUM ONLY'
+        : auditVerification.isValid
+        ? 'LOCAL HASH CHAIN VERIFIED (NOT INDEPENDENTLY CERTIFIED)'
         : `⚠ INTEGRITY ALERT: ${auditVerification.reason || 'Tampering Detected'}`,
       width: 291,
       bold: true,
@@ -475,8 +460,8 @@ export function generateRegulatoryPDFABuffer(
     { text: new Date().toISOString(), width: 291 },
   ], 16);
   doc.addTableRow([
-    { text: 'Statutory Regulatory Archival Conformance:', width: 220, bg: [0.94, 0.96, 0.98] },
-    { text: 'ISO 19005-1:2005 PDF/A-1b; US FDA 21 CFR Part 11; ICH Q8(R2), Q9(R1), Q10', width: 291 },
+    { text: 'Regulatory / Archival Validation:', width: 220, bg: [0.94, 0.96, 0.98] },
+    { text: 'NOT VALIDATED for PDF/A, 21 CFR Part 11 or eCTD submission', width: 291 },
   ], 16);
 
   doc.addSpacer(15);
@@ -879,11 +864,11 @@ export function generateRegulatoryPDFABuffer(
   }
 
   // =========================================================================
-  // SECTION 9: 21 CFR PART 11 ELECTRONIC SIGNATURE TABLE
+  // SECTION 9: INTERNAL ELECTRONIC SIGNATURE INFORMATION
   // =========================================================================
   doc.addSectionHeader(
-    '9. Chữ Ký Điện Tử Hợp Chuẩn 21 CFR Part 11 (Electronic Signature Manifestation)',
-    'Chữ ký điện tử có giá trị pháp lý tương đương chữ ký tay theo FDA 21 CFR § 11.50 và § 11.70.'
+    '9. Thông Tin Ky Duyet Noi Bo (Electronic Signature Record)',
+    'Thong tin ky duyet chi phuc vu nghien cuu; chua duoc tham dinh theo 21 CFR Part 11.'
   );
 
   const signatures: ElectronicSignature[] =
@@ -893,7 +878,7 @@ export function generateRegulatoryPDFABuffer(
     { text: 'Cán Bộ Ký Duyệt & Phòng Ban', width: 130, isHeader: true, bg: [0.12, 0.23, 0.54] },
     { text: 'Vai Trò GxP', width: 75, isHeader: true, bg: [0.12, 0.23, 0.54] },
     { text: 'Thời Điểm UTC', width: 90, isHeader: true, bg: [0.12, 0.23, 0.54] },
-    { text: 'Tuyên Bố Ý Nghĩa Pháp Lý (§ 11.50)', width: 120, isHeader: true, bg: [0.12, 0.23, 0.54] },
+    { text: 'Ly Do Ky Duyet Noi Bo', width: 120, isHeader: true, bg: [0.12, 0.23, 0.54] },
     { text: 'Mã Băm Chữ Ký (Checksum)', width: 96, isHeader: true, bg: [0.12, 0.23, 0.54] },
   ], 18);
 
@@ -948,7 +933,7 @@ export function generateRegulatoryPDFABuffer(
   // =========================================================================
   doc.addSectionHeader(
     '10. Sổ Cái Dấu Vết Kiểm Toán Mật Mã Học (Cryptographic Audit Trail Ledger)',
-    'Chuỗi khối SHA-256 bất biến ghi nhận toàn bộ lịch sử thay đổi theo 21 CFR § 11.10(e).'
+    'Lich su snapshot va ma bam SHA-256 de doi chieu noi bo; chua duoc tham dinh GxP.'
   );
 
   doc.addTableRow([
@@ -975,7 +960,7 @@ export function generateRegulatoryPDFABuffer(
     });
 
     if (history.length > 15) {
-      doc.addParagraph(`... và ${history.length - 15} bản ghi kiểm toán tiếp theo trong sổ cái bất biến.`, 'F1', 7.5, 11, 0.5, 0.5, 0.5);
+      doc.addParagraph(`... và ${history.length - 15} bản ghi tiếp theo trong lịch sử mã băm nội bộ.`, 'F1', 7.5, 11, 0.5, 0.5, 0.5);
     }
   } else {
     doc.addTableRow([
@@ -1003,7 +988,7 @@ export function generateRegulatoryPDFABuffer(
 }
 
 /**
- * Client-side Regulatory Archival PDF/A (ISO 19005) export.
+ * Client-side research PDF export (legacy API name retained).
  * Returns a Blob suitable for browser download or programmatic validation.
  */
 export async function exportRegulatoryPDFA(
@@ -1015,7 +1000,7 @@ export async function exportRegulatoryPDFA(
 }
 
 /**
- * Generates and triggers browser file download for Regulatory Archival PDF/A.
+ * Generates and triggers browser download of the research PDF.
  */
 export async function downloadRegulatoryPDFA(
   project: QBDProject,
@@ -1024,6 +1009,6 @@ export async function downloadRegulatoryPDFA(
   const blob = await exportRegulatoryPDFA(project, options);
   const dateStr = new Date().toISOString().slice(0, 10);
   const safeMolecule = (project.moleculeName || 'QbD_Molecule').replace(/[^a-zA-Z0-9_-]/g, '_');
-  saveAs(blob, `QbD_Regulatory_Archival_PDFA_${safeMolecule}_${dateStr}.pdf`);
+  saveAs(blob, `QbD_Research_Report_${safeMolecule}_${dateStr}.pdf`);
   return blob;
 }

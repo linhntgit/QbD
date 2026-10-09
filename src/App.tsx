@@ -124,10 +124,16 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    let active = true;
     const timer = window.setTimeout(() => {
       const persisted = persistProject(project);
-      idbSaveProject(project).catch(() => {});
-      setStorageWarning(persisted ? null : 'Autosave trình duyệt đã thất bại hoặc hết dung lượng. Hãy dùng nút Lưu để xuất JSON ngay.');
+      idbSaveProject(project)
+        .then((idbSaved) => {
+          if (active) setStorageWarning(persisted || idbSaved ? null : 'Autosave trình duyệt đã thất bại hoặc hết dung lượng. Hãy dùng nút Lưu để xuất JSON ngay.');
+        })
+        .catch(() => {
+          if (active && !persisted) setStorageWarning('Autosave trình duyệt đã thất bại hoặc hết dung lượng. Hãy dùng nút Lưu để xuất JSON ngay.');
+        });
       const now = Date.now();
       const action = pendingAuditAction.current;
       const shouldCheckpoint = hasPersistedInitialProject.current &&
@@ -138,7 +144,10 @@ export function App() {
       }
       hasPersistedInitialProject.current = true;
     }, 500);
-    return () => window.clearTimeout(timer);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
   }, [project]);
 
   useEffect(() => {
@@ -286,9 +295,9 @@ export function App() {
     analysisProvenance.monteCarloVariabilityPercent, analysisProvenance.monteCarloSimulations]);
   // Update Project Handler
   const handleUpdateProject = (updated: Partial<QBDProject>) => {
-    // 21 CFR Part 11: Block modification if project is locked, unless performing unlock
+    // Local approval lock: require a recorded unlock action before edits.
     if (project.isLocked && updated.isLocked !== false && !('isLocked' in updated)) {
-      window.alert('Hồ sơ đã được phê duyệt và đang khóa theo 21 CFR Part 11. Cần thực hiện quy trình Mở khóa (Unlock) có ghi nhận lý do trước khi chỉnh sửa.');
+      window.alert('Hồ sơ đã được phê duyệt nội bộ và đang khóa trong ứng dụng. Cần mở khóa và ghi nhận lý do trước khi chỉnh sửa; đây không phải cơ chế khóa đã thẩm định GxP.');
       return;
     }
     pendingAuditAction.current = `Cập nhật: ${Object.keys(updated).join(', ')}`;
@@ -559,7 +568,7 @@ export function App() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <span style={{ fontSize: '1.2rem' }}>🔒</span>
               <div>
-                <strong>Hồ sơ đang khóa theo 21 CFR Part 11</strong>
+                <strong>Hồ sơ đang khóa nội bộ (chưa thẩm định GxP)</strong>
                 <span style={{ fontSize: '0.82rem', marginLeft: '0.5rem', color: '#7f1d1d' }}>
                   (Phê duyệt bởi: {project.lockDetails?.lockedBy || 'Approver'} lúc {project.lockDetails?.lockedAt ? new Date(project.lockDetails.lockedAt).toLocaleString('vi-VN') : ''} — {project.lockDetails?.reason || 'Đã ký duyệt'})
                 </span>

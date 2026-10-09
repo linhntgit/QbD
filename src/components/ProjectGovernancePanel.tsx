@@ -128,7 +128,7 @@ export const ProjectGovernancePanel: React.FC<ProjectGovernancePanelProps> = ({
 
   const handleExecuteUnlock = () => {
     if (!unlockJustification.trim()) {
-      alert('Bắt buộc phải nhập lý do (justification) mở khóa theo 21 CFR Part 11.');
+      alert('Bắt buộc phải nhập lý do (justification) mở khóa để ghi vết nội bộ.');
       return;
     }
     try {
@@ -169,7 +169,7 @@ export const ProjectGovernancePanel: React.FC<ProjectGovernancePanelProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <ShieldCheck size={20} color={integrity.isValid ? '#059669' : '#dc2626'} />
             <h3 style={{ fontSize: '1.05rem', margin: 0, color: '#0f172a', fontWeight: '700' }}>
-              Quản trị GxP &amp; vết kiểm toán (Tham chiếu 21 CFR Part 11 / EU Annex 11)
+              Quản trị hồ sơ nội bộ &amp; vết kiểm toán (tham khảo nguyên tắc GxP)
             </h3>
           </div>
           <p style={{ fontSize: '0.75rem', margin: '0.2rem 0 0', color: '#64748b' }}>
@@ -247,7 +247,7 @@ export const ProjectGovernancePanel: React.FC<ProjectGovernancePanelProps> = ({
             Phát hiện sự sai lệch mã băm SHA-256 trong chuỗi kiểm toán tại khối #{integrity.tamperedIndex !== undefined ? integrity.tamperedIndex + 1 : 'N/A'}.
             {integrity.reason && <div style={{ marginTop: '0.2rem', fontFamily: 'monospace' }}>Chi tiết lỗi: {integrity.reason}</div>}
             <div style={{ marginTop: '0.2rem', fontWeight: '600' }}>
-              Dữ liệu này không còn bảo đảm tính toàn vẹn (ALCOA+) theo chuẩn 21 CFR Part 11 và không đủ điều kiện nộp cơ quan quản lý.
+              Phát hiện sai lệch mã băm của lịch sử cục bộ. Cần điều tra và đối chiếu với bản sao lưu tin cậy trước khi tiếp tục sử dụng dữ liệu.
             </div>
           </div>
         </div>
@@ -273,7 +273,7 @@ export const ProjectGovernancePanel: React.FC<ProjectGovernancePanelProps> = ({
             <Lock size={20} color="#2563eb" style={{ marginTop: '0.1rem' }} />
             <div>
               <strong style={{ color: '#1e40af', fontSize: '0.84rem' }}>
-                🔒 HỒ SƠ ĐÃ ĐƯỢC PHÊ DUYỆT &amp; KHÓA (21 CFR PART 11 RECORD LOCKED)
+                🔒 HỒ SƠ ĐÃ ĐƯỢC PHÊ DUYỆT NỘI BỘ &amp; KHÓA TRONG ỨNG DỤNG
               </strong>
               <div style={{ fontSize: '0.73rem', color: '#1e3a8a', marginTop: '0.15rem' }}>
                 Được phê duyệt bởi: <strong>{project.lockDetails?.lockedBy || 'Approver'}</strong> ({project.lockDetails?.role || 'Approver'})
@@ -310,7 +310,7 @@ export const ProjectGovernancePanel: React.FC<ProjectGovernancePanelProps> = ({
           }}
         >
           <h4 style={{ margin: '0 0 0.4rem', fontSize: '0.82rem', color: '#0f172a' }}>
-            Yêu cầu mở khóa hồ sơ theo quy trình 21 CFR Part 11
+            Yêu cầu mở khóa và ghi lý do vào lịch sử nội bộ
           </h4>
           <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '0 0 0.5rem' }}>
             Việc mở khóa sẽ hủy bỏ trạng thái Approved và được ghi vết vĩnh viễn vào Audit Trail. Bắt buộc phải nêu rõ căn cứ khoa học / yêu cầu thẩm định.
@@ -398,13 +398,13 @@ export const ProjectGovernancePanel: React.FC<ProjectGovernancePanelProps> = ({
         </div>
       ))}
 
-      {/* 21 CFR PART 11 ELECTRONIC SIGN-OFF SECTION */}
+      {/* Internal electronic sign-off section; no independently authenticated signer identity. */}
       <div style={{ marginTop: '1.1rem', paddingTop: '0.9rem', borderTop: '1px solid #e2e8f0' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <FileCheck size={17} color="#2563eb" />
             <h4 style={{ margin: 0, fontSize: '0.88rem', color: '#0f172a', fontWeight: '700' }}>
-              Chữ ký điện tử 21 CFR § 11.50 (Electronic Signature Manifestations)
+              Bản ghi xác nhận nội bộ (Internal Sign-off Records)
             </h4>
           </div>
 
@@ -502,7 +502,7 @@ export const ProjectGovernancePanel: React.FC<ProjectGovernancePanelProps> = ({
             }}
           >
             <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.82rem', color: '#0f172a' }}>
-              Ký duyệt hồ sơ điện tử theo quy định 21 CFR § 11.50
+              Xác nhận hồ sơ nội bộ (chưa xác thực độc lập danh tính người ký)
             </h4>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.5rem', marginBottom: '0.5rem' }}>
               <div>
@@ -541,7 +541,7 @@ export const ProjectGovernancePanel: React.FC<ProjectGovernancePanelProps> = ({
             </div>
 
             <div style={{ marginBottom: '0.5rem' }}>
-              <label style={{ fontSize: '0.72rem', fontWeight: '600', color: '#475569' }}>Ý nghĩa pháp lý của chữ ký (Meaning of Signature per § 11.50)</label>
+              <label style={{ fontSize: '0.72rem', fontWeight: '600', color: '#475569' }}>Lý do xác nhận nội bộ</label>
               <textarea
                 className="input-field"
                 style={{ width: '100%', fontSize: '0.74rem', minHeight: '44px' }}
@@ -564,7 +564,7 @@ export const ProjectGovernancePanel: React.FC<ProjectGovernancePanelProps> = ({
 
             {signerRole === 'Approver' && (
               <div style={{ fontSize: '0.71rem', color: '#b45309', background: '#fef3c7', padding: '0.4rem 0.6rem', borderRadius: '0.3rem', marginBottom: '0.6rem' }}>
-                ⚠ <strong>Lưu ý quan trọng:</strong> Khi Giám đốc QA ký với vai trò <strong>Approver</strong>, hồ sơ sẽ tự động chuyển sang trạng thái <strong>KHÓA (LOCKED)</strong> để ngăn chặn mọi thay đổi trái phép theo 21 CFR Part 11.
+                ⚠ <strong>Lưu ý:</strong> Khi chọn vai trò <strong>Approver</strong>, ứng dụng chuyển hồ sơ sang trạng thái <strong>KHÓA (LOCKED)</strong> trong giao diện. Ứng dụng không xác minh danh tính hay quyền hạn người nhập tên; không coi đây là chữ ký đáp ứng 21 CFR Part 11.
               </div>
             )}
 
@@ -583,7 +583,7 @@ export const ProjectGovernancePanel: React.FC<ProjectGovernancePanelProps> = ({
                 style={{ fontSize: '0.72rem', padding: '0.3rem 0.75rem' }}
                 onClick={handleExecuteSignOff}
               >
-                Ký điện tử &amp; Niêm phong mật mã học
+                Ghi nhận xác nhận nội bộ &amp; khóa
               </button>
             </div>
           </div>
@@ -595,7 +595,7 @@ export const ProjectGovernancePanel: React.FC<ProjectGovernancePanelProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem' }}>
           <History size={16} color="#475569" />
           <h4 style={{ margin: 0, fontSize: '0.85rem', color: '#0f172a', fontWeight: '700' }}>
-            Sổ cái kiểm toán bất biến (Cryptographic Audit Ledger)
+            Lịch sử mã băm nội bộ (Local Audit History)
           </h4>
         </div>
 

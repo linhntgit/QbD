@@ -34,7 +34,7 @@ import {
   latinHypercubeSample,
   nelderMeadSimplex,
 } from './mathUtils';
-import { buildModelTerms, getModelBlockCounts, type ModelTermDefinition } from './modelTerms';
+import { buildModelTerms, buildRegressionTermEvaluators, getModelBlockCounts, getRegressionModelFactors, type ModelTermDefinition } from './modelTerms';
 import { createSeededRandom } from './random';
 import { actualToCoded, codedToActual, getConfiguredFactorCodes, isDiscreteFactor, snapFactorCoded } from './doeGenerator';
 import { convertCodedToActualEquation } from './equationTransforms';
@@ -278,8 +278,7 @@ export function fitModel(
   if (cqa.dataType?.startsWith('qualitative') || cqa.objective === 'pass_category') return null;
   // Only vary factors that are controllable (or undefined for legacy data).
   // Uncontrollable noise factors are not modeled as active DoE response surface variables.
-  const activeControllable = factors.filter((f) => f.controllability === 'controllable' || f.controllability === undefined);
-  const activeFactors = activeControllable.length > 0 ? activeControllable : factors.filter((f) => f.controllability !== 'constant');
+  const activeFactors = getRegressionModelFactors(factors);
 
   // Convert response value to numeric (handling qualitative binary / numbers)
   const parseResponse = (raw: number | string | null | undefined): number | null => {
@@ -1843,6 +1842,12 @@ export function runMonteCarloSimulation(
     }
     return null;
   });
+  const cqaTermEvaluators = validCQAs.map((cqa, index) => {
+    const model = models[cqa.code];
+    return twoStageMonteCarlo && cqaParamCholesky[index] && 'terms' in model
+      ? buildRegressionTermEvaluators(factors, model.modelType, model.terms)
+      : [];
+  });
   let currentBetaShift: number[][] = validCQAs.map(() => []);
 
   const progressStep = Math.max(500, Math.floor(simulations / 20));
@@ -2052,29 +2057,9 @@ export function runMonteCarloSimulation(
         // Stage 1: Response mean under realized parameter draw
         yPredMean = model.predict(sampleCoded);
         const delta = currentBetaShift[cqaIndex];
-        if (delta && delta.length > 0 && 'terms' in model && model.terms) {
+        if (delta && delta.length > 0 && cqaTermEvaluators[cqaIndex].length > 0) {
           for (let k = 0; k < delta.length; k++) {
-            const term = model.terms[k];
-            let termVal = 1;
-            if (term.name.startsWith('Block ')) {
-              // Block dummies are 0 at the reference (normal operating) block.
-              termVal = 0;
-            } else if (term.name !== 'Intercept' && term.name !== '(Intercept)') {
-              if (term.factorCodes && term.factorCodes.length > 0 && term.power) {
-                termVal = term.factorCodes.reduce(
-                  (prod, code, pIdx) => prod * Math.pow(sampleCoded[code] ?? 0, term.power[pIdx] ?? 1),
-                  1
-                );
-              } else if (term.name.includes('*')) {
-                termVal = term.name.split('*').reduce((prod, f) => prod * (sampleCoded[f] ?? 0), 1);
-              } else if (term.name.includes('^2')) {
-                const f = term.name.replace('^2', '');
-                termVal = Math.pow(sampleCoded[f] ?? 0, 2);
-              } else {
-                termVal = sampleCoded[term.name] ?? 0;
-              }
-            }
-            yPredMean += delta[k] * termVal;
+            yPredMean += delta[k] * cqaTermEvaluators[cqaIndex][k](sampleCoded);
           }
         }
         // Stage 2: Batch process noise with residual covariance

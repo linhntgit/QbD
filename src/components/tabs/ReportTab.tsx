@@ -188,7 +188,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
 
   const handleDownloadPDFA = async () => {
     if (!reportReadiness.readyForScientificReport) {
-      window.alert(`Chưa thể xuất báo cáo pháp lý PDF/A.\n${[...reportReadiness.errors, ...reportReadiness.warnings].slice(0, 8).join('\n')}`);
+      window.alert(`Chưa thể xuất báo cáo nghiên cứu PDF.\n${[...reportReadiness.errors, ...reportReadiness.warnings].slice(0, 8).join('\n')}`);
       return;
     }
     setIsExportingPdf(true);
@@ -201,7 +201,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
         modelingEngine,
       });
     } catch (err) {
-      window.alert(`Lỗi khi xuất PDF/A: ${err instanceof Error ? err.message : String(err)}`);
+      window.alert(`Lỗi khi xuất PDF: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setIsExportingPdf(false);
     }
@@ -296,10 +296,10 @@ export const ReportTab: React.FC<ReportTabProps> = ({
               backgroundColor: reportReadiness.readyForScientificReport ? '#1e3a8a' : undefined,
               color: '#ffffff',
             }}
-            title="Xuất tệp PDF lưu trữ (Archival PDF / XMP) có nhúng mã băm kiểm toán SHA-256 (tham chiếu ISO 19005)"
+            title="Xuất báo cáo nghiên cứu PDF với XMP và mã băm SHA-256. Chưa xác nhận tuân thủ PDF/A hoặc tiêu chuẩn nộp hồ sơ pháp lý."
           >
             <FileText size={16} />
-            <span>{isExportingPdf ? 'Đang tạo PDF lưu trữ...' : 'Xuất báo cáo lưu trữ (Archival PDF)'}</span>
+            <span>{isExportingPdf ? 'Đang tạo PDF nghiên cứu...' : 'Xuất báo cáo nghiên cứu (PDF)'}</span>
           </button>
 
           <button

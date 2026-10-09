@@ -131,4 +131,21 @@ describe('Storage Service (IndexedDB with Fallback)', () => {
     const count = await migrateLocalStorageToIndexedDB();
     expect(count).toBeGreaterThanOrEqual(0);
   });
+
+  it('reports failed saves when neither localStorage nor IndexedDB is writable', async () => {
+    vi.stubGlobal('window', {
+      localStorage: {
+        setItem: () => { throw new Error('Storage quota exceeded'); },
+        getItem: () => null,
+      },
+    });
+
+    expect(await idbSaveProject(dummyProject)).toBe(false);
+    expect(await idbSaveHistory(dummyProject.id, [])).toBe(false);
+    expect(await idbSaveAnchor(dummyProject.id, {
+      sequenceNumber: 1,
+      entryHash: 'abc',
+      timestamp: '2026-10-09T00:00:00Z',
+    })).toBe(false);
+  });
 });

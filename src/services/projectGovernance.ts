@@ -741,7 +741,8 @@ export function verifyAuditTrailIntegrity(
 }
 
 /**
- * Creates an electronic signature according to 21 CFR § 11.50 and § 11.70.
+ * Creates an internal sign-off checksum; this does not authenticate signer identity
+ * or satisfy 21 CFR Part 11 electronic-signature requirements.
  */
 export function createElectronicSignature(
   project: QBDProject,
@@ -789,8 +790,9 @@ export function createElectronicSignature(
 }
 
 /**
- * Executes a 21 CFR Part 11 electronic sign-off.
- * If role is 'Approver', locks the project to prevent unauthorized edits.
+ * Records internal sign-off information entered by the user.
+ * If role is 'Approver', sets the application's local edit-lock flag.
+ * No independent signer authentication, authorization, or GxP validation is performed.
  */
 export function signProjectSnapshot(
   project: QBDProject,
@@ -888,7 +890,7 @@ export function lockProject(
     updated,
     'PROJECT_LOCKED',
     { name: user.name, role: (user.role as GxPRole) || 'Approver' },
-    `Khóa hồ sơ 21 CFR Part 11: ${user.reason}`
+    `Khóa hồ sơ nội bộ: ${user.reason}`
   );
   persistProject(updated);
   return updated;
@@ -902,7 +904,7 @@ export function unlockProject(
   user: { name: string; role: string; justification: string }
 ): QBDProject {
   if (!user.justification || !user.justification.trim()) {
-    throw new Error('Cần có lý do (justification) cụ thể để mở khóa hồ sơ GxP theo 21 CFR Part 11.');
+    throw new Error('Cần có lý do (justification) cụ thể để mở khóa hồ sơ nội bộ.');
   }
   const updated = cloneProject(project);
   updated.isLocked = false;
