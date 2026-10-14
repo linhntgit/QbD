@@ -1182,9 +1182,9 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                   setDesignConfig({ ...designConfig, category: cat, designType: defaultType });
                 }}
               >
-                <option value="RSM">Mặt Đáp (RSM - Tối ưu hóa)</option>
-                <option value="Custom_Optimal">⚡ D-Optimal Design (D-Tối ưu / Thuật toán Fedorov)</option>
-                <option value="Combined_Mixture_Process">🧪 Hỗn Hợp + Quy Trình (Combined Mixture-Process)</option>
+                <option value="RSM">Mặt đáp ứng (RSM - Response Surface)</option>
+                <option value="Custom_Optimal">⚡ Thiết kế D-Optimal (Tối ưu theo chuẩn D - Fedorov)</option>
+                <option value="Combined_Mixture_Process">🧪 Thiết kế Kết hợp Hỗn hợp &amp; Quy trình (Combined Mixture-Process)</option>
                 <option value="Mixture">Thiết kế Hỗn hợp (Mixture / Tá dược)</option>
                 <option value="Screening">Sàng lọc Yếu tố (Screening)</option>
               </select>
@@ -1222,8 +1222,8 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                 )}
                 {designConfig.category === 'Combined_Mixture_Process' && (
                   <>
-                    <option value="Combined_Mixture_Factorial">Combined Simplex x Factorial 2^p (Tích Hỗn hợp - Yếu tố)</option>
-                    <option value="Combined_Mixture_RSM">Combined Simplex x Box-Behnken RSM (Tích Hỗn hợp - Mặt đáp)</option>
+                    <option value="Combined_Mixture_Factorial">Thiết kế kết hợp Simplex Centroid × Yếu tố toàn phần 2^k</option>
+                    <option value="Combined_Mixture_RSM">Thiết kế kết hợp Simplex Centroid × Box-Behnken (RSM)</option>
                     <option value="Combined_Mixture_DOptimal">D-Optimal Mixture–Process (Giảm số run, chọn theo mô hình)</option>
                   </>
                 )}
@@ -1653,7 +1653,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Layers size={18} color="#0284c7" />
               <h4 style={{ fontSize: '0.92rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
-                Cấu trúc gộp hiệu ứng &amp; ma trận Alias (Confounding &amp; Alias Chains)
+                Cấu trúc chồng chập hiệu ứng &amp; Ma trận Alias (Confounding &amp; Alias Chains)
               </h4>
             </div>
             <span style={{
@@ -2075,7 +2075,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               title="Sinh ngẫu nhiên số thứ tự thực hiện thí nghiệm (Randomized Run Order) theo chuẩn DoE"
             >
               <Shuffle size={13} />
-              <span>🎲 Xáo run</span>
+              <span>🎲 Ngẫu nhiên hóa</span>
             </button>
 
             {/* Sort Runs by Run Order */}
@@ -2086,7 +2086,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               title="Sắp xếp danh sách bảng theo thứ tự thực hiện ngẫu nhiên (Run Order)"
             >
               <ArrowUpDown size={13} />
-              <span>Sắp (Run)</span>
+              <span>Sắp xếp (Run Order)</span>
             </button>
 
             {/* Auto-fill Simulation Demo */}
@@ -2098,7 +2098,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
               title="Tự động sinh số liệu thực nghiệm mô phỏng dựa trên mô hình hóa dược phẩm để test nhanh"
             >
               <Sparkles size={13} />
-              <span>{isSimulating ? 'Đang mô phỏng…' : 'Điền mô phỏng'}</span>
+              <span>{isSimulating ? 'Đang mô phỏng…' : 'Điền dữ liệu mô phỏng'}</span>
             </button>
 
             {/* Export Dropdown Menu */}
@@ -2183,7 +2183,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                   >
                     <FileText size={15} color="#0284c7" />
                     <div>
-                      <div style={{ fontWeight: '600' }}>Xuất ma trận rút gọn (.csv)</div>
+                      <div style={{ fontWeight: '600' }}>Xuất ma trận rút gọn cho thiết bị (.csv)</div>
                       <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Chuẩn UTF-8 BOM, chỉ gồm X thực tế và Y</div>
                     </div>
                   </button>
@@ -2211,7 +2211,7 @@ export const DoEDesignerTab: React.FC<DoEDesignerTabProps> = ({
                   >
                     <FileDown size={15} color="#d97706" />
                     <div>
-                      <div style={{ fontWeight: '600' }}>Tải mẫu nhập liệu lab (.csv)</div>
+                      <div style={{ fontWeight: '600' }}>Tải biểu mẫu phòng thí nghiệm (.csv)</div>
                       <div style={{ fontSize: '0.7rem', color: '#64748b' }}>File CSV mẫu để kỹ thuật viên điền trong lab</div>
                     </div>
                   </button>

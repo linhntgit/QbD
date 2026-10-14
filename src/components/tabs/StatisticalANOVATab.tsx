@@ -237,7 +237,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
           title: `Phần dư chuẩn hóa vs. giá trị dự đoán — ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
           xaxis: {
             title: {
-              text: formatAxisTitle('Giá trị dự đoán Ý', currentCQA.code, currentCQA.unit),
+              text: formatAxisTitle('Giá trị dự đoán Ŷ', currentCQA.code, currentCQA.unit),
               font: { size: 12, color: '#1e293b' },
               standoff: 12,
             },
@@ -427,7 +427,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <Calculator size={22} color="#1e3a8a" />
               <h2 style={{ fontSize: '1.18rem', fontWeight: '700', color: '#0f172a' }}>
-                Bước 4: Phân tích thống kê &amp; mô hình hóa ANOVA (Polynomial Regression)
+                Bước 4: Phân tích phương sai (ANOVA) &amp; Mô hình hóa hồi quy đa thức
               </h2>
               {modelingEngine === 'polynomial' && (
                 <span className="badge badge-teal" style={{ fontSize: '0.72rem' }}>
@@ -443,7 +443,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', minWidth: 0, maxWidth: '100%' }}>
             {/* CQA Selector */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#475569' }}>Đáp ứng CQA:</label>
+              <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#475569' }}>Thuộc tính chất lượng (CQA):</label>
               <select
                 className="input-field"
                 style={{ width: '180px', fontWeight: '600', color: '#1e3a8a' }}
@@ -481,7 +481,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                 title="Rút gọn mô hình từng bước tự động (Stepwise Backward Elimination, alpha=0.10, giữ nguyên phân cấp bậc đa thức)"
               >
                 <Wand2 size={14} color="#0f766e" />
-                <span>{isReducing ? 'Đang rút gọn...' : 'Rút gọn (Backward)'}</span>
+                <span>{isReducing ? 'Đang rút gọn...' : 'Rút gọn mô hình từng bước (Backward Elimination)'}</span>
               </button>
             </div>
 
@@ -504,9 +504,9 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
               }}
               className="btn btn-teal"
               style={{ fontSize: '0.82rem', padding: '0.4rem 0.85rem', fontWeight: '700' }}
-              title="Chọn mô hình Hồi quy Đa thức bậc ≤ 2 làm phương pháp chính cho các bước tiếp theo (Bước 6: Mặt đáp, Bước 7: Không gian thiết kế, Bước 8: Báo cáo)"
+              title="Chọn mô hình Hồi quy Đa thức bậc ≤ 2 làm phương pháp chính cho các bước tiếp theo (Bước 6: Mặt đáp ứng, Bước 7: Không gian thiết kế, Bước 8: Báo cáo)"
             >
-              <span>Tiếp tục với đa thức (Bước 6, 7, 8)</span>
+              <span>Áp dụng mô hình đa thức cho các bước tiếp theo (Bước 6 – 8)</span>
               <ArrowRight size={16} />
             </button>
           </div>
@@ -627,7 +627,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
 
             {/* Q-Squared (Cross-Validated R2 via PRESS) */}
             <div className="qbd-card" style={{ padding: '1rem', borderLeft: '4px solid #2563eb' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>HỆ SỐ DỰ BÁO Q² (PRESS)</div>
+              <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>HỆ SỐ DỰ BÁO Q² (Predicted R² / PRESS)</div>
               <div style={{ fontSize: '1.6rem', fontWeight: '800', color: '#2563eb', margin: '0.2rem 0' }}>
                 {(model.diagnostics.qSquared ?? model.diagnostics.predRSquared).toFixed(4)}
               </div>
@@ -660,7 +660,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
 
             {/* Std Dev & CV */}
             <div className="qbd-card" style={{ padding: '1rem', borderLeft: '4px solid #f59e0b' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>ĐỘ LỆCH CHUẨN / CV %</div>
+              <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>HỆ SỐ BIẾN THIÊN % (CV % / RSD %)</div>
               <div style={{ fontSize: '1.6rem', fontWeight: '800', color: '#f59e0b', margin: '0.2rem 0' }}>
                 {model.diagnostics.stdDev.toFixed(3)}
               </div>
@@ -831,7 +831,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                             {row.source}
                             {isLOF && (
                               <span style={{ fontSize: '0.7rem', color: '#64748b', marginLeft: '0.4rem' }}>
-                                (Độ thiếu phù hợp mô hình - Lack of Fit)
+                                (Kiểm định độ thiếu phù hợp - Lack of Fit)
                               </span>
                             )}
                           </td>
@@ -979,7 +979,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <BarChart3 size={19} color="#1e3a8a" />
                 <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#0f172a' }}>
-                  Đồ thị chẩn đoán mô hình (Model diagnostic plots)
+                  Đồ thị chẩn đoán phần dư &amp; mô hình (Model Diagnostic Plots)
                 </h3>
               </div>
 
@@ -1003,7 +1003,7 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                   className={`btn ${activeDiagPlot === 'normProb' ? 'btn-primary' : 'btn-secondary'}`}
                   style={{ padding: '0.3rem 0.65rem', fontSize: '0.78rem', border: 'none' }}
                 >
-                  Xác suất chuẩn (Normal plot)
+                  Xác suất phân phối chuẩn của phần dư (Normal QQ-Plot)
                 </button>
                 <button
                   onClick={() => setActiveDiagPlot('cooks')}
@@ -1280,9 +1280,9 @@ export const StatisticalANOVATab: React.FC<StatisticalANOVATabProps> = ({
                 }}
                 className="btn btn-teal"
                 style={{ fontSize: '0.85rem', padding: '0.5rem 1.25rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.45rem' }}
-                title="Khóa mô hình đa thức và chuyển sang Bước 6: Mặt đáp"
+                title="Khóa mô hình đa thức và chuyển sang Bước 6: Mặt đáp ứng"
               >
-                <span>Tiếp tục với đa thức (Bước 6: Mặt đáp)</span>
+                <span>Tiếp tục với mô hình đa thức (Chuyển sang Bước 6: Mặt đáp ứng)</span>
                 <ArrowRight size={16} />
               </button>
             </div>

@@ -97,7 +97,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="badge badge-primary">v2.5 ICH-aligned workflow</span>
               </div>
               <p style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                Thiết kế thí nghiệm & tối ưu hóa đáp ứng dược phẩm (ICH Q8, Q9, Q10, Q11)
+                Thiết kế thí nghiệm & Tối ưu hóa chất lượng theo tiếp cận QbD (ICH Q8, Q9, Q10, Q11)
               </p>
             </div>
           </div>
@@ -148,10 +148,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                     backgroundColor: modelingEngine === 'polynomial' ? '#0f766e' : 'transparent',
                     color: modelingEngine === 'polynomial' ? '#ffffff' : '#64748b',
                   }}
-                  title="Chuyển toàn bộ phân tích sang hồi quy đa thức bậc ≤ 2"
+                  title="Áp dụng mô hình hồi quy đa thức & phân tích phương sai ANOVA cho toàn bộ dự án"
                 >
                   <Calculator size={12} />
-                  <span>Đa thức</span>
+                  <span>Hồi quy đa thức</span>
                 </button>
                 <button
                   disabled={!hasTrainedNeuralModels}
@@ -176,12 +176,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                   }}
                   title={
                     hasTrainedNeuralModels
-                      ? 'Chuyển toàn bộ phân tích sang mạng nơ-ron nhân tạo'
+                      ? 'Chuyển toàn bộ phân tích sang mô hình mạng nơ-ron nhân tạo (ANN)'
                       : 'Cần huấn luyện mạng nơ-ron tại Bước 5 trước khi kích hoạt'
                   }
                 >
                   <BrainCircuit size={12} />
-                  <span>Mạng nơ-ron</span>
+                  <span>Mạng nơ-ron (ANN)</span>
                 </button>
               </div>
             )}
@@ -266,10 +266,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => { onNewProject(); requestAnimationFrame(() => { projectNameRef.current?.focus(); projectNameRef.current?.select(); }); }}
               className="btn btn-secondary"
               style={{ fontSize: '0.82rem', padding: '0.4rem 0.65rem' }}
-              title="Tạo dự án thiết kế mới"
+              title="Khởi tạo dự án nghiên cứu QbD mới"
             >
               <PlusCircle size={15} />
-              <span>Mới</span>
+              <span>Tạo mới</span>
             </button>
 
             {/* User Session Badge (ALCOA+ Attributable) */}

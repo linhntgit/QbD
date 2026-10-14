@@ -211,8 +211,8 @@ export const FishboneDiagram: React.FC<FishboneDiagramProps> = ({ diagram, onCha
   <rect width="1500" height="1000" fill="#ffffff" />
   
   <!-- Header / Title -->
-  <text x="50" y="55" font-family="${FONT}" font-size="20" font-weight="800" fill="#0f172a">SƠ ĐỒ NGUYÊN NHÂN - KẾT QUẢ ISHIKAWA (FISHBONE DIAGRAM)</text>
-  <text x="50" y="82" font-family="${FONT}" font-size="13" font-weight="500" fill="#64748b">Phân tích rủi ro tiền định và sàng lọc nguyên nhân chất lượng (ICH Q9 Quality Risk Management)</text>
+  <text x="50" y="55" font-family="${FONT}" font-size="20" font-weight="800" fill="#0f172a">BIỂU ĐỒ NGUYÊN NHÂN - KẾT QUẢ ISHIKAWA (SƠ ĐỒ XƯƠNG CÁ)</text>
+  <text x="50" y="82" font-family="${FONT}" font-size="13" font-weight="500" fill="#64748b">Nhận diện nguyên nhân gốc rễ và sàng lọc các yếu tố ảnh hưởng đến CQA (ICH Q9 Quality Risk Management)</text>
   
   <!-- Spine & Main Skeleton -->
   <path d="M95 ${SPINE_Y} L1220 ${SPINE_Y}" stroke="#334155" stroke-width="5" stroke-linecap="round" marker-end="url(#ishikawa-arrow)" />

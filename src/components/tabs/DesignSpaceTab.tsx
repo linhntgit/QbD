@@ -1347,7 +1347,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
       ) : (
         <>
           {/* 1. Prediction Profiler & Desirability Optimization */}
-      <section id="step7-optimize" className="step7-section"><div className="step7-section-heading"><span>1</span><div><h2>Chọn phương án tối ưu</h2><p>Đặt mục tiêu CQA, khảo sát điểm vận hành rồi chọn phương án sẽ đánh giá.</p></div></div>
+      <section id="step7-optimize" className="step7-section"><div className="step7-section-heading"><span>1</span><div><h2>Tối ưu hóa đa đáp ứng &amp; Điểm vận hành tối ưu</h2><p>Thiết lập hàm thỏa dụng (Desirability), khảo sát và lựa chọn điểm vận hành mục tiêu (Target Setpoint).</p></div></div>
       <DesirabilityProfiler
         factors={factors}
         cqas={cqas}
@@ -1359,7 +1359,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
       /></section>
 
       {/* 2. Sweet Spot / Design Space Overlay Plot */}
-      <section id="step7-design-space" className="step7-section"><div className="step7-section-heading"><span>2</span><div><h2>Khảo sát vùng vận hành</h2><p>Quan sát miền đạt chất lượng và thay đổi trục hoặc lát cắt khi cần.</p></div></div>
+      <section id="step7-design-space" className="step7-section"><div className="step7-section-heading"><span>2</span><div><h2>Thiết lập &amp; Khảo sát Không gian thiết kế (Design Space Overlay)</h2><p>Xác định miền phối hợp các thông số đảm bảo tất cả CQA đồng thời nằm trong tiêu chuẩn chấp nhận.</p></div></div>
       <div className="design-space-workspace-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(340px, 100%), 1fr))', gap: '1.5rem' }}>
         
         {/* Main Plot Area */}
@@ -2242,7 +2242,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
       </section>
 
       {/* Monte Carlo Risk & Reliability Assessment (ICH Q9) */}
-      <section id="step7-monte-carlo" className="step7-section"><div className="step7-section-heading"><span>3</span><div><h2>Đánh giá độ bền dự báo quanh phương án đã chọn</h2><p>Mô phỏng ngẫu nhiên các lô ảo dao động quanh điểm cài đặt tối ưu (Target Setpoint) để kiểm tra độ tin cậy và tỷ lệ lỗi.</p></div></div>
+      <section id="step7-monte-carlo" className="step7-section"><div className="step7-section-heading"><span>3</span><div><h2>Đánh giá độ bền &amp; Xác minh rủi ro bằng mô phỏng Monte Carlo (ICH Q9)</h2><p>Mô phỏng ngẫu nhiên biến thiên quy trình quanh điểm tối ưu để định lượng chỉ số năng lực (Ppk/Cpk) và xác suất lỗi.</p></div></div>
       <div className="qbd-card">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
           <div>
@@ -3066,7 +3066,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
       )}
 
       </section>
-      <div className="step7-section-heading"><span>4</span><div><h2>Thí nghiệm xác nhận phương án tối ưu</h2><p>Chốt kế hoạch trước khi nhập số liệu thực nghiệm, rồi đánh giá từng CQA.</p></div></div>
+      <div className="step7-section-heading"><span>4</span><div><h2>Thí nghiệm xác nhận phương án tối ưu</h2><p>Kế hoạch thực nghiệm độc lập tại điểm tối ưu nhằm xác minh tính tái lập của mô hình và tính hợp lệ của Design Space.</p></div></div>
       <ConfirmationPanel
         project={project}
         onUpdateProject={onUpdateProject}
@@ -3074,7 +3074,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
       />
 
       {/* 4. Comprehensive Control Strategy Table (ICH Q10 & FDA Table 105/106/107) */}
-      <section id="step7-control" className="step7-section"><div className="step7-section-heading"><span>5</span><div><h2>Rà soát chiến lược kiểm soát</h2><p>Đối chiếu mục tiêu vận hành, phạm vi đề xuất và mức bằng chứng hiện có.</p></div></div>
+      <section id="step7-control" className="step7-section"><div className="step7-section-heading"><span>5</span><div><h2>Chiến lược kiểm soát quy trình toàn diện (ICH Q10 Control Strategy)</h2><p>Xác định điểm cài đặt mục tiêu, dải kiểm soát thông số (PAR) và tiêu chuẩn chấp nhận thành phẩm.</p></div></div>
       <div className="qbd-card" style={{ borderLeft: '4px solid #0f766e' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

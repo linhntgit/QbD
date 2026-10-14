@@ -236,11 +236,11 @@ export const ReportTab: React.FC<ReportTabProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <FileCheck2 size={22} color="#15803d" />
             <h2 style={{ fontSize: '1.18rem', fontWeight: '700', color: '#0f172a' }}>
-              Bước 8: Báo cáo hồ sơ phát triển dược phẩm (CTD 3.2.P.2 &amp; Export Word)
+              Bước 8: Báo cáo hồ sơ phát triển dược phẩm (Hồ sơ CTD 3.2.P.2 &amp; Xuất tài liệu)
             </h2>
           </div>
           <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.2rem' }}>
-            Tổng hợp toàn diện dữ liệu nghiên cứu phát triển theo cấu trúc hồ sơ đăng ký thuốc CTD Phần 3.2.P.2, hỗ trợ xuất văn bản MS Word (.docx).
+            Tổng hợp toàn diện dữ liệu nghiên cứu phát triển theo cấu trúc hồ sơ kỹ thuật chung (ICH CTD Phần 3.2.P.2), hỗ trợ xuất tài liệu MS Word (.docx) và PDF.
           </p>
         </div>
 
@@ -296,7 +296,7 @@ export const ReportTab: React.FC<ReportTabProps> = ({
               backgroundColor: reportReadiness.readyForScientificReport ? '#1e3a8a' : undefined,
               color: '#ffffff',
             }}
-            title="Xuất báo cáo nghiên cứu PDF với XMP và mã băm SHA-256. Chưa xác nhận tuân thủ PDF/A hoặc tiêu chuẩn nộp hồ sơ pháp lý."
+            title="Xuất báo cáo nghiên cứu dạng PDF tích hợp siêu dữ liệu XMP và mã băm SHA-256 phục vụ lưu trữ nội bộ."
           >
             <FileText size={16} />
             <span>{isExportingPdf ? 'Đang tạo PDF nghiên cứu...' : 'Xuất báo cáo nghiên cứu (PDF)'}</span>

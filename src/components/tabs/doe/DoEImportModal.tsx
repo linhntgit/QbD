@@ -142,7 +142,7 @@ export const DoEImportModal: React.FC<DoEImportModalProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <FileSpreadsheet size={22} color="#1d4ed8" />
             <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
-              Nhập &amp; đối soát bảng số liệu thực nghiệm từ Excel / CSV
+              Nhập &amp; đối chiếu dữ liệu thực nghiệm từ Excel / CSV
             </h3>
           </div>
           <button

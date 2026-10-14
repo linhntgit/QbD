@@ -105,7 +105,7 @@ export const FMEATab: React.FC<FMEATabProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <ShieldAlert size={22} color="#b45309" />
               <h2 style={{ fontSize: '1.18rem', fontWeight: '700', color: '#0f172a' }}>
-                Bước 2: Đánh giá &amp; quản lý rủi ro chất lượng (Quality Risk Management - ICH Q9)
+                Bước 2: Quản lý rủi ro chất lượng &amp; Sàng lọc yếu tố đầu vào (ICH Q9)
               </h2>
             </div>
             <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.2rem' }}>
@@ -147,19 +147,19 @@ export const FMEATab: React.FC<FMEATabProps> = ({
           <div style={{ backgroundColor: '#fee2e2', border: '1px solid #fecaca', borderRadius: '0.5rem', padding: '0.85rem' }}>
             <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#991b1b' }}>RỦI RO CAO (HIGH RISK - RPN ≥ 100)</div>
             <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#b91c1c', margin: '0.2rem 0' }}>{highRiskCount} yếu tố</div>
-            <div style={{ fontSize: '0.75rem', color: '#7f1d1d' }}>Bắt buộc đưa vào khảo sát thực nghiệm DoE</div>
+            <div style={{ fontSize: '0.75rem', color: '#7f1d1d' }}>Ưu tiên hàng đầu đưa vào ma trận khảo sát thực nghiệm DoE</div>
           </div>
 
           <div style={{ backgroundColor: '#fef3c7', border: '1px solid #fde68a', borderRadius: '0.5rem', padding: '0.85rem' }}>
             <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#92400e' }}>RỦI RO TRUNG BÌNH (50 ≤ RPN &lt; 100)</div>
             <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#b45309', margin: '0.2rem 0' }}>{mediumRiskCount} yếu tố</div>
-            <div style={{ fontSize: '0.75rem', color: '#78350f' }}>Đánh giá dựa trên kiến thức tiền định / Kiểm soát</div>
+            <div style={{ fontSize: '0.75rem', color: '#78350f' }}>Xem xét kiểm soát theo quy trình hoặc đưa vào DoE sàng lọc sơ bộ</div>
           </div>
 
           <div style={{ backgroundColor: '#dcfce7', border: '1px solid #bbf7d0', borderRadius: '0.5rem', padding: '0.85rem' }}>
             <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#166534' }}>RỦI RO THẤP (RPN &lt; 50)</div>
             <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#15803d', margin: '0.2rem 0' }}>{lowRiskCount} yếu tố</div>
-            <div style={{ fontSize: '0.75rem', color: '#14532d' }}>Kiểm soát qua SOP & Giám sát thường quy</div>
+            <div style={{ fontSize: '0.75rem', color: '#14532d' }}>Kiểm soát thường quy bằng quy trình thao tác chuẩn (SOP)</div>
           </div>
         </div>
       </div>
@@ -186,13 +186,13 @@ export const FMEATab: React.FC<FMEATabProps> = ({
                 <tr>
                   <th style={{ width: '15%' }}>Yếu tố (Factor)</th>
                   <th style={{ width: '15%' }}>CQA bị ảnh hưởng</th>
-                  <th style={{ width: '22%' }}>Dạng sai lỗi / Cơ chế rủi ro</th>
+                  <th style={{ width: '22%' }}>Dạng sai lỗi tiềm ẩn / Cơ chế ảnh hưởng</th>
                   <th style={{ width: '7%', textAlign: 'center' }} title="Severity - Mức độ nghiêm trọng (1-10)">S (Mức nghiêm trọng)</th>
                   <th style={{ width: '7%', textAlign: 'center' }} title="Occurrence - Khả năng xảy ra / Tần suất (1-10)">O (Khả năng xảy ra)</th>
                   <th style={{ width: '7%', textAlign: 'center' }} title="Detection - Khả năng phát hiện (1-10)">D (Khả năng phát hiện)</th>
                   <th style={{ width: '8%', textAlign: 'center' }} title="RPN = S x O x D">RPN</th>
                   <th style={{ width: '10%', textAlign: 'center' }}>Mức rủi ro</th>
-                  <th style={{ width: '9%', textAlign: 'center' }}>Khảo sát DoE</th>
+                  <th style={{ width: '9%', textAlign: 'center' }}>Đưa vào DoE?</th>
                   <th style={{ width: '5%', textAlign: 'center' }}>Xóa</th>
                 </tr>
               </thead>
@@ -370,7 +370,7 @@ export const FMEATab: React.FC<FMEATabProps> = ({
                   <strong>Khi nào là High:</strong> Yếu tố có khả năng gây sai lệch nghiêm trọng lên CQA, tần suất xuất hiện cao hoặc khó phát hiện qua kiểm tra thông thường (hoặc khi điểm nghiêm trọng <code>S ≥ 8</code>).
                 </p>
                 <div style={{ fontSize: '0.75rem', color: '#991b1b', backgroundColor: '#ffffff', padding: '0.35rem 0.5rem', borderRadius: '4px', border: '1px solid #fecaca', marginTop: '0.2rem' }}>
-                  ⚡ <strong>Hành động:</strong> <strong>BẮT BUỘC</strong> đưa vào ma trận thực nghiệm DoE để xác định Design Space &amp; kiểm soát chặt.
+                  ⚡ <strong>Hành động:</strong> <strong>BẮT BUỘC</strong> đưa vào ma trận thực nghiệm DoE để xác định Không gian Thiết kế &amp; kiểm soát chặt chẽ.
                 </div>
               </div>
 
@@ -432,7 +432,7 @@ export const FMEATab: React.FC<FMEATabProps> = ({
                   <strong>Khi nào là Low:</strong> Tác động không đáng kể lên CQA, xác suất phát sinh lỗi rất thấp hoặc hệ thống kiểm soát tại chỗ phát hiện tức thì 100%.
                 </p>
                 <div style={{ fontSize: '0.75rem', color: '#166534', backgroundColor: '#ffffff', padding: '0.35rem 0.5rem', borderRadius: '4px', border: '1px solid #bbf7d0', marginTop: '0.2rem' }}>
-                  📋 <strong>Hành động:</strong> Kiểm soát thường quy qua quy trình thao tác chuẩn (SOP), không cần thiết khảo sát DoE.
+                  📋 <strong>Hành động:</strong> Kiểm soát thường quy bằng quy trình thao tác chuẩn (SOP), không cần thiết khảo sát DoE.
                 </div>
               </div>
             </div>
@@ -454,7 +454,7 @@ export const FMEATab: React.FC<FMEATabProps> = ({
               <div>
                 <strong style={{ color: '#0f172a' }}>1. S (Severity - Mức độ nghiêm trọng, 1-10):</strong>
                 <div style={{ marginTop: '0.2rem', color: '#64748b' }}>
-                  Đánh giá hậu quả nếu lỗi xảy ra. <strong>1-3</strong>: Nhẹ, không ảnh hưởng CQA; <strong>4-6</strong>: Vừa phải; <strong>7-10</strong>: Rất nghiêm trọng, vi phạm Dược điển hoặc ảnh hưởng tính mạng/an toàn.
+                  Đánh giá hậu quả nếu lỗi xảy ra. <strong>1-3</strong>: Nhẹ, không ảnh hưởng CQA; <strong>4-6</strong>: Vừa phải; <strong>7-10</strong>: Rất nghiêm trọng, vi phạm tiêu chuẩn Dược điển hoặc ảnh hưởng đến an toàn và hiệu quả điều trị của người bệnh.
                 </div>
               </div>
               <div>

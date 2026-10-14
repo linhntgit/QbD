@@ -883,11 +883,11 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Target size={18} color="#1e40af" />
               <h4 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
-                Cấu hình hàm hài lòng từng phần (dᵢ) & tham số hình dạng (s, t)
+                Cấu hình hàm thỏa dụng từng phần (dᵢ) &amp; tham số hình dạng (s, t)
               </h4>
             </div>
             <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-              s &gt; 1: Khắt khe gần mục tiêu | s &lt; 1: Khoan dung | s = 1: Tuyến tính
+              s &gt; 1: Yêu cầu khắt khe quanh đích | s &lt; 1: Dung sai rộng quanh đích | s = 1: Tuyến tính
             </span>
           </div>
 
@@ -1058,7 +1058,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                 <TrendingUp size={17} color="#2563eb" />
                 <h5 style={{ fontSize: '0.9rem', fontWeight: '700', color: '#1e3a8a', margin: 0 }}>
-                  Đồ thị minh họa hàm hài lòng từng phần (dᵢ(Y) theo Y)
+                  Đồ thị biểu diễn hàm thỏa dụng từng phần (dᵢ(Y) theo Y)
                 </h5>
               </div>
               <span className="badge badge-primary" style={{ fontSize: '0.72rem', backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
@@ -1123,7 +1123,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
 
                       {/* 100% Satisfaction Region */}
                       <div style={{ color: '#15803d' }}>
-                        <strong>🟢 Thỏa mãn 100% ($d_{cqa.code} = 1.0$): </strong>
+                        <strong>🟢 Thỏa dụng tối đa ($d_i = 1.0$): </strong>
                         {cqa.objective === 'maximize' && `Khi ${cqa.code} ≥ ${T ?? U ?? 0} ${cqa.unit || ''} (Càng lớn càng tốt)`}
                         {cqa.objective === 'minimize' && `Khi ${cqa.code} ≤ ${T ?? L ?? 0} ${cqa.unit || ''} (Càng nhỏ càng tốt)`}
                         {cqa.objective === 'target' && `Khi ${cqa.code} = ${T ?? ((L ?? 0) + (U ?? 100)) / 2} ${cqa.unit || ''} (Đạt chính xác đích)`}
@@ -1132,7 +1132,7 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
 
                       {/* 0% Satisfaction (Unacceptable) Region */}
                       <div style={{ color: '#b91c1c' }}>
-                        <strong>🔴 Thỏa mãn 0% ($d_{cqa.code} = 0.0$): </strong>
+                        <strong>🔴 Không chấp nhận ($d_i = 0.0$): </strong>
                         {cqa.objective === 'maximize' && `Khi ${cqa.code} ≤ ${L ?? 0} ${cqa.unit || ''} (Dưới ngưỡng chấp nhận)`}
                         {cqa.objective === 'minimize' && `Khi ${cqa.code} ≥ ${U ?? 100} ${cqa.unit || ''} (Vượt ngưỡng chấp nhận)`}
                         {cqa.objective === 'target' && `Khi ${cqa.code} ≤ ${L ?? 0} hoặc ${cqa.code} ≥ ${U ?? 100} ${cqa.unit || ''} (Ngoài dải [L, U])`}
@@ -1142,8 +1142,8 @@ export const DesirabilityProfiler: React.FC<DesirabilityProfilerProps> = ({
                       {/* Shape Parameter Formula */}
                       <div style={{ color: '#475569', fontSize: '0.72rem', backgroundColor: '#f1f5f9', padding: '0.3rem 0.5rem', borderRadius: '0.25rem' }}>
                         <strong>Hệ số hình dạng: </strong>
-                        {cqa.objective === 'maximize' && `s = ${s} (${s === 1 ? 'Tuyến tính' : s > 1 ? 'Khắt khe dốc' : 'Khoan dung lồi'})`}
-                        {cqa.objective === 'minimize' && `t = ${t} (${t === 1 ? 'Tuyến tính' : t > 1 ? 'Khắt khe dốc' : 'Khoan dung lồi'})`}
+                        {cqa.objective === 'maximize' && `s = ${s} (${s === 1 ? 'Tuyến tính' : s > 1 ? 'Khắt khe quanh đích (dốc)' : 'Dung sai rộng (lồi)'})`}
+                        {cqa.objective === 'minimize' && `t = ${t} (${t === 1 ? 'Tuyến tính' : t > 1 ? 'Khắt khe quanh đích (dốc)' : 'Dung sai rộng (lồi)'})`}
                         {cqa.objective === 'target' && `s = ${s} (nhánh dưới), t = ${t} (nhánh trên)`}
                         {cqa.objective === 'range' && `Hàm bước (Step function)`}
                       </div>

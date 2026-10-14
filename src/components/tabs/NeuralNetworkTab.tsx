@@ -462,7 +462,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
 
         data.push({
           type: 'line',
-          name: 'Đường chuẩn Y = Ý (Ideal 45°)',
+          name: 'Đường chuẩn Y = Ŷ (Ideal 45°)',
           x: [minVal, maxVal],
           y: [minVal, maxVal],
           line: { color: '#64748b', width: 1.5, dash: 'dash' },
@@ -472,7 +472,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           title: `Đồ thị thực tế vs. dự đoán — ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
           xaxis: {
             title: {
-              text: formatAxisTitle('Giá trị dự đoán Ý', currentCQA.code, currentCQA.unit),
+              text: formatAxisTitle('Giá trị dự đoán Ŷ', currentCQA.code, currentCQA.unit),
               font: { size: 12, color: '#1e293b' },
               standoff: 12,
             },
@@ -533,7 +533,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           title: `Phần dư vs. giá trị dự đoán — ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
           xaxis: {
             title: {
-              text: formatAxisTitle('Giá trị dự đoán Ý', currentCQA.code, currentCQA.unit),
+              text: formatAxisTitle('Giá trị dự đoán Ŷ', currentCQA.code, currentCQA.unit),
               font: { size: 12, color: '#1e293b' },
               standoff: 12,
             },
@@ -542,7 +542,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
           },
           yaxis: {
             title: {
-              text: formatAxisTitle('Phần dư Y - Ý', currentCQA.code, currentCQA.unit),
+              text: formatAxisTitle('Phần dư Y - Ŷ', currentCQA.code, currentCQA.unit),
               font: { size: 12, color: '#1e293b' },
               standoff: 12,
             },
@@ -713,7 +713,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <Sparkles size={16} color="#7c3aed" />
                 <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#1e293b' }}>
-                  XAI Studio (hộp kính AI bào chế):
+                  XAI Studio (Mô hình AI minh bạch - Glass-Box trong bào chế):
                 </span>
               </div>
 
@@ -1834,7 +1834,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               ) : (
                 <>
                   <RefreshCw size={16} />
-                  <span>{neuralTrainingMode === 'shared' ? '⚡ Huấn luyện mạng chung (All Y)' : `⚡ Huấn luyện ${currentCQA.code}`}</span>
+                  <span>{neuralTrainingMode === 'shared' ? '⚡ Huấn luyện mô hình mạng nơ-ron hợp nhất (Đa biến Y)' : `⚡ Huấn luyện ${currentCQA.code}`}</span>
                 </>
               )}
             </button>
@@ -2065,7 +2065,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <TrendingUp size={18} color="#1e3a8a" />
                 <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
-                  Đấu trường đa mô hình (Multi-Model Benchmarking Arena) — {currentCQA.name} ({currentCQA.code})
+                  Đối chuẩn đa mô hình độc lập (Multi-Model Benchmarking Arena) — {currentCQA.name} ({currentCQA.code})
                 </h3>
               </div>
               <div style={{ fontSize: '0.74rem', color: '#475569' }}>
@@ -2305,7 +2305,7 @@ export const NeuralNetworkTab: React.FC<NeuralNetworkTabProps> = ({
                                 {rating.text}
                               </span>
                             ) : (
-                              <span className="badge badge-secondary" style={{ fontSize: '0.7rem' }}>Chưa fit</span>
+                              <span className="badge badge-secondary" style={{ fontSize: '0.7rem' }}>Chưa huấn luyện</span>
                             )}
                           </td>
                           <td style={{ textAlign: 'center' }}>

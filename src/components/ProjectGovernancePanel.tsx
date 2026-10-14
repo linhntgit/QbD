@@ -169,7 +169,7 @@ export const ProjectGovernancePanel: React.FC<ProjectGovernancePanelProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <ShieldCheck size={20} color={integrity.isValid ? '#059669' : '#dc2626'} />
             <h3 style={{ fontSize: '1.05rem', margin: 0, color: '#0f172a', fontWeight: '700' }}>
-              Quản trị hồ sơ nội bộ &amp; vết kiểm toán (tham khảo nguyên tắc GxP)
+              Quản trị hồ sơ dự án &amp; Dấu vết kiểm toán (Audit Trail theo nguyên tắc GxP / ALCOA+)
             </h3>
           </div>
           <p style={{ fontSize: '0.75rem', margin: '0.2rem 0 0', color: '#64748b' }}>

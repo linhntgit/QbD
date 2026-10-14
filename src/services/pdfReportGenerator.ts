@@ -513,7 +513,7 @@ export function generateRegulatoryPDFABuffer(
   // SECTION 1: QUALITY TARGET PRODUCT PROFILE (QTPP)
   // =========================================================================
   doc.addSectionHeader(
-    '1. Mục Tiêu Chất Lượng Sản Phẩm Mục Tiêu (QTPP - ICH Q8)',
+    '1. Hồ Sơ Mục Tiêu Chất Lượng Sản Phẩm (QTPP - ICH Q8)',
     'Thiết lập các đặc tính chất lượng kỳ vọng của thuốc thành phẩm đảm bảo an toàn và hiệu quả điều trị.'
   );
 
@@ -538,7 +538,7 @@ export function generateRegulatoryPDFABuffer(
   // SECTION 2: CRITICAL QUALITY ATTRIBUTES (CQAs)
   // =========================================================================
   doc.addSectionHeader(
-    '2. Chỉ Tiêu Chất Lượng Cốt Yếu (CQAs - Critical Quality Attributes)',
+    '2. Thuộc Tính Chất Lượng Trọng Yếu (CQAs - Critical Quality Attributes)',
     'Các đặc tính vật lý, hóa học, sinh học phải nằm trong giới hạn kiểm soát để đảm bảo chất lượng.'
   );
 
@@ -571,7 +571,7 @@ export function generateRegulatoryPDFABuffer(
   // SECTION 3: CMAs & CPPs (FACTORS)
   // =========================================================================
   doc.addSectionHeader(
-    '3. Thuộc Tính Nguyên Liệu (CMAs) & Thông Số Quy Trình Cốt Yếu (CPPs)',
+    '3. Thuộc Tính Nguyên Liệu Trọng Yếu (CMAs) & Thông Số Quy Trình Trọng Yếu (CPPs)',
     'Các biến đầu vào khảo sát trong không gian nghiên cứu thực nghiệm DoE.'
   );
 

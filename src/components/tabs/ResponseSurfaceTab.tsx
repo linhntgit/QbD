@@ -618,7 +618,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
 
     plotlyLayout = {
       title: {
-        text: `${plotType === '3d' ? 'Mặt đáp 3D' : 'Đường đồng mức 2D'}: ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
+        text: `${plotType === '3d' ? 'Mặt đáp ứng 3D' : 'Đường đồng mức 2D'}: ${currentCQA.name} (${currentCQA.code})${currentCQA.unit ? ` [${currentCQA.unit}]` : ''}`,
         font: { size: 13, color: '#0f172a', family: 'Inter, sans-serif' },
       },
       autosize: true,
@@ -756,7 +756,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                 disabled={!hasCartesianPair}
                 className={`btn ${plotType === '3d' ? 'btn-primary' : 'btn-secondary'}`}
                 style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', border: 'none' }}
-                title={hasCartesianPair ? 'Mặt đáp 3 chiều trong không gian' : 'Cần một cặp trục không phải đồng thời là hai thành phần hỗn hợp.'}
+                title={hasCartesianPair ? 'Mặt đáp ứng 3 chiều trong không gian' : 'Cần một cặp trục không phải đồng thời là hai thành phần hỗn hợp.'}
               >
                 3D Surface
               </button>
@@ -925,7 +925,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: '#475569', marginBottom: '0.3rem' }}>
-                    Trục hoành X (X-axis):
+                    Trục hoành (Trục X trên đồ thị):
                   </label>
                   <select
                     className="input-field"
@@ -942,7 +942,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '600', color: '#475569', marginBottom: '0.3rem' }}>
-                    Trục tung Y (Y-axis):
+                    Trục tung (Trục Y trên đồ thị):
                   </label>
                   <select
                     className="input-field"
@@ -1452,7 +1452,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                 {canonical.surfaceNature === 'maximum' ? 'Cực đại (Maximum)' :
                  canonical.surfaceNature === 'minimum' ? 'Cực tiểu (Minimum)' :
                  canonical.surfaceNature === 'saddle' ? 'Điểm yên ngựa (Saddle Point)' :
-                 'Sống trâu (Ridge Surface)'}
+                 'Dạng gờ bề mặt (Ridge Surface)'}
               </span>
             </div>
 
@@ -1491,7 +1491,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                 {canonical.surfaceNature === 'maximum' && 'Đỉnh đáp ứng - tất cả λᵢ < 0'}
                 {canonical.surfaceNature === 'minimum' && 'Đáy trũng - tất cả λᵢ > 0'}
                 {canonical.surfaceNature === 'saddle' && 'Yên ngựa - tồn tại λᵢ > 0 và λⱼ < 0'}
-                {canonical.surfaceNature === 'ridge' && 'Sống trâu - có λᵢ tiệm cận 0'}
+                {canonical.surfaceNature === 'ridge' && 'Dạng gờ bề mặt (Ridge System) - có trị riêng λᵢ tiệm cận 0'}
               </div>
               <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
                 Dựa trên dấu của các trị riêng ma trận Hessian B
@@ -1596,7 +1596,7 @@ export const ResponseSurfaceTab: React.FC<ResponseSurfaceTabProps> = ({
                           ) : Math.abs(lambda) < 1e-3 ? (
                             <span style={{ color: '#64748b' }}>Tiệm cận phẳng (Ridge)</span>
                           ) : (
-                            <span style={{ color: '#475569' }}>{lambda < 0 ? 'Dốc úp' : 'Dốc ngửa'}</span>
+                            <span style={{ color: '#475569' }}>{lambda < 0 ? 'Mặt lồi (Dốc xuống)' : 'Mặt lõm (Dốc lên)'}</span>
                           )}
                         </td>
                         <td className="font-mono" style={{ padding: '0.4rem 0.75rem', fontSize: '0.72rem', color: '#475569' }}>
