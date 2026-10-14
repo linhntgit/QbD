@@ -405,7 +405,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({
               Xác định các đặc tính chất lượng của sản phẩm thuốc để đảm bảo độ an toàn và hiệu quả điều trị mong muốn.
             </p>
           </div>
-          <button onClick={handleAddQTPP} className="btn btn-teal" style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}>
+          <button onClick={handleAddQTPP} className="btn btn-teal" style={{ fontSize: '0.8rem', padding: '0.38rem 0.8rem', whiteSpace: 'nowrap', flexShrink: 0 }}>
             <Plus size={15} />
             <span>Thêm yếu tố QTPP</span>
           </button>
@@ -481,7 +481,7 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({
               Hỗ trợ cả biến đầu ra Định lượng (Quantitative liên tục/rời rạc) và Định tính (Qualitative Đạt/Không đạt, Xếp hạng).
             </p>
           </div>
-          <button onClick={handleAddCQA} className="btn btn-primary" style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}>
+          <button onClick={handleAddCQA} className="btn btn-primary" style={{ fontSize: '0.8rem', padding: '0.38rem 0.8rem', whiteSpace: 'nowrap', flexShrink: 0 }}>
             <Plus size={15} />
             <span>Thêm CQA (Biến đáp ứng Y)</span>
           </button>
@@ -645,23 +645,51 @@ export const QTPPTab: React.FC<QTPPTabProps> = ({
         </div>
       </div>
 
-      {/* 3. Input Factors Section (CMAs & CPPs) - Enhanced with Quantitative/Qualitative & Controllability */}
+      {/* 3. Input Factors Section (CMAs & CPPs) */}
       <div className="qbd-card">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Sliders size={19} color="#b45309" />
-              <h2 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#0f172a' }}>
-                3. Các thông số đầu vào khảo sát (Yếu tố khảo sát: CMA &amp; CPP)
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
+          <div style={{ flex: '1 1 520px', minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <Sliders size={20} color="#b45309" />
+              <h2 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
+                3. Thuộc tính nguyên liệu &amp; Thông số quy trình (CMAs &amp; CPPs)
               </h2>
+              <span className="badge" style={{ backgroundColor: '#fef3c7', color: '#92400e', fontSize: '0.72rem', fontWeight: '700', padding: '0.15rem 0.5rem' }}>
+                Biến đầu vào X
+              </span>
             </div>
-            <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.2rem' }}>
-              Phân loại rõ ràng: <strong>Định lượng (Quantitative) / Nhiều mức / Định tính (Qualitative)</strong> và Khả năng kiểm soát: <strong>Kiểm soát được (🎯 Control) / Yếu tố nhiễu môi trường (🌪️ Noise) / Thông số cố định (🔒 Constant)</strong>.
+            <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.25rem', marginBottom: '0.45rem', lineHeight: 1.45 }}>
+              Xác định các biến công thức (CMA) và quy trình (CPP), thiết lập khoảng khảo sát và phân loại khả năng kiểm soát trong DoE.
             </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', fontSize: '0.72rem' }}>
+              <span style={{ color: '#475569', fontWeight: '600' }}>Kiểu dữ liệu:</span>
+              <span className="badge" style={{ backgroundColor: '#f1f5f9', color: '#334155', border: '1px solid #e2e8f0', fontSize: '0.7rem' }}>Định lượng</span>
+              <span className="badge" style={{ backgroundColor: '#f1f5f9', color: '#334155', border: '1px solid #e2e8f0', fontSize: '0.7rem' }}>Nhiều mức</span>
+              <span className="badge" style={{ backgroundColor: '#f1f5f9', color: '#334155', border: '1px solid #e2e8f0', fontSize: '0.7rem' }}>Định tính</span>
+              <span style={{ color: '#cbd5e1', margin: '0 0.15rem' }}>•</span>
+              <span style={{ color: '#475569', fontWeight: '600' }}>Kiểm soát:</span>
+              <span className="badge" style={{ backgroundColor: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', fontSize: '0.7rem' }}>🎯 Kiểm soát được</span>
+              <span className="badge" style={{ backgroundColor: '#f8fafc', color: '#475569', border: '1px solid #cbd5e1', fontSize: '0.7rem' }}>🌪️ Nhiễu</span>
+              <span className="badge" style={{ backgroundColor: '#fffbeb', color: '#92400e', border: '1px solid #fde68a', fontSize: '0.7rem' }}>🔒 Cố định</span>
+            </div>
           </div>
-          <button onClick={handleAddFactor} className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}>
+          <button
+            type="button"
+            onClick={handleAddFactor}
+            className="btn btn-amber"
+            style={{
+              fontSize: '0.8rem',
+              fontWeight: '600',
+              padding: '0.42rem 0.85rem',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+            }}
+          >
             <Plus size={15} />
-            <span>Thêm thông số / Yếu tố (X)</span>
+            <span>Thêm yếu tố đầu vào (X)</span>
           </button>
         </div>
 

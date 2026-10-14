@@ -218,6 +218,14 @@ body {
   background-color: #0f766e;
 }
 
+.btn-amber {
+  background-color: #b45309;
+  color: #ffffff;
+}
+.btn-amber:hover {
+  background-color: #92400e;
+}
+
 .btn-danger {
   background-color: #dc2626;
   color: #ffffff;
