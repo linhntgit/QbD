@@ -1164,14 +1164,14 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
       },
       legend: {
         orientation: 'h',
-        x: 0,
-        y: 1.08,
-        xanchor: 'left',
+        x: 0.5,
+        y: 1.02,
+        xanchor: 'center',
         yanchor: 'bottom',
-        font: { size: 10.5, family: 'Inter, sans-serif' },
+        font: { size: 10, family: 'Inter, sans-serif' },
       },
       annotations: [],
-      margin: { l: 85, r: 40, t: 65, b: 75, pad: 4 },
+      margin: { l: 85, r: 40, t: 125, b: 75, pad: 4 },
     };
   }, [overlayMode, ternaryDS, factorX, factorY, sweetSpotGrid, boundaryMode, probThreshold]);
 
@@ -1967,7 +1967,7 @@ export const DesignSpaceTab: React.FC<DesignSpaceTabProps> = ({
           )}
 
           {/* Plotly Canvas */}
-          <div style={{ height: overlayMode === 'ternary' ? '680px' : '560px', width: '100%' }}>
+          <div style={{ height: overlayMode === 'ternary' ? '680px' : '580px', width: '100%' }}>
             <PlotlyChart data={overlayPlotData} layout={overlayLayout} style={{ width: '100%', height: '100%' }} />
           </div>
         </div>

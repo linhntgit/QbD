@@ -34,7 +34,7 @@ const SCALE_TRACE_TYPES = new Set([
 ]);
 
 const wrapPlotlyText = (value: string, maxLineLength: number) => {
-  if (!value || value.includes('<br>') || value.length <= maxLineLength) return value;
+  if (!value || value.includes('<br>') || value.length <= maxLineLength + 6) return value;
 
   // Nếu tiêu đề có dấu gạch ngang phân tách ngữ nghĩa ' — ', ưu tiên ngắt dòng tại đó
   if (value.includes(' — ')) {
@@ -48,18 +48,32 @@ const wrapPlotlyText = (value: string, maxLineLength: number) => {
     }
   }
 
+  // Nếu tiêu đề có dấu hai chấm ': ' (ví dụ 'Đường đồng mức 2D: ...' hoặc 'Mặt đáp ứng 3D: ...'), ưu tiên ngắt dòng tại đó nếu câu dài
+  if (value.includes(': ') && value.length > maxLineLength) {
+    const colonIdx = value.indexOf(': ');
+    const part1 = value.slice(0, colonIdx + 1).trim();
+    const part2 = value.slice(colonIdx + 2).trim();
+    if (part1.length <= maxLineLength && part2.length <= maxLineLength + 14) {
+      return `${part1}<br>${part2}`;
+    }
+  }
+
   const words = value.split(/\s+/);
   const lines: string[] = [];
   let line = '';
-  words.forEach((word) => {
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
     const candidate = line ? `${line} ${word}` : word;
-    if (line && candidate.length > maxLineLength) {
+    // Không bẻ dòng nếu từ cuối cùng là đơn vị đo / token ngắn (<= 8 ký tự như [%], [mg], (Y1), v.v.) và chỉ vượt maxLineLength một chút
+    const isLastWord = i === words.length - 1;
+    const isShortOrphan = isLastWord && word.length <= 8;
+    if (line && candidate.length > maxLineLength && !(isShortOrphan && candidate.length <= maxLineLength + 12)) {
       lines.push(line);
       line = word;
     } else {
       line = candidate;
     }
-  });
+  }
   if (line) lines.push(line);
   return lines.join('<br>');
 };
@@ -200,7 +214,13 @@ function normaliseChart(data: any[], layout: any, compact = false) {
     r: Math.max(margin.r ?? 0, hasColorbar ? (compact ? 90 : 115) : compact ? 25 : 35),
     t: Math.max(
       margin.t ?? 0,
-      isTopLegend ? (compact ? 98 : 96) : hasTitle ? (compact ? 72 : 80) : compact ? 45 : 55
+      isTopLegend && hasTitle
+        ? (compact ? 122 : 128)
+        : isTopLegend
+        ? (compact ? 98 : 96)
+        : hasTitle
+        ? (compact ? 72 : 80)
+        : compact ? 45 : 55
     ),
     b: Math.max(margin.b ?? 0, isBottomLegend ? (compact ? 85 : 92) : compact ? 55 : 68),
     pad: Math.max(margin.pad ?? 0, compact ? 2 : 4),
@@ -219,7 +239,16 @@ function normaliseChart(data: any[], layout: any, compact = false) {
     computedMargin = {
       l: Math.max(margin.l ?? 0, compact ? 25 : 35),
       r: Math.max(margin.r ?? 0, hasColorbar ? (compact ? 70 : 85) : compact ? 20 : 35),
-      t: Math.max(margin.t ?? 0, isTopLegend ? (compact ? 94 : 90) : hasTitle ? (compact ? 62 : 72) : compact ? 45 : 55),
+      t: Math.max(
+        margin.t ?? 0,
+        isTopLegend && hasTitle
+          ? (compact ? 118 : 124)
+          : isTopLegend
+          ? (compact ? 94 : 90)
+          : hasTitle
+          ? (compact ? 62 : 72)
+          : compact ? 45 : 55
+      ),
       b: Math.max(margin.b ?? 0, isBottomLegend ? (compact ? 75 : 85) : compact ? 30 : 40),
       pad: Math.max(margin.pad ?? 0, 2),
     };
@@ -227,7 +256,16 @@ function normaliseChart(data: any[], layout: any, compact = false) {
     computedMargin = {
       l: Math.max(margin.l ?? 0, compact ? 25 : 35),
       r: Math.max(margin.r ?? 0, hasColorbar ? (compact ? 75 : 95) : compact ? 20 : 35),
-      t: Math.max(margin.t ?? 0, isTopLegend ? (compact ? 94 : 90) : hasTitle ? (compact ? 72 : 80) : compact ? 55 : 65),
+      t: Math.max(
+        margin.t ?? 0,
+        isTopLegend && hasTitle
+          ? (compact ? 118 : 124)
+          : isTopLegend
+          ? (compact ? 94 : 90)
+          : hasTitle
+          ? (compact ? 72 : 80)
+          : compact ? 55 : 65
+      ),
       b: Math.max(margin.b ?? 0, isBottomLegend ? (compact ? 80 : 88) : compact ? 55 : 65),
       pad: Math.max(margin.pad ?? 0, 2),
     };
@@ -248,10 +286,10 @@ function normaliseChart(data: any[], layout: any, compact = false) {
     margin: computedMargin,
     title: layout.title
       ? {
-          ...mergeTitle(layout.title, compact ? 13 : 15, compact ? 42 : 62),
+          ...mergeTitle(layout.title, compact ? 12.5 : 14, compact ? 56 : 68),
           x: layout.title?.x ?? (hasColorbar ? (compact ? 0.44 : 0.46) : 0.5),
           xanchor: layout.title?.xanchor || 'center',
-          y: layout.title?.y ?? (isSmallChart ? (compact ? 0.97 : 0.98) : compact ? 0.95 : 0.96),
+          y: layout.title?.y ?? (isSmallChart ? (compact ? 0.97 : 0.98) : isTopLegend ? (compact ? 0.985 : 0.98) : (compact ? 0.95 : 0.96)),
           yanchor: layout.title?.yanchor || 'top',
           yref: layout.title?.yref || 'container',
           pad: { t: 6, b: 4, ...(typeof layout.title === 'object' ? layout.title?.pad || {} : {}) },
@@ -269,10 +307,12 @@ function normaliseChart(data: any[], layout: any, compact = false) {
           yanchor: 'bottom',
           ...(layout.legend || {}),
           x: layout.legend?.x ?? (hasColorbar ? (compact ? 0.44 : 0.46) : 0.5),
-          y: layout.legend?.y ?? (layout.title ? (compact ? 1.002 : 1.005) : 1.005),
+          y: isTopLegend && hasTitle
+            ? Math.min(layout.legend?.y ?? 1.01, 1.02)
+            : (layout.legend?.y ?? (layout.title ? (compact ? 1.002 : 1.005) : 1.005)),
           font: {
             family: SCIENTIFIC_FONT,
-            size: compact ? 9.5 : 10.5,
+            size: compact ? 9 : 10,
             color: INK,
             ...(layout.legend?.font || {}),
           },
